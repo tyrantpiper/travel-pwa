@@ -44,7 +44,9 @@ export function ProfileView() {
     useEffect(() => {
         const name = localStorage.getItem("user_nickname")
         const avatar = localStorage.getItem("user_avatar")
-        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key")
+        // Check localStorage and DEV key
+        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
+        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
 
         setProfile(prev => ({
             ...prev,
@@ -53,10 +55,10 @@ export function ProfileView() {
         }))
 
         if (storedKey) {
-            setApiKey(storedKey)
+            setApiKey(devKey ? "(開發者模式)" : storedKey)
             setHasApiKey(true)
-            // Migrate old key name to new key name
-            if (!localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
+            // Migrate old key name to new key name (only for non-dev keys)
+            if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
                 localStorage.setItem("user_gemini_key", storedKey)
                 localStorage.removeItem("gemini_api_key")
             }
