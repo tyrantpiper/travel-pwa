@@ -203,9 +203,9 @@ export function ItineraryView() {
         setIsLocSearching(true)
         try {
             const encodedName = encodeURIComponent(newLocName.trim())
-            // 使用 OpenStreetMap Nominatim API 獲取更精確的 POI 資料
+            // 使用 OpenStreetMap Nominatim API - 增加 limit 和 extratags 獲取更多資訊
             const geoRes = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodedName}&format=json&addressdetails=1&limit=8&accept-language=zh-TW,zh,en`,
+                `https://nominatim.openstreetmap.org/search?q=${encodedName}&format=json&addressdetails=1&extratags=1&namedetails=1&limit=15&accept-language=zh-TW,ja,en`,
                 { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
             )
             const geoData = await geoRes.json()
@@ -213,20 +213,26 @@ export function ItineraryView() {
                 toast.warning("找不到此地點，請嘗試其他關鍵字")
                 setLocSearchResults([])
             } else {
-                // 轉換成統一格式
-                const results = geoData.map((item: any) => ({
-                    name: item.name || item.display_name.split(',')[0],
-                    display_name: item.display_name,
-                    latitude: parseFloat(item.lat),
-                    longitude: parseFloat(item.lon),
-                    type: item.type,
-                    class: item.class,
-                    address: item.address,
-                    // 組合行政區資訊
-                    admin1: item.address?.state || item.address?.province || '',
-                    admin2: item.address?.city || item.address?.county || item.address?.suburb || '',
-                    country: item.address?.country || ''
-                }))
+                // 轉換成統一格式，並依 importance 排序（高的在前）
+                const results = geoData
+                    .map((item: any) => ({
+                        name: item.name || item.display_name.split(',')[0],
+                        display_name: item.display_name,
+                        latitude: parseFloat(item.lat),
+                        longitude: parseFloat(item.lon),
+                        type: item.type,
+                        class: item.class,
+                        address: item.address,
+                        importance: item.importance || 0,
+                        // 組合行政區資訊
+                        admin1: item.address?.state || item.address?.province || '',
+                        admin2: item.address?.city || item.address?.county || item.address?.suburb || '',
+                        country: item.address?.country || ''
+                    }))
+                    // 按 importance 排序（重要性高的 POI 在前）
+                    .sort((a: any, b: any) => b.importance - a.importance)
+                    // 只取前 8 個
+                    .slice(0, 8)
                 setLocSearchResults(results)
             }
         } catch (e) { toast.error("搜尋失敗") }
