@@ -1,0 +1,11 @@
+# Docker 建置時忽略的檔案
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.local
+.git/
+.gitignore
+*.md
+seed_trip.py
+_append_code.py

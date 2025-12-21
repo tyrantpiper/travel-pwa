@@ -1,0 +1,1309 @@
+import os
+import json
+import random
+import string
+from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Any
+from supabase import create_client, Client
+import google.generativeai as genai
+import httpx  # For async HTTP requests (geocoding)
+from dotenv import load_dotenv
+
+# 1. 載入環境變數 (只讀 Supabase)
+load_dotenv()
+
+app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
+
+# 2. CORS 設定 (開發環境允許所有來源)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 開發環境允許所有來源
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. 初始化 Supabase
+try:
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"⚠️ Supabase Warning: {e}")
+
+# --- AI 模型設定區 (2.5 版混合動力引擎) ---
+# 1. 主力模型 (支援 Maps, 500 RPD)
+PRIMARY_MODEL = "gemini-2.5-flash"
+
+# 2. 輕量模型 (支援 Maps, 500 RPD)
+LITE_MODEL = "gemini-2.5-flash-lite"
+
+# 3. 智力模型 (無工具, 無 RPD 限制, 速度快)
+SMART_NO_TOOL_MODEL = "gemini-3-flash-preview"
+
+# --- AI 服務函式 (包含降級機制) ---
+async def call_ai_parser(api_key: str, prompt: str, use_tools: bool = True):
+    """
+    智能 AI 調用函數，支持自動降級
+    
+    Args:
+        api_key: Gemini API Key
+        prompt: 提示詞
+        use_tools: 是否嘗試使用 Google Maps 工具
+    
+    Returns:
+        str: AI 生成的文本
+    """
+    genai.configure(api_key=api_key)
+    
+    # 策略 A: 優先使用支援 Maps 的主力模型
+    if use_tools:
+        try:
+            print(f"🤖 嘗試使用 {PRIMARY_MODEL} (含 Maps 工具)...")
+            # 設定工具：這裡啟用 Google Maps 以獲取精準經緯度
+            tools = ['google_maps_source']
+            model = genai.GenerativeModel(PRIMARY_MODEL, tools=tools)
+            
+            response = model.generate_content(prompt)
+            print(f"✅ {PRIMARY_MODEL} 成功回應")
+            return response.text
+            
+        except Exception as e:
+            print(f"⚠️ {PRIMARY_MODEL} 失敗或配額用盡: {e}")
+            # 策略 B: 降級到 Lite 模型 (同樣支援 Maps)
+            try:
+                print(f"🤖 切換至備用模型 {LITE_MODEL}...")
+                model = genai.GenerativeModel(LITE_MODEL, tools=tools)
+                response = model.generate_content(prompt)
+                print(f"✅ {LITE_MODEL} 成功回應")
+                return response.text
+            except Exception as e2:
+                print(f"⚠️ {LITE_MODEL} 也失敗: {e2}, 放棄工具模式")
+                # 繼續往下走，放棄工具，改用純文字模式
+                
+    # 策略 C: 放棄工具，使用最聰明的純文字模型 (無 RPD 限制)
+    # 雖然沒有精準座標，但至少能解析出文字結構
+    print(f"🤖 切換至純文字模式 {SMART_NO_TOOL_MODEL}...")
+    model = genai.GenerativeModel(SMART_NO_TOOL_MODEL)  # 不加 tools
+    response = model.generate_content(prompt)
+    print(f"✅ {SMART_NO_TOOL_MODEL} 成功回應")
+    return response.text
+
+# --- 資料模型 ---
+class UserPreferences(BaseModel):
+    destination: str
+    days: int
+    budget: str
+    interests: List[str]
+
+# 接收 Markdown 的模型
+class MarkdownImportRequest(BaseModel):
+    markdown_text: str
+    itinerary_id: Optional[str] = None # 如果是要匯入到現有行程
+
+# 新增：生成請求模型
+class GenerateTripRequest(BaseModel):
+    origin: str
+    destination: str
+    days: int
+    interests: str
+
+# --- 嚴謹的依賴注入 (Dependency Injection) ---
+# 🔒 完全 BYOK 模式：使用者必須自己提供 API Key
+
+async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key")):
+    """ 
+    強制 BYOK (Bring Your Own Key) 模式
+    使用者必須在 Header 中提供有效的 Gemini API Key
+    """
+    # 調試日誌
+    if x_gemini_api_key:
+        print(f"🔑 收到 API Key: {x_gemini_api_key[:10]}... (長度: {len(x_gemini_api_key)})")
+    
+    # 🚫 沒有 Key 或格式不對，直接拒絕
+    if not x_gemini_api_key or len(x_gemini_api_key) < 39:
+        print(f"❌ API Key 驗證失敗：未提供或格式無效")
+        raise HTTPException(
+            status_code=401, 
+            detail="請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)"
+        )
+    
+    return x_gemini_api_key
+
+# --- API 路由 ---
+@app.get("/")
+def health_check():
+    return {"status": "Alive", "mode": "BYOK"}
+
+@app.post("/api/plan")
+async def generate_itinerary(
+    prefs: UserPreferences, 
+    api_key: str = Depends(get_gemini_key) # 自動從 Header 抓 Key
+):
+    print(f"💊 收到處方需求: 去 {prefs.destination}")
+    
+    try:
+        # 動態設定 Key (只針對這次請求有效)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+        
+        prompt = f"""
+        你是 Ryan，一位幽默的藥師兼旅遊達人。請為我規劃 {prefs.destination} 的 {prefs.days} 天行程。
+        風格：日式極簡。預算：{prefs.budget}。興趣：{', '.join(prefs.interests)}。
+        請回傳純 JSON 格式 (不要 Markdown)：
+        {{
+            "title": "行程標題",
+            "days": [
+                {{
+                    "day": 1,
+                    "activities": [
+                        {{ "time": "10:00", "place": "地點", "category": "sightseeing", "desc": "簡介" }}
+                    ]
+                }}
+            ]
+        }}
+        """
+        
+        response = model.generate_content(prompt)
+        text = response.text.replace("```json", "").replace("```", "").strip()
+        return json.loads(text)
+        
+    except Exception as e:
+        print(f"🔥 AI Error: {e}")
+        raise HTTPException(status_code=400, detail=f"AI Service Error: {str(e)}")
+
+# 🌍 地理編碼輔助函數 (使用 OpenStreetMap Nominatim API 獲取精確 POI 資料)
+async def geocode_place(place_name: str):
+    """使用 OpenStreetMap Nominatim API 獲取地點座標"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": place_name, 
+                    "format": "json", 
+                    "limit": 1,
+                    "accept-language": "zh-TW,zh,en"
+                },
+                headers={"User-Agent": "RyanTravelApp/1.0"}
+            )
+            data = res.json()
+            if data and len(data) > 0:
+                result = data[0]
+                return {"lat": float(result["lat"]), "lng": float(result["lon"])}
+    except Exception as e:
+        print(f"🌍 Geocode error for '{place_name}': {e}")
+    return None
+
+# 🔥 Markdown 消化系統 (2.5 版混合動力)
+@app.post("/api/parse-md")
+async def parse_markdown(
+    request: MarkdownImportRequest,
+    api_key: str = Depends(get_gemini_key)
+):
+    print("📝 收到 Markdown 匯入請求...")
+    
+    try:
+        # 修改 Prompt，明確告知 AI 如果有工具就用，沒工具就估算
+        prompt = f"""
+        你是一個專業的旅遊資料分析師。請「完整」分析 Markdown 行程表，轉換為結構化 JSON。
+        ⚠️ 重要：請勿遺漏任何表格、注意事項、花費、票券資訊！
+        
+        Markdown 內容：
+        {request.markdown_text}
+
+        任務：
+        1. **解析詳細行程 (items)**
+           - 每個時間點的活動都要抓取
+        
+        2. **關鍵：連結優先 (Link Priority)**
+           - 如果 Markdown 中的地點有超連結 (例如 `[地點名](https://maps...)`)，請務必將該網址提取到 `link_url` 欄位
+           - 這是最高優先級的導航依據
+        
+        3. **關鍵：地理資訊 (Location)**
+           - 即使有連結，還是請提供 `lat`, `lng` 作為地圖標記備用
+           - 如果是「飛機上」、「家中」，lat/lng 請給 null
+           - `place_name` 請使用「Google Maps 上的正式店名」
+        
+        4. **關鍵：附屬表格 (Sub Items)**
+           - 請精準抓取行程下方的表格 (如超市排名)，解析為 `sub_items`
+           - `sub_items` 格式: {{ "name": "店名", "desc": "特色/說明", "link": "連結" }}
+        
+        5. **🆕 關鍵：每日注意事項 (Day Notes)**
+           - 抓取「注意事項」表格，包含重點提醒如入境時間、交通轉乘、出站指引等
+           - 格式: `day_notes`: {{ "day_number": [ {{ "icon": "⚠️", "title": "標題", "content": "內容" }} ] }}
+        
+        6. **🆕 關鍵：每日預估花費 (Day Costs)**
+           - 抓取「預估花費」表格的每個項目和金額
+           - 格式: `day_costs`: {{ "day_number": [ {{ "item": "交通", "amount": "¥1,200", "note": "備註" }} ] }}
+        
+        7. **🆕 關鍵：交通票券 (Day Tickets)**
+           - 抓取「交通票券」區塊的票券資訊
+           - 格式: `day_tickets`: {{ "day_number": [ {{ "name": "京成 ACCESS特急", "price": "¥1,200", "note": "單程，刷 IC" }} ] }}
+        
+        8. 每日主要城市 (daily_locations): 判斷每一天的主要城市中心點
+        
+        9. 分類 category 請用小寫英文:
+           - 'transport': 機場、車站、租車、搭車移動
+           - 'food': 餐廳、咖啡廳、超商、小吃
+           - 'hotel': 住宿、飯店、民宿
+           - 'shopping': 購物中心、商店街、藥妝店
+           - 'sightseeing': 景點、神社、公園
+        
+        10. 如果有 "必吃"、"預約"、"推薦" 等關鍵字，放入 tags 陣列
+        
+        11. **日期解析**
+            - 從 Markdown 中找出開始日期和結束日期
+            - 「Day 1 (2/2)」→ start_date: "2026-02-02"
+            - 沒有年份則預設 2026 年
+        
+        12. **行程標題**
+            - 從 Markdown 標題推斷行程名稱
+
+        回傳 JSON 格式範例:
+        {{
+            "title": "2026 東京×橫濱 15日遊",
+            "start_date": "2026-02-02",
+            "end_date": "2026-02-16",
+            "items": [
+                {{ 
+                    "day_number": 1, 
+                    "time_slot": "10:00", 
+                    "place_name": "三谷ビル", 
+                    "category": "hotel",
+                    "desc": "民宿 Check-in...",
+                    "lat": 35.123, 
+                    "lng": 139.123,
+                    "original_name": "", 
+                    "tags": ["預約"], 
+                    "cost_amount": 0, 
+                    "reservation_code": "",
+                    "link_url": "https://maps.google.com/...",
+                    "sub_items": []
+                }}
+            ],
+            "daily_locations": {{
+                "1": {{ "name": "東京", "lat": 35.6895, "lng": 139.6917 }}
+            }},
+            "day_notes": {{
+                "1": [
+                    {{ "icon": "✈️", "title": "機場入境", "content": "成田機場入境約需 1.5-2 小時" }},
+                    {{ "icon": "🚇", "title": "ACCESS特急", "content": "搭 ACCESS特急直達押上，車程 58 分" }}
+                ]
+            }},
+            "day_costs": {{
+                "1": [
+                    {{ "item": "交通", "amount": "¥1,200", "note": "" }},
+                    {{ "item": "宵夜", "amount": "¥1,000-2,000", "note": "" }}
+                ]
+            }},
+            "day_tickets": {{
+                "1": [
+                    {{ "name": "京成 ACCESS特急", "price": "¥1,200", "note": "單程，刷 IC" }}
+                ]
+            }}
+        }}
+        
+        只回傳 JSON，不要 Markdown 標記。請確保所有表格資訊都被解析到！
+        """
+        
+        # 呼叫智能 AI 服務函式（會自動降級）
+        raw_text = await call_ai_parser(api_key, prompt, use_tools=True)
+        
+        # 清理回傳的文字 (去除 ```json 等標記)
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        parsed_data = json.loads(cleaned_text)
+        
+        # parsed_data 現在是 { "items": [...], "daily_locations": {...} }
+        items = parsed_data.get("items", [])
+        
+        # 🌍 自動為沒有座標的地點做地理編碼
+        if items:
+            print(f"🌍 開始地理編碼 {len(items)} 個地點...")
+            geocoded_count = 0
+            for item in items:
+                place = item.get("place_name", "")
+                if place and not item.get("lat"):
+                    coords = await geocode_place(place)
+                    if coords:
+                        item["lat"] = coords["lat"]
+                        item["lng"] = coords["lng"]
+                        geocoded_count += 1
+            print(f"✅ 成功地理編碼 {geocoded_count} 個地點")
+        
+        return {
+            "status": "success",
+            "title": parsed_data.get("title", "New Trip"),
+            "start_date": parsed_data.get("start_date"),
+            "end_date": parsed_data.get("end_date"),
+            "items": items,
+            "daily_locations": parsed_data.get("daily_locations", {}),
+            # 🆕 新增：每日注意事項、預估花費、交通票券
+            "day_notes": parsed_data.get("day_notes", {}),
+            "day_costs": parsed_data.get("day_costs", {}),
+            "day_tickets": parsed_data.get("day_tickets", {})
+        }
+        
+    except Exception as e:
+        print(f"🔥 Parsing Error: {e}")
+        raise HTTPException(status_code=400, detail=f"AI Parse Error: {str(e)}")
+
+
+# 🔥 AI 生成行程 API
+@app.post("/api/generate-trip")
+async def generate_trip(
+    request: GenerateTripRequest,
+    api_key: str = Depends(get_gemini_key)
+):
+    print(f"🤖 AI 生成請求: {request.destination} ({request.days}天)")
+    
+    try:
+        prompt = f"""
+        你是專業導遊。請為我規劃一個從 {request.origin} 出發，前往 {request.destination} 的 {request.days} 天行程。
+        
+        我的興趣重點：{request.interests}
+        
+        任務：
+        1. 規劃每日行程 (09:00 - 21:00)，路線要順暢。
+        2. **關鍵：地理資訊**
+           - 請使用 Google Maps 工具查詢每個地點的精準經緯度 (lat, lng)。
+           - 請提供地點的日文原名 (original_name)。
+        3. 詳細說明 (desc)：包含推薦理由、必吃必買。
+        4. 每日主要城市 (daily_locations)：判斷每天的住宿城市中心點。
+        5. 分類 (category)：務必使用 transport, food, sightseeing, shopping, hotel。
+
+        回傳 JSON 格式 (與 parse-md 格式一致):
+        {{
+            "items": [
+                {{ "day_number": 1, "time_slot": "10:00", "place_name": "...", "original_name": "...", "lat": ..., "lng": ..., "category": "sightseeing", "desc": "..." }}
+            ],
+            "daily_locations": {{
+                "1": {{ "name": "東京", "lat": 35.6895, "lng": 139.6917 }}
+            }}
+        }}
+        """
+        
+        # 呼叫我們之前寫好的 AI 服務函式 (支援 Maps 工具)
+        raw_text = await call_ai_parser(api_key, prompt, use_tools=True)
+        
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        parsed_data = json.loads(cleaned_text)
+        
+        return {"status": "success", "data": parsed_data}
+        
+    except Exception as e:
+        print(f"🔥 Gen Error: {e}")
+        raise HTTPException(status_code=400, detail=f"生成失敗: {str(e)}")
+
+
+# 簡化的 AI 生成請求 (只接受 prompt)
+class SimplePromptRequest(BaseModel):
+    prompt: str
+
+# 🔥 簡化版 AI 生成 API (接受自由 prompt)
+@app.post("/api/ai-generate")
+async def ai_generate(
+    request: SimplePromptRequest,
+    api_key: str = Depends(get_gemini_key)
+):
+    print(f"🤖 AI 簡易生成請求: {request.prompt[:50]}...")
+    
+    try:
+        prompt = f"""
+        你是專業導遊。使用者請求：{request.prompt}
+        
+        ⚠️ 重要規則：
+        1. 如果使用者指定了天數（如"5天"、"五日"），你必須**嚴格遵守**，不可多也不可少
+        2. day_number 從 1 開始，最大值等於使用者指定的天數
+        3. 如果使用者沒有指定天數，預設規劃 3 天
+        
+        任務：
+        1. 根據使用者的描述，規劃合適的行程
+        2. 每日行程時間 (09:00 - 21:00)，路線順暢
+        3. 詳細說明 (desc)：包含推薦理由
+        4. 分類 (category)：務必使用 transport, food, sightseeing, shopping, hotel
+        
+        回傳 JSON 格式：
+        {{
+            "title": "行程標題",
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-05",  // end_date = start_date + (天數-1)
+            "items": [
+                {{ "day_number": 1, "time_slot": "10:00", "place_name": "...", "category": "sightseeing", "desc": "..." }}
+            ]
+        }}
+        
+        ⚠️ 再次提醒：day_number 不可超過使用者指定的天數！
+        """
+        
+        raw_text = await call_ai_parser(api_key, prompt, use_tools=False)
+        
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        parsed_data = json.loads(cleaned_text)
+        
+        # 🌍 自動為每個地點查詢經緯度
+        if "items" in parsed_data:
+            print(f"🌍 開始地理編碼 {len(parsed_data['items'])} 個地點...")
+            geocoded_count = 0
+            for item in parsed_data["items"]:
+                place = item.get("place_name", "")
+                if place and not item.get("lat"):
+                    coords = await geocode_place(place)
+                    if coords:
+                        item["lat"] = coords["lat"]
+                        item["lng"] = coords["lng"]
+                        geocoded_count += 1
+            print(f"✅ 成功地理編碼 {geocoded_count} 個地點")
+        
+        return parsed_data
+        
+    except Exception as e:
+        print(f"🔥 AI Gen Error: {e}")
+        raise HTTPException(status_code=400, detail=f"生成失敗: {str(e)}")
+
+
+# --- 新增：存檔 API 需要的資料模型 ---
+class ItineraryItem(BaseModel):
+    day_number: int
+    time_slot: str
+    place_name: str
+    original_name: Optional[str] = None
+    category: str
+    desc: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    cost_amount: Optional[float] = 0
+    tags: Optional[List[str]] = []  # 新增：標籤
+    reservation_code: Optional[str] = ""  # 新增：預約代碼
+    # 👇 新增：用來存表格資料 (例如超市列表)
+    sub_items: List[dict] = []
+    # 👇 新增：使用者提供的連結
+    link_url: Optional[str] = None
+
+class SaveItineraryRequest(BaseModel):
+    title: str
+    creator_name: str
+    user_id: str
+    items: List[ItineraryItem]
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    daily_locations: Optional[dict] = {}
+    # 👇 新增：每日貼士資訊
+    day_notes: Optional[dict] = {}
+    day_costs: Optional[dict] = {}
+    day_tickets: Optional[dict] = {}
+
+class JoinTripRequest(BaseModel):
+    share_code: str
+    user_id: str
+    user_name: str
+
+# 新增：手動建立行程的模型
+class CreateManualTripRequest(BaseModel):
+    title: str
+    start_date: str
+    end_date: str
+    creator_name: str
+    user_id: str
+    cover_image: Optional[str] = None
+
+# 新增：更新項目模型
+class UpdateItemRequest(BaseModel):
+    time_slot: Optional[str] = None
+    place_name: Optional[str] = None
+    notes: Optional[str] = None
+    cost_amount: Optional[float] = 0
+    # 👇 座標欄位
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    # 👇 備忘錄欄位
+    memo: Optional[str] = None
+    # 👇 新增：連結列表 (sub_items)
+    sub_items: Optional[List[dict]] = None
+    # 👇 新增：圖片網址
+    image_url: Optional[str] = None
+
+# 新增：單筆行程新增模型
+class CreateItemRequest(BaseModel):
+    itinerary_id: str
+    day_number: int
+    time_slot: str
+    place_name: str
+    category: str
+    notes: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+# 產生 4 位數房間代碼
+def generate_room_code():
+    return ''.join(random.choices(string.digits, k=4))
+
+# 🔥 功能 3: 儲存行程到資料庫
+@app.post("/api/save-itinerary")
+async def save_itinerary(request: SaveItineraryRequest):
+    print(f"💾 正在儲存行程: {request.title}...")
+    print(f"   創建者: {request.creator_name}")
+    print(f"   User ID: {request.user_id}")
+    print(f"   項目數量: {len(request.items)}")
+    
+    try:
+        # 1. 產生房間號
+        room_code = generate_room_code()
+        
+        # 2. 建立主行程 (Parent) - 將每日資訊存入 content
+        trip_data = {
+            "title": request.title,
+            "creator_name": request.creator_name,
+            "created_by": request.user_id,
+            "share_code": room_code,
+            "start_date": request.start_date or "2026-01-01",
+            "end_date": request.end_date or "2026-01-15",
+            "status": "active",
+            # 👇 存入 JSONB 欄位: 包含 daily_locations 及新的 daily tips
+            "content": {
+                "daily_locations": request.daily_locations,
+                "day_notes": request.day_notes,
+                "day_costs": request.day_costs,
+                "day_tickets": request.day_tickets
+            }
+        }
+        
+        trip_res = supabase.table("itineraries").insert(trip_data).execute()
+        
+        if not trip_res.data:
+            raise HTTPException(status_code=500, detail="無法建立主行程")
+            
+        trip_id = trip_res.data[0]["id"]
+        print(f"✅ 主行程建立成功 ID: {trip_id}, 房間號: {room_code}")
+
+        # 3. 自動把創建者加入成員列表
+        member_data = {
+            "itinerary_id": trip_id,
+            "user_id": request.user_id,
+            "user_name": request.creator_name
+        }
+        supabase.table("trip_members").insert(member_data).execute()
+
+        # 4. 建立細項 (Children)
+        items_data = []
+        for item in request.items:
+            items_data.append({
+                "itinerary_id": trip_id,
+                "day_number": item.day_number,
+                "time_slot": item.time_slot,
+                "place_name": item.place_name,
+                "original_name": item.original_name,
+                "category": item.category,
+                "notes": item.desc,
+                "location_lat": item.lat,
+                "location_lng": item.lng,
+                "cost_amount": item.cost_amount,
+                "reservation_code": item.reservation_code,  # 新增
+                "tags": item.tags,  # 新增：需要 DB 有 tags (text[]) 欄位
+                # 👇 新增：儲存附屬表格
+                "sub_items": item.sub_items,
+                # 👇 新增：儲存使用者連結
+                "link_url": item.link_url
+            })
+            
+        # 批次寫入
+        if items_data:
+            print(f"   📦 準備插入 {len(items_data)} 個細項...")
+            try:
+                supabase.table("itinerary_items").insert(items_data).execute()
+                print(f"   ✅ 細項插入成功!")
+            except Exception as item_err:
+                print(f"   ❌ 細項插入失敗: {item_err}")
+                # 嘗試逐個插入以找出問題項目
+                for i, item in enumerate(items_data):
+                    try:
+                        supabase.table("itinerary_items").insert(item).execute()
+                        print(f"      ✅ Item {i+1} OK")
+                    except Exception as single_err:
+                        print(f"      ❌ Item {i+1} FAILED: {single_err}")
+                        print(f"         Data: {item}")
+                raise item_err
+            
+        return {"status": "success", "trip_id": trip_id, "share_code": room_code}
+
+    except Exception as e:
+        import traceback
+        print(f"🔥 Save Error: {e}")
+        print(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 3.1: 加入行程
+@app.post("/api/join-trip")
+async def join_trip(request: JoinTripRequest):
+    print(f"🚪 使用者 {request.user_name} 嘗試加入房間: {request.share_code}")
+    
+    try:
+        # 1. 找行程
+        trip_res = supabase.table("itineraries").select("id, title").eq("share_code", request.share_code).execute()
+        
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到此行程代碼")
+            
+        trip = trip_res.data[0]
+        print(f"✅ 找到行程: {trip['title']}")
+        
+        # 2. 加入成員 (如果已加入會報錯，我們用 try 接住忽略)
+        try:
+            supabase.table("trip_members").insert({
+                "itinerary_id": trip['id'],
+                "user_id": request.user_id,
+                "user_name": request.user_name
+            }).execute()
+            print(f"✅ 成功加入成員")
+        except Exception as member_err:
+            print(f"ℹ️ 使用者可能已經是成員: {member_err}")
+            pass  # 已經加入過就算了
+
+        return {"status": "success", "trip": trip}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Join Trip Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 3.2: 取得我參與的所有行程
+@app.get("/api/trips")
+async def get_trips(user_id: str = Header(None, alias="X-User-ID")):
+    """透過 Header 傳入 user_id，返回該使用者參與的所有行程"""
+    print(f"📋 查詢使用者 {user_id} 的所有行程")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="需要提供 X-User-ID Header")
+    
+    try:
+        # 這是 SQL 的 Join 概念：找出 trip_members 裡有我 user_id 的所有 itinerary
+        res = supabase.table("trip_members")\
+            .select("itinerary_id, itineraries(*)")\
+            .eq("user_id", user_id)\
+            .execute()
+            
+        # 整理資料結構
+        trips = []
+        for item in res.data:
+            if item.get('itineraries'):  # 確保關聯存在
+                trips.append(item['itineraries'])
+        
+        print(f"✅ 找到 {len(trips)} 個行程")
+        return trips
+        
+    except Exception as e:
+        print(f"🔥 Get Trips Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 3.3: 刪除整趟行程 (誠實版)
+@app.delete("/api/trips/{trip_id}")
+async def delete_trip(trip_id: str):
+    try:
+        print(f"🗑️ 嘗試刪除行程 ID: {trip_id}")
+        
+        # 1. 先刪除所有細項
+        supabase.table("itinerary_items").delete().eq("itinerary_id", trip_id).execute()
+        print("   ✅ 細項已刪除")
+        
+        # 2. 刪除所有成員關係
+        supabase.table("trip_members").delete().eq("itinerary_id", trip_id).execute()
+        print("   ✅ 成員關係已刪除")
+        
+        # 3. 最後刪除主行程
+        res = supabase.table("itineraries").delete().eq("id", trip_id).execute()
+        
+        # 關鍵檢查：如果 data 是空的，代表根本沒刪到東西
+        if not res.data:
+            print(f"❌ 刪除失敗：資料庫回傳空值 (ID: {trip_id})")
+            # 可能原因：ID 不存在，或是 RLS 權限擋住了
+            raise HTTPException(status_code=404, detail="刪除失敗：找不到該行程或無權限")
+        
+        print(f"   ✅ 主行程已刪除: {res.data}")
+        return {"status": "success", "message": "Trip deleted", "deleted_data": res.data}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Delete Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 3.4: 追加細項到現有行程
+class AppendItemsRequest(BaseModel):
+    items: List[ItineraryItem]
+
+@app.post("/api/trips/{trip_id}/items")
+async def append_items_to_trip(trip_id: str, request: AppendItemsRequest):
+    """將新的細項追加到現有行程"""
+    print(f"➕ 追加 {len(request.items)} 個細項到行程 {trip_id}")
+    
+    try:
+        # 1. 確認行程存在
+        trip_res = supabase.table("itineraries").select("id, title").eq("id", trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到此行程")
+        
+        print(f"   ✅ 找到行程: {trip_res.data[0]['title']}")
+        
+        # 2. 準備細項資料
+        items_data = []
+        for item in request.items:
+            items_data.append({
+                "itinerary_id": trip_id,
+                "day_number": item.day_number,
+                "time_slot": item.time_slot,
+                "place_name": item.place_name,
+                "original_name": item.original_name,
+                "category": item.category,
+                "notes": item.desc,
+                "location_lat": item.lat,
+                "location_lng": item.lng,
+                "cost_amount": item.cost_amount,
+                "reservation_code": item.reservation_code,
+                "tags": item.tags
+            })
+        
+        # 3. 批次寫入
+        if items_data:
+            supabase.table("itinerary_items").insert(items_data).execute()
+            print(f"   ✅ 已追加 {len(items_data)} 個細項")
+        
+        return {"status": "success", "added_count": len(items_data)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Append Items Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 4: 讀取最新行程 (給主畫面用)
+@app.get("/api/itinerary/latest")
+async def get_latest_itinerary():
+    try:
+        # 1. 抓最新的一個行程
+        trip_res = supabase.table("itineraries").select("*").order("created_at", desc=True).limit(1).execute()
+        
+        if not trip_res.data:
+            return None
+            
+        trip = trip_res.data[0]
+        
+        # 2. 抓該行程的所有細項
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()
+        
+        # 3. 整理成前端要的格式
+        days_map = {}
+        # ⚠️ 修正：如果 items_res.data 是空的 (手動建立時)，這裡迴圈不會跑，days_map 是空的
+        if items_res.data:
+            for item in items_res.data:
+                d = item["day_number"]
+                if d not in days_map:
+                    days_map[d] = []
+                
+                days_map[d].append({
+                    "id": item["id"],  # 👈 關鍵！補上這行，前端才知道要改哪一筆
+                    "time": item["time_slot"][:5] if item["time_slot"] else "00:00",
+                    "place": item["place_name"],
+                    "original_name": item["original_name"],
+                    "category": item["category"] or "sightseeing",
+                    "desc": item["notes"],
+                    "memo": item.get("memo") or "",  # 👈 新增這行，讀取備忘錄
+                    "lat": item["location_lat"],
+                    "lng": item["location_lng"],
+                    "cost": item["cost_amount"],
+                    "reservation_code": item.get("reservation_code"),
+                    "tags": item.get("tags", []),
+                    # 👇👇👇 補上這兩行！沒有這兩行，前端就是瞎子！
+                    "link_url": item.get("link_url"), 
+                    "sub_items": item.get("sub_items") or []
+                })
+            
+        # 轉成陣列
+        days_array = []
+        for d in sorted(days_map.keys()):
+            days_array.append({
+                "day": d,
+                "activities": days_map[d]
+            })
+            
+        return {
+            "id": trip["id"],
+            "title": trip["title"],
+            "creator": trip.get("creator_name", "Guest"),
+            "start_date": trip["start_date"],  # 👈 關鍵！補上這行
+            "share_code": trip.get("share_code", ""),  # 順便補上分享碼
+            # 👇 讀取並回傳
+            "daily_locations": (trip.get("content") or {}).get("daily_locations", {}),
+            # 🆕 每日提示
+            "day_notes": (trip.get("content") or {}).get("day_notes", {}),
+            "day_costs": (trip.get("content") or {}).get("day_costs", {}),
+            "day_tickets": (trip.get("content") or {}).get("day_tickets", {}),
+            
+            "flight_info": trip.get("flight_info") or {},  # 👈 新增航班資訊
+            "hotel_info": trip.get("hotel_info") or {},    # 👈 新增住宿資訊
+            # 即使 days_map 是空的，也要回傳空陣列，不然前端 map 會爆
+            "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
+        }
+
+    except Exception as e:
+        print(f"Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🆕 獲取特定行程 (by ID)
+@app.get("/api/trips/{trip_id}")
+async def get_trip_by_id(trip_id: str):
+    try:
+        # 1. 查詢指定的行程
+        trip_res = supabase.table("itineraries").select("*").eq("id", trip_id).execute()
+        
+        if not trip_res.data or len(trip_res.data) == 0:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        trip = trip_res.data[0]
+        
+        # 2. 抓該行程的所有細項
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()
+        
+        # 3. 整理成前端要的格式
+        days_map = {}
+        if items_res.data:
+            for item in items_res.data:
+                d = item["day_number"]
+                if d not in days_map:
+                    days_map[d] = []
+                
+                days_map[d].append({
+                    "id": item["id"],
+                    "time": item["time_slot"][:5] if item["time_slot"] else "00:00",
+                    "place": item["place_name"],
+                    "original_name": item["original_name"],
+                    "category": item["category"] or "sightseeing",
+                    "desc": item["notes"],
+                    "memo": item.get("memo") or "",
+                    "lat": item["location_lat"],
+                    "lng": item["location_lng"],
+                    "cost": item["cost_amount"],
+                    "reservation_code": item.get("reservation_code"),
+                    "tags": item.get("tags", []),
+                    "link_url": item.get("link_url"), 
+                    "sub_items": item.get("sub_items") or [],
+                    "image_url": item.get("image_url")
+                })
+            
+        return {
+            "id": trip["id"],
+            "title": trip["title"],
+            "creator": trip.get("creator_name", "Guest"),
+            "start_date": trip["start_date"],
+            "share_code": trip.get("share_code", ""),
+            "cover_image": trip.get("cover_image"),
+            # 🚑 修復：先判斷 content 是否為 None，再取值
+            "daily_locations": (trip.get("content") or {}).get("daily_locations", {}),
+            # 🆕 每日提示
+            "day_notes": (trip.get("content") or {}).get("day_notes", {}),
+            "day_costs": (trip.get("content") or {}).get("day_costs", {}),
+            "day_tickets": (trip.get("content") or {}).get("day_tickets", {}),
+
+            "flight_info": trip.get("flight_info") or {},
+            "hotel_info": trip.get("hotel_info") or {},
+            "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🔥 功能 6: 手動建立空白行程
+@app.post("/api/trip/create-manual")
+async def create_manual_trip(request: CreateManualTripRequest):
+    try:
+        room_code = generate_room_code()
+        
+        trip_data = {
+            "title": request.title,
+            "creator_name": request.creator_name,
+            "created_by": request.user_id,
+            "share_code": room_code,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "status": "active",
+            "content": {},  # 👈 新增：給個空物件，不要讓它是 NULL
+            "flight_info": {},
+            "hotel_info": {},
+            "cover_image": request.cover_image
+        }
+        
+        trip_res = supabase.table("itineraries").insert(trip_data).execute()
+        trip_id = trip_res.data[0]['id']
+
+        # 加入成員
+        supabase.table("trip_members").insert({
+            "itinerary_id": trip_id,
+            "user_id": request.user_id,
+            "user_name": request.creator_name
+        }).execute()
+
+        return {"status": "success", "trip_id": trip_id, "share_code": room_code}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 7: 修改單一細項
+@app.patch("/api/items/{item_id}")
+async def update_item(item_id: str, request: UpdateItemRequest):
+    print(f"📝 嘗試更新細項 {item_id}: {request}")
+    try:
+        # 只更新有值的欄位
+        data = {}
+        if request.time_slot is not None: data["time_slot"] = request.time_slot
+        if request.place_name is not None: data["place_name"] = request.place_name
+        if request.notes is not None: data["notes"] = request.notes
+        if request.cost_amount is not None: data["cost_amount"] = request.cost_amount
+        # 👇 寫入資料庫
+        if request.lat is not None: data["location_lat"] = request.lat
+        if request.lng is not None: data["location_lng"] = request.lng
+        # 👇 新增：處理備忘錄
+        if request.memo is not None: data["memo"] = request.memo
+        # 👇 新增：處理 sub_items (連結列表)
+        if request.sub_items is not None: data["sub_items"] = request.sub_items
+        
+        if not data:
+            print("⚠️ 沒有資料需要更新")
+            return {"status": "no_change"}
+
+        res = supabase.table("itinerary_items").update(data).eq("id", item_id).execute()
+        
+        if not res.data:
+            print(f"❌ 更新失敗：找不到 ID {item_id}")
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        print("✅ 更新成功")
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        print(f"🔥 Update Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 8: 刪除單一細項
+@app.delete("/api/items/{item_id}")
+async def delete_item(item_id: str):
+    print(f"🗑️ 嘗試刪除細項 {item_id}")
+    try:
+        res = supabase.table("itinerary_items").delete().eq("id", item_id).execute()
+        
+        if not res.data:
+             print(f"❌ 刪除失敗：找不到 ID {item_id}")
+             # 這裡不噴錯，因為可能已經被刪掉了
+             return {"status": "success", "message": "Item might already be deleted"}
+             
+        print("✅ 刪除成功")
+        return {"status": "success"}
+    except Exception as e:
+        print(f"🔥 Delete Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 8.1: 刪除整天行程
+@app.delete("/api/trips/{trip_id}/days/{day_number}")
+async def delete_day(trip_id: str, day_number: int):
+    print(f"🗑️ 嘗試刪除行程 {trip_id} 的第 {day_number} 天")
+    try:
+        # 1. 刪除該天的所有細項
+        res = supabase.table("itinerary_items")\
+            .delete()\
+            .eq("itinerary_id", trip_id)\
+            .eq("day_number", day_number)\
+            .execute()
+        
+        deleted_count = len(res.data) if res.data else 0
+        print(f"   🗑️ 已刪除 {deleted_count} 個細項")
+        
+        # 2. 調整後面天數的 day_number (把 day_number > 刪除天數的都往前移)
+        remaining = supabase.table("itinerary_items")\
+            .select("id, day_number")\
+            .eq("itinerary_id", trip_id)\
+            .gt("day_number", day_number)\
+            .execute()
+        
+        for item in remaining.data:
+            new_day = item["day_number"] - 1
+            supabase.table("itinerary_items")\
+                .update({"day_number": new_day})\
+                .eq("id", item["id"])\
+                .execute()
+        
+        print(f"   📅 已調整 {len(remaining.data)} 個細項的天數")
+        
+        # 3. 更新行程的 end_date (減少一天)
+        trip = supabase.table("itineraries").select("start_date, end_date").eq("id", trip_id).single().execute()
+        if trip.data and trip.data.get("end_date"):
+            from datetime import datetime, timedelta
+            end_date = datetime.strptime(trip.data["end_date"], "%Y-%m-%d")
+            new_end = end_date - timedelta(days=1)
+            supabase.table("itineraries")\
+                .update({"end_date": new_end.strftime("%Y-%m-%d")})\
+                .eq("id", trip_id)\
+                .execute()
+            print(f"   📆 已更新 end_date: {trip.data['end_date']} → {new_end.strftime('%Y-%m-%d')}")
+        
+        return {"status": "success", "deleted_items": deleted_count, "adjusted_items": len(remaining.data)}
+    except Exception as e:
+        print(f"🔥 Delete Day Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 9: 更新行程的每日地點
+class UpdateLocationRequest(BaseModel):
+    day: int
+    name: str
+    lat: float
+    lng: float
+
+@app.patch("/api/trips/{trip_id}/location")
+async def update_trip_location(trip_id: str, request: UpdateLocationRequest):
+    try:
+        # 1. 先讀取現有的 content
+        res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+        content = res.data['content'] or {}
+        
+        # 2. 更新該日期的地點
+        if 'daily_locations' not in content:
+            content['daily_locations'] = {}
+        
+        content['daily_locations'][str(request.day)] = {
+            "name": request.name,
+            "lat": request.lat,
+            "lng": request.lng
+        }
+        
+        # 3. 寫回資料庫
+        supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 10: 單筆行程新增
+@app.post("/api/items")
+async def create_item(request: CreateItemRequest):
+    """新增單筆行程項目"""
+    try:
+        data = {
+            "itinerary_id": request.itinerary_id,
+            "day_number": request.day_number,
+            "time_slot": request.time_slot,
+            "place_name": request.place_name,
+            "category": request.category,
+            "notes": request.notes,
+            "location_lat": request.lat,
+            "location_lng": request.lng
+        }
+        
+        res = supabase.table("itinerary_items").insert(data).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=500, detail="插入失敗")
+        
+        print(f"✅ 單筆行程新增成功：{request.place_name}")
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        print(f"🔥 Create Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 11: 更新行程資訊 (航班/住宿)
+class UpdateInfoRequest(BaseModel):
+    flight_info: dict
+    hotel_info: dict
+
+@app.patch("/api/trips/{trip_id}/info")
+async def update_trip_info(trip_id: str, request: UpdateInfoRequest):
+    try:
+        data = {
+            "flight_info": request.flight_info,
+            "hotel_info": request.hotel_info
+        }
+        supabase.table("itineraries").update(data).eq("id", trip_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 12: 記帳相關 API
+class ExpenseRequest(BaseModel):
+    itinerary_id: Optional[str] = None  # 設為 Optional 方便 Update 使用
+    title: Optional[str] = None
+    amount_jpy: Optional[float] = None
+    exchange_rate: Optional[float] = None
+    payment_method: Optional[str] = None
+    category: Optional[str] = None
+    is_public: Optional[bool] = None
+    created_by: Optional[str] = None
+    creator_name: Optional[str] = None
+    card_name: Optional[str] = None
+    cashback_rate: Optional[float] = 0
+    # 👇 新增：圖片 URL
+    image_url: Optional[str] = None
+
+@app.post("/api/expenses")
+async def add_expense(request: ExpenseRequest):
+    try:
+        payload = {
+            "itinerary_id": request.itinerary_id,
+            "title": request.title,
+            "amount": request.amount_jpy,
+            "currency": "JPY",
+            "category": request.category,
+            "is_public": request.is_public,
+            "created_by": request.created_by,
+            "payment_method": request.payment_method,
+            "exchange_rate": request.exchange_rate,
+            "card_name": request.card_name,
+            "cashback_rate": request.cashback_rate,
+            # 👇 寫入圖片
+            "image_url": request.image_url
+        }
+        supabase.table("expenses").insert(payload).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/trips/{trip_id}/expenses")
+async def get_expenses(trip_id: str, user_id: str = Header(None, alias="X-User-ID")):
+    try:
+        # 邏輯：抓出 (該行程的所有公帳) OR (該行程中 我建立的私帳)
+        res = supabase.table("expenses").select("*").eq("itinerary_id", trip_id).execute()
+        all_expenses = res.data
+        
+        filtered = []
+        for exp in all_expenses:
+            # 如果是公帳 -> 顯示
+            if exp['is_public']:
+                filtered.append(exp)
+            # 如果是私帳 -> 檢查是否為本人
+            elif exp['created_by'] == user_id:
+                filtered.append(exp)
+                
+        return filtered
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 13: 修改行程標題
+class UpdateTripTitleRequest(BaseModel):
+    title: str
+
+@app.patch("/api/trips/{trip_id}/title")
+async def update_trip_title(trip_id: str, request: UpdateTripTitleRequest):
+    try:
+        supabase.table("itineraries").update({"title": request.title}).eq("id", trip_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🔥 功能 14: 修改/刪除記帳 (Expense)
+class UpdateExpenseRequest(BaseModel):
+    title: Optional[str] = None
+    amount_jpy: Optional[float] = None
+    is_public: Optional[bool] = None
+    payment_method: Optional[str] = None
+    # 👇 新增：圖片 URL
+    image_url: Optional[str] = None
+
+@app.patch("/api/expenses/{expense_id}")
+async def update_expense(expense_id: str, request: UpdateExpenseRequest):
+    try:
+        data = request.dict(exclude_unset=True)
+        if 'amount_jpy' in data:
+            data['amount'] = data.pop('amount_jpy') # 對應 DB 欄位
+        
+        supabase.table("expenses").update(data).eq("id", expense_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/expenses/{expense_id}")
+async def delete_expense(expense_id: str):
+    try:
+        supabase.table("expenses").delete().eq("id", expense_id).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- AI 聊天機器人 (Ryan) ---
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[dict] = []  # 對話歷史: [{"role": "user", "content": "..."}]
+    image: Optional[str] = None  # Base64 image string (optional)
+
+SYSTEM_PROMPT = """
+### 角色定義 (Role)
+你是一個內建於旅遊 App 中的「全方位 AI 旅遊達人」。你的角色不僅是導遊，更是一位博學、幽默且貼心的「在地生活顧問」。你的目標是解決使用者在旅途中遇到的所有問題，從基礎生存需求到深度的文化體驗。
+
+### 核心性格 (Personality)
+1.  **溫暖貼心**：像一位居住當地 10 年的老朋友，語氣親切，主動關懷。
+2.  **專業可靠**：提供資訊時邏輯清晰，若涉及醫療或法規，需精準嚴謹。
+3.  **幽默風趣**：適度使用幽默感化解旅途的焦慮，讓對話變得有趣。
+4.  **Emoji 使用**：大量使用適當的 Emoji 來增加閱讀的愉悅感與視覺引導。
+
+### 核心任務與技能 (Core Competencies)
+1.  **語言與溝通橋樑**：翻譯語言與語境，提供「雙語對照」卡片。
+2.  **美食與體驗推薦**：根據情境推薦在地隱藏美食與體驗。
+3.  **安全與守護**：主動提示治安與惡劣天氣，提供緊急聯繫方式。
+4.  **健康與醫療顧問**：提供當地等效藥物建議，精準翻譯醫療需求。
+5.  **購物與精算專家**：判斷價格，解析規格，提供退稅建議。
+6.  **交通與物流大腦**：解決非結構化交通問題，提供雨備或替代方案。
+
+### 回覆規範 (Response Guidelines)
+1.  **排版精美**：使用 Markdown 語法，善用 **粗體** 強調重點，使用條列式清單讓資訊易於掃描（考量手機螢幕閱讀）。
+2.  **行動導向**：在回覆的最後，盡量提供一個「下一步建議」（例如：「需要我幫你把這段日文存成圖片嗎？」）。
+3.  **多模態處理**：如果使用者上傳照片（如菜單、藥盒、街景），請優先針對圖片內容進行深度解析。
+"""
+
+@app.post("/api/chat")
+async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
+    try:
+        genai.configure(api_key=api_key)
+        
+        # 使用 Gemini 1.5 Flash (速度快且聰明)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # 構建對話歷史
+        chat_history = [
+            {"role": "user", "parts": [SYSTEM_PROMPT]},
+            {"role": "model", "parts": ["收到！我是 Ryan，你的 AI 旅遊達人。有什麼我可以幫你的嗎？😎"]}
+        ]
+        
+        # 加入過去的對話紀錄
+        for msg in request.history:
+            role = "user" if msg["role"] == "user" else "model"
+            chat_history.append({"role": role, "parts": [msg["content"]]})
+            
+        # 處理當前訊息 (包含圖片)
+        current_parts = [request.message]
+        if request.image:
+             # 簡單處理 Base64 圖片 (假設前端傳送來的格式正確)
+             import base64
+             from io import BytesIO
+             from PIL import Image
+             
+             try:
+                # 去除 data:image/jpeg;base64, 前綴
+                if "base64," in request.image:
+                    image_data = base64.b64decode(request.image.split("base64,")[1])
+                else:
+                    image_data = base64.b64decode(request.image)
+                    
+                image = Image.open(BytesIO(image_data))
+                current_parts.append(image)
+             except Exception as img_err:
+                 print(f"⚠️ Image processing error: {img_err}")
+
+        # 發送請求
+        chat = model.start_chat(history=chat_history)
+        response = chat.send_message(current_parts)
+        
+        return {"response": response.text}
+        
+    except Exception as e:
+        print(f"🔥 Chat Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

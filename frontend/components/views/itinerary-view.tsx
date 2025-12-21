@@ -1,0 +1,841 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
+import { ArrowLeft, Calendar, Plus, Users, Hash, Settings, Edit2, Trash2, MapPin, Edit3, Sun, Cloud, CloudRain } from "lucide-react"
+import { TimelineCard } from "@/components/timeline-card"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
+import { useTrips, useTripDetail } from "@/lib/hooks"
+import { useLanguage } from "@/lib/LanguageContext"
+import { ImageUpload } from "@/components/ui/image-upload"
+import Link from "next/link"
+const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
+import DailyTips from "@/components/daily-tips"
+import { useTripContext } from "@/lib/trip-context"
+import { TripSwitcher } from "@/components/trip-switcher"
+import { toast } from "sonner"
+import { SwipeableItem } from "@/components/ui/swipeable-item"
+import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+
+const DEFAULT_START_DATE = new Date()
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+export function ItineraryView() {
+    const { t } = useLanguage()
+    const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId } = useTripContext()
+    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
+
+    // Use activeTripId from context
+    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId)
+
+    const [isCreateOpen, setIsCreateOpen] = useState(false)
+    const [newTripTitle, setNewTripTitle] = useState("")
+    const [newTripStart, setNewTripStart] = useState("2026-02-02")
+    const [newTripEnd, setNewTripEnd] = useState("2026-02-10")
+    const [newTripCover, setNewTripCover] = useState("")
+    const [joinCode, setJoinCode] = useState("")
+    const [isJoinLoading, setIsJoinLoading] = useState(false)
+
+    const [editItem, setEditItem] = useState<any>(null)
+    const [isEditOpen, setIsEditOpen] = useState(false)
+    const [isAddMode, setIsAddMode] = useState(false)
+    const [placeSearchResults, setPlaceSearchResults] = useState<any[]>([])
+    const [isPlaceSearching, setIsPlaceSearching] = useState(false)
+
+    const [day, setDay] = useState(1)
+    const [weatherData, setWeatherData] = useState<any[]>([])
+    const [dailyLocs, setDailyLocs] = useState<any>({})
+    const [isLocEditOpen, setIsLocEditOpen] = useState(false)
+    const [newLocName, setNewLocName] = useState("")
+    const [locSearchResults, setLocSearchResults] = useState<any[]>([])
+    const [isLocSearching, setIsLocSearching] = useState(false)
+
+    useEffect(() => {
+        if (currentTrip && currentTrip.daily_locations) {
+            setDailyLocs(currentTrip.daily_locations)
+        }
+    }, [currentTrip])
+    // Get the first activity with coordinates for the current day
+    const getFirstActivityWithCoords = () => {
+        if (currentTrip?.days) {
+            const dayData = currentTrip.days.find((d: any) => d.day === day)
+            if (dayData?.activities) {
+                for (const activity of dayData.activities) {
+                    if (activity.lat && activity.lng) {
+                        return { lat: activity.lat, lng: activity.lng, name: activity.place || "Current Location" }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    useEffect(() => {
+        const fetchWeather = async () => {
+            let lat = 35.6895  // Default: Tokyo
+            let lng = 139.6917
+            let locationName = "Tokyo (Default)"
+
+            // 常見城市座標對照表
+            const CITY_COORDS: { [key: string]: { lat: number, lng: number, name: string } } = {
+                "東京": { lat: 35.6895, lng: 139.6917, name: "東京" },
+                "大阪": { lat: 34.6937, lng: 135.5023, name: "大阪" },
+                "京都": { lat: 35.0116, lng: 135.7681, name: "京都" },
+                "台北": { lat: 25.0330, lng: 121.5654, name: "台北" },
+                "高雄": { lat: 22.6273, lng: 120.3014, name: "高雄" },
+                "台中": { lat: 24.1477, lng: 120.6736, name: "台中" },
+                "台南": { lat: 22.9999, lng: 120.2269, name: "台南" },
+                "橫濱": { lat: 35.4437, lng: 139.6380, name: "橫濱" },
+                "札幌": { lat: 43.0618, lng: 141.3545, name: "札幌" },
+                "福岡": { lat: 33.5904, lng: 130.4017, name: "福岡" },
+                "名古屋": { lat: 35.1815, lng: 136.9066, name: "名古屋" },
+                "沖繩": { lat: 26.2124, lng: 127.6809, name: "沖繩" },
+                "首爾": { lat: 37.5665, lng: 126.9780, name: "首爾" },
+                "釜山": { lat: 35.1796, lng: 129.0756, name: "釜山" },
+                "香港": { lat: 22.3193, lng: 114.1694, name: "香港" },
+                "新加坡": { lat: 1.3521, lng: 103.8198, name: "新加坡" },
+                "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷" },
+            }
+
+            // Priority 1: Use manually set daily location
+            if (dailyLocs && dailyLocs[day]) {
+                lat = dailyLocs[day].lat
+                lng = dailyLocs[day].lng
+                locationName = dailyLocs[day].name || "Current Location"
+            } else {
+                // Priority 2: Use first activity with coordinates
+                const activityLoc = getFirstActivityWithCoords()
+                if (activityLoc) {
+                    lat = activityLoc.lat
+                    lng = activityLoc.lng
+                    locationName = activityLoc.name
+                    // Auto-update dailyLocs for display
+                    setDailyLocs((prev: any) => ({ ...prev, [day]: activityLoc }))
+                } else if (currentTrip?.title) {
+                    // Priority 3: Parse city from trip title
+                    for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
+                        if (currentTrip.title.includes(cityName)) {
+                            lat = coords.lat
+                            lng = coords.lng
+                            locationName = coords.name
+                            // Auto-update dailyLocs for display
+                            setDailyLocs((prev: any) => ({ ...prev, [day]: { lat, lng, name: locationName } }))
+                            break
+                        }
+                    }
+                }
+            }
+
+            try {
+                const res = await fetch(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto&forecast_days=1`
+                )
+                const data = await res.json()
+                const temps = data.hourly.temperature_2m
+                const codes = data.hourly.weather_code
+                const forecast = []
+
+                for (let i = 6; i <= 23; i++) {
+                    forecast.push({
+                        time: `${i}:00`,
+                        temp: Math.round(temps[i]),
+                        code: codes[i]
+                    })
+                }
+                setWeatherData(forecast)
+            } catch (e) { console.error("Weather error", e) }
+        }
+        fetchWeather()
+    }, [day, dailyLocs, currentTrip])
+
+    const handleDeleteTrip = async (tripId: string) => {
+        if (!confirm("Delete this trip?")) return
+        try {
+            await fetch(`${API_BASE}/api/trips/${tripId}`, { method: "DELETE" })
+            reloadTrips()
+        } catch (error) { console.error(error) }
+    }
+
+    const handleManualCreate = async () => {
+        const userName = localStorage.getItem("user_nickname")
+        if (!userId || !newTripTitle) return
+        try {
+            await fetch(`${API_BASE}/api/trip/create-manual`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: newTripTitle, start_date: newTripStart, end_date: newTripEnd,
+                    creator_name: userName, user_id: userId,
+                    cover_image: newTripCover
+                })
+            })
+            setIsCreateOpen(false)
+            setNewTripCover("")
+            reloadTrips()
+        } catch (e) { toast.error("Create failed") }
+    }
+
+    const handleJoinTrip = async () => {
+        if (joinCode.length !== 4) { toast.warning("Please enter 4-digit code"); return }
+        setIsJoinLoading(true)
+        const userName = localStorage.getItem("user_nickname")
+        try {
+            const res = await fetch(`${API_BASE}/api/join-trip`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ share_code: joinCode, user_id: userId, user_name: userName })
+            })
+            if (!res.ok) throw new Error("Invalid code")
+            toast.success("Joined!")
+            setJoinCode("")
+            reloadTrips()
+        } catch (e) { toast.error("Trip not found") }
+        finally { setIsJoinLoading(false) }
+    }
+
+    const handleSearchLocation = async () => {
+        if (!newLocName.trim()) return
+        setIsLocSearching(true)
+        try {
+            const encodedName = encodeURIComponent(newLocName.trim())
+            // 使用 OpenStreetMap Nominatim API 獲取更精確的 POI 資料
+            const geoRes = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodedName}&format=json&addressdetails=1&limit=8&accept-language=zh-TW,zh,en`,
+                { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
+            )
+            const geoData = await geoRes.json()
+            if (!geoData || geoData.length === 0) {
+                toast.warning("找不到此地點，請嘗試其他關鍵字")
+                setLocSearchResults([])
+            } else {
+                // 轉換成統一格式
+                const results = geoData.map((item: any) => ({
+                    name: item.name || item.display_name.split(',')[0],
+                    display_name: item.display_name,
+                    latitude: parseFloat(item.lat),
+                    longitude: parseFloat(item.lon),
+                    type: item.type,
+                    class: item.class,
+                    address: item.address,
+                    // 組合行政區資訊
+                    admin1: item.address?.state || item.address?.province || '',
+                    admin2: item.address?.city || item.address?.county || item.address?.suburb || '',
+                    country: item.address?.country || ''
+                }))
+                setLocSearchResults(results)
+            }
+        } catch (e) { toast.error("搜尋失敗") }
+        finally { setIsLocSearching(false) }
+    }
+
+    const handleSelectLocation = async (loc: any) => {
+        if (!currentTrip) return
+        try {
+            const displayName = loc.admin2 || loc.admin1 ? `${loc.name}, ${loc.admin2 || loc.admin1}` : loc.name
+            await fetch(`${API_BASE}/api/trips/${currentTrip.id}/location`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ day: day, name: displayName, lat: loc.latitude, lng: loc.longitude })
+            })
+
+            setDailyLocs({ ...dailyLocs, [day]: { name: displayName, lat: loc.latitude, lng: loc.longitude } })
+            setIsLocEditOpen(false)
+            setNewLocName("")
+            setLocSearchResults([])
+            reloadTripDetail()
+        } catch (e) { toast.error("更新失敗") }
+    }
+
+    const handleSaveEdit = async () => {
+        if (!editItem && !isAddMode) return
+
+        let finalLat = editItem.lat
+        let finalLng = editItem.lng
+        if (editItem.place && (!finalLat || !finalLng)) {
+            try {
+                const encodedPlace = encodeURIComponent(editItem.place)
+                const geoRes = await fetch(
+                    `https://nominatim.openstreetmap.org/search?q=${encodedPlace}&format=json&limit=1&accept-language=zh-TW,zh,en`,
+                    { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
+                )
+                const geoData = await geoRes.json()
+                if (geoData && geoData.length > 0) {
+                    finalLat = parseFloat(geoData[0].lat)
+                    finalLng = parseFloat(geoData[0].lon)
+                }
+            } catch (e) { }
+        }
+
+        try {
+            if (isAddMode) {
+                if (!currentTrip) return
+                await fetch(`${API_BASE}/api/items`, {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        itinerary_id: currentTrip.id,
+                        day_number: day,
+                        time_slot: editItem.time,
+                        place_name: editItem.place,
+                        category: editItem.category,
+                        notes: editItem.desc,
+                        lat: finalLat, lng: finalLng
+                    })
+                })
+            } else {
+                await fetch(`${API_BASE}/api/items/${editItem.id}`, {
+                    method: "PATCH", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        time_slot: editItem.time,
+                        place_name: editItem.place,
+                        notes: editItem.desc,
+                        lat: finalLat, lng: finalLng,
+                        image_url: editItem.image_url
+                    })
+                })
+            }
+            setIsEditOpen(false)
+            reloadTripDetail()
+        } catch (e) { toast.error("Save failed") }
+    }
+
+    const handleUpdateMemo = async (id: string, newMemo: string) => {
+        await fetch(`${API_BASE}/api/items/${id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ memo: newMemo })
+        })
+        reloadTripDetail()
+        return true
+    }
+
+    const handleUpdateSubItems = async (id: string, newItems: any[]) => {
+        await fetch(`${API_BASE}/api/items/${id}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sub_items: newItems })
+        })
+        reloadTripDetail()
+        return true
+    }
+
+    const handleDeleteItem = async (id: string) => {
+        if (!confirm(t('confirm_delete'))) return
+
+        // Optimistic update: immediately remove from UI
+        if (currentTrip) {
+            const optimisticData = {
+                ...currentTrip,
+                days: currentTrip.days.map((d: any) => ({
+                    ...d,
+                    activities: d.activities.filter((a: any) => a.id !== id)
+                }))
+            }
+            reloadTripDetail(optimisticData, false) // Update cache without revalidation
+        }
+
+        // Background API call
+        fetch(`${API_BASE}/api/items/${id}`, { method: "DELETE" })
+            .catch(() => reloadTripDetail()) // Revert on error
+    }
+
+    const handleDeleteDay = async (dayNum: number) => {
+        if (!currentTrip) return
+        if (!confirm(`確定要刪除第 ${dayNum} 天的所有行程嗎？此操作無法復原！`)) return
+
+        // Optimistic update: immediately remove day from UI
+        const optimisticData = {
+            ...currentTrip,
+            days: currentTrip.days
+                .filter((d: any) => d.day !== dayNum)
+                .map((d: any) => ({
+                    ...d,
+                    day: d.day > dayNum ? d.day - 1 : d.day  // Adjust day numbers
+                }))
+        }
+        reloadTripDetail(optimisticData, false)
+        if (day === dayNum && day > 1) setDay(day - 1)
+
+        // Background API call
+        fetch(`${API_BASE}/api/trips/${currentTrip.id}/days/${dayNum}`, { method: "DELETE" })
+            .catch(() => { toast.error("刪除失敗"); reloadTripDetail() })
+    }
+
+    const handleBack = () => { setActiveTripId(null); setViewMode('list') }
+
+    // Calculate total days from start_date and end_date, with fallback
+    const totalDays = (() => {
+        if (!currentTrip) return 7
+        // First try to calculate from dates
+        if (currentTrip.start_date && currentTrip.end_date) {
+            const start = new Date(currentTrip.start_date)
+            const end = new Date(currentTrip.end_date)
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+            }
+        }
+        // Fallback: use max day_number from days data
+        if (currentTrip.days?.length > 0) {
+            return Math.max(...currentTrip.days.map((d: any) => d.day || 1))
+        }
+        return 7
+    })()
+    const dayNumbers = Array.from({ length: totalDays }, (_, i) => i + 1)
+
+    const getDateInfo = (dayNum: number) => {
+        const start = currentTrip ? new Date(currentTrip.start_date || DEFAULT_START_DATE) : DEFAULT_START_DATE
+        const d = new Date(start)
+        d.setDate(d.getDate() + (dayNum - 1))
+        return { date: `${d.getMonth() + 1}/${d.getDate()}`, week: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()] }
+    }
+
+    if (viewMode === 'list') {
+        return (
+            <div className="flex flex-col min-h-screen bg-stone-50 px-6 py-12 pb-32">
+                <header className="mb-8">
+                    <h1 className="text-3xl font-serif text-slate-900 mb-2">{t('my_trips')}</h1>
+                    <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
+                </header>
+
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                        <DialogTrigger asChild>
+                            <Button className="h-24 border-2 border-dashed border-slate-300 bg-transparent text-slate-400 hover:bg-slate-100 rounded-2xl flex flex-col gap-2"><Plus className="w-6 h-6" /><span className="text-xs font-bold uppercase">{t('new_trip')}</span></Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader><DialogTitle>{t('create_trip')}</DialogTitle></DialogHeader>
+                            <div className="space-y-4 py-4">
+                                {/* Cover Image Upload */}
+                                <div className="flex justify-center">
+                                    <ImageUpload
+                                        value={newTripCover}
+                                        onChange={setNewTripCover}
+                                        onRemove={() => setNewTripCover("")}
+                                        folder="ryan_travel/covers"
+                                    />
+                                </div>
+                                <div className="space-y-2"><Label>{t('trip_name')}</Label><Input value={newTripTitle} onChange={e => setNewTripTitle(e.target.value)} placeholder="Tokyo 2026" /></div>
+                                <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>{t('start_date')}</Label><Input type="date" value={newTripStart} onChange={e => setNewTripStart(e.target.value)} /></div><div className="space-y-2"><Label>{t('end_date')}</Label><Input type="date" value={newTripEnd} onChange={e => setNewTripEnd(e.target.value)} /></div></div>
+                                <div className="flex gap-2 pt-2"><Button className="flex-1" onClick={handleManualCreate}>{t('create')}</Button><Button variant="outline" className="flex-1" onClick={() => toast.info("Go to Tools page for AI import")}>{t('ai_import')}</Button></div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    <Dialog>
+                        <DialogTrigger asChild><Button className="h-24 bg-slate-900 text-white hover:bg-slate-800 rounded-2xl flex flex-col gap-2 shadow-lg"><Hash className="w-6 h-6 text-amber-400" /><span className="text-xs font-bold uppercase">{t('join_code')}</span></Button></DialogTrigger>
+                        <DialogContent className="sm:max-w-xs"><DialogHeader><DialogTitle>{t('enter_trip_code')}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Input placeholder="8821" className="text-center text-2xl tracking-[0.5em] font-mono uppercase h-14" maxLength={4} value={joinCode} onChange={(e) => setJoinCode(e.target.value)} /><Button className="w-full" onClick={handleJoinTrip} disabled={isJoinLoading}>{isJoinLoading ? t('joining') : t('join_trip')}</Button></div></DialogContent>
+                    </Dialog>
+                </div>
+
+                <div className="space-y-4">
+                    {trips.map((trip: any) => (
+                        <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
+                            <div className="absolute top-2 right-2 z-20">
+                                <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>
+                            </div>
+                            <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
+                                <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
+                                    {trip.cover_image ? (
+                                        <img src={trip.cover_image} alt="cover" className="w-full h-full object-cover opacity-80" />
+                                    ) : (
+                                        <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                    <div className="absolute bottom-4 left-4 text-white">
+                                        <h3 className="font-bold text-lg">{trip.title}</h3>
+                                        <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date).toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="absolute top-3 right-12 bg-white/20 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1"><Hash className="w-3 h-3" /> {trip.share_code}</div>
+                                </div>
+                                <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
+                                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    const currentDayData = currentTrip
+        ? currentTrip.days.find((d: any) => d.day === day)?.activities || []
+        : []
+
+    return (
+        <div className="flex flex-col min-h-screen bg-stone-50 pb-32">
+            <div className="bg-white pt-12 pb-2 sticky top-0 z-20 border-b border-slate-100 shadow-sm">
+                <div className="px-6 flex justify-between items-end mb-4">
+                    <div>
+                        <button onClick={handleBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
+                            <ArrowLeft className="w-3 h-3" /> BACK
+                        </button>
+                        <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
+                    </div>
+                </div>
+
+                <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar">
+                    {dayNumbers.map((d) => {
+                        const { date, week } = getDateInfo(d)
+                        return (
+                            <div key={d} className="relative group">
+                                <button onClick={() => setDay(d)} className={cn("flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border transition-all", day === d ? "bg-slate-900 text-white" : "bg-white hover:bg-slate-50")}>
+                                    <span className="text-[10px] opacity-70">{week}</span>
+                                    <span className="font-bold">{date}</span>
+                                </button>
+                                {totalDays > 1 && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
+                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center shadow-sm touch-manipulation border border-white"
+                                    >
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div className="py-6 px-6 bg-stone-50/50">
+                <div className="flex items-center justify-between mb-4">
+                    <Dialog open={isLocEditOpen} onOpenChange={setIsLocEditOpen}>
+                        <DialogTrigger asChild>
+                            <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
+                                <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
+                                <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
+                                    {dailyLocs[day]?.name || "Tokyo (Default)"}
+                                </span>
+                                <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader><DialogTitle>修改第 {day} 天的天氣地點</DialogTitle></DialogHeader>
+                            <div className="space-y-4 py-4">
+                                {/* 當前座標顯示 */}
+                                {dailyLocs[day] && (
+                                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                        <div className="text-xs text-slate-500 mb-1">📍 目前地點</div>
+                                        <div className="font-bold text-slate-800">{dailyLocs[day].name}</div>
+                                        <div className="text-xs text-slate-400 font-mono">
+                                            {dailyLocs[day].lat?.toFixed(4)}, {dailyLocs[day].lng?.toFixed(4)}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 從活動同步按鈕 */}
+                                {(() => {
+                                    const activityLoc = currentTrip?.days.find((d: any) => d.day === day)?.activities?.find((a: any) => a.lat && a.lng)
+                                    if (activityLoc) {
+                                        return (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full justify-start text-left h-auto py-3"
+                                                onClick={() => {
+                                                    setDailyLocs({ ...dailyLocs, [day]: { name: activityLoc.place, lat: activityLoc.lat, lng: activityLoc.lng } })
+                                                    setIsLocEditOpen(false)
+                                                }}
+                                            >
+                                                <div>
+                                                    <div className="text-xs text-amber-600 font-bold">⚡ 從活動同步</div>
+                                                    <div className="text-sm text-slate-700">{activityLoc.place}</div>
+                                                    <div className="text-xs text-slate-400 font-mono">{activityLoc.lat?.toFixed(4)}, {activityLoc.lng?.toFixed(4)}</div>
+                                                </div>
+                                            </Button>
+                                        )
+                                    }
+                                    return null
+                                })()}
+
+                                {/* 搜尋區域 */}
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="輸入城市或區域名稱 (例如：墨田區、三民區)"
+                                            value={newLocName}
+                                            onChange={e => setNewLocName(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
+                                        />
+                                        <Button onClick={handleSearchLocation} disabled={isLocSearching}>
+                                            {isLocSearching ? "..." : "搜尋"}
+                                        </Button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">💡 若中文找不到，請嘗試英文或羅馬拼音</p>
+                                </div>
+
+                                {locSearchResults.length > 0 && (
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        <p className="text-xs text-slate-500">🗺️ OpenStreetMap 搜尋結果 ({locSearchResults.length})：</p>
+                                        {locSearchResults.map((loc, idx) => {
+                                            // POI 類型對照
+                                            const typeLabels: { [key: string]: string } = {
+                                                restaurant: '🍽️ 餐廳', cafe: '☕ 咖啡廳', fast_food: '🍔 速食',
+                                                station: '🚉 車站', bus_stop: '🚌 公車站', subway_entrance: '🚇 地鐵',
+                                                hotel: '🏨 飯店', hostel: '🛏️ 旅館', guest_house: '🏠 民宿',
+                                                attraction: '🎯 景點', museum: '🏛️ 博物館', park: '🌳 公園',
+                                                temple: '⛩️ 寺廟', shrine: '⛩️ 神社', church: '⛪ 教堂',
+                                                shop: '🛍️ 商店', mall: '🏬 百貨', supermarket: '🛒 超市',
+                                                convenience: '🏪 便利店', department_store: '🏬 百貨公司',
+                                                administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
+                                            }
+                                            const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
+
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => handleSelectLocation(loc)}
+                                                    className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
+                                                        <span className="font-bold text-slate-800">{loc.name}</span>
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 line-clamp-1">
+                                                        {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 font-mono">
+                                                        {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
+                                                    </div>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* 手動座標輸入 */}
+                                <div className="space-y-2 pt-2 border-t border-dashed">
+                                    <label className="text-xs font-bold text-slate-500">📌 手動輸入座標 (最精確)</label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="緯度 (lat)"
+                                            className="font-mono text-sm"
+                                            id="manual-lat"
+                                        />
+                                        <Input
+                                            placeholder="經度 (lng)"
+                                            className="font-mono text-sm"
+                                            id="manual-lng"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => {
+                                                const lat = parseFloat((document.getElementById('manual-lat') as HTMLInputElement)?.value)
+                                                const lng = parseFloat((document.getElementById('manual-lng') as HTMLInputElement)?.value)
+                                                if (!isNaN(lat) && !isNaN(lng)) {
+                                                    setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
+                                                    setIsLocEditOpen(false)
+                                                } else {
+                                                    toast.warning("請輸入有效的座標數字")
+                                                }
+                                            }}
+                                        >
+                                            套用
+                                        </Button>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400">💡 可從 Google Maps 複製座標貼上</p>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                    <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                    {weatherData.length > 0 ? weatherData.map((w, i) => (
+                        <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
+                            <span className="text-xs text-slate-400 font-mono">{w.time}</span>
+                            {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
+                            <span className="text-sm font-bold text-slate-700">{w.temp}C</span>
+                        </div>
+                    )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
+                </div>
+            </div>
+
+
+
+            <DailyTips
+                day={day}
+                notes={currentTrip?.day_notes?.[day]}
+                costs={currentTrip?.day_costs?.[day]}
+                tickets={currentTrip?.day_tickets?.[day]}
+            />
+
+            <div className="px-5 py-6 space-y-1">
+                {(() => {
+                    let realIndex = 0;
+                    return currentDayData.map((item: any, idx: number) => {
+                        const isHeader = item.category === 'header' || item.time === '00:00';
+                        if (!isHeader) realIndex++;
+                        return (
+                            <SwipeableItem key={item.id} onDelete={() => handleDeleteItem(item.id)}>
+                                <TimelineCard
+                                    activity={item}
+                                    index={realIndex}
+                                    isLast={idx === currentDayData.length - 1}
+                                    onEdit={(item) => { setIsAddMode(false); setEditItem(item); setIsEditOpen(true) }}
+                                    onDelete={handleDeleteItem}
+                                    onUpdateMemo={handleUpdateMemo}
+                                    onUpdateSubItems={handleUpdateSubItems}
+                                />
+                            </SwipeableItem>
+                        )
+                    })
+                })()}
+
+                <div className="py-4 text-center">
+                    <Button variant="outline" className="w-full border-dashed border-slate-300 text-slate-400" onClick={() => {
+                        setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
+                        setIsAddMode(true);
+                        setIsEditOpen(true);
+                    }}>
+                        <Plus className="w-4 h-4 mr-2" /> Add Activity
+                    </Button>
+                </div>
+
+                <div className="mt-8">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
+                    <DayMap activities={currentDayData} />
+                </div>
+            </div>
+
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>{isAddMode ? "Add Activity" : "Edit Activity"}</DialogTitle></DialogHeader>
+                    {editItem && (
+                        <div className="space-y-4 py-4">
+                            {/* Spot Photo Upload */}
+                            <div className="flex justify-center mb-2">
+                                <ImageUpload
+                                    value={editItem.image_url}
+                                    onChange={(url) => setEditItem({ ...editItem, image_url: url })}
+                                    onRemove={() => setEditItem({ ...editItem, image_url: "" })}
+                                    folder="ryan_travel/spots"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Time</Label>
+                                <Input value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">Place</Label>
+                                <div className="col-span-3 space-y-2">
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={editItem.place}
+                                            onChange={(e) => setEditItem({ ...editItem, place: e.target.value })}
+                                            placeholder="輸入商家/景點名稱..."
+                                            onKeyDown={(e) => e.key === 'Enter' && (async () => {
+                                                if (!editItem.place?.trim()) return
+                                                setIsPlaceSearching(true)
+                                                try {
+                                                    const res = await fetch(
+                                                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(editItem.place)}&format=json&addressdetails=1&limit=5&accept-language=zh-TW,zh,en`,
+                                                        { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
+                                                    )
+                                                    const data = await res.json()
+                                                    setPlaceSearchResults(data.map((item: any) => ({
+                                                        name: item.name || item.display_name.split(',')[0],
+                                                        display_name: item.display_name,
+                                                        lat: parseFloat(item.lat),
+                                                        lng: parseFloat(item.lon),
+                                                        type: item.type,
+                                                        class: item.class
+                                                    })))
+                                                } catch (e) { toast.error('搜尋失敗') }
+                                                finally { setIsPlaceSearching(false) }
+                                            })()}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={isPlaceSearching}
+                                            onClick={async () => {
+                                                if (!editItem.place?.trim()) return
+                                                setIsPlaceSearching(true)
+                                                try {
+                                                    const res = await fetch(
+                                                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(editItem.place)}&format=json&addressdetails=1&limit=5&accept-language=zh-TW,zh,en`,
+                                                        { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
+                                                    )
+                                                    const data = await res.json()
+                                                    setPlaceSearchResults(data.map((item: any) => ({
+                                                        name: item.name || item.display_name.split(',')[0],
+                                                        display_name: item.display_name,
+                                                        lat: parseFloat(item.lat),
+                                                        lng: parseFloat(item.lon),
+                                                        type: item.type,
+                                                        class: item.class
+                                                    })))
+                                                } catch (e) { toast.error('搜尋失敗') }
+                                                finally { setIsPlaceSearching(false) }
+                                            }}
+                                        >
+                                            {isPlaceSearching ? '...' : '🔍'}
+                                        </Button>
+                                    </div>
+
+                                    {placeSearchResults.length > 0 && (
+                                        <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2 bg-slate-50">
+                                            {placeSearchResults.map((loc, idx) => {
+                                                const typeLabels: { [key: string]: string } = {
+                                                    restaurant: '🍽️', cafe: '☕', fast_food: '🍔',
+                                                    station: '🚉', bus_stop: '🚌', subway_entrance: '🚇',
+                                                    hotel: '🏨', hostel: '🛏️', attraction: '🎯',
+                                                    museum: '🏛️', park: '🌳', temple: '⛩️', shrine: '⛩️',
+                                                    shop: '🛍️', mall: '🏬', supermarket: '🛒',
+                                                }
+                                                const icon = typeLabels[loc.type] || '📍'
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        className="w-full text-left p-2 rounded hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                                                        onClick={() => {
+                                                            setEditItem({ ...editItem, place: loc.name, lat: loc.lat, lng: loc.lng })
+                                                            setPlaceSearchResults([])
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{icon}</span>
+                                                            <span className="font-bold text-sm text-slate-800">{loc.name}</span>
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 line-clamp-1 ml-6">{loc.display_name}</div>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Notes</Label>
+                                <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="col-span-3" />
+                            </div>
+
+                            <div className="grid grid-cols-4 items-start gap-4 pt-2 border-t border-dashed">
+                                <Label className="text-right pt-2 text-xs text-slate-400">Coordinates</Label>
+                                <div className="col-span-3 space-y-2">
+                                    <div className="flex gap-2">
+                                        <Input placeholder="Lat" className="text-xs font-mono" value={editItem.lat || ''} onChange={(e) => setEditItem({ ...editItem, lat: e.target.value })} />
+                                        <Input placeholder="Lng" className="text-xs font-mono" value={editItem.lng || ''} onChange={(e) => setEditItem({ ...editItem, lng: e.target.value })} />
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-slate-400">{editItem.lat && editItem.lng ? "Precise" : "Search mode"}</span>
+                                        <Button type="button" variant="ghost" size="sm" className="h-6 text-[10px] text-red-400" onClick={() => setEditItem({ ...editItem, lat: null, lng: null })}>Clear</Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DialogFooter>
+                                <Button onClick={handleSaveEdit}>{isAddMode ? "Add" : "Save"}</Button>
+                            </DialogFooter>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+        </div >
+    )
+}

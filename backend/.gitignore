@@ -1,0 +1,26 @@
+# Environment files (敏感資訊 - 絕對不能推送!)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Development tools (不需要部署)
+seed_trip.py
+_append_code.py
