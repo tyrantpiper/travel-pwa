@@ -495,7 +495,7 @@ export function ToolsView() {
                                 {aiResult?.items && (
                                     <div className="p-4 bg-stone-100 rounded-xl">
                                         <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />{t('saving')}</> : t('save_trip')}</Button>
+                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
                                     </div>
                                 )}
                             </div>
@@ -527,7 +527,7 @@ export function ToolsView() {
                                 {mdResult?.items && (
                                     <div className="p-4 bg-stone-100 rounded-xl">
                                         <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />{t('saving')}</> : t('save_trip')}</Button>
+                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
                                     </div>
                                 )}
                             </div>
