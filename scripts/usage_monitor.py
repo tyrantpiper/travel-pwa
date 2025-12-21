@@ -199,16 +199,13 @@ def generate_report() -> str:
 """
     
     if "error" in vercel:
-        report += f"❌ 無法取得資料: {vercel['error']}\n"
-    else:
-        emoji = get_status_emoji(vercel["percentage"])
-        report += f"""頻寬使用: {vercel['bandwidth_gb']} GB / {vercel['limit_gb']} GB
-{create_progress_bar(vercel['percentage'])} {emoji}
+        report += f"""📍 請手動查看 Dashboard:
+   https://vercel.com/tyrantpiper/travel-pwa/usage
 
 💡 什麼是頻寬？
    每次有人訪問你的網站，瀏覽器需要下載網頁檔案，
    這些下載量的總和就是「頻寬」。
-   100GB 大約等於 10 萬次頁面瀏覽。
+   免費額度: 100GB/月 ≈ 10 萬次頁面瀏覽
 """
     
     report += """
@@ -218,15 +215,12 @@ def generate_report() -> str:
 """
     
     if "error" in supabase:
-        report += f"❌ 無法取得資料: {supabase['error']}\n"
-    else:
-        emoji = get_status_emoji(supabase["percentage"])
-        report += f"""資料庫大小: {supabase['db_size_mb']} MB / {supabase['limit_mb']} MB
-{create_progress_bar(supabase['percentage'])} {emoji}
+        report += f"""📍 請手動查看 Dashboard:
+   https://supabase.com/dashboard/project/{SUPABASE_PROJECT_ID}
 
 💡 什麼是資料庫大小？
    所有行程、費用、用戶資料加起來的儲存空間。
-   500MB 大約可存 10 萬筆行程項目。
+   免費額度: 500MB ≈ 10 萬筆行程項目
 """
     
     report += """
