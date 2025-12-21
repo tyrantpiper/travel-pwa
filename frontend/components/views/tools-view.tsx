@@ -83,6 +83,7 @@ export function ToolsView() {
     const [aiPrompt, setAiPrompt] = useState("")
     const [aiLoading, setAiLoading] = useState(false)
     const [aiResult, setAiResult] = useState<any>(null)
+    const [isSaving, setIsSaving] = useState(false)
 
     useEffect(() => {
         fetch("https://api.exchangerate-api.com/v4/latest/JPY")
@@ -303,11 +304,16 @@ export function ToolsView() {
     }
 
     const handleSaveTrip = async () => {
+        // Prevent double-click
+        if (isSaving) return
+
         const result = mdResult || aiResult
         if (!result?.items) {
             toast.error("No items to save")
             return
         }
+
+        setIsSaving(true)
         const userId = localStorage.getItem("user_uuid")
         const userName = localStorage.getItem("user_nickname")
 
@@ -341,6 +347,7 @@ export function ToolsView() {
                 toast.error(data.detail || "Save failed")
             }
         } catch { toast.error("Save failed") }
+        finally { setIsSaving(false) }
     }
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,7 +495,7 @@ export function ToolsView() {
                                 {aiResult?.items && (
                                     <div className="p-4 bg-stone-100 rounded-xl">
                                         <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip}>{t('save_trip')}</Button>
+                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />{t('saving')}</> : t('save_trip')}</Button>
                                     </div>
                                 )}
                             </div>
@@ -520,7 +527,7 @@ export function ToolsView() {
                                 {mdResult?.items && (
                                     <div className="p-4 bg-stone-100 rounded-xl">
                                         <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip}>{t('save_trip')}</Button>
+                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />{t('saving')}</> : t('save_trip')}</Button>
                                     </div>
                                 )}
                             </div>
