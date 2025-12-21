@@ -70,18 +70,16 @@ export default function ChatWidget() {
 
         const buttonSize = 56
         const margin = 16 // margin from edge
-        const maxX = window.innerWidth - buttonSize - margin
-        const maxY = window.innerHeight - buttonSize - margin - 80 // account for bottom nav
+        const minY = 80 // minimum distance from bottom (above bottom nav)
+        const maxY = window.innerHeight - buttonSize - margin // maximum Y (near top of screen)
 
         // Calculate position from bottom-right
-        const newX = window.innerWidth - clientX - (buttonSize - dragOffset.current.x)
         const newY = window.innerHeight - clientY - (buttonSize - dragOffset.current.y)
 
-        // Clamp to valid range (keep on right edge, slide vertically)
-        const clampedX = Math.max(margin, Math.min(newX, margin)) // Fixed to right edge margin
-        const clampedY = Math.max(margin, Math.min(newY, maxY))
+        // Clamp Y to valid range (slide vertically along right edge)
+        const clampedY = Math.max(minY, Math.min(newY, maxY))
 
-        setPosition({ x: clampedX, y: clampedY })
+        setPosition({ x: margin, y: clampedY })
     }, [isDragging])
 
     // Handle drag end - snap to edge
