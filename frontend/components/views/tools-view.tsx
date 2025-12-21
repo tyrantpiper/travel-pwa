@@ -495,7 +495,7 @@ export function ToolsView() {
                                 <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
                             </div>
                             <p className="text-sm text-amber-700">
-                                使用 AI 行程產生器前，請先設定 Gemini API Key
+                                使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
                             </p>
                             <div className="flex items-center justify-between">
                                 <span className="text-xs text-amber-600">💡 完全免費！</span>
