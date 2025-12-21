@@ -147,7 +147,7 @@ async def generate_itinerary(
     try:
         # 動態設定 Key (只針對這次請求有效)
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+        model = genai.GenerativeModel(PRIMARY_MODEL)  # 使用主力模型
         
         prompt = f"""
         你是 Ryan，一位幽默的藥師兼旅遊達人。請為我規劃 {prefs.destination} 的 {prefs.days} 天行程。
@@ -1264,8 +1264,8 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
     try:
         genai.configure(api_key=api_key)
         
-        # 使用 Gemini 2.0 Flash (最新版本)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        # 使用最聰明的模型 (gemini-3-flash-preview - 無 RPD 限制)
+        model = genai.GenerativeModel(SMART_NO_TOOL_MODEL)
         
         # 構建對話歷史
         chat_history = [
