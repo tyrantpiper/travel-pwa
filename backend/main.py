@@ -1264,8 +1264,8 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
     try:
         genai.configure(api_key=api_key)
         
-        # 使用 Gemini 1.5 Flash (速度快且聰明)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # 使用 Gemini 2.0 Flash (最新版本)
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
         # 構建對話歷史
         chat_history = [
