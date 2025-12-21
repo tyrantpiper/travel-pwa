@@ -5,7 +5,8 @@ import { useSWRConfig } from "swr"
 import {
     Plus, Trash2, Edit2, Camera, ChevronRight, FileText, Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
-    Sparkles, Upload, Image as ImageIcon, X, ChevronLeft, PieChart, List, Users, User
+    Sparkles, Upload, Image as ImageIcon, X, ChevronLeft, PieChart, List, Users, User,
+    Key, CheckCircle2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -84,6 +85,13 @@ export function ToolsView() {
     const [aiLoading, setAiLoading] = useState(false)
     const [aiResult, setAiResult] = useState<any>(null)
     const [isSaving, setIsSaving] = useState(false)
+    const [hasApiKey, setHasApiKey] = useState(false)
+
+    useEffect(() => {
+        // Check if user has API key
+        const storedKey = localStorage.getItem("user_gemini_key")
+        setHasApiKey(!!storedKey)
+    }, [])
 
     useEffect(() => {
         fetch("https://api.exchangerate-api.com/v4/latest/JPY")
@@ -477,6 +485,43 @@ export function ToolsView() {
                 </TabsContent>
 
                 <TabsContent value="ai" className="mt-4 space-y-4">
+                    {/* API Key Prompt */}
+                    {!hasApiKey && (
+                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-amber-100 p-2 rounded-full">
+                                    <Key className="w-4 h-4 text-amber-600" />
+                                </div>
+                                <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
+                            </div>
+                            <p className="text-sm text-amber-700">
+                                使用 AI 行程產生器前，請先設定 Gemini API Key
+                            </p>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-amber-600">💡 完全免費！</span>
+                                <Button
+                                    size="sm"
+                                    className="bg-amber-500 hover:bg-amber-600 text-white"
+                                    onClick={() => {
+                                        // Navigate to profile (need to use custom event or context)
+                                        const event = new CustomEvent('navigate-to-profile')
+                                        window.dispatchEvent(event)
+                                        toast.info("請在 Profile 頁面設定 AI API Key")
+                                    }}
+                                >
+                                    前往 Profile 設定 →
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {hasApiKey && (
+                        <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
+                            <CheckCircle2 className="w-4 h-4" />
+                            <span>AI 功能已啟用</span>
+                        </div>
+                    )}
+
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button variant="outline" className="h-14 w-full bg-white justify-between">

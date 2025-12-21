@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2, X,
-    Shield, Copy, Globe
+    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,13 @@ import { createClient } from "@supabase/supabase-js"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { toast } from "sonner"
+import {
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog"
+import {
+    Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Label } from "@/components/ui/label"
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +30,9 @@ const supabase = createClient(
 export function ProfileView() {
     const { lang, setLang, t } = useLanguage()
     const [isEditing, setIsEditing] = useState(false)
+    const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
+    const [apiKey, setApiKey] = useState("")
+    const [hasApiKey, setHasApiKey] = useState(false)
 
     const [profile, setProfile] = useState({
         nickname: "Traveler",
@@ -34,12 +44,18 @@ export function ProfileView() {
     useEffect(() => {
         const name = localStorage.getItem("user_nickname")
         const avatar = localStorage.getItem("user_avatar")
+        const storedKey = localStorage.getItem("user_gemini_key")
 
         setProfile(prev => ({
             ...prev,
             nickname: name || "Traveler",
             avatarUrl: avatar || ""
         }))
+
+        if (storedKey) {
+            setApiKey(storedKey)
+            setHasApiKey(true)
+        }
     }, [])
 
     const handleSaveProfile = () => {
@@ -75,6 +91,21 @@ export function ProfileView() {
             localStorage.clear()
             window.location.reload()
         }
+    }
+
+    const handleSaveApiKey = () => {
+        if (!apiKey.trim()) return
+        localStorage.setItem("user_gemini_key", apiKey)
+        setHasApiKey(true)
+        setApiKeyDialogOpen(false)
+        toast.success("API Key 設定成功！")
+    }
+
+    const handleClearApiKey = () => {
+        setApiKey("")
+        localStorage.removeItem("user_gemini_key")
+        setHasApiKey(false)
+        toast.info("API Key 已清除")
     }
 
     return (
@@ -189,6 +220,86 @@ export function ProfileView() {
 
                     <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
                         <MenuItem icon={Globe} label={t('language')} value={lang === 'zh' ? '繁體中文' : 'English'} onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} />
+                        <Separator />
+
+                        {/* AI API Key Setting */}
+                        <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
+                            <DialogTrigger asChild>
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 transition-colors text-slate-700">
+                                    <div className="flex items-center gap-3">
+                                        <Sparkles className="w-5 h-5 text-amber-500" />
+                                        <span className="text-sm font-medium">AI API Key</span>
+                                    </div>
+                                    <span className={cn("text-xs px-2 py-1 rounded", hasApiKey ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600")}>
+                                        {hasApiKey ? "✅ 已設定" : "⚠️ 未設定"}
+                                    </span>
+                                </div>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[450px]">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                        <Key className="w-5 h-5 text-amber-500" />
+                                        AI API Key 設定
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        設定 Gemini API Key 以使用 AI 行程規劃功能。<br />
+                                        <span className="text-xs text-slate-400">（本機儲存，不會傳送給開發者）</span>
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="grid gap-4 py-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="apiKey" className="text-xs font-bold text-slate-500 uppercase">您的 API Key</Label>
+                                        <Input
+                                            id="apiKey"
+                                            type="password"
+                                            value={apiKey}
+                                            onChange={(e) => setApiKey(e.target.value)}
+                                            placeholder="AIzaSy**************************"
+                                            className="font-mono text-sm"
+                                        />
+                                    </div>
+
+                                    <Accordion type="single" collapsible className="w-full bg-slate-50 rounded-lg px-4 border border-slate-100">
+                                        <AccordionItem value="item-1" className="border-b-0">
+                                            <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-3">
+                                                🤔 如何免費獲取 API Key？
+                                            </AccordionTrigger>
+                                            <AccordionContent className="text-xs text-slate-500 space-y-3 pb-4">
+                                                <div className="flex gap-3">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">1</div>
+                                                    <div>
+                                                        前往 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold inline-flex items-center">Google AI Studio <ExternalLink className="w-3 h-3 ml-0.5" /></a> 並登入 Google 帳號。
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">2</div>
+                                                    <div>點擊左側選單的 <b>Get API key</b>。</div>
+                                                </div>
+                                                <div className="flex gap-3">
+                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">3</div>
+                                                    <div>點擊 <b>Create API key</b>，複製 <code>AIza...</code> 開頭的代碼。</div>
+                                                </div>
+                                                <div className="bg-amber-50 text-amber-700 p-2 rounded border border-amber-100 flex items-start gap-2 mt-2">
+                                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                    <span>完全免費！每日可用 1,500 次。</span>
+                                                </div>
+                                            </AccordionContent>
+                                        </AccordionItem>
+                                    </Accordion>
+                                </div>
+
+                                <DialogFooter className="flex flex-row justify-between sm:justify-between gap-2">
+                                    <Button variant="outline" onClick={handleClearApiKey} className="text-slate-400 hover:text-red-500">
+                                        清除
+                                    </Button>
+                                    <Button onClick={handleSaveApiKey} className="bg-slate-900 text-white hover:bg-slate-800 flex-1 sm:flex-none">
+                                        <Key className="w-4 h-4 mr-2" /> 儲存設定
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
                         <Separator />
                         <MenuItem icon={User} label={t('account_settings')} />
                         <Separator />

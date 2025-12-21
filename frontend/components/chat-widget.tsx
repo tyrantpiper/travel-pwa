@@ -132,6 +132,18 @@ export default function ChatWidget() {
     const handleSendMessage = async () => {
         if ((!input.trim() && !selectedImage) || isLoading) return
 
+        // Check for API key
+        const apiKey = localStorage.getItem("user_gemini_key") || ""
+        if (!apiKey) {
+            setMessages(prev => [
+                ...prev,
+                { role: "user", content: input },
+                { role: "model", content: "⚠️ 請先設定 AI API Key！\n\n前往 **Profile** 頁面 → 點擊 **AI API Key** 進行設定。\n\n💡 完全免費！" }
+            ])
+            setInput("")
+            return
+        }
+
         const userMsg = input
         const currentImage = selectedImage
 
@@ -152,7 +164,7 @@ export default function ChatWidget() {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-Gemini-API-Key": localStorage.getItem("gemini_api_key") || ""
+                    "X-Gemini-API-Key": apiKey
                 },
                 body: JSON.stringify({
                     message: userMsg,
