@@ -50,7 +50,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         }
     }
 
-    const activeTrip = trips.find(t => t.id === activeTripId) || null
+    const activeTrip = trips.find((t: any) => t.id === activeTripId) || null
 
     return (
         <TripContext.Provider value={{
