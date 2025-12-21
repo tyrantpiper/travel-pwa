@@ -132,8 +132,8 @@ export default function ChatWidget() {
     const handleSendMessage = async () => {
         if ((!input.trim() && !selectedImage) || isLoading) return
 
-        // Check for API key
-        const apiKey = localStorage.getItem("user_gemini_key") || ""
+        // Check for API key (check both new and old key names for backward compatibility)
+        const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || ""
         if (!apiKey) {
             setMessages(prev => [
                 ...prev,

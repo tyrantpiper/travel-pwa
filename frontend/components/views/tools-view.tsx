@@ -88,8 +88,8 @@ export function ToolsView() {
     const [hasApiKey, setHasApiKey] = useState(false)
 
     useEffect(() => {
-        // Check if user has API key
-        const storedKey = localStorage.getItem("user_gemini_key")
+        // Check if user has API key (check both new and old key names for backward compatibility)
+        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key")
         setHasApiKey(!!storedKey)
     }, [])
 

@@ -44,7 +44,7 @@ export function ProfileView() {
     useEffect(() => {
         const name = localStorage.getItem("user_nickname")
         const avatar = localStorage.getItem("user_avatar")
-        const storedKey = localStorage.getItem("user_gemini_key")
+        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key")
 
         setProfile(prev => ({
             ...prev,
@@ -55,6 +55,11 @@ export function ProfileView() {
         if (storedKey) {
             setApiKey(storedKey)
             setHasApiKey(true)
+            // Migrate old key name to new key name
+            if (!localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
+                localStorage.setItem("user_gemini_key", storedKey)
+                localStorage.removeItem("gemini_api_key")
+            }
         }
     }, [])
 
