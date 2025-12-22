@@ -3,6 +3,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 
 export const ACCENT_COLORS = {
+    default: {
+        name: "預設",
+        gradient: "from-slate-700 to-slate-900",
+        primary: "#1e293b",
+        icon: "⚪"
+    },
     amber: {
         name: "Amber",
         gradient: "from-amber-400 to-orange-500",
@@ -50,7 +56,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [isDark, setIsDark] = useState(false)
-    const [accentColor, setAccentColor] = useState<AccentColor>("amber")
+    const [accentColor, setAccentColor] = useState<AccentColor>("default")
     const [mounted, setMounted] = useState(false)
 
     // 初始化時從 localStorage 讀取
