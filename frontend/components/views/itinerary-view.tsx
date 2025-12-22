@@ -22,13 +22,14 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 import { useHaptic } from "@/lib/hooks"
 import { Loader2 } from "lucide-react"
+import { TripCardSkeleton } from "@/components/ui/skeleton"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export function ItineraryView() {
     const { t } = useLanguage()
-    const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId } = useTripContext()
+    const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading } = useTripContext()
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
     // Use activeTripId from context
@@ -496,7 +497,17 @@ export function ItineraryView() {
                 </div>
 
                 <div className="space-y-4">
-                    {trips.map((trip: any) => (
+                    {/* 載入中骨架屏 */}
+                    {isTripsLoading && (
+                        <>
+                            <TripCardSkeleton />
+                            <TripCardSkeleton />
+                            <TripCardSkeleton />
+                        </>
+                    )}
+
+                    {/* 實際 Trip 列表 */}
+                    {!isTripsLoading && trips.map((trip: any) => (
                         <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
                             <div className="absolute top-2 right-2 z-20">
                                 <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>

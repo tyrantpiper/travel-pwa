@@ -7,6 +7,7 @@ import { ToolsView } from "@/components/views/tools-view"
 import { ProfileView } from "@/components/views/profile-view"
 import { BottomNav } from "@/components/bottom-nav"
 import { TripProvider } from "@/lib/trip-context"
+import { OfflineBanner } from "@/components/ui/offline-banner"
 
 export function AppShell() {
     const [activeView, setActiveView] = useState("itinerary")
@@ -20,6 +21,7 @@ export function AppShell() {
 
     return (
         <TripProvider>
+            <OfflineBanner />
             <div className="min-h-screen bg-background flex flex-col">
                 <main className="flex-1 pb-20 overflow-y-auto">
                     <div className={activeView === "itinerary" ? "block" : "hidden"}><ItineraryView /></div>

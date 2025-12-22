@@ -1,4 +1,5 @@
 import useSWR from "swr"
+import { useState, useEffect } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -70,4 +71,33 @@ export function useHaptic() {
         /** Custom pattern */
         custom: (pattern: number | number[]) => vibrate(pattern)
     }
+}
+
+/**
+ * Online status hook for detecting network connectivity
+ * Usage: const isOnline = useOnlineStatus();
+ * Returns false when user is offline, useful for showing offline notifications
+ */
+export function useOnlineStatus() {
+    const [isOnline, setIsOnline] = useState(true)
+
+    useEffect(() => {
+        // Set initial state (only in browser)
+        if (typeof window !== 'undefined') {
+            setIsOnline(navigator.onLine)
+        }
+
+        const handleOnline = () => setIsOnline(true)
+        const handleOffline = () => setIsOnline(false)
+
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+
+        return () => {
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
+        }
+    }, [])
+
+    return isOnline
 }
