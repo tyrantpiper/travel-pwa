@@ -624,26 +624,34 @@ export function ToolsView() {
                         {/* Date picker - 根據行程天數選擇 */}
                         <div className="space-y-1">
                             <Label className="text-xs text-slate-500">📅 日期</Label>
-                            {activeTrip?.start_date && activeTrip?.days ? (
+                            {activeTrip?.start_date ? (
                                 <select
                                     value={expenseDate}
                                     onChange={e => setExpenseDate(e.target.value)}
                                     className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
                                 >
-                                    {Array.from({ length: activeTrip.days.length || 1 }, (_, i) => {
-                                        const date = new Date(activeTrip.start_date)
-                                        date.setDate(date.getDate() + i)
-                                        const dateStr = date.toISOString().split('T')[0]
-                                        const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
-                                        return (
-                                            <option key={i} value={dateStr}>
-                                                Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
-                                            </option>
-                                        )
-                                    })}
+                                    {(() => {
+                                        // 計算行程天數（從 days array 或 start/end date）
+                                        const startDate = new Date(activeTrip.start_date)
+                                        const endDate = activeTrip.end_date ? new Date(activeTrip.end_date) : null
+                                        const totalDays = activeTrip.days?.length ||
+                                            (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
+
+                                        return Array.from({ length: totalDays }, (_, i) => {
+                                            const date = new Date(activeTrip.start_date)
+                                            date.setDate(date.getDate() + i)
+                                            const dateStr = date.toISOString().split('T')[0]
+                                            const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                                            return (
+                                                <option key={i} value={dateStr}>
+                                                    Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
+                                                </option>
+                                            )
+                                        })
+                                    })()}
                                 </select>
                             ) : (
-                                <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} />
+                                <div className="text-xs text-slate-400 py-2">請先選擇行程</div>
                             )}
                         </div>
 
