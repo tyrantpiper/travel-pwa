@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tabidachi-v2'
-const STATIC_CACHE = 'tabidachi-static-v2'
+const CACHE_NAME = 'tabidachi-v3'
+const STATIC_CACHE = 'tabidachi-static-v3'
 
 // 需要緩存的靜態資源
 const STATIC_ASSETS = [
@@ -40,43 +40,28 @@ self.addEventListener('fetch', (event) => {
     // 跳過非 GET 請求
     if (request.method !== 'GET') return
 
-    // API 請求策略
+    // API 請求：全部使用 NetworkFirst 策略
+    // 確保任何 mutation (新增/刪除/編輯) 後都能立即看到最新資料
     if (url.pathname.startsWith('/api') || request.url.includes('/api/')) {
-        // trips 列表使用 NetworkFirst - 確保刪除/新增後立即更新
-        if (request.url.includes('/api/trips') && !request.url.includes('/expenses')) {
-            event.respondWith(
-                fetch(request)
-                    .then((networkResponse) => {
-                        if (networkResponse.ok) {
-                            caches.open(CACHE_NAME).then((cache) => {
-                                cache.put(request, networkResponse.clone())
-                            })
-                        }
-                        return networkResponse
-                    })
-                    .catch(() => caches.match(request)) // 離線時用緩存
-            )
-            return
-        }
-
-        // 其他 API：Stale-While-Revalidate 策略
         event.respondWith(
-            caches.open(CACHE_NAME).then((cache) => {
-                return cache.match(request).then((cachedResponse) => {
-                    const fetchPromise = fetch(request).then((networkResponse) => {
-                        if (networkResponse.ok) {
+            fetch(request)
+                .then((networkResponse) => {
+                    // 只緩存成功的 GET 請求，供離線使用
+                    if (networkResponse.ok) {
+                        caches.open(CACHE_NAME).then((cache) => {
                             cache.put(request, networkResponse.clone())
-                        }
-                        return networkResponse
-                    }).catch(() => cachedResponse) // 網路失敗時返回緩存
-
-                    // 有緩存就先顯示，同時背景更新
-                    return cachedResponse || fetchPromise
+                        })
+                    }
+                    return networkResponse
                 })
-            })
+                .catch(() => {
+                    // 離線時使用緩存
+                    return caches.match(request)
+                })
         )
         return
     }
+
 
 
     // 圖片：Cache First 策略
