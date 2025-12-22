@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tabidachi-v1'
-const STATIC_CACHE = 'tabidachi-static-v1'
+const CACHE_NAME = 'tabidachi-v2'
+const STATIC_CACHE = 'tabidachi-static-v2'
 
 // 需要緩存的靜態資源
 const STATIC_ASSETS = [
@@ -40,8 +40,26 @@ self.addEventListener('fetch', (event) => {
     // 跳過非 GET 請求
     if (request.method !== 'GET') return
 
-    // API 請求：Stale-While-Revalidate 策略
+    // API 請求策略
     if (url.pathname.startsWith('/api') || request.url.includes('/api/')) {
+        // trips 列表使用 NetworkFirst - 確保刪除/新增後立即更新
+        if (request.url.includes('/api/trips') && !request.url.includes('/expenses')) {
+            event.respondWith(
+                fetch(request)
+                    .then((networkResponse) => {
+                        if (networkResponse.ok) {
+                            caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(request, networkResponse.clone())
+                            })
+                        }
+                        return networkResponse
+                    })
+                    .catch(() => caches.match(request)) // 離線時用緩存
+            )
+            return
+        }
+
+        // 其他 API：Stale-While-Revalidate 策略
         event.respondWith(
             caches.open(CACHE_NAME).then((cache) => {
                 return cache.match(request).then((cachedResponse) => {
@@ -59,6 +77,7 @@ self.addEventListener('fetch', (event) => {
         )
         return
     }
+
 
     // 圖片：Cache First 策略
     if (request.destination === 'image') {
