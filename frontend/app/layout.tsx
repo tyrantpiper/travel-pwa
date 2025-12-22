@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
 
 import { LanguageProvider } from "@/lib/LanguageContext"
+import { ThemeProvider } from "@/lib/ThemeContext"
 import ChatWidget from "@/components/chat-widget"
 
 const inter = Inter({ subsets: ["latin"] });
@@ -35,10 +36,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <LanguageProvider>
-          {children}
-          <ChatWidget />
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            {children}
+            <ChatWidget />
+          </LanguageProvider>
+        </ThemeProvider>
         <Toaster position="bottom-center" richColors />
       </body>
     </html>

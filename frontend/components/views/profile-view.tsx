@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2, X,
-    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle
+    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { createClient } from "@supabase/supabase-js"
 import { useLanguage } from "@/lib/LanguageContext"
+import { useTheme, ACCENT_COLORS, AccentColor } from "@/lib/ThemeContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { toast } from "sonner"
 import {
@@ -21,6 +22,7 @@ import {
     Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +31,7 @@ const supabase = createClient(
 
 export function ProfileView() {
     const { lang, setLang, t } = useLanguage()
+    const { isDark, toggleDark, accentColor, setAccentColor, currentTheme } = useTheme()
     const [isEditing, setIsEditing] = useState(false)
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
     const [apiKey, setApiKey] = useState("")
@@ -225,11 +228,46 @@ export function ProfileView() {
                 <div className="mt-10 space-y-4">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Settings</h3>
 
-                    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden shadow-sm">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl border border-stone-200 dark:border-slate-700 overflow-hidden shadow-sm">
                         <MenuItem icon={Globe} label={t('language')} value={lang === 'zh' ? '繁體中文' : 'English'} onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} />
                         <Separator />
 
-                        {/* AI API Key Setting */}
+                        {/* 🌙 Dark Mode Toggle */}
+                        <div className="flex items-center justify-between p-4 text-slate-700 dark:text-slate-200">
+                            <div className="flex items-center gap-3">
+                                {isDark ? <Moon className="w-5 h-5 text-indigo-400" /> : <Sun className="w-5 h-5 text-amber-500" />}
+                                <span className="text-sm font-medium">深色模式</span>
+                            </div>
+                            <Switch checked={isDark} onCheckedChange={toggleDark} />
+                        </div>
+                        <Separator />
+
+                        {/* 🎨 Accent Color Selector */}
+                        <div className="p-4 text-slate-700 dark:text-slate-200">
+                            <div className="flex items-center gap-3 mb-3">
+                                <Palette className="w-5 h-5 text-slate-400" />
+                                <span className="text-sm font-medium">主題色</span>
+                            </div>
+                            <div className="flex gap-2 ml-8">
+                                {(Object.keys(ACCENT_COLORS) as AccentColor[]).map(color => (
+                                    <button
+                                        key={color}
+                                        onClick={() => setAccentColor(color)}
+                                        className={cn(
+                                            "w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all",
+                                            `bg-gradient-to-br ${ACCENT_COLORS[color].gradient}`,
+                                            accentColor === color
+                                                ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-white scale-110"
+                                                : "opacity-70 hover:opacity-100"
+                                        )}
+                                        title={ACCENT_COLORS[color].name}
+                                    >
+                                        {accentColor === color && "✓"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <Separator />
                         <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
                             <DialogTrigger asChild>
                                 <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 transition-colors text-slate-700">
