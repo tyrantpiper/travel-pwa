@@ -32,7 +32,7 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
         // 1. 優先檢查開發者後門
         const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
         if (devKey) {
-            console.log("🚀 Developer Mode: Key Auto-loaded")
+
             setKey(devKey)
             onKeySaved(devKey)
             setIsDev(true)

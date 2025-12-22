@@ -33,8 +33,6 @@ export function ItineraryView() {
 
     // Use activeTripId from context
     const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId)
-    // 🔍 除錯：檢查 activeTripId 和 currentTrip
-    console.log("🔍 [Trip Debug]", { activeTripId, currentTrip: currentTrip ? 'loaded' : 'null', viewMode })
 
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [newTripTitle, setNewTripTitle] = useState("")
@@ -450,14 +448,6 @@ export function ItineraryView() {
         }
         return 7
     })()
-    // 🔍 除錯：顯示 totalDays 計算結果
-    console.log("🔢 [totalDays Debug]", {
-        totalDays,
-        start_date: currentTrip?.start_date,
-        end_date: currentTrip?.end_date,
-        daysCount: currentTrip?.days?.length,
-        maxDayNumber: currentTrip?.days?.length > 0 ? Math.max(...currentTrip.days.map((d: any) => d.day || 1)) : 'N/A'
-    })
     const dayNumbers = Array.from({ length: totalDays }, (_, i) => i + 1)
 
     const getDateInfo = (dayNum: number) => {
@@ -511,7 +501,7 @@ export function ItineraryView() {
                             <div className="absolute top-2 right-2 z-20">
                                 <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>
                             </div>
-                            <div className="cursor-pointer active:opacity-90" onClick={() => { console.log("🔔 Card clicked, trip.id:", trip.id); setActiveTripId(trip.id); setViewMode('detail'); }}>
+                            <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
                                 <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                                     {trip.cover_image ? (
                                         <img src={trip.cover_image} alt="cover" className="w-full h-full object-cover opacity-80" />

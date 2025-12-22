@@ -32,11 +32,8 @@ function useRoute(markersKey: string, markers: any[], mode: string, optimize: bo
         const fetchRoute = async () => {
             setLoading(true)
 
-            // 🔍 除錯：檢查 markers 座標是否有效
+            // 取得有效 markers
             const stopsPayload = markers.map(m => ({ lat: m.lat, lng: m.lng, name: m.place }))
-            console.log("🛣️ [Route Debug] API_BASE:", API_BASE)
-            console.log("🛣️ [Route Debug] Stops:", stopsPayload)
-            console.log("🛣️ [Route Debug] Mode:", mode, "Optimize:", optimize)
 
             // 驗證座標有效性
             const validStops = stopsPayload.filter(s =>
@@ -89,8 +86,6 @@ function useRoute(markersKey: string, markers: any[], mode: string, optimize: bo
                     })
                 })
 
-                console.log("🛣️ [Route Debug] Response status:", res.status)
-
                 if (!res.ok) {
                     const errorText = await res.text()
                     console.error("❌ [Route Debug] API Error:", res.status, errorText)
@@ -98,7 +93,6 @@ function useRoute(markersKey: string, markers: any[], mode: string, optimize: bo
                 }
 
                 const data = await res.json()
-                console.log("✅ [Route Debug] Route data:", data.source, data.distance)
 
                 if (data.route) {
                     setRoute(data.route)
