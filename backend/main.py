@@ -353,14 +353,59 @@ class GeocodeReverseRequest(BaseModel):
 
 @app.post("/api/geocode/search")
 async def geocode_search(request: GeocodeSearchRequest):
-    """地理編碼搜尋：ArcGIS（精確）→ Photon（備援）
+    """🔍 混合地理編碼搜尋（三層架構）
     
-    回傳多個結果供使用者選擇
+    優先使用免費服務，確保最高成功率：
+    1️⃣ Photon（快速、免費、模糊搜尋）
+    2️⃣ Nominatim（結構化確認）
+    3️⃣ ArcGIS（最終保障，最精確）
     """
     print(f"🔍 Geocode search: {request.query}")
     
-    # 1. 優先嘗試 ArcGIS（返回多個結果）
+    # ========== 第一層：Photon（快速且免費）==========
+    print("   [1️⃣ Photon] 嘗試中...")
+    photon_results = await geocode_with_photon(request.query, request.limit)
+    if photon_results and len(photon_results) > 0:
+        for r in photon_results:
+            r["source"] = "photon"
+        print(f"   ✅ Photon 找到 {len(photon_results)} 個結果")
+        return {"results": photon_results, "source": "photon"}
+    
+    # ========== 第二層：Nominatim（結構化搜尋）==========
+    print("   [2️⃣ Nominatim] Photon 無結果，嘗試 Nominatim...")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": request.query,
+                    "format": "json",
+                    "limit": request.limit,
+                    "addressdetails": 1,
+                    "accept-language": "zh-TW,ja,en"
+                },
+                headers={"User-Agent": "RyanTravelApp/2.0"}
+            )
+            data = res.json()
+            if data and len(data) > 0:
+                results = []
+                for item in data:
+                    results.append({
+                        "lat": float(item["lat"]),
+                        "lng": float(item["lon"]),
+                        "name": item.get("name") or item.get("display_name", "").split(",")[0],
+                        "address": item.get("display_name", ""),
+                        "type": item.get("type", "place"),
+                        "source": "nominatim"
+                    })
+                print(f"   ✅ Nominatim 找到 {len(results)} 個結果")
+                return {"results": results, "source": "nominatim"}
+    except Exception as e:
+        print(f"   ⚠️ Nominatim error: {e}")
+    
+    # ========== 第三層：ArcGIS（最終保障）==========
     if ARCGIS_API_KEY:
+        print("   [3️⃣ ArcGIS] 前兩層無結果，使用最終保障...")
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 res = await client.get(
@@ -385,18 +430,13 @@ async def geocode_search(request: GeocodeSearchRequest):
                             "type": c.get("attributes", {}).get("Type", "place"),
                             "source": "arcgis"
                         })
-                    print(f"🗺️ ArcGIS: {len(results)} 結果")
+                    print(f"   ✅ ArcGIS 找到 {len(results)} 個結果")
                     return {"results": results, "source": "arcgis"}
         except Exception as e:
-            print(f"⚠️ ArcGIS search error: {e}")
+            print(f"   ⚠️ ArcGIS error: {e}")
     
-    # 2. 降級到 Photon
-    photon_results = await geocode_with_photon(request.query, request.limit)
-    if photon_results:
-        for r in photon_results:
-            r["source"] = "photon"
-        return {"results": photon_results, "source": "photon"}
-    
+    # ========== 全部失敗 ==========
+    print("   ❌ 三層搜尋均無結果")
     return {"results": [], "source": "none"}
 
 
