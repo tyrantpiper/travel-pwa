@@ -80,10 +80,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("dark_mode", String(isDark))
     }, [isDark, mounted])
 
-    // 當 accentColor 改變時，更新 localStorage
+    // 當 accentColor 改變時，更新 localStorage 和 CSS 變數
     useEffect(() => {
         if (!mounted) return
         localStorage.setItem("accent_color", accentColor)
+
+        // 設置 CSS 變數讓全站可以使用
+        const root = document.documentElement
+        const theme = ACCENT_COLORS[accentColor]
+        root.style.setProperty("--accent-color", theme.primary)
+        root.style.setProperty("--accent-gradient", `linear-gradient(135deg, var(--tw-gradient-stops))`)
     }, [accentColor, mounted])
 
     const toggleDark = () => setIsDark(prev => !prev)

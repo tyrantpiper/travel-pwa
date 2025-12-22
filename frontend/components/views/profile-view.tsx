@@ -119,11 +119,11 @@ export function ProfileView() {
     }
 
     return (
-        <div className="min-h-screen bg-stone-50 pb-32">
+        <div className="min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
 
-            <div className="h-48 bg-slate-900 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-40"></div>
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-stone-50/90"></div>
+            <div className={cn("h-48 relative overflow-hidden bg-gradient-to-br", currentTheme.gradient)}>
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-stone-50/90 dark:to-slate-900/90"></div>
             </div>
 
             <div className="px-6 relative -mt-20">
