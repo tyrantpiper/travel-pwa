@@ -658,21 +658,39 @@ export function ItineraryView() {
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
                                         <div className="flex gap-2">
-                                            <select
-                                                value={searchCountry}
-                                                onChange={e => setSearchCountry(e.target.value)}
-                                                className="w-24 text-sm px-2 py-1.5 rounded-md border border-slate-200 bg-white"
-                                            >
-                                                <option value="">🌍 全球</option>
-                                                <option value="Japan">🇯🇵 日本</option>
-                                                <option value="Taiwan">🇹🇼 台灣</option>
-                                                <option value="Korea">🇰🇷 韓國</option>
-                                                <option value="Thailand">🇹🇭 泰國</option>
-                                                <option value="Vietnam">🇻🇳 越南</option>
-                                                <option value="Hong Kong">🇭🇰 香港</option>
-                                                <option value="Singapore">🇸🇬 新加坡</option>
-                                                <option value="USA">🇺🇸 美國</option>
-                                            </select>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    list="country-list"
+                                                    value={searchCountry}
+                                                    onChange={e => setSearchCountry(e.target.value)}
+                                                    placeholder="🌍 國家"
+                                                    className="w-28 text-sm px-2 py-1.5 rounded-md border border-slate-200 bg-white"
+                                                />
+                                                <datalist id="country-list">
+                                                    <option value="">🌍 全球</option>
+                                                    <option value="Japan">🇯🇵 日本 Japan</option>
+                                                    <option value="Taiwan">🇹🇼 台灣 Taiwan</option>
+                                                    <option value="South Korea">🇰🇷 韓國 Korea</option>
+                                                    <option value="Thailand">🇹🇭 泰國 Thailand</option>
+                                                    <option value="Vietnam">🇻🇳 越南 Vietnam</option>
+                                                    <option value="Hong Kong">🇭🇰 香港 HK</option>
+                                                    <option value="Singapore">🇸🇬 新加坡 SG</option>
+                                                    <option value="Malaysia">🇲🇾 馬來西亞 MY</option>
+                                                    <option value="Philippines">🇵🇭 菲律賓 PH</option>
+                                                    <option value="Indonesia">🇮🇩 印尼 ID</option>
+                                                    <option value="China">🇨🇳 中國 China</option>
+                                                    <option value="USA">🇺🇸 美國 USA</option>
+                                                    <option value="Canada">🇨🇦 加拿大 CA</option>
+                                                    <option value="UK">🇬🇧 英國 UK</option>
+                                                    <option value="France">🇫🇷 法國 France</option>
+                                                    <option value="Italy">🇮🇹 義大利 Italy</option>
+                                                    <option value="Germany">🇩🇪 德國 Germany</option>
+                                                    <option value="Spain">🇪🇸 西班牙 Spain</option>
+                                                    <option value="Australia">🇦🇺 澳洲 AU</option>
+                                                    <option value="New Zealand">🇳🇿 紐西蘭 NZ</option>
+                                                </datalist>
+                                            </div>
                                             <Input
                                                 placeholder="輸入地點名稱..."
                                                 value={newLocName}
@@ -684,7 +702,7 @@ export function ItineraryView() {
                                                 {isLocSearching ? "..." : "搜尋"}
                                             </Button>
                                         </div>
-                                        <p className="text-[10px] text-slate-400">💡 選擇國家可提高短地名的搜尋準確度</p>
+                                        <p className="text-[10px] text-slate-400">💡 輸入或選擇國家可提高短地名的搜尋準確度</p>
                                     </div>
 
                                     {locSearchResults.length > 0 && (
