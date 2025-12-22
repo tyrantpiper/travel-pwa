@@ -17,6 +17,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
+import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 
 // API URL
@@ -75,6 +76,28 @@ export function InfoView() {
         fetchInfo()
     }, [activeTripId])
 
+    // 獨立的刷新函數供 PullToRefresh 使用
+    const refreshInfo = async () => {
+        if (!activeTripId) return
+        try {
+            const res = await fetch(`${API_BASE}/api/trips/${activeTripId}`)
+            const data = await res.json()
+            if (data) {
+                if (data.flight_info?.outbound) {
+                    setFlights({
+                        outbound: { ...DEFAULT_FLIGHTS.outbound, ...data.flight_info.outbound },
+                        inbound: { ...DEFAULT_FLIGHTS.inbound, ...data.flight_info.inbound }
+                    })
+                }
+                const hData = data.hotel_info || {}
+                const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
+                    .map((h: any) => ({ ...DEFAULT_HOTEL, ...h }))
+                setHotels(parsedHotels)
+                toast.success("資料已更新")
+            }
+        } catch (e) { console.error(e) }
+    }
+
     const handleSave = async () => {
         if (!activeTripId) return
         try {
@@ -120,96 +143,96 @@ export function InfoView() {
 
     return (
         <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
-            <header className="mb-6 flex justify-between items-start">
+            <header className="mb-6 space-y-3">
                 <div>
                     <h1 className="text-3xl font-serif text-slate-900">{t('trip_info')}</h1>
                     <p className="text-slate-500 text-sm">{t('trip_details')}</p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                    <TripSwitcher />
-                    <Button
-                        variant={isEditing ? "default" : "outline"}
-                        size="sm"
-                        disabled={!activeTripId}
-                        onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                        className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
-                    >
-                        {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
-                    </Button>
-                </div>
+                <TripSwitcher />
+                <Button
+                    variant={isEditing ? "default" : "outline"}
+                    size="sm"
+                    disabled={!activeTripId}
+                    onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                    className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
+                >
+                    {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
+                </Button>
             </header>
 
-            <div className="space-y-8">
-                {!activeTripId ? (
-                    <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                        <Info className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                        <p>No trip selected</p>
-                        <p className="text-sm">Please select or create a trip to view details.</p>
-                    </div>
-                ) : (
-                    <>
-                        <section>
-                            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Plane className="w-4 h-4" /> {t('flight_details')}
-                            </h2>
-                            <Tabs defaultValue="outbound" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl">
-                                    <TabsTrigger value="outbound" className="rounded-lg data-[state=active]:bg-white">{t('outbound')}</TabsTrigger>
-                                    <TabsTrigger value="inbound" className="rounded-lg data-[state=active]:bg-white">{t('inbound')}</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="outbound">
-                                    <FlightCard data={flights.outbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })} />
-                                </TabsContent>
-                                <TabsContent value="inbound">
-                                    <FlightCard data={flights.inbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })} />
-                                </TabsContent>
-                            </Tabs>
-                        </section>
-
-                        <section>
-                            <div className="flex justify-between items-center mb-3">
-                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Bed className="w-4 h-4" /> {t('accommodation')}
+            <PullToRefresh onRefresh={refreshInfo} className="flex-1">
+                <div className="space-y-8">
+                    {!activeTripId ? (
+                        <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                            <Info className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                            <p>No trip selected</p>
+                            <p className="text-sm">Please select or create a trip to view details.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <section>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <Plane className="w-4 h-4" /> {t('flight_details')}
                                 </h2>
-                                {isEditing && <Button size="sm" variant="ghost" onClick={addHotel} className="h-6 text-xs text-blue-600">{t('add_hotel')}</Button>}
-                            </div>
+                                <Tabs defaultValue="outbound" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl">
+                                        <TabsTrigger value="outbound" className="rounded-lg data-[state=active]:bg-white">{t('outbound')}</TabsTrigger>
+                                        <TabsTrigger value="inbound" className="rounded-lg data-[state=active]:bg-white">{t('inbound')}</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="outbound">
+                                        <FlightCard data={flights.outbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })} />
+                                    </TabsContent>
+                                    <TabsContent value="inbound">
+                                        <FlightCard data={flights.inbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })} />
+                                    </TabsContent>
+                                </Tabs>
+                            </section>
 
-                            <div className="space-y-3">
-                                {hotels.map((item, idx) => (
-                                    <Card key={idx} className="border-0 shadow-sm relative group overflow-hidden">
-                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
-                                        <CardContent className="p-4 pl-6">
-                                            {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
+                            <section>
+                                <div className="flex justify-between items-center mb-3">
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <Bed className="w-4 h-4" /> {t('accommodation')}
+                                    </h2>
+                                    {isEditing && <Button size="sm" variant="ghost" onClick={addHotel} className="h-6 text-xs text-blue-600">{t('add_hotel')}</Button>}
+                                </div>
 
-                                            <div className="space-y-3">
-                                                <div className="space-y-1">
-                                                    <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
-                                                    <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> Address</Label><Input disabled={!isEditing} value={item.address} onChange={e => updateHotel(idx, 'address', e.target.value)} className={isEditing ? "bg-white h-8 text-xs" : "bg-transparent border-0 p-0 h-auto text-sm text-slate-600 shadow-none focus-visible:ring-0"} placeholder="Address..." /></div>
-                                                    <div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Ticket className="w-3 h-3" /> Booking ID</Label><Input disabled={!isEditing} value={item.booking_id} onChange={e => updateHotel(idx, 'booking_id', e.target.value)} className={isEditing ? "bg-white h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-sm font-mono text-indigo-600 shadow-none focus-visible:ring-0"} placeholder="Booking ID..." /></div>
-                                                </div>
+                                <div className="space-y-3">
+                                    {hotels.map((item, idx) => (
+                                        <Card key={idx} className="border-0 shadow-sm relative group overflow-hidden">
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
+                                            <CardContent className="p-4 pl-6">
+                                                {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
 
-                                                <div className="pt-2 border-t border-slate-100 mt-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="w-full text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
-                                                        onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
-                                                    >
-                                                        <Info className="w-3 h-3 mr-2" /> {t('details')}
-                                                    </Button>
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
+                                                        <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> Address</Label><Input disabled={!isEditing} value={item.address} onChange={e => updateHotel(idx, 'address', e.target.value)} className={isEditing ? "bg-white h-8 text-xs" : "bg-transparent border-0 p-0 h-auto text-sm text-slate-600 shadow-none focus-visible:ring-0"} placeholder="Address..." /></div>
+                                                        <div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Ticket className="w-3 h-3" /> Booking ID</Label><Input disabled={!isEditing} value={item.booking_id} onChange={e => updateHotel(idx, 'booking_id', e.target.value)} className={isEditing ? "bg-white h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-sm font-mono text-indigo-600 shadow-none focus-visible:ring-0"} placeholder="Booking ID..." /></div>
+                                                    </div>
+
+                                                    <div className="pt-2 border-t border-slate-100 mt-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="w-full text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
+                                                            onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
+                                                        >
+                                                            <Info className="w-3 h-3 mr-2" /> {t('details')}
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        </section>
-                    </>
-                )}
-            </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </section>
+                        </>
+                    )}
+                </div>
+            </PullToRefresh>
 
             <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
                 <DialogContent className="sm:max-w-md h-[85vh] flex flex-col p-0 gap-0">

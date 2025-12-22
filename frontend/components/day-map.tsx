@@ -1,85 +1,10 @@
 "use client"
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet"
-import "leaflet/dist/leaflet.css"
-import L from "leaflet"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
+import Map, { Marker, Popup, Source, Layer, NavigationControl } from "react-map-gl/maplibre"
+import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
+import "maplibre-gl/dist/maplibre-gl.css"
 import { Bus, Car, Footprints } from "lucide-react"
-
-// 自訂標記 Icon
-const createNumberedIcon = (number: number, color = "#0f172a") => {
-    return L.divIcon({
-        className: "custom-marker",
-        html: `<div style="background-color: ${color}; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); font-size: 12px;">${number}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-    })
-}
-
-// 自動縮放地圖以涵蓋所有點
-function FitBounds({ markers }: { markers: any[] }) {
-    const map = useMap()
-    useEffect(() => {
-        if (markers.length > 0) {
-            const group = new L.FeatureGroup(markers.map((m) => L.marker([m.lat, m.lng])))
-            map.fitBounds(group.getBounds().pad(0.15))
-        }
-    }, [markers, map])
-    return null
-}
-
-// 路線規劃 Hook
-function useRoute(markersKey: string, markers: any[], mode: string) {
-    const [route, setRoute] = useState<[number, number][]>([])
-    const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string } | null>(null)
-    const [loading, setLoading] = useState(false)
-
-    useEffect(() => {
-        if (markers.length < 2) {
-            setRoute([])
-            setRouteInfo(null)
-            return
-        }
-
-        const fetchRoute = async () => {
-            setLoading(true)
-            try {
-                // 建立座標字串 (OSRM 格式: lng,lat;lng,lat;...)
-                const coords = markers.map(m => `${m.lng},${m.lat}`).join(';')
-
-                // OSRM profile: foot (步行), car (開車), bike (腳踏車)
-                const profile = mode === 'walk' ? 'foot' : mode === 'drive' ? 'car' : 'foot'
-
-                const res = await fetch(
-                    `https://router.project-osrm.org/route/v1/${profile}/${coords}?overview=full&geometries=geojson`
-                )
-                const data = await res.json()
-
-                if (data.routes && data.routes.length > 0) {
-                    const geometry = data.routes[0].geometry.coordinates
-                    // GeoJSON 座標是 [lng, lat]，需要轉換為 [lat, lng]
-                    setRoute(geometry.map((c: number[]) => [c[1], c[0]] as [number, number]))
-
-                    // 計算時間和距離
-                    const distanceKm = (data.routes[0].distance / 1000).toFixed(1)
-                    const durationMin = Math.round(data.routes[0].duration / 60)
-                    setRouteInfo({
-                        distance: `${distanceKm} km`,
-                        duration: durationMin < 60 ? `${durationMin} 分鐘` : `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
-                    })
-                }
-            } catch (e) {
-                console.error("Route fetch error:", e)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchRoute()
-    }, [markersKey, mode]) // 使用穩定的 markersKey 而非 markers 陣列
-
-    return { route, routeInfo, loading }
-}
 
 // 路線顏色對照
 const routeColors = {
@@ -88,12 +13,126 @@ const routeColors = {
     transit: "#f59e0b", // 橘色 - 大眾運輸
 }
 
+// API 基礎路徑
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// 路線規劃 Hook (使用後端 /api/route 代理)
+function useRoute(markersKey: string, markers: any[], mode: string, optimize: boolean = false) {
+    const [route, setRoute] = useState<GeoJSON.Feature | null>(null)
+    const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; source?: string } | null>(null)
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (markers.length < 2) {
+            setRoute(null)
+            setRouteInfo(null)
+            return
+        }
+
+        const fetchRoute = async () => {
+            setLoading(true)
+
+            // 🔍 除錯：檢查 markers 座標是否有效
+            const stopsPayload = markers.map(m => ({ lat: m.lat, lng: m.lng, name: m.place }))
+            console.log("🛣️ [Route Debug] API_BASE:", API_BASE)
+            console.log("🛣️ [Route Debug] Stops:", stopsPayload)
+            console.log("🛣️ [Route Debug] Mode:", mode, "Optimize:", optimize)
+
+            // 驗證座標有效性
+            const validStops = stopsPayload.filter(s =>
+                s.lat && s.lng &&
+                typeof s.lat === 'number' && typeof s.lng === 'number' &&
+                s.lat !== 0 && s.lng !== 0
+            )
+
+            if (validStops.length < 2) {
+                console.warn("⚠️ [Route Debug] 少於 2 個有效座標，跳過路線計算")
+                setRoute(null)
+                setRouteInfo(null)
+                setLoading(false)
+                return
+            }
+
+            // 🆕 檢測跨區域路線 (跨國/跨海) - 緯度差超過 5 度視為跨區域
+            const lats = validStops.map(s => s.lat)
+            const latSpan = Math.max(...lats) - Math.min(...lats)
+
+            if (latSpan > 5) {
+                console.warn("⚠️ [Route Debug] 跨區域路線 (緯度差:", latSpan.toFixed(2), "度)，使用直線連接")
+                // 🆕 繪製直線連接所有點 (虛線表示非步行路線)
+                const straightLineRoute: GeoJSON.Feature = {
+                    type: "Feature",
+                    properties: {},
+                    geometry: {
+                        type: "LineString",
+                        coordinates: validStops.map(s => [s.lng, s.lat])
+                    }
+                }
+                setRoute(straightLineRoute)
+                setRouteInfo({
+                    distance: "跨區域",
+                    duration: "含航班",
+                    source: "straight-line"
+                })
+                setLoading(false)
+                return
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/route`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        stops: validStops,  // 只傳送有效座標
+                        mode,
+                        optimize
+                    })
+                })
+
+                console.log("🛣️ [Route Debug] Response status:", res.status)
+
+                if (!res.ok) {
+                    const errorText = await res.text()
+                    console.error("❌ [Route Debug] API Error:", res.status, errorText)
+                    throw new Error(`Route API failed: ${res.status}`)
+                }
+
+                const data = await res.json()
+                console.log("✅ [Route Debug] Route data:", data.source, data.distance)
+
+                if (data.route) {
+                    setRoute(data.route)
+                    setRouteInfo({
+                        distance: data.distance,
+                        duration: data.duration,
+                        source: data.source
+                    })
+                }
+            } catch (e) {
+                console.error("❌ [Route Debug] Fetch error:", e)
+                // 故障安全：清除路線但不崩潰
+                setRoute(null)
+                setRouteInfo(null)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchRoute()
+    }, [markersKey, mode, optimize])
+
+    return { route, routeInfo, loading }
+}
+
 interface DayMapProps {
     activities: any[]
 }
 
 export default function DayMap({ activities }: DayMapProps) {
+    const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
+    const [popupInfo, setPopupInfo] = useState<any>(null)
+    const [mapLoaded, setMapLoaded] = useState(false)  // 🆕 地圖載入狀態
 
     // 過濾出有座標的地點
     const markers = activities
@@ -103,10 +142,35 @@ export default function DayMap({ activities }: DayMapProps) {
             number: index + 1
         }))
 
-    // 建立穩定的 key 避免 useEffect 無限觸發
     const markersKey = markers.map(m => `${m.lat},${m.lng}`).join('|')
-
     const { route, routeInfo, loading } = useRoute(markersKey, markers, mode)
+
+    // 自動縮放到所有點
+    const fitBounds = useCallback(() => {
+        if (markers.length === 0 || !mapRef.current || !mapLoaded) return  // 🆕 檢查 mapLoaded
+
+        if (markers.length === 1) {
+            mapRef.current.flyTo({
+                center: [markers[0].lng, markers[0].lat],
+                zoom: 15
+            })
+            return
+        }
+
+        const lngs = markers.map(m => m.lng)
+        const lats = markers.map(m => m.lat)
+        const bounds: LngLatBoundsLike = [
+            [Math.min(...lngs), Math.min(...lats)],
+            [Math.max(...lngs), Math.max(...lats)]
+        ]
+
+        mapRef.current.fitBounds(bounds, { padding: 60, duration: 500 })
+    }, [markers, mapLoaded])  // 🆕 加入 mapLoaded 依賴
+
+    useEffect(() => {
+        const timer = setTimeout(fitBounds, 100)
+        return () => clearTimeout(timer)
+    }, [fitBounds])
 
     if (markers.length === 0) {
         return (
@@ -119,7 +183,7 @@ export default function DayMap({ activities }: DayMapProps) {
         )
     }
 
-    const center = [markers[0].lat, markers[0].lng] as [number, number]
+    const center = { longitude: markers[0].lng, latitude: markers[0].lat }
 
     return (
         <div className="space-y-2">
@@ -164,23 +228,33 @@ export default function DayMap({ activities }: DayMapProps) {
 
             {/* 地圖容器 */}
             <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-72 w-full z-0 relative">
-                <MapContainer center={center} zoom={13} scrollWheelZoom={true} className="h-full w-full">
-                    <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                    />
+                <Map
+                    ref={mapRef}
+                    initialViewState={{
+                        longitude: center.longitude,
+                        latitude: center.latitude,
+                        zoom: 13
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                    mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+                    onLoad={() => setMapLoaded(true)}  // 🆕 地圖載入完成
+                >
+                    <NavigationControl position="top-right" />
 
                     {/* 路線繪製 */}
-                    {route.length > 0 && (
-                        <Polyline
-                            positions={route}
-                            pathOptions={{
-                                color: routeColors[mode],
-                                weight: 5,
-                                opacity: 0.8,
-                                dashArray: mode === 'transit' ? '10, 10' : undefined,
-                            }}
-                        />
+                    {route && (
+                        <Source id="route" type="geojson" data={route}>
+                            <Layer
+                                id="route-line"
+                                type="line"
+                                paint={{
+                                    "line-color": routeInfo?.source === 'straight-line' ? '#94a3b8' : routeColors[mode],
+                                    "line-width": routeInfo?.source === 'straight-line' ? 3 : 5,
+                                    "line-opacity": routeInfo?.source === 'straight-line' ? 0.6 : 0.8,
+                                    "line-dasharray": routeInfo?.source === 'straight-line' || mode === 'transit' ? [2, 2] : [1, 0]
+                                }}
+                            />
+                        </Source>
                     )}
 
                     {/* 標記點 */}
@@ -190,28 +264,64 @@ export default function DayMap({ activities }: DayMapProps) {
                         const color = isFirst ? "#22c55e" : isLast ? "#ef4444" : "#0f172a"
 
                         return (
-                            <Marker key={m.id || m.place} position={[m.lat, m.lng]} icon={createNumberedIcon(m.number, color)}>
-                                <Popup>
-                                    <div className="min-w-[150px]">
-                                        <div className="font-bold text-sm">{m.number}. {m.place}</div>
-                                        {m.time && <div className="text-xs text-slate-500 mt-1">🕐 {m.time}</div>}
-                                        {m.desc && <div className="text-xs text-slate-600 mt-1">{m.desc}</div>}
-                                        <a
-                                            href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block mt-2 text-xs text-blue-500 hover:underline"
-                                        >
-                                            📍 在 Google Maps 開啟導航
-                                        </a>
-                                    </div>
-                                </Popup>
+                            <Marker
+                                key={m.id || `marker-${idx}`}
+                                longitude={m.lng}
+                                latitude={m.lat}
+                                anchor="center"
+                                onClick={(e) => {
+                                    e.originalEvent.stopPropagation()
+                                    setPopupInfo(m)
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        backgroundColor: color,
+                                        color: "white",
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: "50%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontWeight: "bold",
+                                        border: "3px solid white",
+                                        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                                        fontSize: 12,
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    {m.number}
+                                </div>
                             </Marker>
                         )
                     })}
 
-                    <FitBounds markers={markers} />
-                </MapContainer>
+                    {/* 彈出視窗 */}
+                    {popupInfo && (
+                        <Popup
+                            longitude={popupInfo.lng}
+                            latitude={popupInfo.lat}
+                            anchor="bottom"
+                            onClose={() => setPopupInfo(null)}
+                            closeOnClick={false}
+                        >
+                            <div className="min-w-[150px] p-1">
+                                <div className="font-bold text-sm">{popupInfo.number}. {popupInfo.place}</div>
+                                {popupInfo.time && <div className="text-xs text-slate-500 mt-1">🕐 {popupInfo.time}</div>}
+                                {popupInfo.desc && <div className="text-xs text-slate-600 mt-1">{popupInfo.desc}</div>}
+                                <a
+                                    href={`https://www.google.com/maps/dir/?api=1&destination=${popupInfo.lat},${popupInfo.lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block mt-2 text-xs text-blue-500 hover:underline"
+                                >
+                                    📍 在 Google Maps 開啟導航
+                                </a>
+                            </div>
+                        </Popup>
+                    )}
+                </Map>
             </div>
 
             {/* 圖例 */}

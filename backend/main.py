@@ -33,6 +33,13 @@ try:
 except Exception as e:
     print(f"⚠️ Supabase Warning: {e}")
 
+# 4. 載入 ArcGIS API Key (地理編碼用，可選)
+ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+if ARCGIS_API_KEY:
+    print("🗺️ ArcGIS Geocoding: 已啟用")
+else:
+    print("🗺️ ArcGIS Geocoding: 未設定，使用 Nominatim 備援")
+
 # --- AI 模型設定區 (2.5 版混合動力引擎) ---
 # 1. 主力模型 (支援 Maps, 500 RPD)
 PRIMARY_MODEL = "gemini-2.5-flash"
@@ -174,9 +181,36 @@ async def generate_itinerary(
         print(f"🔥 AI Error: {e}")
         raise HTTPException(status_code=400, detail=f"AI Service Error: {str(e)}")
 
-# 🌍 地理編碼輔助函數 (使用 OpenStreetMap Nominatim API 獲取精確 POI 資料)
-async def geocode_place(place_name: str):
-    """使用 OpenStreetMap Nominatim API 獲取地點座標"""
+# 🌍 地理編碼雙引擎系統 (ArcGIS + Nominatim)
+
+async def geocode_with_arcgis(place_name: str):
+    """ArcGIS World Geocoding Service (精確度高，支援日本POI)"""
+    if not ARCGIS_API_KEY:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(
+                "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+                params={
+                    "SingleLine": place_name,
+                    "f": "json",
+                    "outFields": "PlaceName,Place_addr",
+                    "maxLocations": 1,
+                    "token": ARCGIS_API_KEY
+                }
+            )
+            data = res.json()
+            if data.get("candidates"):
+                loc = data["candidates"][0]["location"]
+                print(f"🗺️ ArcGIS: {place_name} → ({loc['y']:.4f}, {loc['x']:.4f})")
+                return {"lat": loc["y"], "lng": loc["x"]}
+    except Exception as e:
+        print(f"⚠️ ArcGIS error for '{place_name}': {e}")
+    return None
+
+
+async def geocode_with_nominatim(place_name: str):
+    """Nominatim 備援 (OpenStreetMap)"""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.get(
@@ -192,10 +226,28 @@ async def geocode_place(place_name: str):
             data = res.json()
             if data and len(data) > 0:
                 result = data[0]
+                print(f"🌍 Nominatim: {place_name} → ({result['lat']}, {result['lon']})")
                 return {"lat": float(result["lat"]), "lng": float(result["lon"])}
     except Exception as e:
-        print(f"🌍 Geocode error for '{place_name}': {e}")
+        print(f"🌍 Nominatim error for '{place_name}': {e}")
     return None
+
+
+async def geocode_place(place_name: str):
+    """智能地理編碼：ArcGIS 優先，Nominatim 備援
+    
+    ⚠️ 函數簽名與回傳格式完全不變，確保向後相容
+    回傳: {"lat": float, "lng": float} 或 None
+    """
+    # 1. 優先嘗試 ArcGIS (精確度高)
+    if ARCGIS_API_KEY:
+        result = await geocode_with_arcgis(place_name)
+        if result:
+            return result
+        print(f"⚠️ ArcGIS 查無結果，降級到 Nominatim...")
+    
+    # 2. 降級到 Nominatim
+    return await geocode_with_nominatim(place_name)
 
 # 🔥 Markdown 消化系統 (2.5 版混合動力)
 @app.post("/api/parse-md")
@@ -524,6 +576,9 @@ class UpdateItemRequest(BaseModel):
     sub_items: Optional[List[dict]] = None
     # 👇 新增：圖片網址
     image_url: Optional[str] = None
+    # 👇 新增：分類與標籤
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 # 新增：單筆行程新增模型
 class CreateItemRequest(BaseModel):
@@ -552,14 +607,29 @@ async def save_itinerary(request: SaveItineraryRequest):
         # 1. 產生房間號
         room_code = generate_room_code()
         
+        # 🆕 自動計算 end_date (如果未提供)
+        start_date = request.start_date or "2026-01-01"
+        if request.end_date:
+            end_date = request.end_date
+        elif request.items:
+            # 從 items 中找最大的 day_number，計算 end_date
+            max_day = max(item.day_number for item in request.items)
+            from datetime import datetime, timedelta
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = start + timedelta(days=max_day - 1)
+            end_date = end.strftime("%Y-%m-%d")
+            print(f"   🆕 自動計算 end_date: {end_date} (Day {max_day})")
+        else:
+            end_date = start_date
+        
         # 2. 建立主行程 (Parent) - 將每日資訊存入 content
         trip_data = {
             "title": request.title,
             "creator_name": request.creator_name,
             "created_by": request.user_id,
             "share_code": room_code,
-            "start_date": request.start_date or "2026-01-01",
-            "end_date": request.end_date or "2026-01-15",
+            "start_date": start_date,
+            "end_date": end_date,
             "status": "active",
             # 👇 存入 JSONB 欄位: 包含 daily_locations 及新的 daily tips
             "content": {
@@ -833,6 +903,7 @@ async def get_latest_itinerary():
             "title": trip["title"],
             "creator": trip.get("creator_name", "Guest"),
             "start_date": trip["start_date"],  # 👈 關鍵！補上這行
+            "end_date": trip.get("end_date"),  # 🐛 FIX: 補上缺失的 end_date
             "share_code": trip.get("share_code", ""),  # 順便補上分享碼
             # 👇 讀取並回傳
             "daily_locations": (trip.get("content") or {}).get("daily_locations", {}),
@@ -897,6 +968,7 @@ async def get_trip_by_id(trip_id: str):
             "title": trip["title"],
             "creator": trip.get("creator_name", "Guest"),
             "start_date": trip["start_date"],
+            "end_date": trip.get("end_date"),  # 🐛 FIX: 補上缺失的 end_date
             "share_code": trip.get("share_code", ""),
             "cover_image": trip.get("cover_image"),
             # 🚑 修復：先判斷 content 是否為 None，再取值
@@ -970,6 +1042,9 @@ async def update_item(item_id: str, request: UpdateItemRequest):
         if request.memo is not None: data["memo"] = request.memo
         # 👇 新增：處理 sub_items (連結列表)
         if request.sub_items is not None: data["sub_items"] = request.sub_items
+        # 👇 新增：處理分類與標籤
+        if request.category is not None: data["category"] = request.category
+        if request.tags is not None: data["tags"] = request.tags
         
         if not data:
             print("⚠️ 沒有資料需要更新")
@@ -1053,6 +1128,81 @@ async def delete_day(trip_id: str, day_number: int):
         print(f"🔥 Delete Day Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# 🆕 功能 8.2: 新增天數
+class AddDayRequest(BaseModel):
+    position: str = "end"  # "end" 或 "before:N" (例如 "before:3")
+
+@app.post("/api/trips/{trip_id}/days")
+async def add_day(trip_id: str, request: AddDayRequest):
+    print(f"➕ 嘗試新增天數到行程 {trip_id}, 位置: {request.position}")
+    try:
+        from datetime import datetime, timedelta
+        
+        # 1. 取得現有行程資訊
+        trip = supabase.table("itineraries").select("start_date, end_date").eq("id", trip_id).single().execute()
+        if not trip.data:
+            raise HTTPException(status_code=404, detail="行程不存在")
+        
+        # 2. 計算目前的天數
+        items = supabase.table("itinerary_items").select("day_number").eq("itinerary_id", trip_id).execute()
+        current_max_day = max([item["day_number"] for item in items.data]) if items.data else 1
+        
+        # 3. 根據 position 處理
+        if request.position == "end":
+            # 新增到最後一天之後 - 不需要移動現有項目
+            new_day = current_max_day + 1
+            print(f"   ➕ 新增 Day {new_day} 到結尾")
+        elif request.position.startswith("before:"):
+            # 插入到指定天之前 - 需要移動現有項目
+            insert_before = int(request.position.split(":")[1])
+            if insert_before < 1:
+                insert_before = 1
+            
+            # 將 day_number >= insert_before 的全部 +1
+            items_to_shift = supabase.table("itinerary_items")\
+                .select("id, day_number")\
+                .eq("itinerary_id", trip_id)\
+                .gte("day_number", insert_before)\
+                .order("day_number", desc=True)\
+                .execute()
+            
+            for item in items_to_shift.data:
+                supabase.table("itinerary_items")\
+                    .update({"day_number": item["day_number"] + 1})\
+                    .eq("id", item["id"])\
+                    .execute()
+            
+            new_day = insert_before
+            print(f"   ➕ 插入 Day {new_day}, 移動了 {len(items_to_shift.data)} 個項目")
+        else:
+            raise HTTPException(status_code=400, detail="無效的 position 格式")
+        
+        # 4. 更新 end_date (增加一天)
+        if trip.data.get("end_date"):
+            end_date = datetime.strptime(trip.data["end_date"], "%Y-%m-%d")
+            new_end = end_date + timedelta(days=1)
+            supabase.table("itineraries")\
+                .update({"end_date": new_end.strftime("%Y-%m-%d")})\
+                .eq("id", trip_id)\
+                .execute()
+            print(f"   📆 已更新 end_date: {trip.data['end_date']} → {new_end.strftime('%Y-%m-%d')}")
+        elif trip.data.get("start_date"):
+            # 如果沒有 end_date，根據 start_date 和新的天數計算
+            start_date = datetime.strptime(trip.data["start_date"], "%Y-%m-%d")
+            new_end = start_date + timedelta(days=current_max_day)  # current_max_day + 1 - 1
+            supabase.table("itineraries")\
+                .update({"end_date": new_end.strftime("%Y-%m-%d")})\
+                .eq("id", trip_id)\
+                .execute()
+            print(f"   📆 新設定 end_date: {new_end.strftime('%Y-%m-%d')}")
+        
+        return {"status": "success", "new_day": new_day, "total_days": current_max_day + 1}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Add Day Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 🔥 功能 9: 更新行程的每日地點
 class UpdateLocationRequest(BaseModel):
     day: int
@@ -1127,6 +1277,151 @@ async def update_trip_info(trip_id: str, request: UpdateInfoRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# 🔥 功能 11.1: 路線規劃 API (ArcGIS + OSRM 雙引擎)
+class RouteStop(BaseModel):
+    lat: float
+    lng: float
+    name: Optional[str] = None
+
+class RouteRequest(BaseModel):
+    stops: List[RouteStop]
+    mode: str = "walk"  # walk, drive, transit
+    optimize: bool = False  # 是否最佳化路線順序
+
+async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -> dict:
+    """使用 ArcGIS Routing API 計算路線"""
+    if not ARCGIS_API_KEY:
+        raise Exception("ArcGIS API Key 未設定")
+    
+    # ArcGIS stops 格式: lng,lat;lng,lat
+    stops_str = ";".join([f"{s.lng},{s.lat}" for s in stops])
+    
+    # 交通模式對應
+    travel_mode = "Walking" if mode == "walk" else "Driving"
+    
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.get(
+            "https://route.arcgis.com/arcgis/rest/services/World/Route/NAServer/Route_World/solve",
+            params={
+                "f": "json",
+                "stops": stops_str,
+                "returnDirections": "true",
+                "directionsLengthUnits": "esriNAUKilometers",
+                "findBestSequence": "true" if optimize else "false",
+                "travelMode": travel_mode,
+                "token": ARCGIS_API_KEY
+            }
+        )
+        data = res.json()
+        
+        if "error" in data:
+            raise Exception(f"ArcGIS Error: {data['error'].get('message', 'Unknown error')}")
+        
+        if not data.get("routes") or not data["routes"].get("features"):
+            raise Exception("No route found")
+        
+        route_feature = data["routes"]["features"][0]
+        geometry = route_feature.get("geometry", {})
+        attributes = route_feature.get("attributes", {})
+        
+        # 轉換成 GeoJSON 格式
+        geojson = {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[p[0], p[1]] for p in geometry.get("paths", [[]])[0]]
+            }
+        }
+        
+        distance_km = round(attributes.get("Total_Kilometers", 0), 1)
+        duration_min = round(attributes.get("Total_TravelTime", 0))
+        
+        return {
+            "source": "arcgis",
+            "route": geojson,
+            "distance": f"{distance_km} km",
+            "duration": f"{duration_min} 分鐘" if duration_min < 60 else f"{duration_min // 60}h {duration_min % 60}m"
+        }
+
+async def route_with_osrm(stops: List[RouteStop], mode: str) -> dict:
+    """備援：使用 OSRM 計算路線"""
+    coords = ";".join([f"{s.lng},{s.lat}" for s in stops])
+    profile = "foot" if mode == "walk" else "car" if mode == "drive" else "foot"
+    
+    url = f"https://router.project-osrm.org/route/v1/{profile}/{coords}"
+    print(f"   🔍 OSRM Request URL (前100字元): {url[:100]}...")
+    print(f"   🔍 OSRM Stops count: {len(stops)}")
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:  # 增加 timeout 到 30 秒
+        try:
+            res = await client.get(
+                url,
+                params={"overview": "full", "geometries": "geojson"}
+            )
+            print(f"   🔍 OSRM Response status: {res.status_code}")
+            
+            if res.status_code != 200:
+                print(f"   ❌ OSRM HTTP Error: {res.text[:200]}")
+                raise Exception(f"OSRM HTTP {res.status_code}")
+            
+            data = res.json()
+            
+            if data.get("code") != "Ok":
+                print(f"   ❌ OSRM API Error: {data.get('code')}, {data.get('message', 'no message')}")
+                raise Exception(f"OSRM error: {data.get('code')}")
+            
+            if not data.get("routes"):
+                print(f"   ❌ OSRM No routes in response")
+                raise Exception("OSRM no routes")
+            
+            route = data["routes"][0]
+            distance_km = round(route["distance"] / 1000, 1)
+            duration_min = round(route["duration"] / 60)
+            
+            return {
+                "source": "osrm",
+                "route": {
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": route["geometry"]
+                },
+                "distance": f"{distance_km} km",
+                "duration": f"{duration_min} 分鐘" if duration_min < 60 else f"{duration_min // 60}h {duration_min % 60}m"
+            }
+        except httpx.TimeoutException:
+            print(f"   ❌ OSRM Timeout after 30s")
+            raise Exception("OSRM timeout")
+        except Exception as e:
+            print(f"   ❌ OSRM Exception: {type(e).__name__}: {e}")
+            raise
+
+@app.post("/api/route")
+async def calculate_route(request: RouteRequest):
+    """計算路線 (ArcGIS 優先，OSRM 備援)"""
+    if len(request.stops) < 2:
+        raise HTTPException(status_code=400, detail="至少需要 2 個停靠點")
+    
+    print(f"🛣️ 計算路線: {len(request.stops)} 個點, 模式={request.mode}, 優化={request.optimize}")
+    
+    # 1. 嘗試 ArcGIS
+    if ARCGIS_API_KEY:
+        try:
+            result = await route_with_arcgis(request.stops, request.mode, request.optimize)
+            print(f"   ✅ ArcGIS 路線成功: {result['distance']}, {result['duration']}")
+            return result
+        except Exception as e:
+            print(f"   ⚠️ ArcGIS 失敗: {e}, 切換到 OSRM")
+    
+    # 2. 備援到 OSRM
+    try:
+        result = await route_with_osrm(request.stops, request.mode)
+        print(f"   ✅ OSRM 路線成功: {result['distance']}, {result['duration']}")
+        return result
+    except Exception as e:
+        print(f"   ❌ OSRM 也失敗: {e}")
+        raise HTTPException(status_code=500, detail="無法計算路線")
+
 # 🔥 功能 12: 記帳相關 API
 class ExpenseRequest(BaseModel):
     itinerary_id: Optional[str] = None  # 設為 Optional 方便 Update 使用
@@ -1140,12 +1435,13 @@ class ExpenseRequest(BaseModel):
     creator_name: Optional[str] = None
     card_name: Optional[str] = None
     cashback_rate: Optional[float] = 0
-    # 👇 新增：圖片 URL
     image_url: Optional[str] = None
+    expense_date: Optional[str] = None  # 🆕 新增：費用日期
 
 @app.post("/api/expenses")
 async def add_expense(request: ExpenseRequest):
     try:
+        print(f"📝 [Expense] Creating expense: {request.title}, amount: {request.amount_jpy}, user: {request.created_by}")
         payload = {
             "itinerary_id": request.itinerary_id,
             "title": request.title,
@@ -1158,12 +1454,15 @@ async def add_expense(request: ExpenseRequest):
             "exchange_rate": request.exchange_rate,
             "card_name": request.card_name,
             "cashback_rate": request.cashback_rate,
-            # 👇 寫入圖片
-            "image_url": request.image_url
+            "image_url": request.image_url,
+            "incurred_at": request.expense_date  # 🔧 FIX: DB column is 'incurred_at' not 'expense_date'
         }
-        supabase.table("expenses").insert(payload).execute()
+        print(f"   Payload: {payload}")
+        result = supabase.table("expenses").insert(payload).execute()
+        print(f"   ✅ Success: {result}")
         return {"status": "success"}
     except Exception as e:
+        print(f"   ❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/trips/{trip_id}/expenses")
@@ -1204,8 +1503,9 @@ class UpdateExpenseRequest(BaseModel):
     amount_jpy: Optional[float] = None
     is_public: Optional[bool] = None
     payment_method: Optional[str] = None
-    # 👇 新增：圖片 URL
     image_url: Optional[str] = None
+    category: Optional[str] = None  # 🆕 新增
+    expense_date: Optional[str] = None  # 🆕 新增
 
 @app.patch("/api/expenses/{expense_id}")
 async def update_expense(expense_id: str, request: UpdateExpenseRequest):

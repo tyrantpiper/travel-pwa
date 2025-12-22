@@ -18,9 +18,8 @@ const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loadi
 import DailyTips from "@/components/daily-tips"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
-import { toast } from "sonner"
-import { SwipeableItem } from "@/components/ui/swipeable-item"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+import { toast } from "sonner"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -32,6 +31,8 @@ export function ItineraryView() {
 
     // Use activeTripId from context
     const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId)
+    // 🔍 除錯：檢查 activeTripId 和 currentTrip
+    console.log("🔍 [Trip Debug]", { activeTripId, currentTrip: currentTrip ? 'loaded' : 'null', viewMode })
 
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [newTripTitle, setNewTripTitle] = useState("")
@@ -154,11 +155,25 @@ export function ItineraryView() {
     }, [day, dailyLocs, currentTrip])
 
     const handleDeleteTrip = async (tripId: string) => {
-        if (!confirm("Delete this trip?")) return
+        if (!confirm("確定要刪除此行程嗎？此操作無法復原！")) return
+
         try {
-            await fetch(`${API_BASE}/api/trips/${tripId}`, { method: "DELETE" })
+            const res = await fetch(`${API_BASE}/api/trips/${tripId}`, { method: "DELETE" })
+            if (!res.ok) throw new Error("Delete failed")
+
+            toast.success("行程已刪除")
+
+            // If we're deleting the active trip, clear selection
+            if (activeTripId === tripId) {
+                setActiveTripId(null)
+            }
+
+            // Refresh the trips list
             reloadTrips()
-        } catch (error) { console.error(error) }
+        } catch (error) {
+            console.error(error)
+            toast.error("刪除失敗")
+        }
     }
 
     const handleManualCreate = async () => {
@@ -297,6 +312,8 @@ export function ItineraryView() {
                     body: JSON.stringify({
                         time_slot: editItem.time,
                         place_name: editItem.place,
+                        category: editItem.category,
+                        tags: editItem.tags,
                         notes: editItem.desc,
                         lat: finalLat, lng: finalLng,
                         image_url: editItem.image_url
@@ -330,12 +347,12 @@ export function ItineraryView() {
         if (!confirm(t('confirm_delete'))) return
 
         // Optimistic update: immediately remove from UI
-        if (currentTrip) {
+        if (currentTrip?.days) {
             const optimisticData = {
                 ...currentTrip,
                 days: currentTrip.days.map((d: any) => ({
                     ...d,
-                    activities: d.activities.filter((a: any) => a.id !== id)
+                    activities: d.activities?.filter((a: any) => a.id !== id) || []
                 }))
             }
             reloadTripDetail(optimisticData, false) // Update cache without revalidation
@@ -350,22 +367,57 @@ export function ItineraryView() {
         if (!currentTrip) return
         if (!confirm(`確定要刪除第 ${dayNum} 天的所有行程嗎？此操作無法復原！`)) return
 
-        // Optimistic update: immediately remove day from UI
+        try {
+            // 1. 先發送 API 請求
+            const res = await fetch(`${API_BASE}/api/trips/${currentTrip.id}/days/${dayNum}`, { method: "DELETE" })
+            if (!res.ok) throw new Error("Delete failed")
+
+            toast.success("已刪除")
+
+            // 2. 調整當前選擇的日期
+            if (day === dayNum && day > 1) setDay(day - 1)
+
+            // 3. 刷新資料
+            reloadTripDetail()
+        } catch (e) {
+            toast.error("刪除失敗")
+        }
+    }
+
+    // 🆕 新增天數
+    const handleAddDay = async (position: "before" | "end") => {
+        if (!currentTrip) return
+
+        const insertPos = position === "before" ? `before:1` : "end"
+
+        // Optimistic update: add a new empty day
         const optimisticData = {
             ...currentTrip,
-            days: currentTrip.days
-                .filter((d: any) => d.day !== dayNum)
-                .map((d: any) => ({
-                    ...d,
-                    day: d.day > dayNum ? d.day - 1 : d.day  // Adjust day numbers
-                }))
+            // 不需要調整 days，因為新天數是空的
         }
         reloadTripDetail(optimisticData, false)
-        if (day === dayNum && day > 1) setDay(day - 1)
 
-        // Background API call
-        fetch(`${API_BASE}/api/trips/${currentTrip.id}/days/${dayNum}`, { method: "DELETE" })
-            .catch(() => { toast.error("刪除失敗"); reloadTripDetail() })
+        try {
+            const res = await fetch(`${API_BASE}/api/trips/${currentTrip.id}/days`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ position: insertPos })
+            })
+
+            if (!res.ok) throw new Error("API failed")
+
+            const data = await res.json()
+            toast.success(`已新增 Day ${data.new_day}`)
+
+            // 刷新取得正確的天數資料
+            reloadTripDetail()
+
+            // 如果是新增到開頭，切換到第一天
+            if (position === "before") setDay(1)
+        } catch {
+            toast.error("新增失敗")
+            reloadTripDetail()
+        }
     }
 
     const handleBack = () => { setActiveTripId(null); setViewMode('list') }
@@ -387,6 +439,14 @@ export function ItineraryView() {
         }
         return 7
     })()
+    // 🔍 除錯：顯示 totalDays 計算結果
+    console.log("🔢 [totalDays Debug]", {
+        totalDays,
+        start_date: currentTrip?.start_date,
+        end_date: currentTrip?.end_date,
+        daysCount: currentTrip?.days?.length,
+        maxDayNumber: currentTrip?.days?.length > 0 ? Math.max(...currentTrip.days.map((d: any) => d.day || 1)) : 'N/A'
+    })
     const dayNumbers = Array.from({ length: totalDays }, (_, i) => i + 1)
 
     const getDateInfo = (dayNum: number) => {
@@ -440,7 +500,7 @@ export function ItineraryView() {
                             <div className="absolute top-2 right-2 z-20">
                                 <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>
                             </div>
-                            <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
+                            <div className="cursor-pointer active:opacity-90" onClick={() => { console.log("🔔 Card clicked, trip.id:", trip.id); setActiveTripId(trip.id); setViewMode('detail'); }}>
                                 <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                                     {trip.cover_image ? (
                                         <img src={trip.cover_image} alt="cover" className="w-full h-full object-cover opacity-80" />
@@ -465,12 +525,12 @@ export function ItineraryView() {
         )
     }
 
-    const currentDayData = currentTrip
+    const currentDayData = currentTrip?.days
         ? currentTrip.days.find((d: any) => d.day === day)?.activities || []
         : []
 
     return (
-        <div className="flex flex-col min-h-screen bg-stone-50 pb-32">
+        <div className="flex flex-col min-h-screen bg-stone-50 pb-32 overflow-x-hidden">
             <div className="bg-white pt-12 pb-2 sticky top-0 z-20 border-b border-slate-100 shadow-sm">
                 <div className="px-6 flex justify-between items-end mb-4">
                     <div>
@@ -481,7 +541,16 @@ export function ItineraryView() {
                     </div>
                 </div>
 
-                <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar">
+                <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar items-center">
+                    {/* 🆕 新增天數按鈕 (開頭) */}
+                    <button
+                        onClick={() => handleAddDay("before")}
+                        className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
+                        title="在開頭新增一天"
+                    >
+                        +
+                    </button>
+
                     {dayNumbers.map((d) => {
                         const { date, week } = getDateInfo(d)
                         return (
@@ -501,182 +570,192 @@ export function ItineraryView() {
                             </div>
                         )
                     })}
+
+                    {/* 🆕 新增天數按鈕 (結尾) */}
+                    <button
+                        onClick={() => handleAddDay("end")}
+                        className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
+                        title="在結尾新增一天"
+                    >
+                        +
+                    </button>
                 </div>
             </div>
 
-            <div className="py-6 px-6 bg-stone-50/50">
-                <div className="flex items-center justify-between mb-4">
-                    <Dialog open={isLocEditOpen} onOpenChange={setIsLocEditOpen}>
-                        <DialogTrigger asChild>
-                            <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
-                                <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
-                                <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
-                                    {dailyLocs[day]?.name || "Tokyo (Default)"}
-                                </span>
-                                <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
-                            </button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                            <DialogHeader><DialogTitle>修改第 {day} 天的天氣地點</DialogTitle></DialogHeader>
-                            <div className="space-y-4 py-4">
-                                {/* 當前座標顯示 */}
-                                {dailyLocs[day] && (
-                                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                                        <div className="text-xs text-slate-500 mb-1">📍 目前地點</div>
-                                        <div className="font-bold text-slate-800">{dailyLocs[day].name}</div>
-                                        <div className="text-xs text-slate-400 font-mono">
-                                            {dailyLocs[day].lat?.toFixed(4)}, {dailyLocs[day].lng?.toFixed(4)}
+            <PullToRefresh onRefresh={async () => { await reloadTripDetail() }} className="flex-1">
+                <div className="py-6 px-6 bg-stone-50/50">
+                    <div className="flex items-center justify-between mb-4">
+                        <Dialog open={isLocEditOpen} onOpenChange={setIsLocEditOpen}>
+                            <DialogTrigger asChild>
+                                <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
+                                    <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
+                                    <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
+                                        {dailyLocs[day]?.name || "Tokyo (Default)"}
+                                    </span>
+                                    <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
+                                </button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader><DialogTitle>修改第 {day} 天的天氣地點</DialogTitle></DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    {/* 當前座標顯示 */}
+                                    {dailyLocs[day] && (
+                                        <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                            <div className="text-xs text-slate-500 mb-1">📍 目前地點</div>
+                                            <div className="font-bold text-slate-800">{dailyLocs[day].name}</div>
+                                            <div className="text-xs text-slate-400 font-mono">
+                                                {dailyLocs[day].lat?.toFixed(4)}, {dailyLocs[day].lng?.toFixed(4)}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* 從活動同步按鈕 */}
-                                {(() => {
-                                    const activityLoc = currentTrip?.days.find((d: any) => d.day === day)?.activities?.find((a: any) => a.lat && a.lng)
-                                    if (activityLoc) {
-                                        return (
+                                    {/* 從活動同步按鈕 */}
+                                    {(() => {
+                                        const activityLoc = currentTrip?.days?.find((d: any) => d.day === day)?.activities?.find((a: any) => a.lat && a.lng)
+                                        if (activityLoc) {
+                                            return (
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full justify-start text-left h-auto py-3"
+                                                    onClick={() => {
+                                                        setDailyLocs({ ...dailyLocs, [day]: { name: activityLoc.place, lat: activityLoc.lat, lng: activityLoc.lng } })
+                                                        setIsLocEditOpen(false)
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <div className="text-xs text-amber-600 font-bold">⚡ 從活動同步</div>
+                                                        <div className="text-sm text-slate-700">{activityLoc.place}</div>
+                                                        <div className="text-xs text-slate-400 font-mono">{activityLoc.lat?.toFixed(4)}, {activityLoc.lng?.toFixed(4)}</div>
+                                                    </div>
+                                                </Button>
+                                            )
+                                        }
+                                        return null
+                                    })()}
+
+                                    {/* 搜尋區域 */}
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="輸入城市或區域名稱 (例如：墨田區、三民區)"
+                                                value={newLocName}
+                                                onChange={e => setNewLocName(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
+                                            />
+                                            <Button onClick={handleSearchLocation} disabled={isLocSearching}>
+                                                {isLocSearching ? "..." : "搜尋"}
+                                            </Button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400">💡 若中文找不到，請嘗試英文或羅馬拼音</p>
+                                    </div>
+
+                                    {locSearchResults.length > 0 && (
+                                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                                            <p className="text-xs text-slate-500">🗺️ OpenStreetMap 搜尋結果 ({locSearchResults.length})：</p>
+                                            {locSearchResults.map((loc, idx) => {
+                                                // POI 類型對照
+                                                const typeLabels: { [key: string]: string } = {
+                                                    restaurant: '🍽️ 餐廳', cafe: '☕ 咖啡廳', fast_food: '🍔 速食',
+                                                    station: '🚉 車站', bus_stop: '🚌 公車站', subway_entrance: '🚇 地鐵',
+                                                    hotel: '🏨 飯店', hostel: '🛏️ 旅館', guest_house: '🏠 民宿',
+                                                    attraction: '🎯 景點', museum: '🏛️ 博物館', park: '🌳 公園',
+                                                    temple: '⛩️ 寺廟', shrine: '⛩️ 神社', church: '⛪ 教堂',
+                                                    shop: '🛍️ 商店', mall: '🏬 百貨', supermarket: '🛒 超市',
+                                                    convenience: '🏪 便利店', department_store: '🏬 百貨公司',
+                                                    administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
+                                                }
+                                                const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
+
+                                                return (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleSelectLocation(loc)}
+                                                        className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
+                                                            <span className="font-bold text-slate-800">{loc.name}</span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 line-clamp-1">
+                                                            {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
+                                                        </div>
+                                                        <div className="text-[10px] text-slate-400 font-mono">
+                                                            {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
+                                                        </div>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* 手動座標輸入 */}
+                                    <div className="space-y-2 pt-2 border-t border-dashed">
+                                        <label className="text-xs font-bold text-slate-500">📌 手動輸入座標 (最精確)</label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="緯度 (lat)"
+                                                className="font-mono text-sm"
+                                                id="manual-lat"
+                                            />
+                                            <Input
+                                                placeholder="經度 (lng)"
+                                                className="font-mono text-sm"
+                                                id="manual-lng"
+                                            />
                                             <Button
-                                                variant="outline"
-                                                className="w-full justify-start text-left h-auto py-3"
+                                                variant="secondary"
                                                 onClick={() => {
-                                                    setDailyLocs({ ...dailyLocs, [day]: { name: activityLoc.place, lat: activityLoc.lat, lng: activityLoc.lng } })
-                                                    setIsLocEditOpen(false)
+                                                    const lat = parseFloat((document.getElementById('manual-lat') as HTMLInputElement)?.value)
+                                                    const lng = parseFloat((document.getElementById('manual-lng') as HTMLInputElement)?.value)
+                                                    if (!isNaN(lat) && !isNaN(lng)) {
+                                                        setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
+                                                        setIsLocEditOpen(false)
+                                                    } else {
+                                                        toast.warning("請輸入有效的座標數字")
+                                                    }
                                                 }}
                                             >
-                                                <div>
-                                                    <div className="text-xs text-amber-600 font-bold">⚡ 從活動同步</div>
-                                                    <div className="text-sm text-slate-700">{activityLoc.place}</div>
-                                                    <div className="text-xs text-slate-400 font-mono">{activityLoc.lat?.toFixed(4)}, {activityLoc.lng?.toFixed(4)}</div>
-                                                </div>
+                                                套用
                                             </Button>
-                                        )
-                                    }
-                                    return null
-                                })()}
-
-                                {/* 搜尋區域 */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            placeholder="輸入城市或區域名稱 (例如：墨田區、三民區)"
-                                            value={newLocName}
-                                            onChange={e => setNewLocName(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
-                                        />
-                                        <Button onClick={handleSearchLocation} disabled={isLocSearching}>
-                                            {isLocSearching ? "..." : "搜尋"}
-                                        </Button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400">💡 可從 Google Maps 複製座標貼上</p>
                                     </div>
-                                    <p className="text-[10px] text-slate-400">💡 若中文找不到，請嘗試英文或羅馬拼音</p>
                                 </div>
+                            </DialogContent>
+                        </Dialog>
+                        <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
+                    </div>
 
-                                {locSearchResults.length > 0 && (
-                                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                                        <p className="text-xs text-slate-500">🗺️ OpenStreetMap 搜尋結果 ({locSearchResults.length})：</p>
-                                        {locSearchResults.map((loc, idx) => {
-                                            // POI 類型對照
-                                            const typeLabels: { [key: string]: string } = {
-                                                restaurant: '🍽️ 餐廳', cafe: '☕ 咖啡廳', fast_food: '🍔 速食',
-                                                station: '🚉 車站', bus_stop: '🚌 公車站', subway_entrance: '🚇 地鐵',
-                                                hotel: '🏨 飯店', hostel: '🛏️ 旅館', guest_house: '🏠 民宿',
-                                                attraction: '🎯 景點', museum: '🏛️ 博物館', park: '🌳 公園',
-                                                temple: '⛩️ 寺廟', shrine: '⛩️ 神社', church: '⛪ 教堂',
-                                                shop: '🛍️ 商店', mall: '🏬 百貨', supermarket: '🛒 超市',
-                                                convenience: '🏪 便利店', department_store: '🏬 百貨公司',
-                                                administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
-                                            }
-                                            const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
-
-                                            return (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => handleSelectLocation(loc)}
-                                                    className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
-                                                        <span className="font-bold text-slate-800">{loc.name}</span>
-                                                    </div>
-                                                    <div className="text-xs text-slate-500 line-clamp-1">
-                                                        {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400 font-mono">
-                                                        {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
-                                                    </div>
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* 手動座標輸入 */}
-                                <div className="space-y-2 pt-2 border-t border-dashed">
-                                    <label className="text-xs font-bold text-slate-500">📌 手動輸入座標 (最精確)</label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            placeholder="緯度 (lat)"
-                                            className="font-mono text-sm"
-                                            id="manual-lat"
-                                        />
-                                        <Input
-                                            placeholder="經度 (lng)"
-                                            className="font-mono text-sm"
-                                            id="manual-lng"
-                                        />
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() => {
-                                                const lat = parseFloat((document.getElementById('manual-lat') as HTMLInputElement)?.value)
-                                                const lng = parseFloat((document.getElementById('manual-lng') as HTMLInputElement)?.value)
-                                                if (!isNaN(lat) && !isNaN(lng)) {
-                                                    setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
-                                                    setIsLocEditOpen(false)
-                                                } else {
-                                                    toast.warning("請輸入有效的座標數字")
-                                                }
-                                            }}
-                                        >
-                                            套用
-                                        </Button>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400">💡 可從 Google Maps 複製座標貼上</p>
-                                </div>
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+                        {weatherData.length > 0 ? weatherData.map((w, i) => (
+                            <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
+                                <span className="text-xs text-slate-400 font-mono">{w.time}</span>
+                                {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
+                                <span className="text-sm font-bold text-slate-700">{w.temp}C</span>
                             </div>
-                        </DialogContent>
-                    </Dialog>
-                    <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
+                        )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
+                    </div>
                 </div>
 
-                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                    {weatherData.length > 0 ? weatherData.map((w, i) => (
-                        <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
-                            <span className="text-xs text-slate-400 font-mono">{w.time}</span>
-                            {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
-                            <span className="text-sm font-bold text-slate-700">{w.temp}C</span>
-                        </div>
-                    )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
-                </div>
-            </div>
 
 
+                <DailyTips
+                    day={day}
+                    notes={currentTrip?.day_notes?.[day]}
+                    costs={currentTrip?.day_costs?.[day]}
+                    tickets={currentTrip?.day_tickets?.[day]}
+                />
 
-            <DailyTips
-                day={day}
-                notes={currentTrip?.day_notes?.[day]}
-                costs={currentTrip?.day_costs?.[day]}
-                tickets={currentTrip?.day_tickets?.[day]}
-            />
-
-            <div className="px-5 py-6 space-y-1">
-                {(() => {
-                    let realIndex = 0;
-                    return currentDayData.map((item: any, idx: number) => {
-                        const isHeader = item.category === 'header' || item.time === '00:00';
-                        if (!isHeader) realIndex++;
-                        return (
-                            <SwipeableItem key={item.id} onDelete={() => handleDeleteItem(item.id)}>
+                <div className="px-5 py-6 space-y-1">
+                    {(() => {
+                        let realIndex = 0;
+                        return currentDayData.map((item: any, idx: number) => {
+                            const isHeader = item.category === 'header' || item.time === '00:00';
+                            if (!isHeader) realIndex++;
+                            return (
                                 <TimelineCard
+                                    key={item.id}
                                     activity={item}
                                     index={realIndex}
                                     isLast={idx === currentDayData.length - 1}
@@ -685,26 +764,26 @@ export function ItineraryView() {
                                     onUpdateMemo={handleUpdateMemo}
                                     onUpdateSubItems={handleUpdateSubItems}
                                 />
-                            </SwipeableItem>
-                        )
-                    })
-                })()}
+                            )
+                        })
+                    })()}
 
-                <div className="py-4 text-center">
-                    <Button variant="outline" className="w-full border-dashed border-slate-300 text-slate-400" onClick={() => {
-                        setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
-                        setIsAddMode(true);
-                        setIsEditOpen(true);
-                    }}>
-                        <Plus className="w-4 h-4 mr-2" /> Add Activity
-                    </Button>
-                </div>
+                    <div className="py-4 text-center">
+                        <Button variant="outline" className="w-full border-dashed border-slate-300 text-slate-400" onClick={() => {
+                            setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
+                            setIsAddMode(true);
+                            setIsEditOpen(true);
+                        }}>
+                            <Plus className="w-4 h-4 mr-2" /> Add Activity
+                        </Button>
+                    </div>
 
-                <div className="mt-8">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
-                    <DayMap activities={currentDayData} />
+                    <div className="mt-8">
+                        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
+                        <DayMap activities={currentDayData} />
+                    </div>
                 </div>
-            </div>
+            </PullToRefresh>
 
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent>
@@ -819,6 +898,91 @@ export function ItineraryView() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right">Notes</Label>
                                 <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="col-span-3" />
+                            </div>
+
+                            {/* 🆕 分類選擇器 - 圖示按鈕 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">Category</Label>
+                                <div className="col-span-3 flex flex-wrap gap-2">
+                                    {[
+                                        { id: 'sightseeing', icon: '🎯', label: '景點' },
+                                        { id: 'food', icon: '🍽️', label: '美食' },
+                                        { id: 'hotel', icon: '🏨', label: '住宿' },
+                                        { id: 'transport', icon: '🚃', label: '交通' },
+                                        { id: 'shopping', icon: '🛍️', label: '購物' },
+                                        { id: 'activity', icon: '🎭', label: '活動' },
+                                    ].map(cat => (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => setEditItem({ ...editItem, category: cat.id })}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all",
+                                                editItem.category === cat.id
+                                                    ? "bg-slate-800 text-white shadow-sm"
+                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                            )}
+                                        >
+                                            <span>{cat.icon}</span>
+                                            <span>{cat.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 🆕 標籤編輯器 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">Tags</Label>
+                                <div className="col-span-3 space-y-2">
+                                    <div className="flex flex-wrap gap-1">
+                                        {(editItem.tags || []).map((tag: string, i: number) => (
+                                            <span key={i} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
+                                                {tag}
+                                                <button
+                                                    type="button"
+                                                    className="hover:text-red-800"
+                                                    onClick={() => setEditItem({
+                                                        ...editItem,
+                                                        tags: (editItem.tags || []).filter((_: string, idx: number) => idx !== i)
+                                                    })}
+                                                >×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="tag-input"
+                                            placeholder="新增標籤"
+                                            className="text-sm flex-1"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault()
+                                                    const input = e.target as HTMLInputElement
+                                                    const newTag = input.value.trim()
+                                                    if (newTag && !(editItem.tags || []).includes(newTag)) {
+                                                        setEditItem({ ...editItem, tags: [...(editItem.tags || []), newTag] })
+                                                        input.value = ''
+                                                    }
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                                const input = document.getElementById('tag-input') as HTMLInputElement
+                                                const newTag = input?.value?.trim()
+                                                if (newTag && !(editItem.tags || []).includes(newTag)) {
+                                                    setEditItem({ ...editItem, tags: [...(editItem.tags || []), newTag] })
+                                                    input.value = ''
+                                                }
+                                            }}
+                                        >
+                                            +
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-4 items-start gap-4 pt-2 border-t border-dashed">

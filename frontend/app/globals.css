@@ -123,3 +123,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 🔧 PWA 優化：禁止水平滑動，讓操作更像 App */
+html, body {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}

@@ -25,6 +25,7 @@ import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
+import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { SwipeableItem } from "@/components/ui/swipeable-item"
 
 const supabase = createClient(
@@ -371,7 +372,7 @@ export function ToolsView() {
     return (
         <div className="min-h-screen bg-stone-50 pb-32">
             <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
-                <div className="flex justify-between items-start">
+                <div className="space-y-3">
                     <div>
                         <h1 className="text-3xl font-serif mb-2">{t('tools')}</h1>
                         <p className="text-slate-300 text-sm">{t('expense_ai')}</p>
@@ -380,207 +381,209 @@ export function ToolsView() {
                 </div>
             </div>
 
-            <Tabs value={activeSection} onValueChange={setActiveSection} className="px-4 -mt-4">
-                <TabsList className="grid w-full grid-cols-2 bg-white shadow-md rounded-xl p-1">
-                    <TabsTrigger value="expense">{t('expense')}</TabsTrigger>
-                    <TabsTrigger value="ai">{t('ai_tools')}</TabsTrigger>
-                </TabsList>
+            <PullToRefresh onRefresh={async () => { await fetchExpenses(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
+                <Tabs value={activeSection} onValueChange={setActiveSection}>
+                    <TabsList className="grid w-full grid-cols-2 bg-white shadow-md rounded-xl p-1">
+                        <TabsTrigger value="expense">{t('expense')}</TabsTrigger>
+                        <TabsTrigger value="ai">{t('ai_tools')}</TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="expense" className="mt-4 space-y-4">
-                    {/* View Mode Toggle */}
-                    <div className="flex gap-2">
-                        <Button
-                            variant={expenseView === 'summary' ? 'default' : 'outline'}
-                            size="sm"
-                            className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
-                            onClick={() => setExpenseView('summary')}
-                        >
-                            <PieChart className="w-4 h-4 mr-2" /> {t('total')}
-                        </Button>
-                        <Button
-                            variant={expenseView === 'daily' ? 'default' : 'outline'}
-                            size="sm"
-                            className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
-                            onClick={() => setExpenseView('daily')}
-                        >
-                            <List className="w-4 h-4 mr-2" /> 每日
-                        </Button>
-                    </div>
-
-                    {/* Owner Filter */}
-                    <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
-                        {(['all', 'public', 'private'] as const).map(filter => (
-                            <button
-                                key={filter}
-                                onClick={() => setOwnerFilter(filter)}
-                                className={cn(
-                                    "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
-                                    ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
-                                )}
+                    <TabsContent value="expense" className="mt-4 space-y-4">
+                        {/* View Mode Toggle */}
+                        <div className="flex gap-2">
+                            <Button
+                                variant={expenseView === 'summary' ? 'default' : 'outline'}
+                                size="sm"
+                                className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
+                                onClick={() => setExpenseView('summary')}
                             >
-                                {filter === 'all' && <>全部</>}
-                                {filter === 'public' && <><Users className="w-3 h-3" /> 公帳</>}
-                                {filter === 'private' && <><User className="w-3 h-3" /> 私帳</>}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Daily Mode: Date Navigation */}
-                    {expenseView === 'daily' && (
-                        <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')} disabled={allDates.indexOf(selectedDate) === 0}>
-                                <ChevronLeft className="w-4 h-4" />
+                                <PieChart className="w-4 h-4 mr-2" /> {t('total')}
                             </Button>
-                            <span className="font-bold text-slate-800">{selectedDate ? formatDateDisplay(selectedDate) : '-'}</span>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('next')} disabled={allDates.indexOf(selectedDate) === allDates.length - 1}>
-                                <ChevronRight className="w-4 h-4" />
+                            <Button
+                                variant={expenseView === 'daily' ? 'default' : 'outline'}
+                                size="sm"
+                                className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
+                                onClick={() => setExpenseView('daily')}
+                            >
+                                <List className="w-4 h-4 mr-2" /> 每日
                             </Button>
                         </div>
-                    )}
 
-                    {/* Summary Card */}
-                    <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4">
-                            {expenseView === 'summary' ? (
-                                <div className="space-y-4">
-                                    <ExpenseChart data={categoryData} total={totalJPY} />
-                                    <div className="text-center pt-2 border-t">
-                                        <p className="text-xs text-slate-500">{t('total')}</p>
-                                        <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
-                                        <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="text-xs text-slate-500">{t('total')}</p>
-                                        <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
-                                        <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
-                                    </div>
-                                    <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
-                                        <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
-                                    </Button>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Summary Mode: Add Button */}
-                    {expenseView === 'summary' && (
-                        <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
-                            <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
-                        </Button>
-                    )}
-
-                    {/* Expense List */}
-                    <div className="space-y-2">
-                        {filteredExpenses.map((item: any) => (
-                            <SwipeableItem key={item.id} onDelete={() => handleDeleteExpense(item.id)}>
-                                <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
-                            </SwipeableItem>
-                        ))}
-                        {filteredExpenses.length === 0 && (
-                            <div className="text-center py-8 text-slate-400 text-sm">暫無記錄</div>
-                        )}
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="ai" className="mt-4 space-y-4">
-                    {/* API Key Prompt */}
-                    {!hasApiKey && (
-                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-amber-100 p-2 rounded-full">
-                                    <Key className="w-4 h-4 text-amber-600" />
-                                </div>
-                                <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
-                            </div>
-                            <p className="text-sm text-amber-700">
-                                使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-amber-600">💡 完全免費！</span>
-                                <Button
-                                    size="sm"
-                                    className="bg-amber-500 hover:bg-amber-600 text-white"
-                                    onClick={() => {
-                                        // Navigate to profile (need to use custom event or context)
-                                        const event = new CustomEvent('navigate-to-profile')
-                                        window.dispatchEvent(event)
-                                        toast.info("請在 Profile 頁面設定 AI API Key")
-                                    }}
+                        {/* Owner Filter */}
+                        <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
+                            {(['all', 'public', 'private'] as const).map(filter => (
+                                <button
+                                    key={filter}
+                                    onClick={() => setOwnerFilter(filter)}
+                                    className={cn(
+                                        "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
+                                        ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+                                    )}
                                 >
-                                    前往 Profile 設定 →
+                                    {filter === 'all' && <>全部</>}
+                                    {filter === 'public' && <><Users className="w-3 h-3" /> 公帳</>}
+                                    {filter === 'private' && <><User className="w-3 h-3" /> 私帳</>}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Daily Mode: Date Navigation */}
+                        {expenseView === 'daily' && (
+                            <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')} disabled={allDates.indexOf(selectedDate) === 0}>
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <span className="font-bold text-slate-800">{selectedDate ? formatDateDisplay(selectedDate) : '-'}</span>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('next')} disabled={allDates.indexOf(selectedDate) === allDates.length - 1}>
+                                    <ChevronRight className="w-4 h-4" />
                                 </Button>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {hasApiKey && (
-                        <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>AI 功能已啟用</span>
-                        </div>
-                    )}
-
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button variant="outline" className="h-14 w-full bg-white justify-between">
-                                <span className="flex items-center gap-3">
-                                    <div className="bg-amber-100 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600" /></div>
-                                    {t('ai_generator')}
-                                </span>
-                                <ChevronRight className="w-4 h-4 opacity-30" />
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                            <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
-                            <div className="flex-1 space-y-4 py-4">
-                                <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
-                                <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{t('generating')}</> : <>{t('generate')}</>}</Button>
-                                {aiResult?.items && (
-                                    <div className="p-4 bg-stone-100 rounded-xl">
-                                        <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
+                        {/* Summary Card */}
+                        <Card className="border-0 shadow-sm">
+                            <CardContent className="p-4">
+                                {expenseView === 'summary' ? (
+                                    <div className="space-y-4">
+                                        <ExpenseChart data={categoryData} total={totalJPY} />
+                                        <div className="text-center pt-2 border-t">
+                                            <p className="text-xs text-slate-500">{t('total')}</p>
+                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
+                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="text-xs text-slate-500">{t('total')}</p>
+                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
+                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                        </div>
+                                        <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
+                                            <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
+                                        </Button>
                                     </div>
                                 )}
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                            </CardContent>
+                        </Card>
 
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button variant="outline" className="h-14 w-full bg-white justify-between">
-                                <span className="flex items-center gap-3">
-                                    <div className="bg-blue-100 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600" /></div>
-                                    {t('markdown_import')}
-                                </span>
-                                <ChevronRight className="w-4 h-4 opacity-30" />
+                        {/* Summary Mode: Add Button */}
+                        {expenseView === 'summary' && (
+                            <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
+                                <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
                             </Button>
-                        </SheetTrigger>
-                        <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                            <SheetHeader><SheetTitle>{t('markdown_import')}</SheetTitle></SheetHeader>
-                            <div className="flex-1 space-y-4 py-4">
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-xs">{t('input_or_upload')}</Label>
-                                    <div>
-                                        <input type="file" id="file-upload" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
-                                        <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
+                        )}
+
+                        {/* Expense List */}
+                        <div className="space-y-2">
+                            {filteredExpenses.map((item: any) => (
+                                <SwipeableItem key={item.id} onDelete={() => handleDeleteExpense(item.id)}>
+                                    <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
+                                </SwipeableItem>
+                            ))}
+                            {filteredExpenses.length === 0 && (
+                                <div className="text-center py-8 text-slate-400 text-sm">暫無記錄</div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="ai" className="mt-4 space-y-4">
+                        {/* API Key Prompt */}
+                        {!hasApiKey && (
+                            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-amber-100 p-2 rounded-full">
+                                        <Key className="w-4 h-4 text-amber-600" />
                                     </div>
+                                    <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
                                 </div>
-                                <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
-                                <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{t('parsing')}</> : <>{t('parse')}</>}</Button>
-                                {mdResult?.items && (
-                                    <div className="p-4 bg-stone-100 rounded-xl">
-                                        <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
-                                        <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
-                                    </div>
-                                )}
+                                <p className="text-sm text-amber-700">
+                                    使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
+                                </p>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-amber-600">💡 完全免費！</span>
+                                    <Button
+                                        size="sm"
+                                        className="bg-amber-500 hover:bg-amber-600 text-white"
+                                        onClick={() => {
+                                            // Navigate to profile (need to use custom event or context)
+                                            const event = new CustomEvent('navigate-to-profile')
+                                            window.dispatchEvent(event)
+                                            toast.info("請在 Profile 頁面設定 AI API Key")
+                                        }}
+                                    >
+                                        前往 Profile 設定 →
+                                    </Button>
+                                </div>
                             </div>
-                        </SheetContent>
-                    </Sheet>
-                </TabsContent>
-            </Tabs>
+                        )}
+
+                        {hasApiKey && (
+                            <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>AI 功能已啟用</span>
+                            </div>
+                        )}
+
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                    <span className="flex items-center gap-3">
+                                        <div className="bg-amber-100 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600" /></div>
+                                        {t('ai_generator')}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 opacity-30" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
+                                <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
+                                <div className="flex-1 space-y-4 py-4">
+                                    <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
+                                    <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{t('generating')}</> : <>{t('generate')}</>}</Button>
+                                    {aiResult?.items && (
+                                        <div className="p-4 bg-stone-100 rounded-xl">
+                                            <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
+                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                    <span className="flex items-center gap-3">
+                                        <div className="bg-blue-100 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600" /></div>
+                                        {t('markdown_import')}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4 opacity-30" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
+                                <SheetHeader><SheetTitle>{t('markdown_import')}</SheetTitle></SheetHeader>
+                                <div className="flex-1 space-y-4 py-4">
+                                    <div className="flex justify-between items-center">
+                                        <Label className="text-xs">{t('input_or_upload')}</Label>
+                                        <div>
+                                            <input type="file" id="file-upload" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
+                                            <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
+                                        </div>
+                                    </div>
+                                    <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
+                                    <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{t('parsing')}</> : <>{t('parse')}</>}</Button>
+                                    {mdResult?.items && (
+                                        <div className="p-4 bg-stone-100 rounded-xl">
+                                            <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
+                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </SheetContent>
+                        </Sheet>
+                    </TabsContent>
+                </Tabs>
+            </PullToRefresh>
 
             {/* Expense Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

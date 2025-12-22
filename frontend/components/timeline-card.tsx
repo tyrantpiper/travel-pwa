@@ -151,9 +151,9 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
                         <TableBody>
                             {activity.sub_items.map((item: SubItem, i: number) => (
                                 <TableRow key={i} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
-                                    <TableCell className="py-2.5 px-3 align-top">
-                                        <div className="text-xs font-bold text-slate-700 mb-0.5">{item.name}</div>
-                                        {item.desc && <div className="text-[10px] text-slate-500 leading-tight">{item.desc}</div>}
+                                    <TableCell className="py-2.5 px-3 align-top break-words">
+                                        <div className="text-xs font-bold text-slate-700 mb-0.5 break-words">{item.name}</div>
+                                        {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words">{item.desc}</div>}
                                     </TableCell>
                                     {item.link ? (
                                         <TableCell className="py-2 px-2 text-right align-middle w-10">
@@ -189,23 +189,23 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
     )
 
     return (
-        <div className="flex gap-4 relative group">
-            <div className="flex flex-col items-center min-w-[3.5rem]">
-                {!isHeader && <span className="text-sm font-mono font-bold text-slate-500">{activity.time}</span>}
-                {!isLast && <div className="w-px h-full bg-slate-200 my-2" />}
-            </div>
-            <div className="relative flex flex-col items-center">
+        <div className="flex gap-3 relative group">
+            {/* 左側：時間 + 序號 */}
+            <div className="flex flex-col items-center w-12 shrink-0">
+                {!isHeader && <span className="text-xs font-mono font-bold text-slate-500">{activity.time}</span>}
                 {isHeader ? (
                     <div className="w-6 h-6 rounded-full mt-1 bg-amber-100 text-amber-600 flex items-center justify-center border-2 border-white shadow-sm z-10">
                         <Lightbulb className="w-3 h-3" strokeWidth={3} />
                     </div>
                 ) : activity.is_highlight ? (
-                    <div className="w-4 h-4 rounded-full mt-1 bg-amber-500 ring-4 ring-amber-100 z-10 flex items-center justify-center text-[8px] text-white font-bold">{index}</div>
+                    <div className="w-5 h-5 rounded-full mt-1 bg-amber-500 ring-4 ring-amber-100 z-10 flex items-center justify-center text-[9px] text-white font-bold">{index}</div>
                 ) : (
-                    <div className="w-5 h-5 rounded-full mt-1 bg-slate-800 text-white flex items-center justify-center text-[10px] font-bold z-10 border-2 border-white shadow-sm">{index}</div>
+                    <div className="w-5 h-5 rounded-full mt-1 bg-slate-800 text-white flex items-center justify-center text-[9px] font-bold z-10 border-2 border-white shadow-sm">{index}</div>
                 )}
+                {!isLast && <div className="w-px flex-1 bg-slate-200 my-1" />}
             </div>
-            <div className={cn("flex-1 mb-8 relative p-4 rounded-xl border transition-all cursor-default",
+            {/* 右側：卡片內容 */}
+            <div className={cn("flex-1 min-w-0 mb-6 relative p-4 rounded-xl border transition-all cursor-default overflow-hidden",
                 isHeader ? "bg-amber-50/30 border-amber-200/50" :
                     activity.is_highlight ? "bg-amber-50/50 border-amber-200" : "bg-white border-transparent hover:border-slate-200 shadow-sm"
             )}>
