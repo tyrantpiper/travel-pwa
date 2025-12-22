@@ -227,42 +227,44 @@ export function ItineraryView() {
         if (!newLocName.trim()) return
         setIsLocSearching(true)
         try {
-            const encodedName = encodeURIComponent(newLocName.trim())
-            // 使用 OpenStreetMap Nominatim API - 增加 limit 和 extratags 獲取更多資訊
-            const geoRes = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodedName}&format=json&addressdetails=1&extratags=1&namedetails=1&limit=15&accept-language=zh-TW,ja,en`,
-                { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
-            )
-            const geoData = await geoRes.json()
-            if (!geoData || geoData.length === 0) {
+            // 使用後端統一地理編碼 API（ArcGIS + Photon）
+            const res = await fetch(`${API_BASE}/api/geocode/search`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: newLocName.trim(), limit: 8 })
+            })
+            const data = await res.json()
+
+            if (!data.results || data.results.length === 0) {
                 toast.warning("找不到此地點，請嘗試其他關鍵字")
                 setLocSearchResults([])
             } else {
-                // 轉換成統一格式，並依 importance 排序（高的在前）
-                const results = geoData
-                    .map((item: any) => ({
-                        name: item.name || item.display_name.split(',')[0],
-                        display_name: item.display_name,
-                        latitude: parseFloat(item.lat),
-                        longitude: parseFloat(item.lon),
-                        type: item.type,
-                        class: item.class,
-                        address: item.address,
-                        importance: item.importance || 0,
-                        // 組合行政區資訊
-                        admin1: item.address?.state || item.address?.province || '',
-                        admin2: item.address?.city || item.address?.county || item.address?.suburb || '',
-                        country: item.address?.country || ''
-                    }))
-                    // 按 importance 排序（重要性高的 POI 在前）
-                    .sort((a: any, b: any) => b.importance - a.importance)
-                    // 只取前 8 個
-                    .slice(0, 8)
+                // 轉換成統一格式
+                const results = data.results.map((item: any) => ({
+                    name: item.name,
+                    display_name: item.address || item.name,
+                    latitude: item.lat,
+                    longitude: item.lng,
+                    type: item.type || "place",
+                    // 從地址中解析行政區資訊
+                    admin1: item.address?.split(", ").slice(-2, -1)[0] || "",
+                    admin2: item.address?.split(", ")[1] || "",
+                    country: item.address?.split(", ").slice(-1)[0] || "",
+                    source: item.source
+                }))
                 setLocSearchResults(results)
+
+                // 顯示搜尋來源提示
+                if (data.source === "arcgis") {
+                    console.log("🗺️ 使用 ArcGIS 搜尋")
+                } else if (data.source === "photon") {
+                    console.log("🔍 使用 Photon 搜尋")
+                }
             }
         } catch (e) { toast.error("搜尋失敗") }
         finally { setIsLocSearching(false) }
     }
+
 
     const handleSelectLocation = async (loc: any) => {
         if (!currentTrip) return
@@ -288,15 +290,16 @@ export function ItineraryView() {
         let finalLng = editItem.lng
         if (editItem.place && (!finalLat || !finalLng)) {
             try {
-                const encodedPlace = encodeURIComponent(editItem.place)
-                const geoRes = await fetch(
-                    `https://nominatim.openstreetmap.org/search?q=${encodedPlace}&format=json&limit=1&accept-language=zh-TW,zh,en`,
-                    { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
-                )
-                const geoData = await geoRes.json()
-                if (geoData && geoData.length > 0) {
-                    finalLat = parseFloat(geoData[0].lat)
-                    finalLng = parseFloat(geoData[0].lon)
+                // 使用後端統一地理編碼 API
+                const res = await fetch(`${API_BASE}/api/geocode/search`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: editItem.place, limit: 1 })
+                })
+                const data = await res.json()
+                if (data.results && data.results.length > 0) {
+                    finalLat = data.results[0].lat
+                    finalLng = data.results[0].lng
                 }
             } catch (e) { }
         }
@@ -827,18 +830,19 @@ export function ItineraryView() {
                                                 if (!editItem.place?.trim()) return
                                                 setIsPlaceSearching(true)
                                                 try {
-                                                    const res = await fetch(
-                                                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(editItem.place)}&format=json&addressdetails=1&limit=5&accept-language=zh-TW,zh,en`,
-                                                        { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
-                                                    )
+                                                    const res = await fetch(`${API_BASE}/api/geocode/search`, {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ query: editItem.place, limit: 5 })
+                                                    })
                                                     const data = await res.json()
-                                                    setPlaceSearchResults(data.map((item: any) => ({
-                                                        name: item.name || item.display_name.split(',')[0],
-                                                        display_name: item.display_name,
-                                                        lat: parseFloat(item.lat),
-                                                        lng: parseFloat(item.lon),
-                                                        type: item.type,
-                                                        class: item.class
+                                                    setPlaceSearchResults((data.results || []).map((item: any) => ({
+                                                        name: item.name,
+                                                        display_name: item.address || item.name,
+                                                        lat: item.lat,
+                                                        lng: item.lng,
+                                                        type: item.type || "place",
+                                                        source: item.source
                                                     })))
                                                 } catch (e) { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }
@@ -853,18 +857,19 @@ export function ItineraryView() {
                                                 if (!editItem.place?.trim()) return
                                                 setIsPlaceSearching(true)
                                                 try {
-                                                    const res = await fetch(
-                                                        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(editItem.place)}&format=json&addressdetails=1&limit=5&accept-language=zh-TW,zh,en`,
-                                                        { headers: { 'User-Agent': 'RyanTravelApp/1.0' } }
-                                                    )
+                                                    const res = await fetch(`${API_BASE}/api/geocode/search`, {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ query: editItem.place, limit: 5 })
+                                                    })
                                                     const data = await res.json()
-                                                    setPlaceSearchResults(data.map((item: any) => ({
-                                                        name: item.name || item.display_name.split(',')[0],
-                                                        display_name: item.display_name,
-                                                        lat: parseFloat(item.lat),
-                                                        lng: parseFloat(item.lon),
-                                                        type: item.type,
-                                                        class: item.class
+                                                    setPlaceSearchResults((data.results || []).map((item: any) => ({
+                                                        name: item.name,
+                                                        display_name: item.address || item.name,
+                                                        lat: item.lat,
+                                                        lng: item.lng,
+                                                        type: item.type || "place",
+                                                        source: item.source
                                                     })))
                                                 } catch (e) { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }

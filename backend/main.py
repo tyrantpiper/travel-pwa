@@ -211,7 +211,14 @@ async def geocode_with_arcgis(place_name: str):
 
 
 async def geocode_with_nominatim(place_name: str):
-    """Nominatim 備援 (OpenStreetMap)"""
+    """
+    🔒 Nominatim 備援 (OpenStreetMap) - 目前已停用
+    
+    保留原因：未來如需結構化地址批次處理可啟用
+    停用原因：對中文/日文地名搜尋效果差，改用 Photon
+    
+    如需重新啟用，將 geocode_place 中的 Photon 改回 Nominatim 即可
+    """
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             res = await client.get(
@@ -228,14 +235,92 @@ async def geocode_with_nominatim(place_name: str):
             if data and len(data) > 0:
                 result = data[0]
                 print(f"🌍 Nominatim: {place_name} → ({result['lat']}, {result['lon']})")
-                return {"lat": float(result["lat"]), "lng": float(result["lon"])}
+                return {
+                    "lat": float(result["lat"]), 
+                    "lng": float(result["lon"]),
+                    "name": result.get("display_name", place_name).split(",")[0],
+                    "address": result.get("display_name", "")
+                }
     except Exception as e:
         print(f"🌍 Nominatim error for '{place_name}': {e}")
     return None
 
 
+async def geocode_with_photon(place_name: str, limit: int = 5):
+    """Photon 地理編碼 (基於 OpenStreetMap + Elasticsearch，模糊搜尋強)
+    
+    優點：
+    - 免費無限制
+    - 支援模糊搜尋（打錯字也能找到）
+    - 多語言支援佳
+    - 支援正向和反向地理編碼
+    """
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(
+                "https://photon.komoot.io/api/",
+                params={
+                    "q": place_name,
+                    "limit": limit,
+                    "lang": "zh"  # 中文優先
+                }
+            )
+            data = res.json()
+            if data.get("features") and len(data["features"]) > 0:
+                results = []
+                for feature in data["features"]:
+                    props = feature.get("properties", {})
+                    coords = feature.get("geometry", {}).get("coordinates", [0, 0])
+                    
+                    # 組合地址
+                    address_parts = []
+                    for key in ["country", "state", "city", "district", "street", "housenumber"]:
+                        if props.get(key):
+                            address_parts.append(props[key])
+                    
+                    results.append({
+                        "lat": coords[1],
+                        "lng": coords[0],
+                        "name": props.get("name", place_name),
+                        "address": ", ".join(address_parts) if address_parts else props.get("name", ""),
+                        "type": props.get("osm_value", "place")
+                    })
+                
+                if results:
+                    print(f"🔍 Photon: {place_name} → {len(results)} 結果")
+                    return results
+    except Exception as e:
+        print(f"🔍 Photon error for '{place_name}': {e}")
+    return None
+
+
+async def reverse_geocode_with_photon(lat: float, lng: float):
+    """Photon 反向地理編碼（座標 → 地名）"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            res = await client.get(
+                "https://photon.komoot.io/reverse",
+                params={"lat": lat, "lon": lng, "lang": "zh"}
+            )
+            data = res.json()
+            if data.get("features") and len(data["features"]) > 0:
+                props = data["features"][0].get("properties", {})
+                address_parts = []
+                for key in ["country", "state", "city", "district", "street", "housenumber"]:
+                    if props.get(key):
+                        address_parts.append(props[key])
+                
+                return {
+                    "name": props.get("name", "Unknown"),
+                    "address": ", ".join(address_parts) if address_parts else "Unknown"
+                }
+    except Exception as e:
+        print(f"🔍 Photon reverse error: {e}")
+    return None
+
+
 async def geocode_place(place_name: str):
-    """智能地理編碼：ArcGIS 優先，Nominatim 備援
+    """智能地理編碼：ArcGIS 優先，Photon 備援
     
     ⚠️ 函數簽名與回傳格式完全不變，確保向後相容
     回傳: {"lat": float, "lng": float} 或 None
@@ -245,12 +330,92 @@ async def geocode_place(place_name: str):
         result = await geocode_with_arcgis(place_name)
         if result:
             return result
-        print(f"⚠️ ArcGIS 查無結果，降級到 Nominatim...")
+        print(f"⚠️ ArcGIS 查無結果，降級到 Photon...")
     
-    # 2. 降級到 Nominatim
-    return await geocode_with_nominatim(place_name)
+    # 2. 降級到 Photon（取代 Nominatim）
+    photon_results = await geocode_with_photon(place_name, limit=1)
+    if photon_results:
+        first = photon_results[0]
+        return {"lat": first["lat"], "lng": first["lng"]}
+    
+    return None
 
-# 🔥 Markdown 消化系統 (2.5 版混合動力)
+
+# 🌍 地理編碼 API 端點（供前端使用）
+
+class GeocodeSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+
+class GeocodeReverseRequest(BaseModel):
+    lat: float
+    lng: float
+
+@app.post("/api/geocode/search")
+async def geocode_search(request: GeocodeSearchRequest):
+    """地理編碼搜尋：ArcGIS（精確）→ Photon（備援）
+    
+    回傳多個結果供使用者選擇
+    """
+    print(f"🔍 Geocode search: {request.query}")
+    
+    # 1. 優先嘗試 ArcGIS（返回多個結果）
+    if ARCGIS_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(
+                    "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+                    params={
+                        "SingleLine": request.query,
+                        "f": "json",
+                        "outFields": "PlaceName,Place_addr,Type",
+                        "maxLocations": request.limit,
+                        "token": ARCGIS_API_KEY
+                    }
+                )
+                data = res.json()
+                if data.get("candidates") and len(data["candidates"]) > 0:
+                    results = []
+                    for c in data["candidates"]:
+                        results.append({
+                            "lat": c["location"]["y"],
+                            "lng": c["location"]["x"],
+                            "name": c.get("attributes", {}).get("PlaceName", request.query),
+                            "address": c.get("attributes", {}).get("Place_addr", ""),
+                            "type": c.get("attributes", {}).get("Type", "place"),
+                            "source": "arcgis"
+                        })
+                    print(f"🗺️ ArcGIS: {len(results)} 結果")
+                    return {"results": results, "source": "arcgis"}
+        except Exception as e:
+            print(f"⚠️ ArcGIS search error: {e}")
+    
+    # 2. 降級到 Photon
+    photon_results = await geocode_with_photon(request.query, request.limit)
+    if photon_results:
+        for r in photon_results:
+            r["source"] = "photon"
+        return {"results": photon_results, "source": "photon"}
+    
+    return {"results": [], "source": "none"}
+
+
+@app.post("/api/geocode/reverse")
+async def geocode_reverse(request: GeocodeReverseRequest):
+    """反向地理編碼：座標 → 地名
+    
+    使用 Photon（免費無限制）
+    """
+    print(f"🔍 Reverse geocode: ({request.lat}, {request.lng})")
+    
+    # 使用 Photon 反向地理編碼
+    result = await reverse_geocode_with_photon(request.lat, request.lng)
+    if result:
+        return {"success": True, **result}
+    
+    return {"success": False, "name": "Unknown", "address": ""}
+
+
 @app.post("/api/parse-md")
 async def parse_markdown(
     request: MarkdownImportRequest,
