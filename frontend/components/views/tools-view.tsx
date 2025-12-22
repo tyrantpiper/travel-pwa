@@ -27,6 +27,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { SwipeableItem } from "@/components/ui/swipeable-item"
+import { useHaptic } from "@/lib/hooks"
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,6 +78,8 @@ export function ToolsView() {
     const [expenseDate, setExpenseDate] = useState("")
     const [receiptUrl, setReceiptUrl] = useState("")
     const [isUploading, setIsUploading] = useState(false)
+    const [isSavingExpense, setIsSavingExpense] = useState(false)
+    const haptic = useHaptic()
 
     // AI Tools state
     const [markdown, setMarkdown] = useState("")
@@ -211,11 +214,16 @@ export function ToolsView() {
     }
 
     const handleSaveExpense = async () => {
+        if (isSavingExpense) return // 防止重複點擊
+        haptic.tap() // 觸覺回饋
+
         const userId = localStorage.getItem("user_uuid")
         const userName = localStorage.getItem("user_nickname")
-        if (!amountJPY || !title) { toast.error("Please fill in amount and title"); return }
+        if (!amountJPY || !title) { toast.error("Please fill in amount and title"); haptic.error(); return }
 
         if (!activeTripId) return
+        setIsSavingExpense(true)
+
         const rateNum = parseFloat(cashback) || 0
         const payload = {
             itinerary_id: activeTripId, title, amount_jpy: parseInt(amountJPY), exchange_rate: rate,
@@ -233,6 +241,7 @@ export function ToolsView() {
         try {
             const res = await fetch(url, { method: methodType, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
             if (res.ok) {
+                haptic.success()
                 toast.success(editItem ? "Updated" : "Saved")
                 closeDialog()
                 setReceiptUrl("")
@@ -240,7 +249,8 @@ export function ToolsView() {
             } else {
                 throw new Error("API Error")
             }
-        } catch (e) { toast.error("Save failed") }
+        } catch (e) { haptic.error(); toast.error("Save failed") }
+        finally { setIsSavingExpense(false) }
     }
 
     const handleDeleteExpense = async (id: string) => {
@@ -643,7 +653,9 @@ export function ToolsView() {
                             <Switch checked={isPublic} onCheckedChange={setIsPublic} />
                         </div>
 
-                        <Button className="w-full bg-slate-900" onClick={handleSaveExpense}>{t('save')}</Button>
+                        <Button className="w-full bg-slate-900" onClick={handleSaveExpense} disabled={isSavingExpense}>
+                            {isSavingExpense ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />儲存中...</> : t('save')}
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

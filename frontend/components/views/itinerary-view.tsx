@@ -20,6 +20,8 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
+import { useHaptic } from "@/lib/hooks"
+import { Loader2 } from "lucide-react"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -39,8 +41,10 @@ export function ItineraryView() {
     const [newTripStart, setNewTripStart] = useState("2026-02-02")
     const [newTripEnd, setNewTripEnd] = useState("2026-02-10")
     const [newTripCover, setNewTripCover] = useState("")
+    const [isCreating, setIsCreating] = useState(false)
     const [joinCode, setJoinCode] = useState("")
     const [isJoinLoading, setIsJoinLoading] = useState(false)
+    const haptic = useHaptic()
 
     const [editItem, setEditItem] = useState<any>(null)
     const [isEditOpen, setIsEditOpen] = useState(false)
@@ -177,8 +181,13 @@ export function ItineraryView() {
     }
 
     const handleManualCreate = async () => {
+        if (isCreating) return // 防止重複點擊
+        haptic.tap()
+
         const userName = localStorage.getItem("user_nickname")
-        if (!userId || !newTripTitle) return
+        if (!userId || !newTripTitle) { haptic.error(); return }
+
+        setIsCreating(true)
         try {
             await fetch(`${API_BASE}/api/trip/create-manual`, {
                 method: "POST",
@@ -189,10 +198,12 @@ export function ItineraryView() {
                     cover_image: newTripCover
                 })
             })
+            haptic.success()
             setIsCreateOpen(false)
             setNewTripCover("")
             reloadTrips()
-        } catch (e) { toast.error("Create failed") }
+        } catch (e) { haptic.error(); toast.error("Create failed") }
+        finally { setIsCreating(false) }
     }
 
     const handleJoinTrip = async () => {
@@ -483,7 +494,7 @@ export function ItineraryView() {
                                 </div>
                                 <div className="space-y-2"><Label>{t('trip_name')}</Label><Input value={newTripTitle} onChange={e => setNewTripTitle(e.target.value)} placeholder="Tokyo 2026" /></div>
                                 <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>{t('start_date')}</Label><Input type="date" value={newTripStart} onChange={e => setNewTripStart(e.target.value)} /></div><div className="space-y-2"><Label>{t('end_date')}</Label><Input type="date" value={newTripEnd} onChange={e => setNewTripEnd(e.target.value)} /></div></div>
-                                <div className="flex gap-2 pt-2"><Button className="flex-1" onClick={handleManualCreate}>{t('create')}</Button><Button variant="outline" className="flex-1" onClick={() => toast.info("Go to Tools page for AI import")}>{t('ai_import')}</Button></div>
+                                <div className="flex gap-2 pt-2"><Button className="flex-1" onClick={handleManualCreate} disabled={isCreating}>{isCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />創建中...</> : t('create')}</Button><Button variant="outline" className="flex-1" onClick={() => toast.info("Go to Tools page for AI import")}>{t('ai_import')}</Button></div>
                             </div>
                         </DialogContent>
                     </Dialog>
