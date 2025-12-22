@@ -101,3 +101,26 @@ export function useOnlineStatus() {
 
     return isOnline
 }
+
+/**
+ * Service Worker registration hook
+ * Only registers in production environment
+ */
+export function useServiceWorker() {
+    useEffect(() => {
+        if (
+            typeof window !== 'undefined' &&
+            'serviceWorker' in navigator &&
+            process.env.NODE_ENV === 'production'
+        ) {
+            navigator.serviceWorker
+                .register('/sw.js')
+                .then((registration) => {
+                    console.log('SW registered:', registration.scope)
+                })
+                .catch((error) => {
+                    console.error('SW registration failed:', error)
+                })
+        }
+    }, [])
+}

@@ -8,9 +8,13 @@ import { ProfileView } from "@/components/views/profile-view"
 import { BottomNav } from "@/components/bottom-nav"
 import { TripProvider } from "@/lib/trip-context"
 import { OfflineBanner } from "@/components/ui/offline-banner"
+import { useServiceWorker } from "@/lib/hooks"
 
 export function AppShell() {
     const [activeView, setActiveView] = useState("itinerary")
+
+    // Register Service Worker in production
+    useServiceWorker()
 
     // Listen for navigation events from other components
     useEffect(() => {
