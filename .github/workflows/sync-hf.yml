@@ -1,0 +1,39 @@
+name: Sync Backend to Hugging Face
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'  # 只有 backend 資料夾變更時才觸發
+
+jobs:
+  sync-to-hf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 取得完整歷史紀錄
+
+      - name: Push backend to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # 設定 Git
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          
+          # 創建臨時目錄並複製 backend 檔案
+          mkdir -p /tmp/hf-sync
+          cp -r backend/* /tmp/hf-sync/
+          
+          # 初始化 Git 並推送到 Hugging Face
+          cd /tmp/hf-sync
+          git init
+          git remote add origin https://tyrantpiper:$HF_TOKEN@huggingface.co/spaces/tyrantpiper/Ryan-Travel-Api
+          git fetch origin main --depth=1 || true
+          git checkout -b main
+          git add .
+          git commit -m "Sync from GitHub: ${{ github.sha }}" || echo "No changes to commit"
+          git push origin main --force
