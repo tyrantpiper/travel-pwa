@@ -54,7 +54,7 @@ const CATEGORIES: Record<string, { label: string; icon: any; color: string }> = 
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTripId } = useTripContext()
+    const { activeTripId, activeTrip } = useTripContext()
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")
     const [expenses, setExpenses] = useState<any[]>([])
@@ -161,8 +161,17 @@ export function ToolsView() {
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
     // Calculate totals and category breakdown
-    const { totalJPY, totalTWD, categoryData } = useMemo(() => {
+    const { totalJPY, totalTWD, totalCashback, categoryData } = useMemo(() => {
         const total = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0)
+        // 計算總回饋金額
+        const cashbackTotal = filteredExpenses.reduce((sum, e) => {
+            if (e.cashback_rate && e.cashback_rate > 0) {
+                const usedRate = e.exchange_rate || rate
+                return sum + Math.round(e.amount * usedRate * e.cashback_rate / 100)
+            }
+            return sum
+        }, 0)
+
         const cats: Record<string, number> = {}
         filteredExpenses.forEach(e => {
             const cat = e.category || 'general'
@@ -174,7 +183,7 @@ export function ToolsView() {
             color: CATEGORY_COLORS[category] || CATEGORY_COLORS.general
         })).sort((a, b) => b.amount - a.amount)
 
-        return { totalJPY: total, totalTWD: Math.round(total * rate), categoryData: data }
+        return { totalJPY: total, totalTWD: Math.round(total * rate), totalCashback: cashbackTotal, categoryData: data }
     }, [filteredExpenses, rate])
 
     // Date navigation
@@ -460,6 +469,9 @@ export function ToolsView() {
                                             <p className="text-xs text-slate-500">{t('total')}</p>
                                             <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
                                             <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                            {totalCashback > 0 && (
+                                                <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
@@ -468,6 +480,9 @@ export function ToolsView() {
                                             <p className="text-xs text-slate-500">{t('total')}</p>
                                             <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
                                             <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                            {totalCashback > 0 && (
+                                                <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
+                                            )}
                                         </div>
                                         <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
                                             <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
@@ -606,10 +621,30 @@ export function ToolsView() {
                         </div>
                         <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
 
-                        {/* Date picker */}
+                        {/* Date picker - 根據行程天數選擇 */}
                         <div className="space-y-1">
-                            <Label className="text-xs text-slate-500">日期</Label>
-                            <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} />
+                            <Label className="text-xs text-slate-500">📅 日期</Label>
+                            {activeTrip?.start_date && activeTrip?.days ? (
+                                <select
+                                    value={expenseDate}
+                                    onChange={e => setExpenseDate(e.target.value)}
+                                    className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
+                                >
+                                    {Array.from({ length: activeTrip.days.length || 1 }, (_, i) => {
+                                        const date = new Date(activeTrip.start_date)
+                                        date.setDate(date.getDate() + i)
+                                        const dateStr = date.toISOString().split('T')[0]
+                                        const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                                        return (
+                                            <option key={i} value={dateStr}>
+                                                Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
+                                            </option>
+                                        )
+                                    })}
+                                </select>
+                            ) : (
+                                <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} />
+                            )}
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
@@ -642,7 +677,25 @@ export function ToolsView() {
                         {(method === "JCB" || method === "VisaMaster") && (
                             <div className="flex gap-2">
                                 <Input placeholder="Card name" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
-                                <Input placeholder="Cashback %" type="number" value={cashback} onChange={e => setCashback(e.target.value)} className="w-24" />
+                                <div className="relative w-28">
+                                    <input
+                                        type="text"
+                                        list="cashback-rates"
+                                        placeholder="回饋 %"
+                                        value={cashback}
+                                        onChange={e => setCashback(e.target.value)}
+                                        className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
+                                    />
+                                    <datalist id="cashback-rates">
+                                        <option value="0.5">0.5%</option>
+                                        <option value="1">1%</option>
+                                        <option value="1.5">1.5%</option>
+                                        <option value="2">2%</option>
+                                        <option value="2.5">2.5%</option>
+                                        <option value="3">3%</option>
+                                        <option value="5">5%</option>
+                                    </datalist>
+                                </div>
                             </div>
                         )}
 
