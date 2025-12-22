@@ -667,7 +667,7 @@ export function ItineraryView() {
 
                                     {locSearchResults.length > 0 && (
                                         <div className="space-y-2 max-h-48 overflow-y-auto">
-                                            <p className="text-xs text-slate-500">🗺️ OpenStreetMap 搜尋結果 ({locSearchResults.length})：</p>
+                                            <p className="text-xs text-slate-500">🗺️ 地點搜尋結果 ({locSearchResults.length})：</p>
                                             {locSearchResults.map((loc, idx) => {
                                                 // POI 類型對照
                                                 const typeLabels: { [key: string]: string } = {
