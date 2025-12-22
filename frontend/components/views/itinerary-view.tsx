@@ -50,6 +50,7 @@ export function ItineraryView() {
     const [isAddMode, setIsAddMode] = useState(false)
     const [placeSearchResults, setPlaceSearchResults] = useState<any[]>([])
     const [isPlaceSearching, setIsPlaceSearching] = useState(false)
+    const [isSavingActivity, setIsSavingActivity] = useState(false)
 
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<any[]>([])
@@ -291,6 +292,10 @@ export function ItineraryView() {
 
     const handleSaveEdit = async () => {
         if (!editItem && !isAddMode) return
+        if (isSavingActivity) return // 防止重複點擊
+        haptic.tap() // 觸覺回饋
+
+        setIsSavingActivity(true)
 
         let finalLat = editItem.lat
         let finalLng = editItem.lng
@@ -339,9 +344,15 @@ export function ItineraryView() {
                     })
                 })
             }
+            haptic.success()
             setIsEditOpen(false)
             reloadTripDetail()
-        } catch (e) { toast.error("Save failed") }
+        } catch (e) {
+            haptic.error()
+            toast.error("Save failed")
+        } finally {
+            setIsSavingActivity(false)
+        }
     }
 
     const handleUpdateMemo = async (id: string, newMemo: string) => {
@@ -1057,7 +1068,9 @@ export function ItineraryView() {
                             </div>
 
                             <DialogFooter>
-                                <Button onClick={handleSaveEdit}>{isAddMode ? "Add" : "Save"}</Button>
+                                <Button onClick={handleSaveEdit} disabled={isSavingActivity}>
+                                    {isSavingActivity ? "儲存中..." : (isAddMode ? "Add" : "Save")}
+                                </Button>
                             </DialogFooter>
                         </div>
                     )}
