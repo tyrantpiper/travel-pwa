@@ -58,6 +58,7 @@ export function ItineraryView() {
     const [newLocName, setNewLocName] = useState("")
     const [locSearchResults, setLocSearchResults] = useState<any[]>([])
     const [isLocSearching, setIsLocSearching] = useState(false)
+    const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
 
     useEffect(() => {
         if (currentTrip && currentTrip.daily_locations) {
@@ -227,11 +228,16 @@ export function ItineraryView() {
         if (!newLocName.trim()) return
         setIsLocSearching(true)
         try {
+            // 組合搜尋詞：如果有選擇國家，附加到搜尋詞後面
+            const queryWithCountry = searchCountry
+                ? `${newLocName.trim()} ${searchCountry}`
+                : newLocName.trim()
+
             // 使用後端統一地理編碼 API（ArcGIS + Photon）
             const res = await fetch(`${API_BASE}/api/geocode/search`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: newLocName.trim(), limit: 8 })
+                body: JSON.stringify({ query: queryWithCountry, limit: 8 })
             })
             const data = await res.json()
 
@@ -652,17 +658,33 @@ export function ItineraryView() {
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
                                         <div className="flex gap-2">
+                                            <select
+                                                value={searchCountry}
+                                                onChange={e => setSearchCountry(e.target.value)}
+                                                className="w-24 text-sm px-2 py-1.5 rounded-md border border-slate-200 bg-white"
+                                            >
+                                                <option value="">🌍 全球</option>
+                                                <option value="Japan">🇯🇵 日本</option>
+                                                <option value="Taiwan">🇹🇼 台灣</option>
+                                                <option value="Korea">🇰🇷 韓國</option>
+                                                <option value="Thailand">🇹🇭 泰國</option>
+                                                <option value="Vietnam">🇻🇳 越南</option>
+                                                <option value="Hong Kong">🇭🇰 香港</option>
+                                                <option value="Singapore">🇸🇬 新加坡</option>
+                                                <option value="USA">🇺🇸 美國</option>
+                                            </select>
                                             <Input
-                                                placeholder="輸入城市或區域名稱 (例如：墨田區、三民區)"
+                                                placeholder="輸入地點名稱..."
                                                 value={newLocName}
                                                 onChange={e => setNewLocName(e.target.value)}
                                                 onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
+                                                className="flex-1"
                                             />
                                             <Button onClick={handleSearchLocation} disabled={isLocSearching}>
                                                 {isLocSearching ? "..." : "搜尋"}
                                             </Button>
                                         </div>
-                                        <p className="text-[10px] text-slate-400">💡 若中文找不到，請嘗試英文或羅馬拼音</p>
+                                        <p className="text-[10px] text-slate-400">💡 選擇國家可提高短地名的搜尋準確度</p>
                                     </div>
 
                                     {locSearchResults.length > 0 && (
