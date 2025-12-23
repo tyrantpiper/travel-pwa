@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import {
     Plane, Bed, Save, Edit3, Clock, MapPin, Ticket,
-    Copy, Check, ExternalLink, Phone, Wifi, Link as LinkIcon, Plus, Trash2, Info
+    Copy, ExternalLink, Phone, Wifi, Link as LinkIcon, Plus, Trash2, Info
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -180,10 +180,20 @@ export function InfoView() {
                                         <TabsTrigger value="inbound" className="rounded-lg data-[state=active]:bg-white">{t('inbound')}</TabsTrigger>
                                     </TabsList>
                                     <TabsContent value="outbound">
-                                        <FlightCard data={flights.outbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })} />
+                                        <FlightCard
+                                            data={flights.outbound}
+                                            isEditing={isEditing}
+                                            onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
+                                            onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
+                                        />
                                     </TabsContent>
                                     <TabsContent value="inbound">
-                                        <FlightCard data={flights.inbound} isEditing={isEditing} onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })} />
+                                        <FlightCard
+                                            data={flights.inbound}
+                                            isEditing={isEditing}
+                                            onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
+                                            onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
+                                        />
                                     </TabsContent>
                                 </Tabs>
                             </section>
@@ -336,30 +346,83 @@ export function InfoView() {
     )
 }
 
-function FlightCard({ data, isEditing, onChange }: any) {
+function FlightCard({ data, isEditing, onChange, onClear }: { data: any, isEditing: boolean, onChange: (field: string, value: string) => void, onClear?: () => void }) {
     const [copied, setCopied] = useState(false)
     const handleCopyPNR = () => { if (data.pnr) { navigator.clipboard.writeText(data.pnr); setCopied(true); setTimeout(() => setCopied(false), 2000) } }
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
+            {/* 清除按鈕 */}
+            {isEditing && onClear && (
+                <button
+                    onClick={onClear}
+                    className="absolute top-2 right-2 z-10 text-slate-300 hover:text-red-500 transition-colors"
+                    title="清除航班資訊"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
+
             <div className="p-5 bg-gradient-to-br from-slate-50 to-white">
-                <div className="flex justify-between items-center mb-6">
+                {/* 日期區塊 - 置頂顯示 */}
+                <div className="mb-4 pb-3 border-b border-slate-100">
+                    <Label className="text-[10px] text-slate-400 uppercase block text-center mb-2">Date</Label>
+                    <Input
+                        type="date"
+                        disabled={!isEditing}
+                        value={data.date}
+                        onChange={e => onChange('date', e.target.value)}
+                        className={isEditing ? "h-9 text-sm text-center mx-auto max-w-[200px] block" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-center text-slate-800 mx-auto block"}
+                    />
+                </div>
+
+                {/* 出發/到達 機場 + 時間 */}
+                <div className="flex justify-between items-center mb-4">
                     <div className="flex-1">
                         <Input disabled={!isEditing} value={data.dep_airport} onChange={e => onChange('dep_airport', e.target.value.toUpperCase())} className={isEditing ? "bg-white h-10 w-20 text-center font-bold" : "bg-transparent border-0 p-0 h-auto text-4xl font-black text-slate-800 w-24"} maxLength={3} />
-                        <Input type={isEditing ? "datetime-local" : "text"} disabled={!isEditing} value={data.dep_time} onChange={e => onChange('dep_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1"} placeholder="Departure" />
+                        <Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.dep_time} onChange={e => onChange('dep_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1"} placeholder="出發" />
                     </div>
                     <div className="flex flex-col items-center justify-center px-4 opacity-50">
                         <Plane className="w-6 h-6 text-slate-400 rotate-90 mb-1" /><div className="w-16 h-px border-t-2 border-dashed border-slate-300"></div>
                     </div>
                     <div className="flex-1 text-right">
                         <div className="flex justify-end"><Input disabled={!isEditing} value={data.arr_airport} onChange={e => onChange('arr_airport', e.target.value.toUpperCase())} className={isEditing ? "bg-white h-10 w-20 text-center font-bold" : "bg-transparent border-0 p-0 h-auto text-4xl font-black text-slate-800 w-24 text-right"} maxLength={3} /></div>
-                        <div className="flex justify-end"><Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.arr_time} onChange={e => onChange('arr_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1 text-right"} placeholder="Arrival" /></div>
+                        <div className="flex justify-end"><Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.arr_time} onChange={e => onChange('arr_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1 text-right"} placeholder="到達" /></div>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase">Airline / Flight</Label><div className="flex gap-2"><Input disabled={!isEditing} value={data.airline} onChange={e => onChange('airline', e.target.value)} placeholder="Airline" className="h-8 text-xs" /><Input disabled={!isEditing} value={data.code} onChange={e => onChange('code', e.target.value)} placeholder="Code" className="h-8 text-xs font-mono font-bold" /></div></div><div className="space-y-1 text-right"><Label className="text-[10px] text-slate-400 uppercase">Date</Label><Input type="date" disabled={!isEditing} value={data.date} onChange={e => onChange('date', e.target.value)} className="h-8 text-xs text-right" /></div></div>
+
+                {/* Airline / Flight */}
+                <div className="space-y-1">
+                    <Label className="text-[10px] text-slate-400 uppercase">Airline / Flight</Label>
+                    <div className="flex gap-2">
+                        <Input disabled={!isEditing} value={data.airline} onChange={e => onChange('airline', e.target.value)} placeholder="Airline" className="h-8 text-xs" />
+                        <Input disabled={!isEditing} value={data.code} onChange={e => onChange('code', e.target.value)} placeholder="Code" className="h-8 text-xs font-mono font-bold w-24" />
+                    </div>
+                </div>
             </div>
+
             <div className="relative flex items-center justify-between px-4"><div className="w-4 h-4 bg-stone-50 rounded-full -ml-6"></div><div className="flex-1 border-t-2 border-dashed border-slate-200"></div><div className="w-4 h-4 bg-stone-50 rounded-full -mr-6"></div></div>
-            <div className="p-5 bg-white"><div className="grid grid-cols-3 gap-4"><div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase">PNR</Label><div className="flex items-center gap-2"><Input disabled={!isEditing} value={data.pnr} onChange={e => onChange('pnr', e.target.value)} placeholder="Code" className={isEditing ? "h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-lg font-mono font-black text-slate-800 tracking-wider"} />{!isEditing && data.pnr && <button onClick={handleCopyPNR} className="text-slate-400 hover:text-green-600"><Copy className="w-4 h-4" /></button>}</div></div><div className="space-y-1 text-center"><Label className="text-[10px] text-slate-400 uppercase">Terminal</Label><Input disabled={!isEditing} value={data.terminal} onChange={e => onChange('terminal', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-center" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-center text-slate-800"} /></div><div className="space-y-1 text-right"><Label className="text-[10px] text-slate-400 uppercase">Seat</Label><Input disabled={!isEditing} value={data.seat} onChange={e => onChange('seat', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-right" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-right text-slate-800"} /></div></div></div>
+
+            {/* PNR / Terminal / Seat - 置中對齊 */}
+            <div className="p-5 bg-white">
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                        <Label className="text-[10px] text-slate-400 uppercase">PNR</Label>
+                        <div className="flex items-center gap-2">
+                            <Input disabled={!isEditing} value={data.pnr} onChange={e => onChange('pnr', e.target.value)} placeholder="Code" className={isEditing ? "h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-lg font-mono font-black text-slate-800 tracking-wider"} />
+                            {!isEditing && data.pnr && <button onClick={handleCopyPNR} className="text-slate-400 hover:text-green-600"><Copy className="w-4 h-4" /></button>}
+                        </div>
+                    </div>
+                    <div className="space-y-1 text-center">
+                        <Label className="text-[10px] text-slate-400 uppercase">Terminal</Label>
+                        <Input disabled={!isEditing} value={data.terminal} onChange={e => onChange('terminal', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-center" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-center text-slate-800"} />
+                    </div>
+                    <div className="space-y-1 text-center">
+                        <Label className="text-[10px] text-slate-400 uppercase">Seat</Label>
+                        <Input disabled={!isEditing} value={data.seat} onChange={e => onChange('seat', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-center" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-center text-slate-800"} />
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }

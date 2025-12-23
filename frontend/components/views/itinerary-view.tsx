@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { ArrowLeft, Calendar, Plus, Users, Hash, Settings, Edit2, Trash2, MapPin, Edit3, Sun, Cloud, CloudRain } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { useTrips, useTripDetail } from "@/lib/hooks"
+import { useTripDetail } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
-import Link from "next/link"
+
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import DailyTips from "@/components/daily-tips"
 import { useTripContext } from "@/lib/trip-context"
@@ -867,7 +867,7 @@ export function ItineraryView() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right">Time</Label>
-                                <Input value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
+                                <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
                             </div>
                             <div className="grid grid-cols-4 items-start gap-4">
                                 <Label className="text-right pt-2">Place</Label>

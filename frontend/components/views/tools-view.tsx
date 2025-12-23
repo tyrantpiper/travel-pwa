@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo } from "react"
 import { useSWRConfig } from "swr"
 import {
-    Plus, Trash2, Edit2, Camera, ChevronRight, FileText, Loader2,
+    Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
-    Sparkles, Upload, Image as ImageIcon, X, ChevronLeft, PieChart, List, Users, User,
+    Sparkles, Upload, Image as ImageIcon, ChevronLeft, PieChart, List, Users, User,
     Key, CheckCircle2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -616,7 +616,7 @@ export function ToolsView() {
                     <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-2">
                         <div className="flex gap-2">
-                            <Input placeholder={t('amount_jpy')} type="number" className="text-lg font-mono font-bold" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
+                            <Input placeholder={t('amount_jpy')} type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
                             <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * rate)} TWD</div>
                         </div>
                         <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
