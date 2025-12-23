@@ -37,6 +37,13 @@ export function ProfileView() {
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
 
+    // 🆕 POI 推薦偏好設定
+    const [poiPreferences, setPoiPreferences] = useState({
+        prefer_rating: true,
+        prefer_distance: false,
+        prefer_price: false
+    })
+
     const [profile, setProfile] = useState({
         nickname: "Traveler",
         avatarUrl: "",
@@ -65,6 +72,14 @@ export function ProfileView() {
                 localStorage.setItem("user_gemini_key", storedKey)
                 localStorage.removeItem("gemini_api_key")
             }
+        }
+
+        // 🆕 載入 POI 偏好設定
+        const savedPoiPrefs = localStorage.getItem("poi_preferences")
+        if (savedPoiPrefs) {
+            try {
+                setPoiPreferences(JSON.parse(savedPoiPrefs))
+            } catch { /* ignore */ }
         }
     }, [])
 
@@ -376,6 +391,51 @@ export function ProfileView() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
+
+                        {/* 🆕 POI 推薦偏好設定 */}
+                        <Separator />
+                        <div className="p-4 space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Globe className="w-5 h-5 text-blue-500" />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">AI 推薦偏好</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="pref-rating" className="text-sm text-slate-600 dark:text-slate-300">⭐ 重視評分</Label>
+                                <Switch
+                                    id="pref-rating"
+                                    checked={poiPreferences.prefer_rating}
+                                    onCheckedChange={(checked) => {
+                                        const newPrefs = { ...poiPreferences, prefer_rating: checked }
+                                        setPoiPreferences(newPrefs)
+                                        localStorage.setItem("poi_preferences", JSON.stringify(newPrefs))
+                                    }}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="pref-distance" className="text-sm text-slate-600 dark:text-slate-300">📍 重視距離</Label>
+                                <Switch
+                                    id="pref-distance"
+                                    checked={poiPreferences.prefer_distance}
+                                    onCheckedChange={(checked) => {
+                                        const newPrefs = { ...poiPreferences, prefer_distance: checked }
+                                        setPoiPreferences(newPrefs)
+                                        localStorage.setItem("poi_preferences", JSON.stringify(newPrefs))
+                                    }}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="pref-price" className="text-sm text-slate-600 dark:text-slate-300">💰 重視價格</Label>
+                                <Switch
+                                    id="pref-price"
+                                    checked={poiPreferences.prefer_price}
+                                    onCheckedChange={(checked) => {
+                                        const newPrefs = { ...poiPreferences, prefer_price: checked }
+                                        setPoiPreferences(newPrefs)
+                                        localStorage.setItem("poi_preferences", JSON.stringify(newPrefs))
+                                    }}
+                                />
+                            </div>
+                        </div>
 
                         <Separator />
                         <MenuItem icon={User} label={t('account_settings')} />

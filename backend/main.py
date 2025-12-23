@@ -2025,3 +2025,35 @@ async def get_poi_categories():
         ]
     }
 
+
+# ==================== WikiVoyage API ====================
+from services.poi_service import search_wikivoyage
+
+
+@app.get("/api/wikivoyage/search")
+async def wikivoyage_search(place: str, lang: str = "en"):
+    """
+    搜索 WikiVoyage 景點描述
+    
+    Args:
+        place: 景點名稱 (英文效果較佳)
+        lang: 語言代碼 (en, ja, zh)
+    
+    Returns:
+        WikiVoyage 頁面資訊
+    """
+    if not place or len(place) < 2:
+        raise HTTPException(status_code=400, detail="Place name too short")
+    
+    result = await search_wikivoyage(place, lang)
+    
+    if not result:
+        return {
+            "found": False,
+            "message": f"No WikiVoyage article found for '{place}'"
+        }
+    
+    return {
+        "found": True,
+        **result
+    }

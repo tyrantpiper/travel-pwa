@@ -371,3 +371,101 @@ def get_ai_prompt_for_recommendation(
 用戶問題：{user_query}
 
 請給出簡潔推薦（100字內），說明原因。"""
+
+
+# ==================== WikiVoyage API ====================
+
+WIKIVOYAGE_API = "https://en.wikivoyage.org/w/api.php"
+
+
+async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]:
+    """
+    透過 WikiVoyage MediaWiki API 搜索景點描述
+    
+    Args:
+        place_name: 景點名稱 (英文效果較佳)
+        lang: 語言代碼 (en, ja, zh 等)
+    
+    Returns:
+        {
+            "title": "Tokyo",
+            "description": "Tokyo is Japan's capital...",
+            "url": "https://en.wikivoyage.org/wiki/Tokyo"
+        }
+    
+    Note:
+        WikiVoyage 速率限制: 每 30 秒最多 1 請求
+        建議快取結果避免重複查詢
+    """
+    api_url = f"https://{lang}.wikivoyage.org/w/api.php"
+    
+    params = {
+        "action": "query",
+        "prop": "extracts",
+        "exintro": "true",       # 只取摘要
+        "explaintext": "true",   # 純文字 (非 HTML)
+        "titles": place_name,
+        "format": "json",
+        "formatversion": "2"
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(api_url, params=params)
+            
+            if response.status_code != 200:
+                print(f"WikiVoyage API error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            pages = data.get("query", {}).get("pages", [])
+            
+            if not pages:
+                return None
+            
+            page = pages[0]
+            
+            # 檢查是否找到頁面
+            if page.get("missing"):
+                return None
+            
+            title = page.get("title", place_name)
+            extract = page.get("extract", "")
+            
+            # 限制描述長度 (避免 token 過多)
+            if len(extract) > 500:
+                extract = extract[:500] + "..."
+            
+            return {
+                "title": title,
+                "description": extract,
+                "url": f"https://{lang}.wikivoyage.org/wiki/{title.replace(' ', '_')}"
+            }
+            
+    except Exception as e:
+        print(f"WikiVoyage API error: {e}")
+        return None
+
+
+async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en") -> Dict:
+    """
+    用 WikiVoyage 資料豐富 POI 資訊
+    
+    Args:
+        poi: POI 資料字典
+        lang: 語言代碼
+    
+    Returns:
+        豐富後的 POI (加入 wikivoyage_description)
+    """
+    if not poi.get("name"):
+        return poi
+    
+    wiki_data = await search_wikivoyage(poi["name"], lang)
+    
+    if wiki_data:
+        poi["wikivoyage_description"] = wiki_data.get("description", "")
+        poi["wikivoyage_url"] = wiki_data.get("url", "")
+    
+    return poi
+
