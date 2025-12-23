@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
-import { useTripDetail } from "@/lib/hooks"
+import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 
@@ -46,6 +46,7 @@ export function ItineraryView() {
     const [joinCode, setJoinCode] = useState("")
     const [isJoinLoading, setIsJoinLoading] = useState(false)
     const haptic = useHaptic()
+    const isOnline = useOnlineStatus()  // 🆕 離線狀態偵測
 
     const [editItem, setEditItem] = useState<any>(null)
     const [isEditOpen, setIsEditOpen] = useState(false)
@@ -69,6 +70,18 @@ export function ItineraryView() {
             setDailyLocs(currentTrip.daily_locations)
         }
     }, [currentTrip])
+
+    // 🆕 離線快取：有網路時將行程存入 localStorage
+    useEffect(() => {
+        if (isOnline && currentTrip && activeTripId) {
+            try {
+                localStorage.setItem(`offline_trip_${activeTripId}`, JSON.stringify(currentTrip))
+                console.log(`✈️ 已快取行程: ${currentTrip.title}`)
+            } catch (e) {
+                console.warn("快取行程失敗:", e)
+            }
+        }
+    }, [isOnline, currentTrip, activeTripId])
     // Get the first activity with coordinates for the current day
     const getFirstActivityWithCoords = () => {
         if (currentTrip?.days) {
@@ -843,8 +856,22 @@ export function ItineraryView() {
                                     activity={item}
                                     index={realIndex}
                                     isLast={idx === currentDayData.length - 1}
-                                    onEdit={(item) => { setIsAddMode(false); setEditItem(item); setIsEditOpen(true) }}
-                                    onDelete={handleDeleteItem}
+                                    onEdit={(item) => {
+                                        if (!isOnline) {
+                                            toast.error("✈️ 離線模式下無法編輯")
+                                            return
+                                        }
+                                        setIsAddMode(false)
+                                        setEditItem(item)
+                                        setIsEditOpen(true)
+                                    }}
+                                    onDelete={(id) => {
+                                        if (!isOnline) {
+                                            toast.error("✈️ 離線模式下無法刪除")
+                                            return
+                                        }
+                                        handleDeleteItem(id)
+                                    }}
                                     onUpdateMemo={handleUpdateMemo}
                                     onUpdateSubItems={handleUpdateSubItems}
                                 />
@@ -853,12 +880,21 @@ export function ItineraryView() {
                     })()}
 
                     <div className="py-4 text-center">
-                        <Button variant="outline" className="w-full border-dashed border-slate-300 text-slate-400" onClick={() => {
-                            setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
-                            setIsAddMode(true);
-                            setIsEditOpen(true);
-                        }}>
-                            <Plus className="w-4 h-4 mr-2" /> Add Activity
+                        <Button
+                            variant="outline"
+                            className="w-full border-dashed border-slate-300 text-slate-400"
+                            disabled={!isOnline}
+                            onClick={() => {
+                                if (!isOnline) {
+                                    toast.error("✈️ 離線模式下無法編輯")
+                                    return
+                                }
+                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
+                                setIsAddMode(true);
+                                setIsEditOpen(true);
+                            }}
+                        >
+                            <Plus className="w-4 h-4 mr-2" />{isOnline ? "Add Activity" : "✈️ 離線模式"}
                         </Button>
                     </div>
 
