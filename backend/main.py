@@ -51,6 +51,9 @@ LITE_MODEL = "gemini-2.5-flash-lite"
 # 3. 智力模型 (無工具, 無 RPD 限制, 速度快)
 SMART_NO_TOOL_MODEL = "gemini-3-flash-preview"
 
+# 4. 🆕 推理模型 (免費無限, 複雜推理, 行程診斷)
+REASONING_MODEL = "gemini-2.5-pro"
+
 # --- AI 服務函式 (包含降級機制) ---
 async def call_ai_parser(api_key: str, prompt: str, use_tools: bool = True):
     """
