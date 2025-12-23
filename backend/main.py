@@ -1944,7 +1944,6 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
             intent_type="PLANNING"
         )
         
-        # 🆕 回傳完整資訊 (含思想簽名、來源標籤)
         return {
             "response": result["text"],
             "raw_parts": result["raw_parts"],  # 🔒 前端需要儲存並 Round-Trip
@@ -1959,6 +1958,160 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 🆕 SSE Streaming Chat API ====================
+from fastapi.responses import StreamingResponse
+import asyncio
+
+async def stream_chat_generator(
+    api_key: str,
+    history: List[dict],
+    message: str,
+    thought_signatures: Optional[List[dict]] = None
+):
+    """
+    SSE Generator for streaming AI responses
+    實作 Vercel 10s Bypass 策略
+    """
+    import json
+    
+    # 🔥 Step 1: TTFB Bypass - 立即發送 start 事件
+    yield "event: start\ndata: {}\n\n"
+    await asyncio.sleep(0)  # Force flush
+    
+    try:
+        # 初始化 Client
+        client = genai.Client(api_key=api_key)
+        
+        # 發送 thinking 事件
+        yield 'event: thinking\ndata: {"status": "processing"}\n\n'
+        await asyncio.sleep(0)
+        
+        # 建構 history
+        from google.genai import types
+        chat_history = []
+        for msg in history:
+            role = "user" if msg.get("role") == "user" else "model"
+            text_content = ""
+            if "rawParts" in msg and msg["rawParts"]:
+                for part in msg["rawParts"]:
+                    if isinstance(part, dict) and "text" in part:
+                        text_content += part["text"]
+            elif "parts" in msg and msg["parts"]:
+                for part in msg["parts"]:
+                    if isinstance(part, dict) and "text" in part:
+                        text_content += part["text"]
+                    elif isinstance(part, str):
+                        text_content += part
+            else:
+                text_content = msg.get("content") or msg.get("displayContent") or ""
+            
+            if text_content:
+                chat_history.append(types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=text_content)]
+                ))
+        
+        # 設定心跳任務
+        last_heartbeat = asyncio.get_event_loop().time()
+        heartbeat_interval = 15  # 15秒心跳
+        
+        # 串流生成
+        model_name = "gemini-3-flash-preview"
+        full_text = ""
+        raw_parts = []
+        
+        try:
+            # 使用 async streaming API
+            async for chunk in await client.aio.models.generate_content_stream(
+                model=model_name,
+                contents=chat_history + [types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=message)]
+                )]
+            ):
+                # 心跳檢查
+                current_time = asyncio.get_event_loop().time()
+                if current_time - last_heartbeat > heartbeat_interval:
+                    yield ": heartbeat\n\n"
+                    last_heartbeat = current_time
+                
+                # 發送文字 chunk
+                if hasattr(chunk, 'text') and chunk.text:
+                    full_text += chunk.text
+                    yield f'event: text\ndata: {json.dumps({"text": chunk.text})}\n\n'
+                    await asyncio.sleep(0)
+            
+            raw_parts = [{"text": full_text}]
+            
+        except Exception as gen_error:
+            # 模型可能不支援 Streaming，嘗試降級
+            print(f"⚠️ Streaming 失敗，嘗試降級: {gen_error}")
+            model_name = "gemini-2.5-pro"
+            yield f'event: thinking\ndata: {json.dumps({"status": "fallback"})}\n\n'
+            
+            # 非串流 fallback
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=chat_history + [types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=message)]
+                )]
+            )
+            full_text = response.text if hasattr(response, 'text') else ""
+            yield f'event: text\ndata: {json.dumps({"text": full_text})}\n\n'
+            raw_parts = [{"text": full_text}]
+        
+        # 發送完成事件
+        yield f'event: done\ndata: {json.dumps({"model_used": model_name, "raw_parts": raw_parts})}\n\n'
+        
+    except Exception as e:
+        print(f"🔥 Stream Error: {e}")
+        yield f'event: error\ndata: {json.dumps({"message": str(e), "code": 500})}\n\n'
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
+    """
+    SSE Streaming Chat Endpoint
+    用於繞過 Vercel 10 秒 Timeout 限制
+    """
+    # 建構對話歷史 (加入 System Prompt)
+    system_history = [
+        {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
+        {"role": "model", "parts": [{"text": "收到！我是 Ryan，你的 AI 旅遊達人。有什麼我可以幫你的嗎？😎"}]}
+    ]
+    
+    # 處理對話歷史
+    processed_history = []
+    for msg in request.history:
+        role = "user" if msg.get("role") == "user" else "model"
+        if "rawParts" in msg and msg["rawParts"]:
+            parts = msg["rawParts"]
+        elif "parts" in msg and msg["parts"]:
+            parts = msg["parts"]
+        else:
+            content = msg.get("content") or msg.get("displayContent") or ""
+            parts = [{"text": content}]
+        processed_history.append({"role": role, "parts": parts})
+    
+    full_history = system_history + processed_history
+    
+    return StreamingResponse(
+        stream_chat_generator(
+            api_key=api_key,
+            history=full_history,
+            message=request.message,
+            thought_signatures=request.thought_signatures
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
 
 
 # ==================== POI 智能搜索 API ====================

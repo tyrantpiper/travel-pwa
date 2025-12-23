@@ -11,6 +11,7 @@ import { useTripContext } from "@/lib/trip-context"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
+import { streamChat } from "@/lib/sse-parser"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
@@ -230,51 +231,120 @@ export default function ChatWidget() {
         setMessages(prev => [...prev, userMessage])
         setIsLoading(true)
 
-        try {
-            // 🆕 準備 history (使用 rawParts 傳送思想簽名)
-            const history = messages.map(m => ({
-                role: m.role,
-                rawParts: m.rawParts,  // 🔒 包含 thought_signature
-                displayContent: m.displayContent
-            }))
+        // 🆕 準備 history
+        const history = messages.map(m => ({
+            role: m.role,
+            rawParts: m.rawParts,
+            displayContent: m.displayContent
+        }))
 
-            const res = await fetch(`${API_BASE}/api/chat`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Gemini-API-Key": apiKey
-                },
-                body: JSON.stringify({
-                    message: userMsg,
-                    history: history,
-                    image: currentImage,
-                    location: tripLocation
-                })
-            })
+        // 🆕 嘗試使用 Streaming API
+        let streamingText = ""
+        let streamingRawParts: Part[] = []
+        let streamingSuccess = false
 
-            const data = await res.json()
+        // 如果有圖片，跳過 streaming (目前不支援)
+        if (!currentImage && apiKey) {
+            try {
+                await streamChat(
+                    API_BASE,
+                    userMsg,
+                    history,
+                    apiKey,
+                    {
+                        onStart: () => {
+                            console.log("🟢 SSE 連線建立")
+                        },
+                        onThinking: (status) => {
+                            console.log("🧠 AI 思考中:", status)
+                            // ThinkingIndicator 已經在 isLoading 時顯示
+                        },
+                        onText: (text) => {
+                            streamingText += text
+                            // 🆕 即時更新 UI (打字機效果)
+                            setMessages(prev => {
+                                const updated = [...prev]
+                                const lastMsg = updated[updated.length - 1]
+                                if (lastMsg?.role === "model" && lastMsg.modelUsed === "__streaming__") {
+                                    lastMsg.displayContent = streamingText
+                                } else {
+                                    updated.push(hydrateMessage({
+                                        role: "model",
+                                        displayContent: streamingText,
+                                        modelUsed: "__streaming__"
+                                    }))
+                                }
+                                return updated
+                            })
+                        },
+                        onDone: (data) => {
+                            console.log("✅ SSE 完成:", data.model_used)
+                            streamingRawParts = data.raw_parts
+                            streamingSuccess = true
 
-            if (!res.ok) throw new Error(data.detail || "Failed to send message")
-
-            // 🆕 建立 AI 回應 (含 rawParts 和來源標籤)
-            const aiMessage: Message = {
-                role: "model",
-                displayContent: data.response,
-                rawParts: data.raw_parts || [{ text: data.response }],  // 🔒 儲存完整 parts
-                groundingSources: data.grounding_metadata?.sources,
-                modelUsed: data.model_used
+                            // 更新最終訊息
+                            setMessages(prev => {
+                                const updated = [...prev]
+                                const lastMsg = updated[updated.length - 1]
+                                if (lastMsg?.role === "model") {
+                                    lastMsg.displayContent = streamingText
+                                    lastMsg.rawParts = streamingRawParts
+                                    lastMsg.modelUsed = data.model_used
+                                }
+                                return updated
+                            })
+                        },
+                        onError: (error) => {
+                            console.error("🔴 SSE 錯誤:", error)
+                            // Fallback 會在下面處理
+                        }
+                    }
+                )
+            } catch (streamError) {
+                console.error("⚠️ Streaming 失敗，使用 fallback:", streamError)
             }
-
-            setMessages(prev => [...prev, aiMessage])
-        } catch (error) {
-            console.error(error)
-            setMessages(prev => [
-                ...prev,
-                hydrateMessage({ role: "model", displayContent: "🔥 抱歉，我好像當機了... 請稍後再試。" })
-            ])
-        } finally {
-            setIsLoading(false)
         }
+
+        // 🔄 Fallback: 如果 streaming 失敗或有圖片，使用原有 API
+        if (!streamingSuccess) {
+            try {
+                const res = await fetch(`${API_BASE}/api/chat`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Gemini-API-Key": apiKey
+                    },
+                    body: JSON.stringify({
+                        message: userMsg,
+                        history: history,
+                        image: currentImage,
+                        location: tripLocation
+                    })
+                })
+
+                const data = await res.json()
+
+                if (!res.ok) throw new Error(data.detail || "Failed to send message")
+
+                const aiMessage: Message = {
+                    role: "model",
+                    displayContent: data.response,
+                    rawParts: data.raw_parts || [{ text: data.response }],
+                    groundingSources: data.grounding_metadata?.sources,
+                    modelUsed: data.model_used
+                }
+
+                setMessages(prev => [...prev, aiMessage])
+            } catch (error) {
+                console.error(error)
+                setMessages(prev => [
+                    ...prev,
+                    hydrateMessage({ role: "model", displayContent: "🔥 抱歉，我好像當機了... 請稍後再試。" })
+                ])
+            }
+        }
+
+        setIsLoading(false)
     }
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

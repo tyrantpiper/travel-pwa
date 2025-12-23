@@ -31,12 +31,24 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
     const { trips, isLoading, mutate } = useTrips(userId)
 
-    // 當 trips 載入完成且沒有選中行程時，預設選中最新的行程
+    // 當 trips 載入完成，驗證 activeTripId 是否有效
     useEffect(() => {
-        if (!isLoading && trips.length > 0 && !activeTripId) {
-            const latestTrip = trips[0] // 假設 API 回傳已排序
-            setActiveTripId(latestTrip.id)
-            localStorage.setItem("active_trip_id", latestTrip.id)
+        if (!isLoading && trips.length > 0) {
+            if (activeTripId) {
+                // 🆕 檢查快取的 ID 是否存在於 trips 中
+                const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
+                if (!tripExists) {
+                    console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
+                    const latestTrip = trips[0]
+                    setActiveTripId(latestTrip.id)
+                    localStorage.setItem("active_trip_id", latestTrip.id)
+                }
+            } else {
+                // 沒有選中行程時，預設選中最新的行程
+                const latestTrip = trips[0]
+                setActiveTripId(latestTrip.id)
+                localStorage.setItem("active_trip_id", latestTrip.id)
+            }
         }
     }, [isLoading, trips, activeTripId])
 
