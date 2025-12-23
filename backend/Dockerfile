@@ -1,5 +1,5 @@
-# 使用官方 Python 輕量版 (3.10+ required for google-genai)
-FROM python:3.10-slim
+# 使用官方 Python 輕量版 (3.13 = 最穩定，套件相容性最佳)
+FROM python:3.13-slim
 
 # 設定工作目錄
 WORKDIR /app
