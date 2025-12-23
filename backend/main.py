@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from supabase import create_client, Client
-import google.generativeai as genai
+from google import genai  # 🆕 新版 SDK
 import httpx  # For async HTTP requests (geocoding)
 from dotenv import load_dotenv
 
@@ -34,6 +34,29 @@ try:
 except Exception as e:
     print(f"⚠️ Supabase Warning: {e}")
 
+# 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
+@app.get("/health")
+async def health_check():
+    """
+    健康檢查端點 - UptimeRobot 每 5 分鐘戳一次
+    防止 Supabase 免費版 7 天無請求後暫停
+    """
+    from datetime import datetime
+    
+    try:
+        # 簡單的 DB 查詢來觸發 Supabase 連線
+        result = supabase.table("itineraries").select("id").limit(1).execute()
+        db_status = "connected" if result else "no_data"
+    except Exception as e:
+        db_status = f"error: {str(e)[:50]}"
+    
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "database": db_status,
+        "service": "ryan-travel-api"
+    }
+
 # 4. 載入 ArcGIS API Key (地理編碼用，可選)
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 if ARCGIS_API_KEY:
@@ -58,49 +81,52 @@ REASONING_MODEL = "gemini-2.5-pro"
 async def call_ai_parser(api_key: str, prompt: str, use_tools: bool = True):
     """
     智能 AI 調用函數，支持自動降級
+    使用新版 google-genai SDK
     
     Args:
         api_key: Gemini API Key
         prompt: 提示詞
-        use_tools: 是否嘗試使用 Google Maps 工具
+        use_tools: 是否嘗試使用 Google Maps 工具 (目前未實作)
     
     Returns:
         str: AI 生成的文本
     """
-    genai.configure(api_key=api_key)
+    # 🆕 使用新版 Client API
+    client = genai.Client(api_key=api_key)
     
-    # 策略 A: 優先使用支援 Maps 的主力模型
-    if use_tools:
+    # 策略 A: 優先使用主力模型
+    try:
+        print(f"🤖 嘗試使用 {PRIMARY_MODEL}...")
+        response = client.models.generate_content(
+            model=PRIMARY_MODEL,
+            contents=prompt
+        )
+        print(f"✅ {PRIMARY_MODEL} 成功回應")
+        return response.text
+        
+    except Exception as e:
+        print(f"⚠️ {PRIMARY_MODEL} 失敗: {e}")
+        
+        # 策略 B: 降級到 Lite 模型
         try:
-            print(f"🤖 嘗試使用 {PRIMARY_MODEL} (含 Maps 工具)...")
-            # 設定工具：這裡啟用 Google Maps 以獲取精準經緯度
-            tools = ['google_maps_source']
-            model = genai.GenerativeModel(PRIMARY_MODEL, tools=tools)
-            
-            response = model.generate_content(prompt)
-            print(f"✅ {PRIMARY_MODEL} 成功回應")
+            print(f"🤖 切換至備用模型 {LITE_MODEL}...")
+            response = client.models.generate_content(
+                model=LITE_MODEL,
+                contents=prompt
+            )
+            print(f"✅ {LITE_MODEL} 成功回應")
             return response.text
+        except Exception as e2:
+            print(f"⚠️ {LITE_MODEL} 也失敗: {e2}")
             
-        except Exception as e:
-            print(f"⚠️ {PRIMARY_MODEL} 失敗或配額用盡: {e}")
-            # 策略 B: 降級到 Lite 模型 (同樣支援 Maps)
-            try:
-                print(f"🤖 切換至備用模型 {LITE_MODEL}...")
-                model = genai.GenerativeModel(LITE_MODEL, tools=tools)
-                response = model.generate_content(prompt)
-                print(f"✅ {LITE_MODEL} 成功回應")
-                return response.text
-            except Exception as e2:
-                print(f"⚠️ {LITE_MODEL} 也失敗: {e2}, 放棄工具模式")
-                # 繼續往下走，放棄工具，改用純文字模式
-                
-    # 策略 C: 放棄工具，使用最聰明的純文字模型 (無 RPD 限制)
-    # 雖然沒有精準座標，但至少能解析出文字結構
-    print(f"🤖 切換至純文字模式 {SMART_NO_TOOL_MODEL}...")
-    model = genai.GenerativeModel(SMART_NO_TOOL_MODEL)  # 不加 tools
-    response = model.generate_content(prompt)
-    print(f"✅ {SMART_NO_TOOL_MODEL} 成功回應")
-    return response.text
+            # 策略 C: 使用最聰明的模型
+            print(f"🤖 切換至 {SMART_NO_TOOL_MODEL}...")
+            response = client.models.generate_content(
+                model=SMART_NO_TOOL_MODEL,
+                contents=prompt
+            )
+            print(f"✅ {SMART_NO_TOOL_MODEL} 成功回應")
+            return response.text
 
 # --- 資料模型 ---
 class UserPreferences(BaseModel):
@@ -156,9 +182,8 @@ async def generate_itinerary(
     print(f"💊 收到處方需求: 去 {prefs.destination}")
     
     try:
-        # 動態設定 Key (只針對這次請求有效)
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(PRIMARY_MODEL)  # 使用主力模型
+        # 🆕 使用新版 Client API
+        client = genai.Client(api_key=api_key)
         
         prompt = f"""
         你是 Ryan，一位幽默的藥師兼旅遊達人。請為我規劃 {prefs.destination} 的 {prefs.days} 天行程。
@@ -177,7 +202,10 @@ async def generate_itinerary(
         }}
         """
         
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=PRIMARY_MODEL,
+            contents=prompt
+        )
         text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
         
@@ -1796,7 +1824,8 @@ async def delete_user_data(user_id: str):
 
 class ChatRequest(BaseModel):
     message: str
-    history: List[dict] = []  # 對話歷史: [{"role": "user", "content": "..."}]
+    history: List[dict] = []  # 對話歷史: [{"role": "user", "parts": [...]}] 或 [{"role": "user", "content": "..."}]
+    thought_signatures: Optional[List[dict]] = None  # 🆕 上一輪的思想簽名 (Round-Trip)
     image: Optional[str] = None  # Base64 image string (optional)
     location: Optional[dict] = None  # 當前位置: {"lat": float, "lng": float, "name": str}
 
@@ -1827,13 +1856,11 @@ SYSTEM_PROMPT = """
 @app.post("/api/chat")
 async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
     try:
-        genai.configure(api_key=api_key)
-        
-        # 使用最聰明的模型 (gemini-3-flash-preview - 無 RPD 限制)
-        model = genai.GenerativeModel(SMART_NO_TOOL_MODEL)
+        # 🆕 使用 Model Manager (Gemini 3 優先 + 自動降級)
+        from services.model_manager import call_with_fallback, call_verifier
+        from services.poi_service import detect_poi_query
         
         # 🆕 偵測是否為 POI 相關查詢
-        from services.poi_service import detect_poi_query
         poi_detection = detect_poi_query(request.message)
         poi_context = ""
         
@@ -1861,51 +1888,76 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
             except Exception as poi_err:
                 print(f"⚠️ POI 查詢失敗: {poi_err}")
         
-        # 構建對話歷史
-        chat_history = [
-            {"role": "user", "parts": [SYSTEM_PROMPT]},
-            {"role": "model", "parts": ["收到！我是 Ryan，你的 AI 旅遊達人。有什麼我可以幫你的嗎？😎"]}
+        # 🆕 建構對話歷史 (加入 System Prompt)
+        # 使用 rawParts (如果有) 或向後相容 content
+        system_history = [
+            {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
+            {"role": "model", "parts": [{"text": "收到！我是 Ryan，你的 AI 旅遊達人。有什麼我可以幫你的嗎？😎"}]}
         ]
         
-        # 加入過去的對話紀錄
+        # 處理對話歷史 (向後相容)
+        processed_history = []
         for msg in request.history:
-            role = "user" if msg["role"] == "user" else "model"
-            chat_history.append({"role": role, "parts": [msg["content"]]})
+            role = "user" if msg.get("role") == "user" else "model"
             
+            # 🆕 優先使用 rawParts (含思想簽名)
+            if "rawParts" in msg and msg["rawParts"]:
+                parts = msg["rawParts"]
+            elif "parts" in msg and msg["parts"]:
+                parts = msg["parts"]
+            else:
+                # 向後相容：舊格式只有 content
+                content = msg.get("content") or msg.get("displayContent") or ""
+                parts = [{"text": content}]
+            
+            processed_history.append({"role": role, "parts": parts})
+        
+        full_history = system_history + processed_history
+        
         # 處理當前訊息 (包含圖片 + POI 上下文)
         enhanced_message = request.message + poi_context
-        current_parts = [enhanced_message]
         
+        # 🆕 處理圖片 (如果有)
         if request.image:
-             # 簡單處理 Base64 圖片 (假設前端傳送來的格式正確)
-             import base64
-             from io import BytesIO
-             from PIL import Image
-             
-             try:
-                # 去除 data:image/jpeg;base64, 前綴
+            import base64
+            from io import BytesIO
+            from PIL import Image
+            
+            try:
                 if "base64," in request.image:
                     image_data = base64.b64decode(request.image.split("base64,")[1])
                 else:
                     image_data = base64.b64decode(request.image)
                     
                 image = Image.open(BytesIO(image_data))
-                current_parts.append(image)
-             except Exception as img_err:
-                 print(f"⚠️ Image processing error: {img_err}")
-
-        # 發送請求
-        chat = model.start_chat(history=chat_history)
-        response = chat.send_message(current_parts)
+                enhanced_message = f"[使用者上傳了一張圖片]\n{enhanced_message}"
+                # Note: 圖片功能需要特殊處理，暫時保持備註
+            except Exception as img_err:
+                print(f"⚠️ Image processing error: {img_err}")
         
+        # 🆕 調用 Model Manager (含思想簽名 Round-Trip)
+        result = await call_with_fallback(
+            api_key=api_key,
+            history=full_history,
+            message=enhanced_message,
+            thought_signatures=request.thought_signatures,
+            intent_type="PLANNING"
+        )
+        
+        # 🆕 回傳完整資訊 (含思想簽名、來源標籤)
         return {
-            "response": response.text,
+            "response": result["text"],
+            "raw_parts": result["raw_parts"],  # 🔒 前端需要儲存並 Round-Trip
+            "model_used": result["model_used"],
+            "grounding_metadata": result["grounding_metadata"],
             "poi_query_detected": poi_detection is not None,
             "poi_category": poi_detection["category"] if poi_detection else None
         }
         
     except Exception as e:
         print(f"🔥 Chat Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1991,17 +2043,20 @@ async def ai_recommend_poi(request: POIRecommendRequest):
             request.user_preferences
         )
         
-        # Step 3: 呼叫 Gemini
-        genai.configure(api_key=request.api_key)
-        model = genai.GenerativeModel(
-            LITE_MODEL,  # 使用輕量模型節省成本
-            generation_config={
-                "max_output_tokens": 300,  # 限制輸出
-                "temperature": 0.7
-            }
+        # Step 3: 🆕 使用新版 Client API
+        client = genai.Client(api_key=request.api_key)
+        
+        from google.genai import types
+        config = types.GenerateContentConfig(
+            max_output_tokens=300,
+            temperature=0.7
         )
         
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=LITE_MODEL,
+            contents=prompt,
+            config=config
+        )
         
         return {
             "recommendation": response.text,

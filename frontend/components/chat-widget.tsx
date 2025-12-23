@@ -1,17 +1,37 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { MessageCircle, X, Send, Image as ImageIcon, Loader2, Bot, User } from "lucide-react"
+import { MessageCircle, X, Send, Image as ImageIcon, Bot, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
+import SourceCitation from "@/components/chat/SourceCitation"
+import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
+import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
+
+// 🆕 Part 結構 (與 Gemini API 對應)
+interface Part {
+    text?: string
+    function_call?: { name: string; args: Record<string, unknown> }
+    thought?: string  // 思想簽名 (加密)
+    _raw?: string
+}
+
+// 🆕 來源標籤
+interface GroundingSource {
+    title: string
+    uri: string
+}
 
 interface Message {
     role: "user" | "model"
-    content: string
+    displayContent: string    // UI 渲染用的文字
+    rawParts: Part[]          // 🔒 Round-trip 回後端 (含 thought_signature)
+    groundingSources?: GroundingSource[]  // 來源標籤 (如有)
+    modelUsed?: string        // 使用的模型 (調試用)
 }
 
 interface Position {
@@ -52,8 +72,20 @@ export default function ChatWidget() {
     }, [activeTrip])
 
     const [isOpen, setIsOpen] = useState(false)
+    // 🆕 向後相容：將舊格式訊息遷移到新格式
+    const hydrateMessage = (msg: Partial<Message> & { content?: string }): Message => ({
+        role: msg.role || "model",
+        displayContent: msg.displayContent || msg.content || "",
+        rawParts: msg.rawParts || [{ text: msg.displayContent || msg.content || "" }],
+        groundingSources: msg.groundingSources,
+        modelUsed: msg.modelUsed
+    })
+
     const [messages, setMessages] = useState<Message[]>([
-        { role: "model", content: "👋哈囉！我是 Ryan，你的 AI 旅遊達人。\n我可以幫你翻譯、推薦美食、查詢交通，或者解決任何旅途中的疑難雜症！😎" }
+        hydrateMessage({
+            role: "model",
+            displayContent: "👋哈囉！我是 Ryan，你的 AI 旅遊達人。\n我可以幫你翻譯、推薦美食、查詢交通，或者解決任何旅途中的疑難雜症！😎"
+        })
     ])
     const [input, setInput] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -169,13 +201,14 @@ export default function ChatWidget() {
     const handleSendMessage = async () => {
         if ((!input.trim() && !selectedImage) || isLoading) return
 
-        // Check for API key (check both new and old key names for backward compatibility)
+        // Check for API key
         const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || ""
         if (!apiKey) {
+            const errorMsg = "⚠️ 請先設定 AI API Key！\n\n前往 **Profile** 頁面 → 點擊 **AI API Key** 進行設定。\n\n💡 完全免費！"
             setMessages(prev => [
                 ...prev,
-                { role: "user", content: input },
-                { role: "model", content: "⚠️ 請先設定 AI API Key！\n\n前往 **Profile** 頁面 → 點擊 **AI API Key** 進行設定。\n\n💡 完全免費！" }
+                hydrateMessage({ role: "user", displayContent: input }),
+                hydrateMessage({ role: "model", displayContent: errorMsg })
             ])
             setInput("")
             return
@@ -187,15 +220,23 @@ export default function ChatWidget() {
         setInput("")
         setSelectedImage(null)
 
-        const newMessages: Message[] = [
-            ...messages,
-            { role: "user", content: userMsg + (currentImage ? " [圖片已上傳]" : "") }
-        ]
-        setMessages(newMessages)
+        // 🆕 建立使用者訊息 (新格式)
+        const userMessage: Message = {
+            role: "user",
+            displayContent: userMsg + (currentImage ? " [圖片已上傳]" : ""),
+            rawParts: [{ text: userMsg }]
+        }
+
+        setMessages(prev => [...prev, userMessage])
         setIsLoading(true)
 
         try {
-            const history = messages.map(m => ({ role: m.role, content: m.content }))
+            // 🆕 準備 history (使用 rawParts 傳送思想簽名)
+            const history = messages.map(m => ({
+                role: m.role,
+                rawParts: m.rawParts,  // 🔒 包含 thought_signature
+                displayContent: m.displayContent
+            }))
 
             const res = await fetch(`${API_BASE}/api/chat`, {
                 method: "POST",
@@ -207,7 +248,7 @@ export default function ChatWidget() {
                     message: userMsg,
                     history: history,
                     image: currentImage,
-                    location: tripLocation  // 🆕 傳送位置以啟用 POI 搜索
+                    location: tripLocation
                 })
             })
 
@@ -215,15 +256,21 @@ export default function ChatWidget() {
 
             if (!res.ok) throw new Error(data.detail || "Failed to send message")
 
-            setMessages(prev => [
-                ...prev,
-                { role: "model", content: data.response }
-            ])
+            // 🆕 建立 AI 回應 (含 rawParts 和來源標籤)
+            const aiMessage: Message = {
+                role: "model",
+                displayContent: data.response,
+                rawParts: data.raw_parts || [{ text: data.response }],  // 🔒 儲存完整 parts
+                groundingSources: data.grounding_metadata?.sources,
+                modelUsed: data.model_used
+            }
+
+            setMessages(prev => [...prev, aiMessage])
         } catch (error) {
             console.error(error)
             setMessages(prev => [
                 ...prev,
-                { role: "model", content: "🔥 抱歉，我好像當機了... 請稍後再試。" }
+                hydrateMessage({ role: "model", displayContent: "🔥 抱歉，我好像當機了... 請稍後再試。" })
             ])
         } finally {
             setIsLoading(false)
@@ -278,11 +325,25 @@ export default function ChatWidget() {
                                         msg.role === "model" ? "bg-white text-slate-700 rounded-tl-none border border-slate-100" : "bg-blue-600 text-white rounded-tr-none"
                                     )}>
                                         {msg.role === "model" ? (
-                                            <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                                            </div>
+                                            <>
+                                                {/* 🆕 POI 預覽卡片 (如果有 function_call) */}
+                                                {(() => {
+                                                    const poiData = extractFunctionCall(msg.rawParts)
+                                                    if (poiData) {
+                                                        return <POIPreviewCard poiData={poiData} />
+                                                    }
+                                                    return null
+                                                })()}
+                                                <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent}</ReactMarkdown>
+                                                </div>
+                                                {/* 來源標籤 */}
+                                                {msg.groundingSources && msg.groundingSources.length > 0 && (
+                                                    <SourceCitation sources={msg.groundingSources} />
+                                                )}
+                                            </>
                                         ) : (
-                                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                                            <div className="whitespace-pre-wrap">{msg.displayContent}</div>
                                         )}
                                     </div>
                                 </div>
@@ -292,10 +353,8 @@ export default function ChatWidget() {
                                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-1">
                                         <Bot className="w-5 h-5" />
                                     </div>
-                                    <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm flex items-center gap-2">
-                                        <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-                                        <span className="text-xs text-slate-400">正在思考中...</span>
-                                    </div>
+                                    {/* 🆕 脈衝手風琴 */}
+                                    <ThinkingIndicator phase="thinking" />
                                 </div>
                             )}
                             <div ref={messagesEndRef} />
