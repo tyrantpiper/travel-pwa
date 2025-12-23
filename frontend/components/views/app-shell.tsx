@@ -6,7 +6,6 @@ import { InfoView } from "@/components/views/info-view"
 import { ToolsView } from "@/components/views/tools-view"
 import { ProfileView } from "@/components/views/profile-view"
 import { BottomNav } from "@/components/bottom-nav"
-import { TripProvider } from "@/lib/trip-context"
 import { OfflineBanner } from "@/components/ui/offline-banner"
 import { useServiceWorker } from "@/lib/hooks"
 
@@ -24,7 +23,7 @@ export function AppShell() {
     }, [])
 
     return (
-        <TripProvider>
+        <>
             <OfflineBanner />
             <div className="min-h-screen bg-background flex flex-col">
                 <main className="flex-1 pb-20 overflow-y-auto">
@@ -35,6 +34,7 @@ export function AppShell() {
                 </main>
                 <BottomNav activeTab={activeView} onTabChange={setActiveView} />
             </div>
-        </TripProvider>
+        </>
     )
 }
+

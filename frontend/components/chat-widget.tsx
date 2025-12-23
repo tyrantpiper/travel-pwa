@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { MessageCircle, X, Send, Image as ImageIcon, Loader2, Bot, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { useTripContext } from "@/lib/trip-context"
 
 interface Message {
     role: "user" | "model"
@@ -20,43 +21,35 @@ interface Position {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-export default function ChatWidget() {
-    // 🛡️ 安全地取得行程位置（從 localStorage 讀取，避免 Context 問題）
-    const [tripLocation, setTripLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
+// 城市座標映射
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+    "東京": { lat: 35.6895, lng: 139.6917 },
+    "tokyo": { lat: 35.6895, lng: 139.6917 },
+    "大阪": { lat: 34.6937, lng: 135.5023 },
+    "osaka": { lat: 34.6937, lng: 135.5023 },
+    "京都": { lat: 35.0116, lng: 135.7681 },
+    "kyoto": { lat: 35.0116, lng: 135.7681 },
+    "福岡": { lat: 33.5904, lng: 130.4017 },
+    "名古屋": { lat: 35.1815, lng: 136.9066 },
+    "札幌": { lat: 43.0618, lng: 141.3545 },
+    "沖繩": { lat: 26.2124, lng: 127.6809 },
+}
 
-    useEffect(() => {
-        // 從 localStorage 讀取當前行程資訊
-        const savedTripId = localStorage.getItem("active_trip_id")
-        const savedTripsJson = localStorage.getItem("cached_trips")
-        if (savedTripId && savedTripsJson) {
-            try {
-                const trips = JSON.parse(savedTripsJson)
-                const activeTrip = trips.find((t: { id: string }) => t.id === savedTripId)
-                if (activeTrip?.title) {
-                    // 從行程標題解析城市
-                    const cityCoords: Record<string, { lat: number; lng: number }> = {
-                        "東京": { lat: 35.6895, lng: 139.6917 },
-                        "tokyo": { lat: 35.6895, lng: 139.6917 },
-                        "大阪": { lat: 34.6937, lng: 135.5023 },
-                        "osaka": { lat: 34.6937, lng: 135.5023 },
-                        "京都": { lat: 35.0116, lng: 135.7681 },
-                        "kyoto": { lat: 35.0116, lng: 135.7681 },
-                        "福岡": { lat: 33.5904, lng: 130.4017 },
-                        "名古屋": { lat: 35.1815, lng: 136.9066 },
-                        "札幌": { lat: 43.0618, lng: 141.3545 },
-                        "沖繩": { lat: 26.2124, lng: 127.6809 },
-                    }
-                    const tripTitle = (activeTrip.title as string).toLowerCase()
-                    for (const [city, coords] of Object.entries(cityCoords)) {
-                        if (tripTitle.includes(city)) {
-                            setTripLocation({ ...coords, name: city })
-                            break
-                        }
-                    }
-                }
-            } catch { /* 忽略解析錯誤 */ }
+export default function ChatWidget() {
+    // ✅ 直接使用 TripContext（現在 ChatWidget 在 TripProvider 內）
+    const { activeTrip } = useTripContext()
+
+    // 從行程標題解析位置（即時更新）
+    const tripLocation = useMemo(() => {
+        if (!activeTrip?.title) return null
+        const titleLower = (activeTrip.title as string).toLowerCase()
+        for (const [city, coords] of Object.entries(CITY_COORDS)) {
+            if (titleLower.includes(city)) {
+                return { ...coords, name: city }
+            }
         }
-    }, [])
+        return null
+    }, [activeTrip])
 
     const [isOpen, setIsOpen] = useState(false)
     const [messages, setMessages] = useState<Message[]>([

@@ -45,12 +45,25 @@ export function TripProvider({ children }: { children: ReactNode }) {
         setActiveTripId(id)
         if (id) {
             localStorage.setItem("active_trip_id", id)
+            // 🆕 儲存行程標題，供 ChatWidget 使用
+            const trip = trips.find((t: { id: string }) => t.id === id)
+            if (trip?.title) {
+                localStorage.setItem("active_trip_title", trip.title)
+            }
         } else {
             localStorage.removeItem("active_trip_id")
+            localStorage.removeItem("active_trip_title")
         }
     }
 
-    const activeTrip = trips.find((t: any) => t.id === activeTripId) || null
+    const activeTrip = trips.find((t: { id: string; title?: string }) => t.id === activeTripId) || null
+
+    // 🆕 當 activeTrip 變更時，也更新 localStorage
+    useEffect(() => {
+        if (activeTrip?.title) {
+            localStorage.setItem("active_trip_title", activeTrip.title)
+        }
+    }, [activeTrip])
 
     return (
         <TripContext.Provider value={{
