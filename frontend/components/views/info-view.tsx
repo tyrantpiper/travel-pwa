@@ -24,8 +24,8 @@ import { toast } from "sonner"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const DEFAULT_FLIGHTS = {
-    outbound: { date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "TPE", arr_airport: "NRT", seat: "", terminal: "", pnr: "" },
-    inbound: { date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "NRT", arr_airport: "TPE", seat: "", terminal: "", pnr: "" }
+    outbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "TPE", arr_airport: "NRT", seat: "", terminal: "", pnr: "" },
+    inbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "NRT", arr_airport: "TPE", seat: "", terminal: "", pnr: "" }
 }
 
 const DEFAULT_HOTEL = {
@@ -364,16 +364,30 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: any, isEditi
             )}
 
             <div className="p-5 bg-gradient-to-br from-slate-50 to-white">
-                {/* 日期區塊 - 置頂顯示 */}
+                {/* 日期區塊 - 出發/到達雙日期（支援跨天）*/}
                 <div className="mb-4 pb-3 border-b border-slate-100">
-                    <Label className="text-[10px] text-slate-400 uppercase block text-center mb-2">Date</Label>
-                    <Input
-                        type="date"
-                        disabled={!isEditing}
-                        value={data.date}
-                        onChange={e => onChange('date', e.target.value)}
-                        className={isEditing ? "h-9 text-sm text-center mx-auto max-w-[200px] block" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-center text-slate-800 mx-auto block"}
-                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center">
+                            <Label className="text-[10px] text-slate-400 uppercase block mb-1">Departure</Label>
+                            <Input
+                                type="date"
+                                disabled={!isEditing}
+                                value={data.dep_date || data.date || ""}
+                                onChange={e => onChange('dep_date', e.target.value)}
+                                className={isEditing ? "h-9 text-sm text-center" : "bg-transparent border-0 p-0 h-auto text-base font-bold text-center text-slate-800"}
+                            />
+                        </div>
+                        <div className="text-center">
+                            <Label className="text-[10px] text-slate-400 uppercase block mb-1">Arrival</Label>
+                            <Input
+                                type="date"
+                                disabled={!isEditing}
+                                value={data.arr_date || data.date || ""}
+                                onChange={e => onChange('arr_date', e.target.value)}
+                                className={isEditing ? "h-9 text-sm text-center" : "bg-transparent border-0 p-0 h-auto text-base font-bold text-center text-slate-800"}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* 出發/到達 機場 + 時間 */}
