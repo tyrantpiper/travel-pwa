@@ -21,8 +21,9 @@ import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 import { useHaptic } from "@/lib/hooks"
-import { Loader2 } from "lucide-react"
+import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
+import { getNowInZone } from "@/lib/timezone"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -60,6 +61,7 @@ export function ItineraryView() {
     const [locSearchResults, setLocSearchResults] = useState<any[]>([])
     const [isLocSearching, setIsLocSearching] = useState(false)
     const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
+    const [currentTimezone, setCurrentTimezone] = useState<string>("Asia/Tokyo")  // 當前顯示地點的時區
 
     useEffect(() => {
         if (currentTrip && currentTrip.daily_locations) {
@@ -87,25 +89,25 @@ export function ItineraryView() {
             let lng = 139.6917
             let locationName = "Tokyo (Default)"
 
-            // 常見城市座標對照表
-            const CITY_COORDS: { [key: string]: { lat: number, lng: number, name: string } } = {
-                "東京": { lat: 35.6895, lng: 139.6917, name: "東京" },
-                "大阪": { lat: 34.6937, lng: 135.5023, name: "大阪" },
-                "京都": { lat: 35.0116, lng: 135.7681, name: "京都" },
-                "台北": { lat: 25.0330, lng: 121.5654, name: "台北" },
-                "高雄": { lat: 22.6273, lng: 120.3014, name: "高雄" },
-                "台中": { lat: 24.1477, lng: 120.6736, name: "台中" },
-                "台南": { lat: 22.9999, lng: 120.2269, name: "台南" },
-                "橫濱": { lat: 35.4437, lng: 139.6380, name: "橫濱" },
-                "札幌": { lat: 43.0618, lng: 141.3545, name: "札幌" },
-                "福岡": { lat: 33.5904, lng: 130.4017, name: "福岡" },
-                "名古屋": { lat: 35.1815, lng: 136.9066, name: "名古屋" },
-                "沖繩": { lat: 26.2124, lng: 127.6809, name: "沖繩" },
-                "首爾": { lat: 37.5665, lng: 126.9780, name: "首爾" },
-                "釜山": { lat: 35.1796, lng: 129.0756, name: "釜山" },
-                "香港": { lat: 22.3193, lng: 114.1694, name: "香港" },
-                "新加坡": { lat: 1.3521, lng: 103.8198, name: "新加坡" },
-                "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷" },
+            // 常見城市座標對照表（含時區）
+            const CITY_COORDS: { [key: string]: { lat: number, lng: number, name: string, timezone: string } } = {
+                "東京": { lat: 35.6895, lng: 139.6917, name: "東京", timezone: "Asia/Tokyo" },
+                "大阪": { lat: 34.6937, lng: 135.5023, name: "大阪", timezone: "Asia/Tokyo" },
+                "京都": { lat: 35.0116, lng: 135.7681, name: "京都", timezone: "Asia/Tokyo" },
+                "台北": { lat: 25.0330, lng: 121.5654, name: "台北", timezone: "Asia/Taipei" },
+                "高雄": { lat: 22.6273, lng: 120.3014, name: "高雄", timezone: "Asia/Taipei" },
+                "台中": { lat: 24.1477, lng: 120.6736, name: "台中", timezone: "Asia/Taipei" },
+                "台南": { lat: 22.9999, lng: 120.2269, name: "台南", timezone: "Asia/Taipei" },
+                "橫濱": { lat: 35.4437, lng: 139.6380, name: "橫濱", timezone: "Asia/Tokyo" },
+                "札幌": { lat: 43.0618, lng: 141.3545, name: "札幌", timezone: "Asia/Tokyo" },
+                "福岡": { lat: 33.5904, lng: 130.4017, name: "福岡", timezone: "Asia/Tokyo" },
+                "名古屋": { lat: 35.1815, lng: 136.9066, name: "名古屋", timezone: "Asia/Tokyo" },
+                "沖繩": { lat: 26.2124, lng: 127.6809, name: "沖繩", timezone: "Asia/Tokyo" },
+                "首爾": { lat: 37.5665, lng: 126.9780, name: "首爾", timezone: "Asia/Seoul" },
+                "釜山": { lat: 35.1796, lng: 129.0756, name: "釜山", timezone: "Asia/Seoul" },
+                "香港": { lat: 22.3193, lng: 114.1694, name: "香港", timezone: "Asia/Hong_Kong" },
+                "新加坡": { lat: 1.3521, lng: 103.8198, name: "新加坡", timezone: "Asia/Singapore" },
+                "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷", timezone: "Asia/Bangkok" },
             }
 
             // Priority 1: Use manually set daily location
@@ -113,6 +115,13 @@ export function ItineraryView() {
                 lat = dailyLocs[day].lat
                 lng = dailyLocs[day].lng
                 locationName = dailyLocs[day].name || "Current Location"
+                // 根據地點名稱推測時區
+                for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
+                    if (dailyLocs[day].name?.includes(cityName)) {
+                        setCurrentTimezone(coords.timezone)
+                        break
+                    }
+                }
             } else {
                 // Priority 2: Use first activity with coordinates
                 const activityLoc = getFirstActivityWithCoords()
@@ -129,6 +138,7 @@ export function ItineraryView() {
                             lat = coords.lat
                             lng = coords.lng
                             locationName = coords.name
+                            setCurrentTimezone(coords.timezone)  // 設定時區
                             // Auto-update dailyLocs for display
                             setDailyLocs((prev: any) => ({ ...prev, [day]: { lat, lng, name: locationName } }))
                             break
@@ -627,6 +637,13 @@ export function ItineraryView() {
                                     <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
                                 </button>
                             </DialogTrigger>
+                            {/* 當地時間顯示 */}
+                            <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-lg shadow-sm border border-slate-100">
+                                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                <span className="text-xs font-mono font-medium text-slate-700">
+                                    {getNowInZone(currentTimezone)}
+                                </span>
+                            </div>
                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader><DialogTitle>修改第 {day} 天的天氣地點</DialogTitle></DialogHeader>
                                 <div className="space-y-4 py-4">
