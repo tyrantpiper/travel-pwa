@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2, X,
-    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette
+    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,9 @@ export function ProfileView() {
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
     const [apiKey, setApiKey] = useState("")
     const [hasApiKey, setHasApiKey] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deleteConfirmText, setDeleteConfirmText] = useState("")
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const [profile, setProfile] = useState({
         nickname: "Traveler",
@@ -116,6 +119,38 @@ export function ProfileView() {
         localStorage.removeItem("user_gemini_key")
         setHasApiKey(false)
         toast.info("API Key 已清除")
+    }
+
+    const handleDeleteAllData = async () => {
+        if (deleteConfirmText !== "DELETE") {
+            toast.error("請輸入 DELETE 確認刪除")
+            return
+        }
+        setIsDeleting(true)
+        try {
+            const userId = localStorage.getItem("user_uuid")
+            if (!userId) throw new Error("找不到用戶 ID")
+
+            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://tyrantpiper-ryan-travel-api.hf.space"
+            const res = await fetch(`${API_BASE}/api/user/${userId}/data`, {
+                method: "DELETE"
+            })
+
+            if (!res.ok) throw new Error("刪除失敗")
+
+            const data = await res.json()
+            toast.success(`已刪除 ${data.deleted?.trips || 0} 個行程、${data.deleted?.expenses || 0} 筆消費`)
+
+            // 清除 localStorage 並重新載入
+            localStorage.clear()
+            window.location.reload()
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : "刪除失敗")
+        } finally {
+            setIsDeleting(false)
+            setDeleteDialogOpen(false)
+            setDeleteConfirmText("")
+        }
     }
 
     return (
@@ -353,6 +388,59 @@ export function ProfileView() {
                         <MenuItem icon={CreditCard} label={t('default_currency')} value="TWD (NT$)" />
                         <Separator />
                         <MenuItem icon={Trash2} label={t('clear_cache')} isDestructive onClick={handleClearCache} />
+                        <Separator />
+                        {/* 🔴 刪除所有資料 (GDPR) */}
+                        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                            <DialogTrigger asChild>
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-red-50 transition-colors text-red-600">
+                                    <div className="flex items-center gap-3">
+                                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                                        <span className="text-sm font-medium">刪除所有資料</span>
+                                    </div>
+                                    <span className="text-xs text-red-400">GDPR</span>
+                                </div>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[400px]">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2 text-red-600">
+                                        <AlertTriangle className="w-5 h-5" />
+                                        刪除所有資料
+                                    </DialogTitle>
+                                    <DialogDescription className="text-left">
+                                        此操作將<strong>永久刪除</strong>您在雲端的所有資料，包括：
+                                        <ul className="list-disc ml-4 mt-2 space-y-1">
+                                            <li>所有行程</li>
+                                            <li>所有消費記錄</li>
+                                            <li>所有成員關係</li>
+                                        </ul>
+                                        <p className="mt-3 text-red-600 font-bold">⚠️ 此操作無法復原！</p>
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="py-4">
+                                    <Label htmlFor="deleteConfirm" className="text-sm text-slate-600">
+                                        請輸入 <code className="bg-red-100 text-red-600 px-1 rounded">DELETE</code> 確認刪除
+                                    </Label>
+                                    <Input
+                                        id="deleteConfirm"
+                                        value={deleteConfirmText}
+                                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                        placeholder="DELETE"
+                                        className="mt-2 font-mono"
+                                    />
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={handleDeleteAllData}
+                                        disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                                    >
+                                        {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                                        確認刪除
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
 
                     <Button variant="outline" className="w-full h-12 text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 mt-4" onClick={handleLogout}>
