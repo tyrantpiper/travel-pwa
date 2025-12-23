@@ -1795,6 +1795,7 @@ class ChatRequest(BaseModel):
     message: str
     history: List[dict] = []  # 對話歷史: [{"role": "user", "content": "..."}]
     image: Optional[str] = None  # Base64 image string (optional)
+    location: Optional[dict] = None  # 當前位置: {"lat": float, "lng": float, "name": str}
 
 SYSTEM_PROMPT = """
 ### 角色定義 (Role)
@@ -1828,6 +1829,35 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         # 使用最聰明的模型 (gemini-3-flash-preview - 無 RPD 限制)
         model = genai.GenerativeModel(SMART_NO_TOOL_MODEL)
         
+        # 🆕 偵測是否為 POI 相關查詢
+        from services.poi_service import detect_poi_query
+        poi_detection = detect_poi_query(request.message)
+        poi_context = ""
+        
+        if poi_detection and request.location:
+            # 自動查詢 POI 資料
+            try:
+                lat = request.location.get("lat", 35.6895)  # 預設東京
+                lng = request.location.get("lng", 139.6917)
+                location_name = request.location.get("name", "當前位置")
+                category = poi_detection["category"]
+                
+                print(f"🗺️ POI 查詢觸發: {category} @ ({lat}, {lng})")
+                
+                pois = await search_poi_combined(lat, lng, category, radius=1000)
+                
+                if pois:
+                    pois_text = format_pois_for_ai(pois, max_items=5)
+                    poi_context = f"""
+
+📍 **附近 {location_name} 的{poi_detection.get('matched_keyword', '地點')}搜尋結果 (即時資料):**
+{pois_text}
+
+請根據以上即時資料回答用戶問題。"""
+                    print(f"✅ POI 查詢成功，找到 {len(pois)} 個結果")
+            except Exception as poi_err:
+                print(f"⚠️ POI 查詢失敗: {poi_err}")
+        
         # 構建對話歷史
         chat_history = [
             {"role": "user", "parts": [SYSTEM_PROMPT]},
@@ -1839,8 +1869,10 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
             role = "user" if msg["role"] == "user" else "model"
             chat_history.append({"role": role, "parts": [msg["content"]]})
             
-        # 處理當前訊息 (包含圖片)
-        current_parts = [request.message]
+        # 處理當前訊息 (包含圖片 + POI 上下文)
+        enhanced_message = request.message + poi_context
+        current_parts = [enhanced_message]
+        
         if request.image:
              # 簡單處理 Base64 圖片 (假設前端傳送來的格式正確)
              import base64
@@ -1863,7 +1895,11 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         chat = model.start_chat(history=chat_history)
         response = chat.send_message(current_parts)
         
-        return {"response": response.text}
+        return {
+            "response": response.text,
+            "poi_query_detected": poi_detection is not None,
+            "poi_category": poi_detection["category"] if poi_detection else None
+        }
         
     except Exception as e:
         print(f"🔥 Chat Error: {e}")
@@ -1874,7 +1910,8 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
 from services.poi_service import (
     search_poi_combined,
     format_pois_for_ai,
-    get_ai_prompt_for_recommendation
+    get_ai_prompt_for_recommendation,
+    detect_poi_query
 )
 
 

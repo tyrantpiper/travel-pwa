@@ -34,6 +34,61 @@ CATEGORY_OPENTRIPMAP_MAP = {
     "popular": "interesting_places"
 }
 
+# 位置相關關鍵字 (用於偵測 POI 查詢)
+LOCATION_KEYWORDS = [
+    "附近", "周邊", "nearby", "around", "near",
+    "哪裡有", "哪裏有", "哪邊有", "where",
+    "推薦", "recommend", "suggest",
+    "最近的", "closest", "nearest"
+]
+
+# 類別關鍵字映射 (用戶語言 -> POI 類別)
+CATEGORY_KEYWORDS = {
+    "pharmacy": ["藥局", "藥妝", "藥店", "pharmacy", "drugstore", "松本清", "大國"],
+    "restaurant": ["餐廳", "美食", "吃飯", "restaurant", "food", "吃的", "好吃"],
+    "convenience": ["超商", "便利商店", "便利店", "7-11", "全家", "羅森", "lawson", "便利"],
+    "supermarket": ["超市", "超級市場", "supermarket", "grocery"],
+    "department_store": ["百貨", "百貨公司", "mall", "shopping"],
+    "popular": ["景點", "熱門", "觀光", "attraction", "tourist", "sightseeing"]
+}
+
+
+def detect_poi_query(message: str) -> Optional[Dict]:
+    """
+    偵測訊息是否為 POI 相關查詢
+    
+    Args:
+        message: 用戶訊息
+    
+    Returns:
+        如果是 POI 查詢，回傳 {"is_poi_query": True, "category": "pharmacy"}
+        否則回傳 None
+    """
+    message_lower = message.lower()
+    
+    # 檢查是否包含位置關鍵字
+    has_location_keyword = any(kw in message_lower for kw in LOCATION_KEYWORDS)
+    
+    if not has_location_keyword:
+        return None
+    
+    # 偵測類別
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for kw in keywords:
+            if kw.lower() in message_lower:
+                return {
+                    "is_poi_query": True,
+                    "category": category,
+                    "matched_keyword": kw
+                }
+    
+    # 有位置關鍵字但無明確類別，預設搜索熱門景點
+    return {
+        "is_poi_query": True,
+        "category": "popular",
+        "matched_keyword": None
+    }
+
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """計算兩點間的 Haversine 距離（公尺）"""

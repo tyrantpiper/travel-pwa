@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { MessageCircle, X, Send, Image as ImageIcon, Loader2, Bot, User, GripVertical } from "lucide-react"
+import { MessageCircle, X, Send, Image as ImageIcon, Loader2, Bot, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,43 @@ interface Position {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export default function ChatWidget() {
+    // 🛡️ 安全地取得行程位置（從 localStorage 讀取，避免 Context 問題）
+    const [tripLocation, setTripLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
+
+    useEffect(() => {
+        // 從 localStorage 讀取當前行程資訊
+        const savedTripId = localStorage.getItem("active_trip_id")
+        const savedTripsJson = localStorage.getItem("cached_trips")
+        if (savedTripId && savedTripsJson) {
+            try {
+                const trips = JSON.parse(savedTripsJson)
+                const activeTrip = trips.find((t: { id: string }) => t.id === savedTripId)
+                if (activeTrip?.title) {
+                    // 從行程標題解析城市
+                    const cityCoords: Record<string, { lat: number; lng: number }> = {
+                        "東京": { lat: 35.6895, lng: 139.6917 },
+                        "tokyo": { lat: 35.6895, lng: 139.6917 },
+                        "大阪": { lat: 34.6937, lng: 135.5023 },
+                        "osaka": { lat: 34.6937, lng: 135.5023 },
+                        "京都": { lat: 35.0116, lng: 135.7681 },
+                        "kyoto": { lat: 35.0116, lng: 135.7681 },
+                        "福岡": { lat: 33.5904, lng: 130.4017 },
+                        "名古屋": { lat: 35.1815, lng: 136.9066 },
+                        "札幌": { lat: 43.0618, lng: 141.3545 },
+                        "沖繩": { lat: 26.2124, lng: 127.6809 },
+                    }
+                    const tripTitle = (activeTrip.title as string).toLowerCase()
+                    for (const [city, coords] of Object.entries(cityCoords)) {
+                        if (tripTitle.includes(city)) {
+                            setTripLocation({ ...coords, name: city })
+                            break
+                        }
+                    }
+                }
+            } catch { /* 忽略解析錯誤 */ }
+        }
+    }, [])
+
     const [isOpen, setIsOpen] = useState(false)
     const [messages, setMessages] = useState<Message[]>([
         { role: "model", content: "👋哈囉！我是 Ryan，你的 AI 旅遊達人。\n我可以幫你翻譯、推薦美食、查詢交通，或者解決任何旅途中的疑難雜症！😎" }
@@ -176,7 +213,8 @@ export default function ChatWidget() {
                 body: JSON.stringify({
                     message: userMsg,
                     history: history,
-                    image: currentImage
+                    image: currentImage,
+                    location: tripLocation  // 🆕 傳送位置以啟用 POI 搜索
                 })
             })
 
