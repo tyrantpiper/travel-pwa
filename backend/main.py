@@ -1868,3 +1868,123 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
     except Exception as e:
         print(f"🔥 Chat Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== POI 智能搜索 API ====================
+from services.poi_service import (
+    search_poi_combined,
+    format_pois_for_ai,
+    get_ai_prompt_for_recommendation
+)
+
+
+class POIRecommendRequest(BaseModel):
+    pois: List[dict]
+    user_query: str
+    api_key: str
+    user_preferences: Optional[dict] = None
+
+
+@app.get("/api/poi/nearby")
+async def search_nearby_poi(
+    lat: float,
+    lng: float,
+    category: str = "restaurant",
+    radius: int = 1000
+):
+    """
+    搜索附近 POI
+    
+    Args:
+        lat: 緯度
+        lng: 經度
+        category: 類別 (pharmacy, restaurant, convenience, supermarket, department_store, popular)
+        radius: 搜索半徑（公尺，預設 1000）
+    
+    Returns:
+        POI 列表（含距離、評分等）
+    """
+    valid_categories = ["pharmacy", "restaurant", "convenience", "supermarket", "department_store", "popular"]
+    if category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Invalid category. Valid: {valid_categories}")
+    
+    if radius < 100 or radius > 5000:
+        raise HTTPException(status_code=400, detail="Radius must be between 100 and 5000 meters")
+    
+    try:
+        pois = await search_poi_combined(lat, lng, category, radius)
+        return {
+            "count": len(pois),
+            "radius": radius,
+            "category": category,
+            "pois": pois
+        }
+    except Exception as e:
+        print(f"🔥 POI Search Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/poi/recommend")
+async def ai_recommend_poi(request: POIRecommendRequest):
+    """
+    基於 POI 列表進行 AI 推薦
+    
+    Token 優化策略：
+    1. POI 資料已由 /api/poi/nearby 預先查詢
+    2. 只傳精簡摘要給 Gemini（~200 tokens vs ~2000 tokens）
+    3. 節省 80%+ Token 消耗
+    """
+    if not request.pois:
+        return {"recommendation": "附近沒有找到相關地點，請嘗試其他類別或擴大搜索範圍。"}
+    
+    if not request.api_key:
+        raise HTTPException(status_code=400, detail="API key required")
+    
+    try:
+        # Step 1: 格式化 POI 為精簡文字
+        pois_text = format_pois_for_ai(request.pois, max_items=5)
+        
+        # Step 2: 生成精簡 prompt
+        prompt = get_ai_prompt_for_recommendation(
+            pois_text,
+            request.user_query,
+            request.user_preferences
+        )
+        
+        # Step 3: 呼叫 Gemini
+        genai.configure(api_key=request.api_key)
+        model = genai.GenerativeModel(
+            LITE_MODEL,  # 使用輕量模型節省成本
+            generation_config={
+                "max_output_tokens": 300,  # 限制輸出
+                "temperature": 0.7
+            }
+        )
+        
+        response = model.generate_content(prompt)
+        
+        return {
+            "recommendation": response.text,
+            "pois_count": len(request.pois),
+            "token_optimized": True
+        }
+        
+    except Exception as e:
+        print(f"🔥 POI Recommend Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/poi/categories")
+async def get_poi_categories():
+    """取得支援的 POI 類別列表"""
+    return {
+        "categories": [
+            {"id": "department_store", "name": "百貨公司", "icon": "🏬"},
+            {"id": "restaurant", "name": "美食餐廳", "icon": "🍽️"},
+            {"id": "convenience", "name": "便利商店", "icon": "🏪"},
+            {"id": "supermarket", "name": "超市", "icon": "🛒"},
+            {"id": "pharmacy", "name": "藥局藥妝", "icon": "💊"},
+            {"id": "popular", "name": "熱門景點", "icon": "🔥"}
+        ]
+    }
+

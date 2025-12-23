@@ -1,0 +1,232 @@
+"use client"
+
+import { useState } from "react"
+import { MapPin, Plus, Sparkles, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// POI 類別定義
+const POI_CATEGORIES = [
+    { id: "department_store", name: "百貨", icon: "🏬" },
+    { id: "restaurant", name: "美食", icon: "🍽️" },
+    { id: "convenience", name: "超商", icon: "🏪" },
+    { id: "supermarket", name: "超市", icon: "🛒" },
+    { id: "pharmacy", name: "藥局", icon: "💊" },
+    { id: "popular", name: "熱門", icon: "🔥" }
+]
+
+interface POI {
+    id: string
+    name: string
+    category: string
+    lat: number
+    lng: number
+    distance?: number
+    rating?: number
+    opening_hours?: string
+    address?: string
+    phone?: string
+    website?: string
+    source?: string
+}
+
+interface POISearchProps {
+    centerLat: number
+    centerLng: number
+    onSelectPOI?: (poi: POI) => void
+    className?: string
+}
+
+export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POISearchProps) {
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [pois, setPois] = useState<POI[]>([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [aiRecommendation, setAiRecommendation] = useState<string | null>(null)
+    const [isAiLoading, setIsAiLoading] = useState(false)
+
+    const handleCategoryClick = async (categoryId: string) => {
+        if (selectedCategory === categoryId) {
+            // 再次點擊同類別 = 取消搜索
+            setSelectedCategory(null)
+            setPois([])
+            setAiRecommendation(null)
+            return
+        }
+
+        setSelectedCategory(categoryId)
+        setIsLoading(true)
+        setPois([])
+        setAiRecommendation(null)
+
+        try {
+            const res = await fetch(
+                `${API_BASE}/api/poi/nearby?lat=${centerLat}&lng=${centerLng}&category=${categoryId}&radius=1000`
+            )
+            const data = await res.json()
+            setPois(data.pois || [])
+        } catch (e) {
+            console.error("POI search error:", e)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleAiRecommend = async () => {
+        if (pois.length === 0) return
+
+        setIsAiLoading(true)
+        setAiRecommendation(null)
+
+        try {
+            const apiKey = localStorage.getItem("user_gemini_key") ||
+                localStorage.getItem("gemini_api_key") ||
+                process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
+
+            if (!apiKey) {
+                setAiRecommendation("請先在設定中輸入 Gemini API Key")
+                return
+            }
+
+            const res = await fetch(`${API_BASE}/api/poi/recommend`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pois: pois.slice(0, 10),
+                    user_query: "請推薦最適合觀光客的一間，說明原因。",
+                    api_key: apiKey,
+                    user_preferences: JSON.parse(localStorage.getItem("poi_preferences") || "{}")
+                })
+            })
+            const data = await res.json()
+            setAiRecommendation(data.recommendation)
+        } catch (e) {
+            console.error("AI recommend error:", e)
+            setAiRecommendation("AI 推薦失敗，請稍後再試")
+        } finally {
+            setIsAiLoading(false)
+        }
+    }
+
+    const getRatingStars = (rating?: number) => {
+        if (!rating) return null
+        const normalized = Math.min(5, Math.round(rating / 2))
+        return "⭐".repeat(normalized)
+    }
+
+    return (
+        <div className={className}>
+            {/* 類別快速按鈕列 */}
+            <div className="flex gap-2 overflow-x-auto py-2 no-scrollbar">
+                {POI_CATEGORIES.map((cat) => (
+                    <button
+                        key={cat.id}
+                        onClick={() => handleCategoryClick(cat.id)}
+                        className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-all ${selectedCategory === cat.id
+                            ? "bg-amber-500 text-white shadow-md"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                    >
+                        <span>{cat.icon}</span>
+                        <span>{cat.name}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* 搜索結果 */}
+            {(isLoading || pois.length > 0) && (
+                <div className="mt-3">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-8 text-slate-400">
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                            <span>搜索中...</span>
+                        </div>
+                    ) : (
+                        <>
+                            {/* AI 推薦按鈕 */}
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs text-slate-500">
+                                    找到 {pois.length} 個結果
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleAiRecommend}
+                                    disabled={isAiLoading}
+                                    className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                >
+                                    {isAiLoading ? (
+                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                    ) : (
+                                        <Sparkles className="w-4 h-4 mr-1" />
+                                    )}
+                                    AI 推薦
+                                </Button>
+                            </div>
+
+                            {/* AI 推薦結果 */}
+                            {aiRecommendation && (
+                                <Card className="p-3 mb-3 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+                                    <div className="flex items-start gap-2">
+                                        <Sparkles className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <p className="text-sm text-slate-700">{aiRecommendation}</p>
+                                    </div>
+                                </Card>
+                            )}
+
+                            {/* POI 列表 */}
+                            <ScrollArea className="max-h-[300px]">
+                                <div className="space-y-2">
+                                    {pois.slice(0, 10).map((poi) => (
+                                        <div
+                                            key={poi.id}
+                                            className="p-3 bg-white rounded-lg border border-slate-100 hover:border-amber-300 hover:shadow-sm transition-all cursor-pointer"
+                                            onClick={() => onSelectPOI?.(poi)}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                                                        <span className="font-medium text-slate-800 text-sm">
+                                                            {poi.name}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                                        <span>{poi.distance}m</span>
+                                                        {poi.rating && (
+                                                            <span>{getRatingStars(poi.rating)}</span>
+                                                        )}
+                                                        {poi.opening_hours && (
+                                                            <span className="truncate max-w-[120px]">
+                                                                {poi.opening_hours}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {onSelectPOI && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0 text-slate-400 hover:text-amber-500 hover:bg-amber-50"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            onSelectPOI(poi)
+                                                        }}
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}

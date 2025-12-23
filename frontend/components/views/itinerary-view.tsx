@@ -24,6 +24,7 @@ import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
 import { getNowInZone } from "@/lib/timezone"
+import { POISearch } from "@/components/poi-search"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -980,6 +981,32 @@ export function ItineraryView() {
                                     )}
                                 </div>
                             </div>
+
+                            {/* 🆕 POI 快速搜索 */}
+                            {(editItem.lat && editItem.lng) || (dailyLocs[day]?.lat && dailyLocs[day]?.lng) ? (
+                                <div className="border-t border-dashed pt-4 mt-2">
+                                    <Label className="text-xs text-slate-500 mb-2 block">📍 附近搜索</Label>
+                                    <POISearch
+                                        centerLat={editItem.lat || dailyLocs[day]?.lat || 35.6895}
+                                        centerLng={editItem.lng || dailyLocs[day]?.lng || 139.6917}
+                                        onSelectPOI={(poi) => {
+                                            setEditItem({
+                                                ...editItem,
+                                                place: poi.name,
+                                                lat: poi.lat,
+                                                lng: poi.lng,
+                                                desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : editItem.desc
+                                            })
+                                            toast.success(`已選擇: ${poi.name}`)
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="text-xs text-slate-400 text-center py-2 border-t border-dashed mt-2">
+                                    💡 先搜索地點以啟用附近 POI 搜索
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label className="text-right">Notes</Label>
                                 <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="col-span-3" />
