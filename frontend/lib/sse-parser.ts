@@ -161,20 +161,34 @@ export async function streamChat(
 
     try {
         while (true) {
+            // 🆕 v3.7: 檢查是否已被 abort
+            if (signal?.aborted) {
+                console.log("🛑 SSE 已被用戶中斷")
+                break
+            }
+
             const { done, value } = await reader.read()
             if (done) break
+
+            // 🆕 再次檢查 abort（在 read 等待期間可能被 abort）
+            if (signal?.aborted) {
+                console.log("🛑 SSE 在讀取時被中斷")
+                break
+            }
 
             const chunk = decoder.decode(value, { stream: true })
             const { events, remaining } = parseSSE(chunk, buffer)
             buffer = remaining
 
             for (const event of events) {
+                // 🆕 處理事件前也檢查 abort
+                if (signal?.aborted) break
                 handleSSEEvent(event, handlers)
             }
         }
 
-        // 處理最後剩餘的 buffer
-        if (buffer.trim()) {
+        // 處理最後剩餘的 buffer（只在未 abort 時）
+        if (buffer.trim() && !signal?.aborted) {
             const { events } = parseSSE(buffer + "\n\n", "")
             for (const event of events) {
                 handleSSEEvent(event, handlers)
