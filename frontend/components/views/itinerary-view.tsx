@@ -63,6 +63,7 @@ export function ItineraryView() {
     const [locSearchResults, setLocSearchResults] = useState<any[]>([])
     const [isLocSearching, setIsLocSearching] = useState(false)
     const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
+    const [dailyLocSearchRegion, setDailyLocSearchRegion] = useState<string>("") // 每日地點搜尋區域
     const [currentTimezone, setCurrentTimezone] = useState<string>("Asia/Tokyo")  // 當前顯示地點的時區
     const [activitySearchCountry, setActivitySearchCountry] = useState<string>("")
     const [activitySearchRegion, setActivitySearchRegion] = useState<string>("")
@@ -269,10 +270,8 @@ export function ItineraryView() {
         if (!newLocName.trim()) return
         setIsLocSearching(true)
         try {
-            // 組合搜尋詞：如果有選擇國家，附加到搜尋詞後面
-            const queryWithCountry = searchCountry
-                ? `${newLocName.trim()} ${searchCountry}`
-                : newLocName.trim()
+            // 組合搜尋詞：關鍵字 + 地區 + 國家
+            const queryWithCountry = `${newLocName.trim()} ${dailyLocSearchRegion} ${searchCountry}`.trim()
 
             // 使用後端統一地理編碼 API（ArcGIS + Photon）
             const res = await fetch(`${API_BASE}/api/geocode/search`, {
@@ -657,7 +656,14 @@ export function ItineraryView() {
             <PullToRefresh onRefresh={async () => { await reloadTripDetail() }} className="flex-1">
                 <div className="py-6 px-6 bg-stone-50/50">
                     <div className="flex items-center justify-between mb-4">
-                        <Dialog open={isLocEditOpen} onOpenChange={setIsLocEditOpen}>
+                        <Dialog open={isLocEditOpen} onOpenChange={(open) => {
+                            if (open) {
+                                // Reset filters when opening
+                                setSearchCountry("")
+                                setDailyLocSearchRegion("")
+                            }
+                            setIsLocEditOpen(open)
+                        }}>
                             <DialogTrigger asChild>
                                 <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
                                     <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
@@ -716,125 +722,148 @@ export function ItineraryView() {
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
                                         <div className="flex gap-2">
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    list="country-list"
-                                                    value={searchCountry}
-                                                    onChange={e => setSearchCountry(e.target.value)}
-                                                    placeholder="🌍 國家"
-                                                    className="w-28 text-sm px-2 py-1.5 rounded-md border border-slate-200 bg-white"
-                                                />
-                                                <datalist id="country-list">
-                                                    <option value="">🌍 全球</option>
-                                                    <option value="Japan">🇯🇵 日本 Japan</option>
-                                                    <option value="Taiwan">🇹🇼 台灣 Taiwan</option>
-                                                    <option value="South Korea">🇰🇷 韓國 Korea</option>
-                                                    <option value="Thailand">🇹🇭 泰國 Thailand</option>
-                                                    <option value="Vietnam">🇻🇳 越南 Vietnam</option>
-                                                    <option value="Hong Kong">🇭🇰 香港 HK</option>
-                                                    <option value="Singapore">🇸🇬 新加坡 SG</option>
-                                                    <option value="Malaysia">🇲🇾 馬來西亞 MY</option>
-                                                    <option value="Philippines">🇵🇭 菲律賓 PH</option>
-                                                    <option value="Indonesia">🇮🇩 印尼 ID</option>
-                                                    <option value="China">🇨🇳 中國 China</option>
-                                                    <option value="USA">🇺🇸 美國 USA</option>
-                                                    <option value="Canada">🇨🇦 加拿大 CA</option>
-                                                    <option value="UK">🇬🇧 英國 UK</option>
-                                                    <option value="France">🇫🇷 法國 France</option>
-                                                    <option value="Italy">🇮🇹 義大利 Italy</option>
-                                                    <option value="Germany">🇩🇪 德國 Germany</option>
-                                                    <option value="Spain">🇪🇸 西班牙 Spain</option>
-                                                    <option value="Australia">🇦🇺 澳洲 AU</option>
-                                                    <option value="New Zealand">🇳🇿 紐西蘭 NZ</option>
-                                                </datalist>
-                                            </div>
-                                            <Input
-                                                placeholder="輸入地點名稱..."
-                                                value={newLocName}
-                                                onChange={e => setNewLocName(e.target.value)}
-                                                onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
-                                                className="flex-1"
-                                            />
-                                            <Button onClick={handleSearchLocation} disabled={isLocSearching}>
-                                                {isLocSearching ? "..." : "搜尋"}
-                                            </Button>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400">💡 輸入或選擇國家可提高短地名的搜尋準確度</p>
-                                    </div>
-
-                                    {locSearchResults.length > 0 && (
-                                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                                            <p className="text-xs text-slate-500">🗺️ 地點搜尋結果 ({locSearchResults.length})：</p>
-                                            {locSearchResults.map((loc, idx) => {
-                                                // POI 類型對照
-                                                const typeLabels: { [key: string]: string } = {
-                                                    restaurant: '🍽️ 餐廳', cafe: '☕ 咖啡廳', fast_food: '🍔 速食',
-                                                    station: '🚉 車站', bus_stop: '🚌 公車站', subway_entrance: '🚇 地鐵',
-                                                    hotel: '🏨 飯店', hostel: '🛏️ 旅館', guest_house: '🏠 民宿',
-                                                    attraction: '🎯 景點', museum: '🏛️ 博物館', park: '🌳 公園',
-                                                    temple: '⛩️ 寺廟', shrine: '⛩️ 神社', church: '⛪ 教堂',
-                                                    shop: '🛍️ 商店', mall: '🏬 百貨', supermarket: '🛒 超市',
-                                                    convenience: '🏪 便利店', department_store: '🏬 百貨公司',
-                                                    administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
-                                                }
-                                                const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
-
-                                                return (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => handleSelectLocation(loc)}
-                                                        className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
+                                            <div className="flex gap-2">
+                                                <div className="w-1/3 space-y-2">
+                                                    <select
+                                                        className="w-full h-9 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950"
+                                                        value={searchCountry}
+                                                        onChange={e => {
+                                                            setSearchCountry(e.target.value)
+                                                            setDailyLocSearchRegion("") // Reset region
+                                                        }}
                                                     >
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
-                                                            <span className="font-bold text-slate-800">{loc.name}</span>
-                                                        </div>
-                                                        <div className="text-xs text-slate-500 line-clamp-1">
-                                                            {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-400 font-mono">
-                                                            {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
-                                                        </div>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
+                                                        <option value="">🌍 Country</option>
+                                                        <option value="Japan">🇯🇵 Japan</option>
+                                                        <option value="Taiwan">🇹🇼 Taiwan</option>
+                                                        <option value="South Korea">🇰🇷 Korea</option>
+                                                        <option value="Thailand">🇹🇭 Thailand</option>
+                                                        <option value="Vietnam">🇻🇳 Vietnam</option>
+                                                        <option value="Hong Kong">🇭🇰 Hong Kong</option>
+                                                        <option value="Singapore">🇸🇬 Singapore</option>
+                                                        <option value="Malaysia">🇲🇾 Malaysia</option>
+                                                        <option value="Philippines">🇵🇭 Philippines</option>
+                                                        <option value="Indonesia">🇮🇩 Indonesia</option>
+                                                        <option value="China">🇨🇳 China</option>
+                                                        <option value="USA">🇺🇸 USA</option>
+                                                        <option value="Canada">🇨🇦 Canada</option>
+                                                        <option value="UK">🇬🇧 UK</option>
+                                                        <option value="France">🇫🇷 France</option>
+                                                        <option value="Italy">🇮🇹 Italy</option>
+                                                        <option value="Germany">🇩🇪 Germany</option>
+                                                        <option value="Spain">🇪🇸 Spain</option>
+                                                        <option value="Australia">🇦🇺 Australia</option>
+                                                        <option value="New Zealand">🇳🇿 New Zealand</option>
+                                                    </select>
 
-                                    {/* 手動座標輸入 */}
-                                    <div className="space-y-2 pt-2 border-t border-dashed">
-                                        <label className="text-xs font-bold text-slate-500">📌 手動輸入座標 (最精確)</label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="緯度 (lat)"
-                                                className="font-mono text-sm"
-                                                id="manual-lat"
-                                            />
-                                            <Input
-                                                placeholder="經度 (lng)"
-                                                className="font-mono text-sm"
-                                                id="manual-lng"
-                                            />
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() => {
-                                                    const lat = parseFloat((document.getElementById('manual-lat') as HTMLInputElement)?.value)
-                                                    const lng = parseFloat((document.getElementById('manual-lng') as HTMLInputElement)?.value)
-                                                    if (!isNaN(lat) && !isNaN(lng)) {
-                                                        setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
-                                                        setIsLocEditOpen(false)
-                                                    } else {
-                                                        toast.warning("請輸入有效的座標數字")
-                                                    }
-                                                }}
-                                            >
-                                                套用
-                                            </Button>
+                                                    {searchCountry && COUNTRY_REGIONS[searchCountry] ? (
+                                                        <select
+                                                            className="w-full h-9 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950"
+                                                            value={dailyLocSearchRegion}
+                                                            onChange={e => setDailyLocSearchRegion(e.target.value)}
+                                                        >
+                                                            <option value="">🏙️ Region (All)</option>
+                                                            {COUNTRY_REGIONS[searchCountry].map(region => (
+                                                                <option key={region} value={region}>{region}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <Input
+                                                            placeholder="🏙️ Region"
+                                                            className="h-9 text-xs"
+                                                            value={dailyLocSearchRegion}
+                                                            onChange={e => setDailyLocSearchRegion(e.target.value)}
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-1 flex gap-2">
+                                                    <Input
+                                                        placeholder="輸入地點..."
+                                                        value={newLocName}
+                                                        onChange={e => setNewLocName(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
+                                                        className="flex-1 h-auto"
+                                                    />
+                                                    <Button onClick={handleSearchLocation} disabled={isLocSearching}>
+                                                        {isLocSearching ? "..." : "搜尋"}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">💡 輸入或選擇國家可提高短地名的搜尋準確度</p>
                                         </div>
-                                        <p className="text-[10px] text-slate-400">💡 可從 Google Maps 複製座標貼上</p>
+
+                                        {locSearchResults.length > 0 && (
+                                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                <p className="text-xs text-slate-500">🗺️ 地點搜尋結果 ({locSearchResults.length})：</p>
+                                                {locSearchResults.map((loc, idx) => {
+                                                    // POI 類型對照
+                                                    const typeLabels: { [key: string]: string } = {
+                                                        restaurant: '🍽️ 餐廳', cafe: '☕ 咖啡廳', fast_food: '🍔 速食',
+                                                        station: '🚉 車站', bus_stop: '🚌 公車站', subway_entrance: '🚇 地鐵',
+                                                        hotel: '🏨 飯店', hostel: '🛏️ 旅館', guest_house: '🏠 民宿',
+                                                        attraction: '🎯 景點', museum: '🏛️ 博物館', park: '🌳 公園',
+                                                        temple: '⛩️ 寺廟', shrine: '⛩️ 神社', church: '⛪ 教堂',
+                                                        shop: '🛍️ 商店', mall: '🏬 百貨', supermarket: '🛒 超市',
+                                                        convenience: '🏪 便利店', department_store: '🏬 百貨公司',
+                                                        administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
+                                                    }
+                                                    const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
+
+                                                    return (
+                                                        <button
+                                                            key={idx}
+                                                            onClick={() => handleSelectLocation(loc)}
+                                                            className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
+                                                        >
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
+                                                                <span className="font-bold text-slate-800">{loc.name}</span>
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 line-clamp-1">
+                                                                {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 font-mono">
+                                                                {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
+                                                            </div>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* 手動座標輸入 */}
+                                        <div className="space-y-2 pt-2 border-t border-dashed">
+                                            <label className="text-xs font-bold text-slate-500">📌 手動輸入座標 (最精確)</label>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="緯度 (lat)"
+                                                    className="font-mono text-sm"
+                                                    id="manual-lat"
+                                                />
+                                                <Input
+                                                    placeholder="經度 (lng)"
+                                                    className="font-mono text-sm"
+                                                    id="manual-lng"
+                                                />
+                                                <Button
+                                                    variant="secondary"
+                                                    onClick={() => {
+                                                        const lat = parseFloat((document.getElementById('manual-lat') as HTMLInputElement)?.value)
+                                                        const lng = parseFloat((document.getElementById('manual-lng') as HTMLInputElement)?.value)
+                                                        if (!isNaN(lat) && !isNaN(lng)) {
+                                                            setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
+                                                            setIsLocEditOpen(false)
+                                                        } else {
+                                                            toast.warning("請輸入有效的座標數字")
+                                                        }
+                                                    }}
+                                                >
+                                                    套用
+                                                </Button>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">💡 可從 Google Maps 複製座標貼上</p>
+                                        </div>
                                     </div>
-                                </div>
                             </DialogContent>
                         </Dialog>
                         <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
