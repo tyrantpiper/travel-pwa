@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain } from "lucide-react"
+import Image from "next/image"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils"
 import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
+import { ItineraryItemState, LocationInfo, DailyLocation, DayWeather, Trip, Activity, GeocodeResult } from "@/lib/itinerary-types"
 
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import DailyTips from "@/components/daily-tips"
@@ -35,7 +37,8 @@ export function ItineraryView() {
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
     // Use activeTripId from context
-    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId)
+    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void> }
+    const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
 
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [newTripTitle, setNewTripTitle] = useState("")
@@ -48,19 +51,19 @@ export function ItineraryView() {
     const haptic = useHaptic()
     const isOnline = useOnlineStatus()  // 🆕 離線狀態偵測
 
-    const [editItem, setEditItem] = useState<any>(null)
+    const [editItem, setEditItem] = useState<ItineraryItemState | null>(null)
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isAddMode, setIsAddMode] = useState(false)
-    const [placeSearchResults, setPlaceSearchResults] = useState<any[]>([])
+    const [placeSearchResults, setPlaceSearchResults] = useState<LocationInfo[]>([])
     const [isPlaceSearching, setIsPlaceSearching] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
 
     const [day, setDay] = useState(1)
-    const [weatherData, setWeatherData] = useState<any[]>([])
-    const [dailyLocs, setDailyLocs] = useState<any>({})
+    const [weatherData, setWeatherData] = useState<DayWeather[]>([])
+    const [dailyLocs, setDailyLocs] = useState<Record<number, DailyLocation>>({})
     const [isLocEditOpen, setIsLocEditOpen] = useState(false)
     const [newLocName, setNewLocName] = useState("")
-    const [locSearchResults, setLocSearchResults] = useState<any[]>([])
+    const [locSearchResults, setLocSearchResults] = useState<LocationInfo[]>([])
     const [isLocSearching, setIsLocSearching] = useState(false)
     const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
     const [dailyLocSearchRegion, setDailyLocSearchRegion] = useState<string>("") // 每日地點搜尋區域
@@ -100,21 +103,23 @@ export function ItineraryView() {
         }
     }, [isOnline, currentTrip, activeTripId])
     // Get the first activity with coordinates for the current day
-    const getFirstActivityWithCoords = () => {
-        if (currentTrip?.days) {
-            const dayData = currentTrip.days.find((d: any) => d.day === day)
-            if (dayData?.activities) {
-                for (const activity of dayData.activities) {
-                    if (activity.lat && activity.lng) {
-                        return { lat: activity.lat, lng: activity.lng, name: activity.place || "Current Location" }
+
+
+    useEffect(() => {
+        const getFirstActivityWithCoords = () => {
+            if (currentTrip?.days) {
+                const dayData = currentTrip.days?.find((d) => d.day === day)
+                if (dayData?.activities) {
+                    for (const activity of dayData.activities) {
+                        if (activity.lat && activity.lng) {
+                            return { lat: activity.lat, lng: activity.lng, name: activity.place || "Current Location" }
+                        }
                     }
                 }
             }
+            return null
         }
-        return null
-    }
 
-    useEffect(() => {
         const fetchWeather = async () => {
             let lat = 35.6895  // Default: Tokyo
             let lng = 139.6917
@@ -161,7 +166,7 @@ export function ItineraryView() {
                     lng = activityLoc.lng
                     locationName = activityLoc.name
                     // Auto-update dailyLocs for display
-                    setDailyLocs((prev: any) => ({ ...prev, [day]: activityLoc }))
+                    setDailyLocs((prev) => ({ ...prev, [day]: activityLoc }))
                 } else if (currentTrip?.title) {
                     // Priority 3: Parse city from trip title
                     for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
@@ -171,7 +176,7 @@ export function ItineraryView() {
                             locationName = coords.name
                             setCurrentTimezone(coords.timezone)  // 設定時區
                             // Auto-update dailyLocs for display
-                            setDailyLocs((prev: any) => ({ ...prev, [day]: { lat, lng, name: locationName } }))
+                            setDailyLocs((prev) => ({ ...prev, [day]: { lat, lng, name: locationName } }))
                             break
                         }
                     }
@@ -201,16 +206,20 @@ export function ItineraryView() {
     }, [day, dailyLocs, currentTrip])
 
     const handleDeleteTrip = async (tripId: string) => {
-        if (!confirm("確定要刪除此行程嗎？此操作無法復原！")) return
+        setDeletingTripId(tripId)
+    }
+
+    const confirmDeleteTrip = async () => {
+        if (!deletingTripId) return
 
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${tripId}`, { method: "DELETE" })
+            const res = await fetch(`${API_BASE}/api/trips/${deletingTripId}`, { method: "DELETE" })
             if (!res.ok) throw new Error("Delete failed")
 
             toast.success("行程已刪除")
 
             // If we're deleting the active trip, clear selection
-            if (activeTripId === tripId) {
+            if (activeTripId === deletingTripId) {
                 setActiveTripId(null)
             }
 
@@ -219,6 +228,8 @@ export function ItineraryView() {
         } catch (error) {
             console.error(error)
             toast.error("刪除失敗")
+        } finally {
+            setDeletingTripId(null)
         }
     }
 
@@ -227,7 +238,8 @@ export function ItineraryView() {
         haptic.tap()
 
         const userName = localStorage.getItem("user_nickname")
-        if (!userId || !newTripTitle) { haptic.error(); return }
+        const activeUserId = localStorage.getItem("user_uuid") || userId
+        if (!activeUserId || !newTripTitle) { haptic.error(); return }
 
         setIsCreating(true)
         try {
@@ -236,7 +248,7 @@ export function ItineraryView() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     title: newTripTitle, start_date: newTripStart, end_date: newTripEnd,
-                    creator_name: userName, user_id: userId,
+                    creator_name: userName, user_id: activeUserId,
                     cover_image: newTripCover
                 })
             })
@@ -244,7 +256,7 @@ export function ItineraryView() {
             setIsCreateOpen(false)
             setNewTripCover("")
             reloadTrips()
-        } catch (_e) { haptic.error(); toast.error("Create failed") }
+        } catch { haptic.error(); toast.error("Create failed") }
         finally { setIsCreating(false) }
     }
 
@@ -252,17 +264,18 @@ export function ItineraryView() {
         if (joinCode.length !== 4) { toast.warning("Please enter 4-digit code"); return }
         setIsJoinLoading(true)
         const userName = localStorage.getItem("user_nickname")
+        const activeUserId = localStorage.getItem("user_uuid") || userId
         try {
             const res = await fetch(`${API_BASE}/api/join-trip`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ share_code: joinCode, user_id: userId, user_name: userName })
+                body: JSON.stringify({ share_code: joinCode, user_id: activeUserId, user_name: userName })
             })
             if (!res.ok) throw new Error("Invalid code")
             toast.success("Joined!")
             setJoinCode("")
             reloadTrips()
-        } catch (_e) { toast.error("Trip not found") }
+        } catch { toast.error("Trip not found") }
         finally { setIsJoinLoading(false) }
     }
 
@@ -286,11 +299,11 @@ export function ItineraryView() {
                 setLocSearchResults([])
             } else {
                 // 轉換成統一格式
-                const results = data.results.map((item: any) => ({
+                const results = data.results.map((item: GeocodeResult) => ({
                     name: item.name,
                     display_name: item.address || item.name,
-                    latitude: item.lat,
-                    longitude: item.lng,
+                    lat: item.lat,
+                    lng: item.lng,
                     type: item.type || "place",
                     // 從地址中解析行政區資訊
                     admin1: item.address?.split(", ").slice(-2, -1)[0] || "",
@@ -307,26 +320,26 @@ export function ItineraryView() {
                     console.log("🔍 使用 Photon 搜尋")
                 }
             }
-        } catch (_e) { toast.error("搜尋失敗") }
+        } catch { toast.error("搜尋失敗") }
         finally { setIsLocSearching(false) }
     }
 
 
-    const handleSelectLocation = async (loc: any) => {
+    const handleSelectLocation = async (loc: LocationInfo) => {
         if (!currentTrip) return
         try {
             const displayName = loc.admin2 || loc.admin1 ? `${loc.name}, ${loc.admin2 || loc.admin1}` : loc.name
             await fetch(`${API_BASE}/api/trips/${currentTrip.id}/location`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ day: day, name: displayName, lat: loc.latitude, lng: loc.longitude })
+                body: JSON.stringify({ day: day, name: displayName, lat: loc.lat, lng: loc.lng })
             })
 
-            setDailyLocs({ ...dailyLocs, [day]: { name: displayName, lat: loc.latitude, lng: loc.longitude } })
+            setDailyLocs({ ...dailyLocs, [day]: { name: displayName, lat: loc.lat, lng: loc.lng } })
             setIsLocEditOpen(false)
             setNewLocName("")
             setLocSearchResults([])
             reloadTripDetail()
-        } catch (_e) { toast.error("更新失敗") }
+        } catch { toast.error("更新失敗") }
     }
 
     const handleSaveEdit = async () => {
@@ -336,9 +349,9 @@ export function ItineraryView() {
 
         setIsSavingActivity(true)
 
-        let finalLat = editItem.lat
-        let finalLng = editItem.lng
-        if (editItem.place && (!finalLat || !finalLng)) {
+        let finalLat = editItem?.lat
+        let finalLng = editItem?.lng
+        if (editItem?.place && (!finalLat || !finalLng)) {
             try {
                 // 使用後端統一地理編碼 API
                 const res = await fetch(`${API_BASE}/api/geocode/search`, {
@@ -351,12 +364,12 @@ export function ItineraryView() {
                     finalLat = data.results[0].lat
                     finalLng = data.results[0].lng
                 }
-            } catch (_e) { }
+            } catch { }
         }
 
         try {
             if (isAddMode) {
-                if (!currentTrip) return
+                if (!currentTrip || !editItem) return
                 await fetch(`${API_BASE}/api/items`, {
                     method: "POST", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -366,10 +379,12 @@ export function ItineraryView() {
                         place_name: editItem.place,
                         category: editItem.category,
                         notes: editItem.desc,
-                        lat: finalLat, lng: finalLng
+                        lat: finalLat ? Number(finalLat) : null,
+                        lng: finalLng ? Number(finalLng) : null
                     })
                 })
             } else {
+                if (!editItem) return
                 await fetch(`${API_BASE}/api/items/${editItem.id}`, {
                     method: "PATCH", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -378,7 +393,8 @@ export function ItineraryView() {
                         category: editItem.category,
                         tags: editItem.tags,
                         notes: editItem.desc,
-                        lat: finalLat, lng: finalLng,
+                        lat: finalLat ? Number(finalLat) : null,
+                        lng: finalLng ? Number(finalLng) : null,
                         image_url: editItem.image_url
                     })
                 })
@@ -386,7 +402,7 @@ export function ItineraryView() {
             haptic.success()
             setIsEditOpen(false)
             reloadTripDetail()
-        } catch (_e) {
+        } catch {
             haptic.error()
             toast.error("Save failed")
         } finally {
@@ -403,7 +419,7 @@ export function ItineraryView() {
         return true
     }
 
-    const handleUpdateSubItems = async (id: string, newItems: any[]) => {
+    const handleUpdateSubItems = async (id: string, newItems: Record<string, unknown>[]) => {
         await fetch(`${API_BASE}/api/items/${id}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sub_items: newItems })
@@ -419,9 +435,9 @@ export function ItineraryView() {
         if (currentTrip?.days) {
             const optimisticData = {
                 ...currentTrip,
-                days: currentTrip.days.map((d: any) => ({
+                days: currentTrip.days.map((d) => ({
                     ...d,
-                    activities: d.activities?.filter((a: any) => a.id !== id) || []
+                    activities: d.activities?.filter((a) => a.id !== id) || []
                 }))
             }
             reloadTripDetail(optimisticData, false) // Update cache without revalidation
@@ -448,7 +464,7 @@ export function ItineraryView() {
 
             // 3. 刷新資料
             reloadTripDetail()
-        } catch (_e) {
+        } catch {
             toast.error("刪除失敗")
         }
     }
@@ -504,7 +520,7 @@ export function ItineraryView() {
         }
         // Fallback: use max day_number from days data
         if (currentTrip.days?.length > 0) {
-            return Math.max(...currentTrip.days.map((d: any) => d.day || 1))
+            return Math.max(...currentTrip.days.map((d) => d.day || 1))
         }
         return 7
     })()
@@ -555,6 +571,27 @@ export function ItineraryView() {
                     </Dialog>
                 </div>
 
+                <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="text-red-600 flex items-center gap-2">
+                                <AlertCircle className="w-5 h-5" />
+                                {t('confirm_delete')}
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <p className="text-slate-600">
+                                確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: any) => t.id === deletingTripId)?.title}</span> 嗎？
+                            </p>
+                            <p className="text-sm text-slate-500 mt-2">此操作無法復原，所有相關資料將會遺失。</p>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
+                            <Button variant="destructive" onClick={confirmDeleteTrip}>{t('delete')}</Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 <div className="space-y-4">
                     {/* 載入中骨架屏 */}
                     {isTripsLoading && (
@@ -566,7 +603,7 @@ export function ItineraryView() {
                     )}
 
                     {/* 實際 Trip 列表 */}
-                    {!isTripsLoading && trips.map((trip: any) => (
+                    {!isTripsLoading && trips.map((trip: Trip) => (
                         <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
                             <div className="absolute top-2 right-2 z-20">
                                 <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>
@@ -574,7 +611,9 @@ export function ItineraryView() {
                             <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
                                 <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                                     {trip.cover_image ? (
-                                        <img src={trip.cover_image} alt="cover" className="w-full h-full object-cover opacity-80" />
+                                        <div className="relative w-full h-full">
+                                            <Image src={trip.cover_image} alt="cover" fill className="object-cover opacity-80" unoptimized />
+                                        </div>
                                     ) : (
                                         <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
                                     )}
@@ -597,7 +636,7 @@ export function ItineraryView() {
     }
 
     const currentDayData = currentTrip?.days
-        ? currentTrip.days.find((d: any) => d.day === day)?.activities || []
+        ? currentTrip.days.find((d) => d.day === day)?.activities || []
         : []
 
     return (
@@ -696,14 +735,14 @@ export function ItineraryView() {
 
                                     {/* 從活動同步按鈕 */}
                                     {(() => {
-                                        const activityLoc = currentTrip?.days?.find((d: any) => d.day === day)?.activities?.find((a: any) => a.lat && a.lng)
+                                        const activityLoc = currentTrip?.days?.find((d) => d.day === day)?.activities?.find((a) => a.lat && a.lng)
                                         if (activityLoc) {
                                             return (
                                                 <Button
                                                     variant="outline"
                                                     className="w-full justify-start text-left h-auto py-3"
                                                     onClick={() => {
-                                                        setDailyLocs({ ...dailyLocs, [day]: { name: activityLoc.place, lat: activityLoc.lat, lng: activityLoc.lng } })
+                                                        setDailyLocs({ ...dailyLocs, [day]: { name: activityLoc.place || "Location", lat: activityLoc.lat!, lng: activityLoc.lng! } })
                                                         setIsLocEditOpen(false)
                                                     }}
                                                 >
@@ -807,7 +846,7 @@ export function ItineraryView() {
                                                     convenience: '🏪 便利店', department_store: '🏬 百貨公司',
                                                     administrative: '📍 行政區', suburb: '📍 地區', city: '🏙️ 城市',
                                                 }
-                                                const typeLabel = typeLabels[loc.type] || `📍 ${loc.type || '地點'}`
+                                                const typeLabel = typeLabels[loc.type || ''] || `📍 ${loc.type || '地點'}`
 
                                                 return (
                                                     <button
@@ -823,7 +862,7 @@ export function ItineraryView() {
                                                             {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
                                                         </div>
                                                         <div className="text-[10px] text-slate-400 font-mono">
-                                                            {loc.latitude?.toFixed(6)}, {loc.longitude?.toFixed(6)}
+                                                            {loc.lat?.toFixed(6)}, {loc.lng?.toFixed(6)}
                                                         </div>
                                                     </button>
                                                 )
@@ -892,7 +931,7 @@ export function ItineraryView() {
                 <div className="px-5 py-6 space-y-1">
                     {(() => {
                         let realIndex = 0;
-                        return currentDayData.map((item: any, idx: number) => {
+                        return currentDayData.map((item: Activity, idx: number) => {
                             const isHeader = item.category === 'header' || item.time === '00:00';
                             if (!isHeader) realIndex++;
                             return (
@@ -901,13 +940,24 @@ export function ItineraryView() {
                                     activity={item}
                                     index={realIndex}
                                     isLast={idx === currentDayData.length - 1}
-                                    onEdit={(item) => {
+                                    onEdit={(item: Activity) => {
                                         if (!isOnline) {
                                             toast.error("✈️ 離線模式下無法編輯")
                                             return
                                         }
                                         setIsAddMode(false)
-                                        setEditItem(item)
+                                        // Map Activity to ItineraryItemState
+                                        setEditItem({
+                                            id: item.id,
+                                            time: item.time || item.time_slot || "00:00",
+                                            place: item.place || item.place_name || "",
+                                            category: item.category || "sightseeing",
+                                            desc: item.desc || item.notes || "",
+                                            lat: item.lat,
+                                            lng: item.lng,
+                                            image_url: item.image_url,
+                                            tags: item.tags || []
+                                        })
                                         // Reset search filters when opening edit
                                         setActivitySearchCountry("")
                                         setActivitySearchRegion("")
@@ -938,7 +988,7 @@ export function ItineraryView() {
                                     return
                                 }
                                 setIsAddMode(true);
-                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
+                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] });
                                 // Reset search filters when opening add
                                 setActivitySearchCountry("")
                                 setActivitySearchRegion("")
@@ -1042,7 +1092,7 @@ export function ItineraryView() {
                                                         })
                                                     })
                                                     const data = await res.json()
-                                                    setPlaceSearchResults((data.results || []).map((item: any) => ({
+                                                    setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
                                                         name: item.name,
                                                         display_name: item.address || item.name,
                                                         lat: item.lat,
@@ -1050,7 +1100,7 @@ export function ItineraryView() {
                                                         type: item.type || "place",
                                                         source: item.source
                                                     })))
-                                                } catch (_e) { toast.error('搜尋失敗') }
+                                                } catch { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }
                                             })()}
                                         />
@@ -1072,7 +1122,7 @@ export function ItineraryView() {
                                                         })
                                                     })
                                                     const data = await res.json()
-                                                    setPlaceSearchResults((data.results || []).map((item: any) => ({
+                                                    setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
                                                         name: item.name,
                                                         display_name: item.address || item.name,
                                                         lat: item.lat,
@@ -1080,7 +1130,7 @@ export function ItineraryView() {
                                                         type: item.type || "place",
                                                         source: item.source
                                                     })))
-                                                } catch (_e) { toast.error('搜尋失敗') }
+                                                } catch { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }
                                             }}
                                         >
@@ -1098,7 +1148,7 @@ export function ItineraryView() {
                                                     museum: '🏛️', park: '🌳', temple: '⛩️', shrine: '⛩️',
                                                     shop: '🛍️', mall: '🏬', supermarket: '🛒',
                                                 }
-                                                const icon = typeLabels[loc.type] || '📍'
+                                                const icon = typeLabels[loc.type || ''] || '📍'
                                                 return (
                                                     <button
                                                         key={idx}
@@ -1127,8 +1177,8 @@ export function ItineraryView() {
                                 <div className="border-t border-dashed pt-4 mt-2">
                                     <Label className="text-xs text-slate-500 mb-2 block">📍 附近搜索</Label>
                                     <POISearch
-                                        centerLat={editItem.lat || dailyLocs[day]?.lat || 35.6895}
-                                        centerLng={editItem.lng || dailyLocs[day]?.lng || 139.6917}
+                                        centerLat={Number(editItem.lat) || dailyLocs[day]?.lat || 35.6895}
+                                        centerLng={Number(editItem.lng) || dailyLocs[day]?.lng || 139.6917}
                                         onSelectPOI={(poi) => {
                                             setEditItem({
                                                 ...editItem,

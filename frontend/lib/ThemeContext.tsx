@@ -65,11 +65,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             const savedDark = localStorage.getItem("dark_mode") === "true"
             const savedAccent = localStorage.getItem("accent_color") as AccentColor
 
-            setIsDark(savedDark)
-            if (savedAccent && ACCENT_COLORS[savedAccent]) {
-                setAccentColor(savedAccent)
-            }
-            setMounted(true)
+            setTimeout(() => {
+                setIsDark(savedDark)
+                if (savedAccent && ACCENT_COLORS[savedAccent]) {
+                    setAccentColor(savedAccent)
+                }
+                setMounted(true)
+            }, 0)
         }
     }, [])
 
