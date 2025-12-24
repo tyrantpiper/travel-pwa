@@ -2202,6 +2202,48 @@ async def summarize_history(request: SummarizeRequest, api_key: str = Depends(ge
         raise HTTPException(status_code=500, detail=f"摘要失敗: {str(e)}")
 
 
+# 🆕 v3.7: POI 三源整合 API
+from services.poi_service import enrich_poi_complete, format_enriched_poi_for_ai
+
+
+class POIEnrichRequest(BaseModel):
+    name: str  # 景點名稱
+    wikidata_id: Optional[str] = None  # Wikidata ID (可選)
+
+
+@app.post("/api/poi/enrich")
+async def enrich_poi(request: POIEnrichRequest):
+    """
+    三源整合 POI 端點 - Wikipedia + WikiVoyage + Wikidata
+    
+    Returns:
+        {
+            "display_name": {"primary": "金閣寺", "secondary": "金閣寺 (Kinkaku-ji)"},
+            "cultural_desc": "...",
+            "travel_tips": "...",
+            "official_url": "..."
+        }
+    """
+    try:
+        poi = {
+            "name": request.name,
+            "wikidata_id": request.wikidata_id or ""
+        }
+        
+        enriched = await enrich_poi_complete(poi)
+        formatted = format_enriched_poi_for_ai(enriched)
+        
+        return {
+            "success": True,
+            "poi": enriched,
+            "formatted": formatted
+        }
+        
+    except Exception as e:
+        print(f"🔥 POI 整合失敗：{e}")
+        raise HTTPException(status_code=500, detail=f"POI 整合失敗: {str(e)}")
+
+
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
     """
