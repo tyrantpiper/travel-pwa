@@ -54,18 +54,26 @@ interface Expense {
 }
 
 interface ParseResult {
-    items?: unknown[]
+    items?: any[]
     title?: string
     start_date?: string
     end_date?: string
+    daily_locations?: Record<string, any>
+    day_notes?: Record<string, any>
+    day_costs?: Record<string, any>
+    day_tickets?: Record<string, any>
 }
 
 interface GenerateResult {
-    items?: unknown[]
-    data?: { items?: unknown[] }
+    items?: any[]
+    data?: { items?: any[] }
     title?: string
     start_date?: string
     end_date?: string
+    daily_locations?: Record<string, any>
+    day_notes?: Record<string, any>
+    day_costs?: Record<string, any>
+    day_tickets?: Record<string, any>
 }
 
 // 🆕 v3.8: 信用卡回饋功能
