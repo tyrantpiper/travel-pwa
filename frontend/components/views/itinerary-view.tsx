@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
-import { ItineraryItemState, LocationInfo, DailyLocation, DayWeather, Trip, Activity, GeocodeResult } from "@/lib/itinerary-types"
+import { ItineraryItemState, LocationInfo, DailyLocation, DayWeather, Trip, Activity, GeocodeResult, SubItem } from "@/lib/itinerary-types"
 
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import DailyTips from "@/components/daily-tips"
@@ -419,7 +419,7 @@ export function ItineraryView() {
         return true
     }
 
-    const handleUpdateSubItems = async (id: string, newItems: Record<string, unknown>[]) => {
+    const handleUpdateSubItems = async (id: string, newItems: SubItem[]) => {
         await fetch(`${API_BASE}/api/items/${id}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ sub_items: newItems })
