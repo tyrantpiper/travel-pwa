@@ -3,6 +3,11 @@ import withPWA from '@ducanh2912/next-pwa';
 
 const nextConfig = {
     reactStrictMode: true,
+    images: {
+        remotePatterns: [
+            { protocol: 'https', hostname: 'res.cloudinary.com' },
+        ],
+    },
     // 👇 強制顯示開發指示器
     devIndicators: {
         appIsrStatus: true,

@@ -38,6 +38,33 @@ const DEFAULT_HOTEL = {
     links: [] as { title: string, url: string }[]
 }
 
+// Type definitions
+type Hotel = typeof DEFAULT_HOTEL
+
+interface PlaceSearchResult {
+    name: string
+    display_name?: string
+    lat?: number
+    lng?: number
+    latitude?: number
+    longitude?: number
+}
+
+interface FlightData {
+    dep_date: string
+    arr_date: string
+    airline: string
+    code: string
+    dep_time: string
+    arr_time: string
+    dep_airport: string
+    arr_airport: string
+    seat: string
+    terminal: string
+    pnr: string
+    date?: string  // Legacy fallback
+}
+
 // 國家-地區對照表 (與 itinerary-view 同步)
 const COUNTRY_REGIONS: { [key: string]: string[] } = {
     "Japan": ["Tokyo 東京", "Osaka 大阪", "Kyoto 京都", "Hokkaido 北海道", "Okinawa 沖繩", "Fukuoka 福岡", "Nagoya 名古屋", "Yokohama 橫濱", "Nara 奈良", "Hiroshima 廣島"],
@@ -59,7 +86,7 @@ export function InfoView() {
     const [isEditing, setIsEditing] = useState(false)
 
     const [flights, setFlights] = useState(DEFAULT_FLIGHTS)
-    const [hotels, setHotels] = useState<any[]>([DEFAULT_HOTEL])
+    const [hotels, setHotels] = useState<Hotel[]>([DEFAULT_HOTEL])
 
     const [detailOpen, setDetailOpen] = useState(false)
     const [currentHotelIdx, setCurrentHotelIdx] = useState<number | null>(null)
@@ -68,7 +95,7 @@ export function InfoView() {
     const [hotelSearchQuery, setHotelSearchQuery] = useState("")
     const [hotelSearchCountry, setHotelSearchCountry] = useState("")
     const [hotelSearchRegion, setHotelSearchRegion] = useState("")
-    const [hotelSearchResults, setHotelSearchResults] = useState<any[]>([])
+    const [hotelSearchResults, setHotelSearchResults] = useState<PlaceSearchResult[]>([])
     const [isHotelSearching, setIsHotelSearching] = useState(false)
     const [searchingHotelIdx, setSearchingHotelIdx] = useState<number | null>(null)
 
@@ -93,7 +120,7 @@ export function InfoView() {
                     }
                     const hData = data.hotel_info || {}
                     const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
-                        .map((h: any) => ({ ...DEFAULT_HOTEL, ...h }))
+                        .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
                     setHotels(parsedHotels)
                 }
             } catch (e) { console.error(e) }
@@ -116,7 +143,7 @@ export function InfoView() {
                 }
                 const hData = data.hotel_info || {}
                 const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
-                    .map((h: any) => ({ ...DEFAULT_HOTEL, ...h }))
+                    .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
                 setHotels(parsedHotels)
                 toast.success("資料已更新")
             }
@@ -133,10 +160,10 @@ export function InfoView() {
             })
             toast.success("Done")
             setIsEditing(false)
-        } catch (e) { toast.error("Save failed") }
+        } catch { toast.error("Save failed") }
     }
 
-    const updateHotel = (index: number, field: string, value: any) => {
+    const updateHotel = (index: number, field: string, value: string | number | null | undefined | { title: string; url: string }[]) => {
         const newHotels = [...hotels]
         newHotels[index] = { ...newHotels[index], [field]: value }
         setHotels(newHotels)
@@ -172,7 +199,7 @@ export function InfoView() {
     }
 
     // 🎯 選擇搜尋結果
-    const handleSelectHotelPlace = (hotelIdx: number, place: any) => {
+    const handleSelectHotelPlace = (hotelIdx: number, place: PlaceSearchResult) => {
         updateHotel(hotelIdx, 'address', place.name || place.display_name)
         updateHotel(hotelIdx, 'lat', place.latitude || place.lat)
         updateHotel(hotelIdx, 'lng', place.longitude || place.lng)
@@ -195,7 +222,7 @@ export function InfoView() {
     }
     const removeLink = (hotelIdx: number, linkIdx: number) => {
         const newHotels = [...hotels]
-        newHotels[hotelIdx].links = newHotels[hotelIdx].links.filter((_: any, i: number) => i !== linkIdx)
+        newHotels[hotelIdx].links = newHotels[hotelIdx].links.filter((_: { title: string; url: string }, i: number) => i !== linkIdx)
         setHotels(newHotels)
     }
 
@@ -479,7 +506,7 @@ export function InfoView() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            {hotels[currentHotelIdx].links?.map((link: any, i: number) => (
+                                            {hotels[currentHotelIdx].links?.map((link: { title: string; url: string }, i: number) => (
                                                 <div key={i} className="flex gap-2 items-center bg-white p-2 rounded border border-slate-100">
                                                     <Input className="h-7 text-xs w-1/3 border-0 bg-slate-50" placeholder="Title" value={link.title} onChange={e => updateLink(currentHotelIdx, i, 'title', e.target.value)} />
                                                     <Input className="h-7 text-xs flex-1 font-mono text-slate-500 border-0" placeholder="https://..." value={link.url} onChange={e => updateLink(currentHotelIdx, i, 'url', e.target.value)} />
@@ -505,9 +532,8 @@ export function InfoView() {
     )
 }
 
-function FlightCard({ data, isEditing, onChange, onClear }: { data: any, isEditing: boolean, onChange: (field: string, value: string) => void, onClear?: () => void }) {
-    const [copied, setCopied] = useState(false)
-    const handleCopyPNR = () => { if (data.pnr) { navigator.clipboard.writeText(data.pnr); setCopied(true); setTimeout(() => setCopied(false), 2000) } }
+function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, isEditing: boolean, onChange: (field: string, value: string) => void, onClear?: () => void }) {
+    const handleCopyPNR = () => { if (data.pnr) { navigator.clipboard.writeText(data.pnr) } }
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
