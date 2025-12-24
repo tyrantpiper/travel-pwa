@@ -64,6 +64,22 @@ export function ItineraryView() {
     const [isLocSearching, setIsLocSearching] = useState(false)
     const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
     const [currentTimezone, setCurrentTimezone] = useState<string>("Asia/Tokyo")  // 當前顯示地點的時區
+    const [activitySearchCountry, setActivitySearchCountry] = useState<string>("")
+    const [activitySearchRegion, setActivitySearchRegion] = useState<string>("")
+
+    const COUNTRY_REGIONS: { [key: string]: string[] } = {
+        "Japan": ["Tokyo", "Osaka", "Kyoto", "Hokkaido", "Okinawa", "Fukuoka", "Nagoya", "Yokohama", "Nara", "Hiroshima"],
+        "Taiwan": ["Taipei", "Kaohsiung", "Taichung", "Tainan", "Hualien", "Yilan", "Taitung"],
+        "South Korea": ["Seoul", "Busan", "Jeju", "Incheon", "Daegu"],
+        "Thailand": ["Bangkok", "Chiang Mai", "Phuket", "Pattaya"],
+        "Vietnam": ["Ho Chi Minh City", "Hanoi", "Da Nang", "Hoi An"],
+        "Hong Kong": ["Central", "Tsim Sha Tsui", "Mong Kok", "Causeway Bay"],
+        "Singapore": ["Marina Bay", "Sentosa", "Chinatown", "Orchard"],
+        "USA": ["New York", "Los Angeles", "San Francisco", "Las Vegas", "Chicago"],
+        "UK": ["London", "Edinburgh", "Manchester", "Oxford"],
+        "France": ["Paris", "Nice", "Lyon", "Marseille"],
+        "Italy": ["Rome", "Milan", "Venice", "Florence"],
+    }
 
     useEffect(() => {
         if (currentTrip && currentTrip.daily_locations) {
@@ -863,6 +879,9 @@ export function ItineraryView() {
                                         }
                                         setIsAddMode(false)
                                         setEditItem(item)
+                                        // Reset search filters when opening edit
+                                        setActivitySearchCountry("")
+                                        setActivitySearchRegion("")
                                         setIsEditOpen(true)
                                     }}
                                     onDelete={(id) => {
@@ -889,8 +908,11 @@ export function ItineraryView() {
                                     toast.error("✈️ 離線模式下無法編輯")
                                     return
                                 }
-                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
                                 setIsAddMode(true);
+                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null });
+                                // Reset search filters when opening add
+                                setActivitySearchCountry("")
+                                setActivitySearchRegion("")
                                 setIsEditOpen(true);
                             }}
                         >
@@ -923,6 +945,53 @@ export function ItineraryView() {
                                 <Label className="text-right">Time</Label>
                                 <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
                             </div>
+
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Filter</Label>
+                                <div className="col-span-3 flex gap-2">
+                                    <select
+                                        className="flex-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                        value={activitySearchCountry}
+                                        onChange={(e) => {
+                                            setActivitySearchCountry(e.target.value)
+                                            setActivitySearchRegion("") // Reset region when country changes
+                                        }}
+                                    >
+                                        <option value="">🌍 Country</option>
+                                        <option value="Japan">🇯🇵 Japan</option>
+                                        <option value="Taiwan">🇹🇼 Taiwan</option>
+                                        <option value="South Korea">🇰🇷 Korea</option>
+                                        <option value="Thailand">🇹🇭 Thailand</option>
+                                        <option value="Vietnam">🇻🇳 Vietnam</option>
+                                        <option value="Hong Kong">🇭🇰 Hong Kong</option>
+                                        <option value="Singapore">🇸🇬 Singapore</option>
+                                        <option value="USA">🇺🇸 USA</option>
+                                        <option value="UK">🇬🇧 UK</option>
+                                        <option value="France">🇫🇷 France</option>
+                                        <option value="Italy">🇮🇹 Italy</option>
+                                    </select>
+
+                                    {activitySearchCountry && COUNTRY_REGIONS[activitySearchCountry] ? (
+                                        <select
+                                            className="flex-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                            value={activitySearchRegion}
+                                            onChange={(e) => setActivitySearchRegion(e.target.value)}
+                                        >
+                                            <option value="">🏙️ Region (All)</option>
+                                            {COUNTRY_REGIONS[activitySearchCountry].map(region => (
+                                                <option key={region} value={region}>{region}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <Input
+                                            placeholder="🏙️ Region"
+                                            className="flex-1"
+                                            value={activitySearchRegion}
+                                            onChange={(e) => setActivitySearchRegion(e.target.value)}
+                                        />
+                                    )}
+                                </div>
+                            </div>
                             <div className="grid grid-cols-4 items-start gap-4">
                                 <Label className="text-right pt-2">Place</Label>
                                 <div className="col-span-3 space-y-2">
@@ -938,7 +1007,10 @@ export function ItineraryView() {
                                                     const res = await fetch(`${API_BASE}/api/geocode/search`, {
                                                         method: "POST",
                                                         headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({ query: editItem.place, limit: 5 })
+                                                        body: JSON.stringify({
+                                                            query: `${editItem.place} ${activitySearchRegion} ${activitySearchCountry}`.trim(),
+                                                            limit: 5
+                                                        })
                                                     })
                                                     const data = await res.json()
                                                     setPlaceSearchResults((data.results || []).map((item: any) => ({
@@ -965,7 +1037,10 @@ export function ItineraryView() {
                                                     const res = await fetch(`${API_BASE}/api/geocode/search`, {
                                                         method: "POST",
                                                         headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({ query: editItem.place, limit: 5 })
+                                                        body: JSON.stringify({
+                                                            query: `${editItem.place} ${activitySearchRegion} ${activitySearchCountry}`.trim(),
+                                                            limit: 5
+                                                        })
                                                     })
                                                     const data = await res.json()
                                                     setPlaceSearchResults((data.results || []).map((item: any) => ({
