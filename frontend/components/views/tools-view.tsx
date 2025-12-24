@@ -67,6 +67,15 @@ interface GenerateResult {
     end_date?: string
 }
 
+// 🆕 v3.8: 信用卡回饋功能
+interface CreditCard {
+    id: string
+    name: string           // 卡片名稱
+    rewardRate: number     // 回饋趴數 (%)
+    rewardLimit: number    // 回饋上限 (TWD)
+    notes: string          // 備忘錄
+}
+
 interface ExpenseItemProps {
     item: Expense
     rate: number
@@ -134,11 +143,32 @@ export function ToolsView() {
     const [parseProgress, setParseProgress] = useState<string | null>(null)
     const [generateProgress, setGenerateProgress] = useState<string | null>(null)
 
+    // 🆕 v3.8: 信用卡回饋彙整
+    const [creditCards, setCreditCards] = useState<CreditCard[]>([])
+    const [cardDialogOpen, setCardDialogOpen] = useState(false)
+    const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
+    const [newCardName, setNewCardName] = useState("")
+    const [newRewardRate, setNewRewardRate] = useState("")
+    const [newRewardLimit, setNewRewardLimit] = useState("")
+    const [newCardNotes, setNewCardNotes] = useState("")
+
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
         const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
         const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
         setHasApiKey(!!storedKey)
+    }, [])
+
+    // 🆕 v3.8: 載入信用卡資料
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem("credit_cards")
+            if (saved) {
+                setCreditCards(JSON.parse(saved))
+            }
+        } catch (e) {
+            console.error("Failed to load credit cards:", e)
+        }
     }, [])
 
     useEffect(() => {
@@ -463,6 +493,66 @@ export function ToolsView() {
         }
     }
 
+    // 🆕 v3.8: 信用卡管理函數
+    const saveCardsToLocalStorage = (cards: CreditCard[]) => {
+        localStorage.setItem("credit_cards", JSON.stringify(cards))
+    }
+
+    const openAddCardDialog = () => {
+        setEditingCard(null)
+        setNewCardName("")
+        setNewRewardRate("")
+        setNewRewardLimit("")
+        setNewCardNotes("")
+        setCardDialogOpen(true)
+    }
+
+    const openEditCardDialog = (card: CreditCard) => {
+        setEditingCard(card)
+        setNewCardName(card.name)
+        setNewRewardRate(String(card.rewardRate))
+        setNewRewardLimit(String(card.rewardLimit))
+        setNewCardNotes(card.notes)
+        setCardDialogOpen(true)
+    }
+
+    const handleSaveCard = () => {
+        if (!newCardName.trim()) {
+            toast.error("請輸入卡片名稱")
+            return
+        }
+
+        const cardData: CreditCard = {
+            id: editingCard?.id || crypto.randomUUID(),
+            name: newCardName.trim(),
+            rewardRate: parseFloat(newRewardRate) || 0,
+            rewardLimit: parseFloat(newRewardLimit) || 0,
+            notes: newCardNotes.trim()
+        }
+
+        let updatedCards: CreditCard[]
+        if (editingCard) {
+            updatedCards = creditCards.map(c => c.id === editingCard.id ? cardData : c)
+            toast.success("卡片已更新")
+        } else {
+            updatedCards = [...creditCards, cardData]
+            toast.success("卡片已新增")
+        }
+
+        setCreditCards(updatedCards)
+        saveCardsToLocalStorage(updatedCards)
+        setCardDialogOpen(false)
+        haptic()
+    }
+
+    const handleDeleteCard = (cardId: string) => {
+        const updatedCards = creditCards.filter(c => c.id !== cardId)
+        setCreditCards(updatedCards)
+        saveCardsToLocalStorage(updatedCards)
+        toast.success("卡片已刪除")
+        haptic()
+    }
+
     return (
         <div className="min-h-screen bg-stone-50 pb-32">
             <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
@@ -477,10 +567,60 @@ export function ToolsView() {
 
             <PullToRefresh onRefresh={async () => { await fetchExpenses(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
                 <Tabs value={activeSection} onValueChange={setActiveSection}>
-                    <TabsList className="grid w-full grid-cols-2 bg-white shadow-md rounded-xl p-1">
+                    <TabsList className="grid w-full grid-cols-3 bg-white shadow-md rounded-xl p-1">
+                        <TabsTrigger value="cards">💳 卡片</TabsTrigger>
                         <TabsTrigger value="expense">{t('expense')}</TabsTrigger>
                         <TabsTrigger value="ai">{t('ai_tools')}</TabsTrigger>
                     </TabsList>
+
+                    {/* 🆕 v3.8: 信用卡回饋彙整 */}
+                    <TabsContent value="cards" className="mt-4 space-y-4">
+                        <Card>
+                            <CardContent className="pt-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-semibold text-slate-900">我的信用卡</h3>
+                                    <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900">
+                                        <Plus className="w-4 h-4 mr-1" /> 新增
+                                    </Button>
+                                </div>
+
+                                {creditCards.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-sm">
+                                        <CreditCard className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                        <p>尚未新增任何卡片</p>
+                                        <p className="text-xs mt-1">點擊「新增」開始記錄回饋資訊</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {creditCards.map((card) => (
+                                            <SwipeableItem key={card.id} onDelete={() => handleDeleteCard(card.id)}>
+                                                <div
+                                                    onClick={() => openEditCardDialog(card)}
+                                                    className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <p className="font-semibold text-lg">{card.name}</p>
+                                                            <p className="text-slate-300 text-sm mt-1">
+                                                                回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
+                                                                {card.rewardLimit > 0 && (
+                                                                    <span className="ml-2">上限 ${card.rewardLimit.toLocaleString()}</span>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <CreditCard className="w-6 h-6 text-slate-400" />
+                                                    </div>
+                                                    {card.notes && (
+                                                        <p className="text-xs text-slate-400 mt-2 line-clamp-2">📝 {card.notes}</p>
+                                                    )}
+                                                </div>
+                                            </SwipeableItem>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
                     <TabsContent value="expense" className="mt-4 space-y-4">
                         {/* View Mode Toggle */}
@@ -791,6 +931,57 @@ export function ToolsView() {
 
                         <Button className="w-full bg-slate-900" onClick={handleSaveExpense} disabled={isSavingExpense}>
                             {isSavingExpense ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />儲存中...</> : t('save')}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* 🆕 v3.8: 信用卡編輯 Dialog */}
+            <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{editingCard ? "編輯卡片" : "新增卡片"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label>卡片名稱 *</Label>
+                            <Input
+                                placeholder="例：玉山 Pi 拍錢包"
+                                value={newCardName}
+                                onChange={(e) => setNewCardName(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>回饋趴數 (%)</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="例：3.5"
+                                    value={newRewardRate}
+                                    onChange={(e) => setNewRewardRate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <Label>回饋上限 (TWD)</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="例：500"
+                                    value={newRewardLimit}
+                                    onChange={(e) => setNewRewardLimit(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>備忘錄</Label>
+                            <Textarea
+                                placeholder="例：海外消費限定、需登錄活動..."
+                                value={newCardNotes}
+                                onChange={(e) => setNewCardNotes(e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                        <Button className="w-full bg-slate-900" onClick={handleSaveCard}>
+                            {editingCard ? "更新" : "新增"}
                         </Button>
                     </div>
                 </DialogContent>
