@@ -6,7 +6,7 @@ import string
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from supabase import create_client, Client
 from google import genai  # 🆕 新版 SDK
 import httpx  # For async HTTP requests (geocoding)
