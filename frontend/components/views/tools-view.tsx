@@ -351,7 +351,7 @@ export function ToolsView() {
             } else {
                 throw new Error("API Error")
             }
-        } catch (e) { haptic.error(); toast.error("Save failed") }
+        } catch (_e) { haptic.error(); toast.error("Save failed") }
         finally { setIsSavingExpense(false) }
     }
 

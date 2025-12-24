@@ -244,7 +244,7 @@ export function ItineraryView() {
             setIsCreateOpen(false)
             setNewTripCover("")
             reloadTrips()
-        } catch (e) { haptic.error(); toast.error("Create failed") }
+        } catch (_e) { haptic.error(); toast.error("Create failed") }
         finally { setIsCreating(false) }
     }
 
@@ -262,7 +262,7 @@ export function ItineraryView() {
             toast.success("Joined!")
             setJoinCode("")
             reloadTrips()
-        } catch (e) { toast.error("Trip not found") }
+        } catch (_e) { toast.error("Trip not found") }
         finally { setIsJoinLoading(false) }
     }
 
@@ -307,7 +307,7 @@ export function ItineraryView() {
                     console.log("🔍 使用 Photon 搜尋")
                 }
             }
-        } catch (e) { toast.error("搜尋失敗") }
+        } catch (_e) { toast.error("搜尋失敗") }
         finally { setIsLocSearching(false) }
     }
 
@@ -326,7 +326,7 @@ export function ItineraryView() {
             setNewLocName("")
             setLocSearchResults([])
             reloadTripDetail()
-        } catch (e) { toast.error("更新失敗") }
+        } catch (_e) { toast.error("更新失敗") }
     }
 
     const handleSaveEdit = async () => {
@@ -351,7 +351,7 @@ export function ItineraryView() {
                     finalLat = data.results[0].lat
                     finalLng = data.results[0].lng
                 }
-            } catch (e) { }
+            } catch (_e) { }
         }
 
         try {
@@ -386,7 +386,7 @@ export function ItineraryView() {
             haptic.success()
             setIsEditOpen(false)
             reloadTripDetail()
-        } catch (e) {
+        } catch (_e) {
             haptic.error()
             toast.error("Save failed")
         } finally {
@@ -448,7 +448,7 @@ export function ItineraryView() {
 
             // 3. 刷新資料
             reloadTripDetail()
-        } catch (e) {
+        } catch (_e) {
             toast.error("刪除失敗")
         }
     }
@@ -1050,7 +1050,7 @@ export function ItineraryView() {
                                                         type: item.type || "place",
                                                         source: item.source
                                                     })))
-                                                } catch (e) { toast.error('搜尋失敗') }
+                                                } catch (_e) { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }
                                             })()}
                                         />
@@ -1080,7 +1080,7 @@ export function ItineraryView() {
                                                         type: item.type || "place",
                                                         source: item.source
                                                     })))
-                                                } catch (e) { toast.error('搜尋失敗') }
+                                                } catch (_e) { toast.error('搜尋失敗') }
                                                 finally { setIsPlaceSearching(false) }
                                             }}
                                         >
