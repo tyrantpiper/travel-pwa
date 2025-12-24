@@ -620,7 +620,7 @@ export function ItineraryView() {
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                                     <div className="absolute bottom-4 left-4 text-white">
                                         <h3 className="font-bold text-lg">{trip.title}</h3>
-                                        <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date).toLocaleDateString()}</p>
+                                        <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}</p>
                                     </div>
                                     <div className="absolute top-3 right-12 bg-white/20 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1"><Hash className="w-3 h-3" /> {trip.share_code}</div>
                                 </div>
