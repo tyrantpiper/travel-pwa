@@ -598,8 +598,9 @@ async def parse_markdown(
         只回傳 JSON，不要 Markdown 標記。請確保所有表格資訊都被解析到！
         """
         
-        # 呼叫智能 AI 服務函式（會自動降級）
-        raw_text = await call_ai_parser(api_key, prompt, use_tools=True)
+        # 🆕 v3.5: 使用統一的 Model Manager
+        from services.model_manager import call_extraction
+        raw_text = await call_extraction(api_key, prompt, intent_type="EXTRACTION")
         
         # 清理回傳的文字 (去除 ```json 等標記)
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
@@ -674,8 +675,9 @@ async def generate_trip(
         }}
         """
         
-        # 呼叫我們之前寫好的 AI 服務函式 (支援 Maps 工具)
-        raw_text = await call_ai_parser(api_key, prompt, use_tools=True)
+        # 🆕 v3.5: 使用統一的 Model Manager
+        from services.model_manager import call_extraction
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
         
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         parsed_data = json.loads(cleaned_text)
@@ -701,24 +703,25 @@ async def ai_generate(
     
     try:
         prompt = f"""
-        你是專業導遊。使用者請求：{request.prompt}
+        你是「Ryan 旅遊達人」👋 一位熱愛探索當地美食和秘境的資深玩家！
         
-        ⚠️ 重要規則：
+        用戶跟你說：{request.prompt}
+        
+        請發揮你的專業，規劃一個讓用戶驚艷的行程！
+        每個地點的 desc 請寫得有溫度，像跟朋友分享私房景點一樣 ❤️
+        
+        【必須遵守的技術規則】
         1. 如果使用者指定了天數（如"5天"、"五日"），你必須**嚴格遵守**，不可多也不可少
         2. day_number 從 1 開始，最大值等於使用者指定的天數
         3. 如果使用者沒有指定天數，預設規劃 3 天
-        
-        任務：
-        1. 根據使用者的描述，規劃合適的行程
-        2. 每日行程時間 (09:00 - 21:00)，路線順暢
-        3. 詳細說明 (desc)：包含推薦理由
-        4. 分類 (category)：務必使用 transport, food, sightseeing, shopping, hotel
+        4. 每日行程時間 (09:00 - 21:00)，路線要順暢
+        5. 分類 (category)：務必使用 transport, food, sightseeing, shopping, hotel
         
         回傳 JSON 格式：
         {{
             "title": "行程標題",
             "start_date": "2025-01-01",
-            "end_date": "2025-01-05",  // end_date = start_date + (天數-1)
+            "end_date": "2025-01-05",
             "items": [
                 {{ "day_number": 1, "time_slot": "10:00", "place_name": "...", "category": "sightseeing", "desc": "..." }}
             ]
@@ -727,7 +730,9 @@ async def ai_generate(
         ⚠️ 再次提醒：day_number 不可超過使用者指定的天數！
         """
         
-        raw_text = await call_ai_parser(api_key, prompt, use_tools=False)
+        # 🆕 v3.5: 使用統一的 Model Manager
+        from services.model_manager import call_extraction
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
         
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         parsed_data = json.loads(cleaned_text)
@@ -1820,7 +1825,56 @@ async def delete_user_data(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
 # --- AI 聊天機器人 (Ryan) ---
+
+# 🆕 v3.5: 行程上下文格式化函數
+def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
+    """
+    將精簡版行程轉為 AI 可理解的 Markdown 格式
+    
+    Args:
+        itinerary: getLeanItinerary 產生的精簡版行程
+        focused_day: 用戶正在查看的天數 (用 👉 標記)
+    
+    Returns:
+        str: Markdown 格式的行程摘要
+    """
+    if not itinerary:
+        return ""
+    
+    lines = [
+        "\n\n📅 **[用戶當前行程]**",
+        f"行程名稱: {itinerary.get('title', '未命名')}",
+        f"日期: {itinerary.get('start_date', '?')} ~ {itinerary.get('end_date', '?')}",
+        f"總天數: {itinerary.get('total_days', 0)} 天",
+        ""
+    ]
+    
+    days = itinerary.get("days", [])
+    for day in days:
+        day_num = day.get("day_number", 0)
+        date_str = day.get("date", "")
+        prefix = "👉 " if day_num == focused_day else ""
+        lines.append(f"{prefix}**Day {day_num}** ({date_str}):")
+        
+        items = day.get("items", [])
+        for item in items:
+            time = item.get("time", "?")
+            place = item.get("place", "?")
+            category = item.get("category", "")
+            icon = {
+                "transport": "🚃",
+                "food": "🍽️",
+                "hotel": "🏨",
+                "shopping": "🛍️",
+                "sightseeing": "📸"
+            }.get(category, "📍")
+            lines.append(f"  {time} {icon} {place}")
+        lines.append("")
+    
+    lines.append("請參考以上行程回答用戶問題。\n")
+    return "\n".join(lines)
 
 class ChatRequest(BaseModel):
     message: str
@@ -1828,6 +1882,9 @@ class ChatRequest(BaseModel):
     thought_signatures: Optional[List[dict]] = None  # 🆕 上一輪的思想簽名 (Round-Trip)
     image: Optional[str] = None  # Base64 image string (optional)
     location: Optional[dict] = None  # 當前位置: {"lat": float, "lng": float, "name": str}
+    # 🆕 v3.5: 行程上下文
+    current_itinerary: Optional[dict] = None  # 精簡版行程 JSON
+    focused_day: Optional[int] = None  # 用戶正在查看的天數
 
 SYSTEM_PROMPT = """
 ### 角色定義 (Role)
@@ -1914,8 +1971,17 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         
         full_history = system_history + processed_history
         
-        # 處理當前訊息 (包含圖片 + POI 上下文)
-        enhanced_message = request.message + poi_context
+        # 🆕 v3.5: 注入行程上下文
+        itinerary_context = ""
+        if request.current_itinerary:
+            itinerary_context = format_itinerary_context(
+                request.current_itinerary, 
+                request.focused_day
+            )
+            print(f"📅 注入行程上下文: {request.current_itinerary.get('title', '?')}")
+        
+        # 處理當前訊息 (包含圖片 + POI 上下文 + 行程上下文)
+        enhanced_message = request.message + poi_context + itinerary_context
         
         # 🆕 處理圖片 (如果有)
         if request.image:
@@ -1935,13 +2001,35 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
             except Exception as img_err:
                 print(f"⚠️ Image processing error: {img_err}")
         
+        # 🆕 v3.5: 偵測診斷意圖
+        from services.model_manager import detect_diagnosis_intent
+        
+        intent_type = "PLANNING"  # 預設
+        if detect_diagnosis_intent(request.message):
+            intent_type = "DIAGNOSIS"
+            print("🩺 診斷意圖偵測：切換到 DIAGNOSIS 模式")
+            # 注入診斷專用 System Prompt
+            diagnosis_prompt = """
+**[診斷模式啟動]**
+你現在是一位嚴謹的「行程診斷專家」。請對用戶的行程進行深度分析：
+
+1. **物流可行性**：檢查交通時間、轉乘是否合理
+2. **營業時間衝突**：景點/餐廳是否在計畫時間營業
+3. **體力負荷**：評估當日步行距離和疲勞程度
+4. **時間緩衝**：是否有足夠的用餐和休息時間
+5. **雨備方案**：如有戶外活動，是否有替代方案
+
+請使用批判性思維指出問題，並提供具體改善建議。
+"""
+            enhanced_message = diagnosis_prompt + enhanced_message
+        
         # 🆕 調用 Model Manager (含思想簽名 Round-Trip)
         result = await call_with_fallback(
             api_key=api_key,
             history=full_history,
             message=enhanced_message,
             thought_signatures=request.thought_signatures,
-            intent_type="PLANNING"
+            intent_type=intent_type  # 🆕 動態意圖
         )
         
         return {
@@ -2069,6 +2157,49 @@ async def stream_chat_generator(
     except Exception as e:
         print(f"🔥 Stream Error: {e}")
         yield f'event: error\ndata: {json.dumps({"message": str(e), "code": 500})}\n\n'
+
+
+# 🆕 v3.6: 記憶摘要 API
+class SummarizeRequest(BaseModel):
+    history: List[Dict]  # 要摘要的對話歷史
+
+@app.post("/api/chat/summarize")
+async def summarize_history(request: SummarizeRequest, api_key: str = Depends(get_gemini_key)):
+    """
+    記憶摘要端點 - 將長對話壓縮成短摘要
+    使用 Gemini 2.5 Flash Lite (最省 Token)
+    """
+    print(f"🧠 記憶摘要請求：{len(request.history)} 條訊息")
+    
+    try:
+        # 將歷史轉為文字
+        history_text = ""
+        for msg in request.history:
+            role = "用戶" if msg.get("role") == "user" else "AI"
+            content = msg.get("displayContent") or msg.get("content") or ""
+            if content:
+                history_text += f"{role}: {content[:200]}...\n" if len(content) > 200 else f"{role}: {content}\n"
+        
+        prompt = f"""請將以下對話歷史摘要成 200 字以內的關鍵重點，保留：
+1. 使用者提到的重要地點、餐廳、景點名稱
+2. 使用者的偏好和需求
+3. AI 給過的重要建議
+
+對話歷史：
+{history_text}
+
+請直接輸出摘要，不要加標題或格式："""
+        
+        # 使用 Flash Lite 最省 Token
+        from services.model_manager import call_extraction
+        summary = await call_extraction(api_key, prompt, intent_type="SUMMARIZE")
+        
+        print(f"✅ 摘要完成：{len(summary)} 字")
+        return {"summary": summary.strip(), "original_count": len(request.history)}
+        
+    except Exception as e:
+        print(f"🔥 摘要失敗：{e}")
+        raise HTTPException(status_code=500, detail=f"摘要失敗: {str(e)}")
 
 
 @app.post("/api/chat/stream")

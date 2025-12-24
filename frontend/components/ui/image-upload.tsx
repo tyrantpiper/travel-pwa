@@ -16,6 +16,8 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon }: ImageUploadProps) {
     const [loading, setLoading] = useState(false)
+    // 🆕 v3.5: 上傳進度百分比
+    const [progress, setProgress] = useState(0)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,6 +25,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
         if (!file) return
 
         setLoading(true)
+        setProgress(0)
         try {
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
             const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY
@@ -53,9 +56,8 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
             const { signature } = await res.json();
 
-            // Upload to Cloudinary
+            // 🆕 Upload to Cloudinary with XMLHttpRequest for progress
             const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
-
             const data = new FormData()
             data.append("file", file)
             data.append("timestamp", timestamp.toString())
@@ -63,21 +65,47 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             data.append("signature", signature)
             data.append("api_key", apiKey)
 
-            const uploadRes = await fetch(url, { method: "POST", body: data })
-            const result = await uploadRes.json()
+            // 使用 XMLHttpRequest 以獲取上傳進度
+            const xhr = new XMLHttpRequest()
 
-            if (result.secure_url) {
-                onChange(result.secure_url)
-            } else {
-                console.error("Cloudinary error:", result)
-                toast.error(`Cloudinary 錯誤: ${result.error?.message || JSON.stringify(result)}`)
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100)
+                    setProgress(percent)
+                }
             }
+
+            xhr.onload = () => {
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText)
+                    if (result.secure_url) {
+                        onChange(result.secure_url)
+                        toast.success("圖片上傳成功！")
+                    } else {
+                        console.error("Cloudinary error:", result)
+                        toast.error(`Cloudinary 錯誤: ${result.error?.message || JSON.stringify(result)}`)
+                    }
+                } else {
+                    toast.error(`上傳失敗: ${xhr.status}`)
+                }
+                setLoading(false)
+                setProgress(0)
+            }
+
+            xhr.onerror = () => {
+                toast.error("圖片上傳失敗")
+                setLoading(false)
+                setProgress(0)
+            }
+
+            xhr.open("POST", url)
+            xhr.send(data)
 
         } catch (error) {
             console.error("Upload error:", error)
             toast.error("圖片上傳失敗")
-        } finally {
             setLoading(false)
+            setProgress(0)
         }
     }
 
@@ -100,14 +128,21 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                     onClick={() => fileInputRef.current?.click()}
                     className={cn("flex items-center justify-center cursor-pointer", className)}
                 >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
+                    {loading ? (
+                        <span className="text-[10px] font-mono text-blue-500">{progress}%</span>
+                    ) : icon}
                 </div>
             ) : (
                 <div
                     onClick={() => fileInputRef.current?.click()}
                     className="h-16 w-16 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shrink-0"
                 >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : (icon || <Camera className="w-5 h-5 text-slate-400" />)}
+                    {loading ? (
+                        <div className="flex flex-col items-center">
+                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                            <span className="text-[10px] text-blue-500 font-mono mt-1">{progress}%</span>
+                        </div>
+                    ) : (icon || <Camera className="w-5 h-5 text-slate-400" />)}
                 </div>
             )}
 

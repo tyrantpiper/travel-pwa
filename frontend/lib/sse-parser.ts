@@ -123,7 +123,9 @@ export async function streamChat(
     history: Array<{ role: string; displayContent?: string; rawParts?: unknown[] }>,
     apiKey: string,
     handlers: SSEHandlers,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    // 🆕 新增行程上下文參數
+    itinerary?: unknown
 ): Promise<void> {
     const response = await fetch(`${apiUrl}/api/chat/stream`, {
         method: "POST",
@@ -138,7 +140,9 @@ export async function streamChat(
                 rawParts: msg.rawParts,
                 displayContent: msg.displayContent
             })),
-            thought_signatures: []  // Round-trip signatures if needed
+            thought_signatures: [],  // Round-trip signatures if needed
+            // 🆕 帶入行程上下文
+            current_itinerary: itinerary
         }),
         signal
     })

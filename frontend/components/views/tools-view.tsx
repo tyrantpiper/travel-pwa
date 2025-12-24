@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, ComponentType } from "react"
 import { useSWRConfig } from "swr"
 import {
     Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
@@ -34,6 +34,46 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+// Type definitions
+interface Expense {
+    id: string
+    title: string
+    amount: number
+    payment_method?: string
+    category?: string
+    is_public: boolean
+    image_url?: string
+    expense_date?: string
+    created_at?: string
+    exchange_rate?: number
+    cashback_rate?: number
+    trip_id?: string
+    card_name?: string
+    creator_name?: string
+}
+
+interface ParseResult {
+    items?: unknown[]
+    title?: string
+    start_date?: string
+    end_date?: string
+}
+
+interface GenerateResult {
+    items?: unknown[]
+    data?: { items?: unknown[] }
+    title?: string
+    start_date?: string
+    end_date?: string
+}
+
+interface ExpenseItemProps {
+    item: Expense
+    rate: number
+    onEdit: (item: Expense) => void
+    onDelete: (id: string) => void
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const PAYMENT_METHODS = [
@@ -43,7 +83,7 @@ const PAYMENT_METHODS = [
     { id: "VisaMaster", label: "Visa/MC", icon: CreditCard, color: "text-orange-600" },
 ]
 
-const CATEGORIES: Record<string, { label: string; icon: any; color: string }> = {
+const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ className?: string }>; color: string }> = {
     food: { label: "Food", icon: Utensils, color: "bg-orange-100 text-orange-600" },
     transport: { label: "Transport", icon: Train, color: "bg-teal-100 text-teal-600" },
     shopping: { label: "Shopping", icon: ShoppingBag, color: "bg-pink-100 text-pink-600" },
@@ -57,7 +97,7 @@ export function ToolsView() {
     const { activeTripId, activeTrip } = useTripContext()
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")
-    const [expenses, setExpenses] = useState<any[]>([])
+    const [expenses, setExpenses] = useState<Expense[]>([])
     const [rate, setRate] = useState(0.22)
 
     // View controls
@@ -67,7 +107,7 @@ export function ToolsView() {
 
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false)
-    const [editItem, setEditItem] = useState<any>(null)
+    const [editItem, setEditItem] = useState<Expense | null>(null)
     const [title, setTitle] = useState("")
     const [amountJPY, setAmountJPY] = useState("")
     const [method, setMethod] = useState("Cash")
@@ -84,12 +124,15 @@ export function ToolsView() {
     // AI Tools state
     const [markdown, setMarkdown] = useState("")
     const [mdLoading, setMdLoading] = useState(false)
-    const [mdResult, setMdResult] = useState<any>(null)
+    const [mdResult, setMdResult] = useState<ParseResult | null>(null)
     const [aiPrompt, setAiPrompt] = useState("")
     const [aiLoading, setAiLoading] = useState(false)
-    const [aiResult, setAiResult] = useState<any>(null)
+    const [aiResult, setAiResult] = useState<GenerateResult | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [hasApiKey, setHasApiKey] = useState(false)
+    // 🆕 v3.5: 進度指示器
+    const [parseProgress, setParseProgress] = useState<string | null>(null)
+    const [generateProgress, setGenerateProgress] = useState<string | null>(null)
 
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
@@ -295,7 +338,7 @@ export function ToolsView() {
         setExpenseDate(selectedDate || new Date().toISOString().split('T')[0])
         setIsDialogOpen(true)
     }
-    const openEditDialog = (item: any) => {
+    const openEditDialog = (item: Expense) => {
         setEditItem(item); setTitle(item.title); setAmountJPY(item.amount.toString()); setMethod(item.payment_method || "Cash"); setCategory(item.category || "general"); setIsPublic(item.is_public); setReceiptUrl(item.image_url || "")
         setExpenseDate(item.expense_date || item.created_at?.split('T')[0] || "")
         setIsDialogOpen(true)
@@ -309,6 +352,7 @@ export function ToolsView() {
     const handleParse = async () => {
         if (!markdown.trim()) return
         setMdLoading(true)
+        setParseProgress("🤖 AI 正在解析行程...")
         const apiKey = localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
         try {
             const response = await fetch(`${API_BASE}/api/parse-md`, {
@@ -319,19 +363,25 @@ export function ToolsView() {
                 },
                 body: JSON.stringify({ markdown_text: markdown })
             })
+            setParseProgress("🌍 正在地理編碼地點...")
             const data = await response.json()
             if (!response.ok) {
                 toast.error(data.detail || "Parse failed")
             } else {
                 setMdResult(data)
+                toast.success(`✅ 成功解析 ${data.items?.length || 0} 個地點`)
             }
         } catch { toast.error("Parse failed") }
-        finally { setMdLoading(false) }
+        finally {
+            setMdLoading(false)
+            setParseProgress(null)
+        }
     }
 
     const handleGenerate = async () => {
         if (!aiPrompt.trim()) return
         setAiLoading(true)
+        setGenerateProgress("🤖 AI 正在生成行程...")
         const apiKey = localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
         try {
             const response = await fetch(`${API_BASE}/api/ai-generate`, {
@@ -342,14 +392,19 @@ export function ToolsView() {
                 },
                 body: JSON.stringify({ prompt: aiPrompt })
             })
+            setGenerateProgress("🌍 正在地理編碼地點...")
             const data = await response.json()
             if (!response.ok) {
                 toast.error(data.detail || "Generate failed")
             } else {
                 setAiResult(data)
+                toast.success(`✅ 成功生成 ${data.data?.items?.length || 0} 個地點`)
             }
         } catch { toast.error("Generate failed") }
-        finally { setAiLoading(false) }
+        finally {
+            setAiLoading(false)
+            setGenerateProgress(null)
+        }
     }
 
     const handleSaveTrip = async () => {
@@ -521,7 +576,7 @@ export function ToolsView() {
 
                         {/* Expense List */}
                         <div className="space-y-2">
-                            {filteredExpenses.map((item: any) => (
+                            {filteredExpenses.map((item: Expense) => (
                                 <SwipeableItem key={item.id} onDelete={() => handleDeleteExpense(item.id)}>
                                     <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
                                 </SwipeableItem>
@@ -584,7 +639,7 @@ export function ToolsView() {
                                 <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
                                 <div className="flex-1 space-y-4 py-4">
                                     <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
-                                    <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{t('generating')}</> : <>{t('generate')}</>}</Button>
+                                    <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
                                     {aiResult?.items && (
                                         <div className="p-4 bg-stone-100 rounded-xl">
                                             <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
@@ -616,7 +671,7 @@ export function ToolsView() {
                                         </div>
                                     </div>
                                     <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
-                                    <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{t('parsing')}</> : <>{t('parse')}</>}</Button>
+                                    <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
                                     {mdResult?.items && (
                                         <div className="p-4 bg-stone-100 rounded-xl">
                                             <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
@@ -676,7 +731,7 @@ export function ToolsView() {
                         </div>
 
                         <div className="grid grid-cols-3 gap-2">
-                            {Object.entries(CATEGORIES).map(([key, info]: any) => (
+                            {Object.entries(CATEGORIES).map(([key, info]) => (
                                 <button key={key} onClick={() => setCategory(key)} className={cn("flex items-center justify-center gap-1 p-2 rounded-lg border text-xs transition-all", category === key ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
                                     <info.icon className="w-3 h-3" /> {info.label}
                                 </button>
@@ -744,7 +799,7 @@ export function ToolsView() {
     )
 }
 
-function ExpenseItem({ item, rate, onEdit, onDelete }: any) {
+function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
     const CatIcon = catInfo.icon
@@ -773,7 +828,7 @@ function ExpenseItem({ item, rate, onEdit, onDelete }: any) {
                 </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-                <div className="text-right mr-2"><div className="font-mono font-bold text-slate-900 text-sm">{item.amount.toLocaleString()} JPY</div><div className="text-[10px] text-slate-400 flex flex-col items-end"><span>~ {finalTWD.toLocaleString()} TWD</span>{item.cashback_rate > 0 && <span className="text-green-500">(-{Math.round(cashback)})</span>}</div></div>
+                <div className="text-right mr-2"><div className="font-mono font-bold text-slate-900 text-sm">{item.amount.toLocaleString()} JPY</div><div className="text-[10px] text-slate-400 flex flex-col items-end"><span>~ {finalTWD.toLocaleString()} TWD</span>{(item.cashback_rate ?? 0) > 0 && <span className="text-green-500">(-{Math.round(cashback)})</span>}</div></div>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
             </div>

@@ -1,7 +1,5 @@
 "use client"
 
-import { cn } from "@/lib/utils"
-
 interface ExpenseChartProps {
     data: { category: string; amount: number; color: string }[]
     total: number

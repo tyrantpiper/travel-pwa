@@ -1,9 +1,11 @@
 """
-Model Manager Service - Intelligent Hybrid Architecture v2.0
+Model Manager Service - Intelligent Hybrid Architecture v3.5
 
 使用新版 google-genai SDK (1.56.0+)
 Gemini 3 Flash Preview 優先策略 + 自動降級機制
 支援 GenerateContentConfig 完整配置
+
+🆕 v3.5: 新增 DIAGNOSIS 和 EXTRACTION 意圖
 """
 
 from google import genai
@@ -15,13 +17,34 @@ GEMINI_3_FLASH = "gemini-3-flash-preview"  # Primary (免費脈絡快取)
 GEMINI_25_PRO = "gemini-2.5-pro"            # Fallback (複雜推理)
 GEMINI_25_FLASH = "gemini-2.5-flash"        # Verifier (快速驗證)
 
+# --- 🆕 v3.5: 診斷意圖偵測 ---
+DIAGNOSIS_KEYWORDS = [
+    "行程建議", "好不好", "順不順", "會不會太趕", "來得及嗎",
+    "這樣排", "幫我看", "診斷", "健檢", "評估", "分析這個行程",
+    "路線順嗎", "時間夠嗎", "會太累嗎", "能遍完嗎",
+    "有什麼建議", "要調整嗎", "怎麼樣"
+]
+
+def detect_diagnosis_intent(message: str) -> bool:
+    """
+    偵測是否為行程診斷請求
+    
+    Args:
+        message: 用戶訊息
+    
+    Returns:
+        bool: 是否為診斷意圖
+    """
+    message_lower = message.lower()
+    return any(kw in message_lower for kw in DIAGNOSIS_KEYWORDS)
+
 
 def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
     """
     配置工廠函數 - 根據意圖類型生成對應 Config
     
     Args:
-        intent_type: 意圖類型 (PLANNING, VERIFY, CHAT)
+        intent_type: 意圖類型 (PLANNING, VERIFY, CHAT, DIAGNOSIS, EXTRACTION)
     
     Returns:
         GenerateContentConfig with appropriate settings
@@ -37,6 +60,24 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
         return types.GenerateContentConfig(
             temperature=0.3,
             max_output_tokens=1024,
+        )
+    elif intent_type == "DIAGNOSIS":
+        # 🆕 v3.5: 診斷模式：深度推理，長輸出
+        return types.GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=4096,
+        )
+    elif intent_type == "EXTRACTION":
+        # 🆕 v3.5: 提取模式：Parser 用，需要精確
+        return types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=8192,
+        )
+    elif intent_type == "SUMMARIZE":
+        # 🆕 v3.6: 記憶摘要模式：精準提取，短輸出，省 Token
+        return types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=500,
         )
     else:
         # 一般聊天
@@ -157,6 +198,68 @@ async def call_verifier(
         "verified_data": response.text,
         "grounding_metadata": None
     }
+
+
+# 🆕 v3.5: 統一的提取/生成函數 (替代 call_ai_parser)
+async def call_extraction(
+    api_key: str,
+    prompt: str,
+    intent_type: str = "EXTRACTION"
+) -> str:
+    """
+    統一的 AI 調用函數，用於 Parser 和 Planner
+    
+    Args:
+        api_key: Gemini API Key (BYOK)
+        prompt: 完整的提示詞
+        intent_type: 意圖類型 ("EXTRACTION" 或 "PLANNING")
+    
+    Returns:
+        str: AI 生成的文本
+    """
+    client = genai.Client(api_key=api_key)
+    config = get_generation_config(intent_type)
+    
+    primary_model = GEMINI_3_FLASH
+    
+    try:
+        print(f"🤖 [Extraction] 嘗試 {primary_model} (intent={intent_type})...")
+        response = client.models.generate_content(
+            model=primary_model,
+            contents=prompt,
+            config=config
+        )
+        print(f"✅ {primary_model} 成功回應")
+        return response.text
+        
+    except Exception as e:
+        print(f"⚠️ {primary_model} 失敗: {e}")
+        
+        # Fallback to Gemini 2.5 Pro
+        try:
+            fallback_model = GEMINI_25_PRO
+            print(f"🔄 降級至 {fallback_model}...")
+            response = client.models.generate_content(
+                model=fallback_model,
+                contents=prompt,
+                config=config
+            )
+            print(f"✅ {fallback_model} 降級成功")
+            return response.text
+            
+        except Exception as e2:
+            print(f"⚠️ {fallback_model} 也失敗: {e2}")
+            
+            # 最後嘗試 Flash
+            last_model = GEMINI_25_FLASH
+            print(f"🔄 最後嘗試 {last_model}...")
+            response = client.models.generate_content(
+                model=last_model,
+                contents=prompt,
+                config=config
+            )
+            print(f"✅ {last_model} 成功")
+            return response.text
 
 
 def _build_chat_history(history: List[Dict]) -> List[types.Content]:

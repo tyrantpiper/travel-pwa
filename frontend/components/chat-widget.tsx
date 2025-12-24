@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
+import { useTripDetail } from "@/lib/hooks"
+import { getLeanItinerary, LeanItinerary } from "@/lib/getLeanItinerary"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
@@ -58,7 +60,10 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 
 export default function ChatWidget() {
     // ✅ 直接使用 TripContext（現在 ChatWidget 在 TripProvider 內）
-    const { activeTrip } = useTripContext()
+    const { activeTrip, activeTripId } = useTripContext()
+
+    // 🆕 取得行程詳細資料 (包含 items)
+    const { trip: tripDetail } = useTripDetail(activeTripId)
 
     // 從行程標題解析位置（即時更新）
     const tripLocation = useMemo(() => {
@@ -71,6 +76,12 @@ export default function ChatWidget() {
         }
         return null
     }, [activeTrip])
+
+    // 🆕 產生精簡版行程供 AI 使用
+    const leanItinerary: LeanItinerary | null = useMemo(() => {
+        if (!activeTrip || !tripDetail?.items) return null
+        return getLeanItinerary(activeTrip, tripDetail.items)
+    }, [activeTrip, tripDetail])
 
     const [isOpen, setIsOpen] = useState(false)
     // 🆕 向後相容：將舊格式訊息遷移到新格式
@@ -85,14 +96,21 @@ export default function ChatWidget() {
     const [messages, setMessages] = useState<Message[]>([
         hydrateMessage({
             role: "model",
-            displayContent: "👋哈囉！我是 Ryan，你的 AI 旅遊達人。\n我可以幫你翻譯、推薦美食、查詢交通，或者解決任何旅途中的疑難雜症！😎"
+            displayContent: "👋哈囉！我是 Ryan，你的 AI 旅遊達人！\n\n💡 **我能幫你：**\n• 翻譯、推薦美食、查詢交通\n• 解決旅途中的疑難雜症\n• 🩺 **行程健檢**：跟我說「幫我看這行程順不順？」\n\n有什麼我可以幫忙的嗎？😎"
         })
     ])
     const [input, setInput] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
+    // 🆕 v3.5: 保存失敗的訊息用於重試
+    const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
+    // 🆕 v3.6: 記憶摘要永動機
+    const [memorySummary, setMemorySummary] = useState<string | null>(null)
+    const [isSummarizing, setIsSummarizing] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    // 🆕 v3.5: AbortController for stopping generation
+    const abortControllerRef = useRef<AbortController | null>(null)
 
     // Draggable state
     const [position, setPosition] = useState<Position>({ x: 0, y: 0 })
@@ -231,8 +249,65 @@ export default function ChatWidget() {
         setMessages(prev => [...prev, userMessage])
         setIsLoading(true)
 
-        // 🆕 準備 history
-        const history = messages.map(m => ({
+        // 🆕 v3.5: 建立 AbortController
+        abortControllerRef.current = new AbortController()
+
+        // 🆕 v3.6: 記憶摘要永動機
+        const PREHEAT_THRESHOLD = 20  // 預熱觸發點
+        const MAX_HISTORY = 25        // 最大歷史條數
+        const KEEP_RECENT = 10        // 保留最近 N 條
+
+        // 預熱觸發摘要（背景執行，不阻塞）
+        if (messages.length >= PREHEAT_THRESHOLD && messages.length < MAX_HISTORY && !memorySummary && !isSummarizing) {
+            setIsSummarizing(true)
+            toast.info("🧠 正在整理記憶...", { duration: 2000 })
+
+            // 背景呼叫摘要 API
+            const toSummarize = messages.slice(0, messages.length - KEEP_RECENT)
+            fetch(`${API_BASE}/api/chat/summarize`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Gemini-API-Key": apiKey
+                },
+                body: JSON.stringify({
+                    history: toSummarize.map(m => ({
+                        role: m.role,
+                        displayContent: m.displayContent
+                    }))
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.summary) {
+                        setMemorySummary(data.summary)
+                        toast.success("🧠 記憶整理完成！")
+                    }
+                })
+                .catch(err => console.error("摘要失敗:", err))
+                .finally(() => setIsSummarizing(false))
+        }
+
+        // 準備 history
+        let historySource = messages
+        if (messages.length > MAX_HISTORY) {
+            if (memorySummary) {
+                // 有摘要：注入摘要 + 最近 N 條
+                toast.success("🧠 使用記憶摘要繼續對話~")
+                const recentMessages = messages.slice(-KEEP_RECENT)
+                const summaryMessage = {
+                    role: "model" as const,
+                    rawParts: [{ text: `[對話記憶摘要] ${memorySummary}` }],
+                    displayContent: `[對話記憶摘要] ${memorySummary}`
+                }
+                historySource = [summaryMessage, ...recentMessages]
+            } else {
+                // 無摘要：Fallback 到簡單截斷
+                toast.info("💬 對話記錄已達上限，保留最近 25 條訊息~")
+                historySource = messages.slice(-MAX_HISTORY)
+            }
+        }
+        const history = historySource.map(m => ({
             role: m.role,
             rawParts: m.rawParts,
             displayContent: m.displayContent
@@ -298,7 +373,9 @@ export default function ChatWidget() {
                             console.error("🔴 SSE 錯誤:", error)
                             // Fallback 會在下面處理
                         }
-                    }
+                    },
+                    abortControllerRef.current?.signal,  // 🆕 傳入 AbortSignal
+                    leanItinerary  // 🆕 行程上下文
                 )
             } catch (streamError) {
                 console.error("⚠️ Streaming 失敗，使用 fallback:", streamError)
@@ -318,7 +395,9 @@ export default function ChatWidget() {
                         message: userMsg,
                         history: history,
                         image: currentImage,
-                        location: tripLocation
+                        location: tripLocation,
+                        // 🆕 注入精簡版行程上下文
+                        current_itinerary: leanItinerary
                     })
                 })
 
@@ -337,11 +416,18 @@ export default function ChatWidget() {
                 setMessages(prev => [...prev, aiMessage])
             } catch (error) {
                 console.error(error)
+                // 🆕 v3.5: 保存失敗訊息供重試
+                setLastFailedMessage(userMsg)
                 setMessages(prev => [
                     ...prev,
-                    hydrateMessage({ role: "model", displayContent: "🔥 抱歉，我好像當機了... 請稍後再試。" })
+                    hydrateMessage({ role: "model", displayContent: "🔥 連線中斷！點擊下方重試按鈕。" })
                 ])
             }
+        }
+
+        // 🆕 清除失敗狀態（如果成功）
+        if (streamingSuccess) {
+            setLastFailedMessage(null)
         }
 
         setIsLoading(false)
@@ -423,8 +509,36 @@ export default function ChatWidget() {
                                     <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-1">
                                         <Bot className="w-5 h-5" />
                                     </div>
-                                    {/* 🆕 脈衝手風琴 */}
-                                    <ThinkingIndicator phase="thinking" />
+                                    <div className="flex flex-col gap-2">
+                                        {/* 🆕 脈衝手風琴 */}
+                                        <ThinkingIndicator phase="thinking" />
+                                        {/* 🆕 停止按鈕 */}
+                                        <button
+                                            onClick={() => {
+                                                abortControllerRef.current?.abort()
+                                                setIsLoading(false)
+                                            }}
+                                            className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                                        >
+                                            <X className="w-3 h-3" /> 停止生成
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {/* 🆕 v3.5: 重試按鈕 */}
+                            {lastFailedMessage && !isLoading && (
+                                <div className="flex justify-center">
+                                    <button
+                                        onClick={() => {
+                                            setInput(lastFailedMessage)
+                                            setLastFailedMessage(null)
+                                            // 移除最後一條錯誤訊息
+                                            setMessages(prev => prev.slice(0, -1))
+                                        }}
+                                        className="text-sm bg-blue-50 text-blue-600 px-4 py-2 rounded-full hover:bg-blue-100 transition-colors flex items-center gap-2"
+                                    >
+                                        🔄 重新發送
+                                    </button>
                                 </div>
                             )}
                             <div ref={messagesEndRef} />
