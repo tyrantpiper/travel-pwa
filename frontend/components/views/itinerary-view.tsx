@@ -975,11 +975,11 @@ export function ItineraryView() {
                                 <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
                             </div>
 
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Filter</Label>
-                                <div className="col-span-3 flex gap-2">
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">Filter</Label>
+                                <div className="col-span-3 flex flex-wrap gap-2">
                                     <select
-                                        className="flex-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                        className="min-w-[100px] flex-1 h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
                                         value={activitySearchCountry}
                                         onChange={(e) => {
                                             setActivitySearchCountry(e.target.value)
@@ -1002,7 +1002,7 @@ export function ItineraryView() {
 
                                     {activitySearchCountry && COUNTRY_REGIONS[activitySearchCountry] ? (
                                         <select
-                                            className="flex-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                            className="min-w-[100px] flex-1 h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
                                             value={activitySearchRegion}
                                             onChange={(e) => setActivitySearchRegion(e.target.value)}
                                         >
@@ -1014,7 +1014,7 @@ export function ItineraryView() {
                                     ) : (
                                         <Input
                                             placeholder="🏙️ Region"
-                                            className="flex-1"
+                                            className="min-w-[100px] flex-1"
                                             value={activitySearchRegion}
                                             onChange={(e) => setActivitySearchRegion(e.target.value)}
                                         />
