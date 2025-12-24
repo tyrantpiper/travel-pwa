@@ -7,6 +7,7 @@ import httpx
 import asyncio
 from typing import List, Dict, Optional
 from math import radians, cos, sin, sqrt, atan2
+from urllib.parse import quote
 
 # Overpass API endpoint
 OVERPASS_API = "https://overpass-api.de/api/interpreter"
@@ -469,3 +470,207 @@ async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en") -> Dict:
     
     return poi
 
+
+# ==================== Wikipedia API ====================
+
+WIKIPEDIA_API = "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}"
+
+
+async def get_wikipedia_summary(name: str, lang: str = "zh") -> str:
+    """
+    從 Wikipedia 獲取景點簡介 (200 字以內)
+    
+    Args:
+        name: 景點名稱
+        lang: 語言代碼 (zh, ja, en)
+    
+    Returns:
+        景點簡介文字
+    """
+    try:
+        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(name)}"
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                extract = data.get("extract", "")
+                # 限制長度
+                return extract[:200] if len(extract) > 200 else extract
+    except Exception as e:
+        print(f"Wikipedia API error ({lang}): {e}")
+    
+    # 語言 fallback: zh → ja → en
+    fallback_order = {"zh": "ja", "ja": "en"}
+    if lang in fallback_order:
+        return await get_wikipedia_summary(name, fallback_order[lang])
+    
+    return ""
+
+
+# ==================== Wikidata API ====================
+
+async def get_wikidata_labels(wikidata_id: str) -> Optional[Dict]:
+    """
+    從 Wikidata 獲取多語言 labels 和結構化資料
+    
+    Args:
+        wikidata_id: Wikidata ID (如 Q42)
+    
+    Returns:
+        {
+            "labels": {"zh": "金閣寺", "ja": "金閣寺", "en": "Kinkaku-ji"},
+            "website": "https://...",
+            "opening_hours": "9:00-17:00"
+        }
+    """
+    if not wikidata_id:
+        return None
+    
+    try:
+        url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            entity = data.get("entities", {}).get(wikidata_id, {})
+            
+            # 解析多語言 labels
+            labels_raw = entity.get("labels", {})
+            labels = {}
+            for lang in ["zh", "zh-tw", "zh-hant", "ja", "en"]:
+                if lang in labels_raw:
+                    # 統一使用 zh
+                    key = "zh" if lang.startswith("zh") else lang
+                    if key not in labels:
+                        labels[key] = labels_raw[lang].get("value", "")
+            
+            # 解析 claims (結構化資料)
+            claims = entity.get("claims", {})
+            
+            # P856: 官方網站
+            website = ""
+            if "P856" in claims:
+                website = claims["P856"][0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
+            
+            # P3025: 開放時間
+            opening_hours = ""
+            if "P3025" in claims:
+                opening_hours = claims["P3025"][0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
+            
+            return {
+                "labels": labels,
+                "website": website,
+                "opening_hours": opening_hours
+            }
+            
+    except Exception as e:
+        print(f"Wikidata API error: {e}")
+        return None
+
+
+# ==================== 三源整合 ====================
+
+async def enrich_poi_complete(poi: Dict) -> Dict:
+    """
+    三源互補整合：Wikidata + Wikipedia + WikiVoyage
+    
+    Args:
+        poi: POI 資料字典 (需包含 name, 可選 wikidata_id)
+    
+    Returns:
+        豐富後的 POI，包含:
+        - display_name: {primary, secondary}
+        - cultural_desc: Wikipedia 描述
+        - travel_tips: WikiVoyage 描述
+        - official_url: 官方網站
+    """
+    name = poi.get("name", "")
+    wikidata_id = poi.get("wikidata_id", "")
+    
+    if not name:
+        return poi
+    
+    # 並行查詢三個來源
+    try:
+        tasks = [
+            get_wikidata_labels(wikidata_id) if wikidata_id else asyncio.sleep(0),
+            get_wikipedia_summary(name),
+            search_wikivoyage(name)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        wikidata_result = results[0] if not isinstance(results[0], Exception) else None
+        wikipedia_result = results[1] if not isinstance(results[1], Exception) else ""
+        wikivoyage_result = results[2] if not isinstance(results[2], Exception) else None
+        
+        # 處理 Wikidata 多語言名稱
+        if wikidata_result and isinstance(wikidata_result, dict):
+            labels = wikidata_result.get("labels", {})
+            primary = labels.get("zh", name)
+            ja_name = labels.get("ja", "")
+            en_name = labels.get("en", "")
+            
+            # 組合副標題
+            secondary_parts = []
+            if ja_name and ja_name != primary:
+                secondary_parts.append(ja_name)
+            if en_name:
+                secondary_parts.append(f"({en_name})")
+            
+            poi["display_name"] = {
+                "primary": primary,
+                "secondary": " ".join(secondary_parts) if secondary_parts else ""
+            }
+            
+            if wikidata_result.get("website"):
+                poi["official_url"] = wikidata_result["website"]
+            if wikidata_result.get("opening_hours"):
+                poi["wikidata_hours"] = wikidata_result["opening_hours"]
+        
+        # Wikipedia 文化描述
+        if wikipedia_result:
+            poi["cultural_desc"] = wikipedia_result
+        
+        # WikiVoyage 旅遊指南
+        if wikivoyage_result and isinstance(wikivoyage_result, dict):
+            poi["travel_tips"] = wikivoyage_result.get("description", "")
+            if wikivoyage_result.get("url"):
+                poi["wikivoyage_url"] = wikivoyage_result["url"]
+        
+    except Exception as e:
+        print(f"enrich_poi_complete error: {e}")
+    
+    return poi
+
+
+def format_enriched_poi_for_ai(poi: Dict) -> str:
+    """
+    將豐富後的 POI 格式化為 AI 可讀文字
+    """
+    lines = []
+    
+    # 名稱 (主標題 + 副標題)
+    display = poi.get("display_name", {})
+    if display:
+        name_line = display.get("primary", poi.get("name", ""))
+        if display.get("secondary"):
+            name_line += f" {display['secondary']}"
+        lines.append(f"📍 {name_line}")
+    else:
+        lines.append(f"📍 {poi.get('name', '')}")
+    
+    # 文化描述
+    if poi.get("cultural_desc"):
+        lines.append(f"📖 {poi['cultural_desc']}")
+    
+    # 旅遊指南
+    if poi.get("travel_tips"):
+        lines.append(f"🧳 {poi['travel_tips'][:150]}...")
+    
+    # 官方連結
+    if poi.get("official_url"):
+        lines.append(f"🔗 官網: {poi['official_url']}")
+    
+    return "\n".join(lines)
