@@ -542,7 +542,7 @@ export function ToolsView() {
         setCreditCards(updatedCards)
         saveCardsToLocalStorage(updatedCards)
         setCardDialogOpen(false)
-        haptic()
+        haptic.success()
     }
 
     const handleDeleteCard = (cardId: string) => {
@@ -550,7 +550,7 @@ export function ToolsView() {
         setCreditCards(updatedCards)
         saveCardsToLocalStorage(updatedCards)
         toast.success("卡片已刪除")
-        haptic()
+        haptic.success()
     }
 
     return (
