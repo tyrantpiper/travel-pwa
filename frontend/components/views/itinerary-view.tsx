@@ -39,6 +39,7 @@ export function ItineraryView() {
     // Use activeTripId from context
     const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void> }
     const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [newTripTitle, setNewTripTitle] = useState("")
@@ -211,11 +212,15 @@ export function ItineraryView() {
 
     const confirmDeleteTrip = async () => {
         if (!deletingTripId) return
+        if (isDeleting) return
+        haptic.tap()
 
+        setIsDeleting(true)
         try {
             const res = await fetch(`${API_BASE}/api/trips/${deletingTripId}`, { method: "DELETE" })
             if (!res.ok) throw new Error("Delete failed")
 
+            haptic.success()
             toast.success("行程已刪除")
 
             // If we're deleting the active trip, clear selection
@@ -225,11 +230,13 @@ export function ItineraryView() {
 
             // Refresh the trips list
             reloadTrips()
+            setDeletingTripId(null)
         } catch (error) {
             console.error(error)
+            haptic.error()
             toast.error("刪除失敗")
         } finally {
-            setDeletingTripId(null)
+            setIsDeleting(false)
         }
     }
 
@@ -587,7 +594,9 @@ export function ItineraryView() {
                         </div>
                         <div className="flex justify-end gap-3">
                             <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
-                            <Button variant="destructive" onClick={confirmDeleteTrip}>{t('delete')}</Button>
+                            <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
+                                {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />刪除中...</> : t('delete')}
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>
