@@ -1,0 +1,76 @@
+﻿Initial commit - Ryan Travel App (PWA)
+Fix TypeScript error in trip-context.tsx
+Fix: Make Sheet close button larger and more visible on mobile
+Fix: Prevent duplicate saves with isSaving state guard
+Fix: Replace t('saving') with hardcoded Chinese string
+Fix: Sheet header padding and clarify text/MD import label
+Add usage monitoring system with email reports
+Fix: Replace API errors with dashboard links for Vercel/Supabase
+Move AI API Key settings to Profile page and add user prompts
+Update API key prompt to mention both AI Generator and Markdown Import
+Fix: Backward compatibility for API key localStorage name
+Fix: Show DEV_GEMINI_KEY status correctly in Profile and Tools
+Fix: Chat widget UX - center window, edge-only button, remove header drag
+Fix: Allow chat button to slide full height of screen
+Fix: Update Gemini model to 2.0-flash for chat endpoint
+Fix: Improve location search with importance sorting and better language support
+P0: Upgrade to hybrid AI model architecture - gemini-3-flash-preview for chat
+feat: PWA UX improvements - pull-to-refresh, category/tag editing, layout fixes
+ci: add GitHub Actions for auto-sync to Hugging Face
+test: trigger auto-sync to Hugging Face
+feat: add loading state and haptic feedback to prevent duplicate submissions
+chore: remove debug console.log statements for production
+feat: add offline detection, skeleton loading screens, and OfflineBanner
+feat: add manual Service Worker for offline caching
+fix: add README.md for Hugging Face Space configuration
+fix: use NetworkFirst for trips API to ensure fresh data after mutations
+fix: use NetworkFirst for ALL API requests to prevent stale data
+feat: upgrade geocoding to ArcGIS + Photon with smart fallback
+fix: update UI text for geocoding results
+feat: add country selector dropdown to improve geocoding accuracy
+feat: upgrade country selector to searchable combobox with 20 countries
+feat: implement 3-layer hybrid geocoding (PhotonNominatimArcGIS)
+feat: enhance expense with cashback % selector, total cashback display, and itinerary day picker
+fix: add double-click prevention and haptic feedback to activity save button
+feat: improve expense chart with split view layout and fix 0K format bug
+fix: replace calendar date picker with mandatory day selector from trip dates
+feat: add dark mode toggle and accent color selector in profile settings
+feat: apply theme accent color to BottomNav and Profile header gradient
+feat: add default slate theme option and create ThemedButton component
+feat: add GDPR delete all data feature
+feat: UI improvements - flight layout, time picker, numeric input, cleanup unused imports
+feat: add timezone utility and local time display in itinerary header
+feat: replace exchange rate API with fawazahmed0/currency-api (unlimited, no rate limit)
+feat: flight card supports cross-day flights with separate departure and arrival dates
+feat: add POI smart search with Overpass/OpenTripMap APIs and AI recommendation
+feat: integrate POI smart search into AI chat with auto-detection and token optimization
+refactor: move TripProvider to layout.tsx for ChatWidget context access
+feat: add user POI preferences UI and WikiVoyage API integration
+feat: add lightweight offline mode with trip caching and edit disabled
+feat: add Gemini 2.5 Pro as REASONING_MODEL for complex tasks
+feat: Migrate to google-genai SDK v1.56 + Intelligent Hybrid Architecture
+feat: Add SSE streaming for Vercel 10s bypass + auto-clear invalid trip cache
+fix: upgrade Python to 3.10 for google-genai compatibility
+chore: upgrade to Python 3.13 for best stability and compatibility
+chore: upgrade all Python dependencies to latest stable versions
+chore: upgrade frontend dependencies and migrate to @ducanh2912/next-pwa
+feat(v3.6): Deep Scan audit fixes + AI Memory Summarization
+fix: add missing toast import in chat-widget
+fix: add Dict import to main.py
+feat(v3.7): Wikipedia/Wikidata/WikiVoyage 銝?鈭??游?
+feat: add /api/poi/enrich endpoint for three-source POI integration
+feat: integrate three-source POI data into POIPreviewCard
+feat(v3.7): auto-inject three-source POI data into Chat API
+chore: remove debug logs from sign-cloudinary API
+fix: improve stop generation feature with signal.aborted checks
+feat(v3.7.1): add source citation feature
+feat(v3.8): add credit card rewards management feature
+fix: resolve Vercel build error with incorrect haptic usage
+feat(v3.9): enhance location search with country and region filters
+feat(v3.9): sync daily location search UI with activity search filters
+fix: remove duplicate code block causing build error in itinerary-view
+feat: add bilingual (English+Chinese) labels to region dropdowns
+feat: add place search and Google Maps navigation to hotel info
+fix: improve responsive layout for Filter row in Activity Edit dialog
+fix: rename unused 'e' to '_e' in catch blocks (lint cleanup)
+chore: add Cloudinary config and type definitions for info-view

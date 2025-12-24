@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { createClient } from "@supabase/supabase-js"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -103,7 +104,7 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTripId, activeTrip } = useTripContext()
+    const { activeTripId, activeTrip, trips } = useTripContext()
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")
     const [expenses, setExpenses] = useState<Expense[]>([])
@@ -142,6 +143,9 @@ export function ToolsView() {
     // 🆕 v3.5: 進度指示器
     const [parseProgress, setParseProgress] = useState<string | null>(null)
     const [generateProgress, setGenerateProgress] = useState<string | null>(null)
+
+    // 🆕 v3.9: 匯入行程選擇
+    const [selectedImportTripId, setSelectedImportTripId] = useState<string>("new")
 
     // 🆕 v3.8: 信用卡回饋彙整
     const [creditCards, setCreditCards] = useState<CreditCard[]>([])
@@ -457,28 +461,64 @@ export function ToolsView() {
         }
 
         try {
-            const response = await fetch(`${API_BASE}/api/save-itinerary`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: result.title || "New Trip",
-                    start_date: result.start_date || new Date().toISOString().split('T')[0],
-                    end_date: result.end_date || new Date().toISOString().split('T')[0],
-                    items: result.items,
-                    user_id: userId,
-                    creator_name: userName
+            if (selectedImportTripId === "new") {
+                // 1. 建立新行程
+                const response = await fetch(`${API_BASE}/api/save-itinerary`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title: result.title || "New Trip",
+                        start_date: result.start_date || new Date().toISOString().split('T')[0],
+                        end_date: result.end_date || new Date().toISOString().split('T')[0],
+                        items: result.items,
+                        user_id: userId,
+                        creator_name: userName,
+                        daily_locations: result.daily_locations || {}, // 🆕 傳遞每日地點
+                        day_notes: result.day_notes || {},
+                        day_costs: result.day_costs || {},
+                        day_tickets: result.day_tickets || {}
+                    })
                 })
-            })
-            const data = await response.json()
-            if (response.ok) {
-                toast.success(`行程已儲存！房間代碼: ${data.share_code}`)
-                setMarkdown("")
-                setMdResult(null)
-                setAiResult(null)
-                // Refresh trip list immediately
-                mutate((key) => typeof key === 'string' ? key.includes('/api/trips') : Array.isArray(key) && key[0]?.includes('/api/trips'), undefined, { revalidate: true })
+                const data = await response.json()
+                if (response.ok) {
+                    toast.success(`行程已建立！房間代碼: ${data.share_code}`)
+                    setMarkdown("")
+                    setMdResult(null)
+                    setAiResult(null)
+                    setSelectedImportTripId("new") // Reset
+                    mutate((key) => typeof key === 'string' ? key.includes('/api/trips') : Array.isArray(key) && key[0]?.includes('/api/trips'), undefined, { revalidate: true })
+                } else {
+                    toast.error(data.detail || "Save failed")
+                }
             } else {
-                toast.error(data.detail || "Save failed")
+                // 2. 匯入至現有行程
+                const response = await fetch(`${API_BASE}/api/import-to-trip`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        trip_id: selectedImportTripId,
+                        items: result.items,
+                        daily_locations: result.daily_locations || {},
+                        day_notes: result.day_notes || {},
+                        day_costs: result.day_costs || {},
+                        day_tickets: result.day_tickets || {}
+                    })
+                })
+                const data = await response.json()
+                if (response.ok) {
+                    toast.success(data.message || "匯入成功")
+                    setMarkdown("")
+                    setMdResult(null)
+                    setAiResult(null)
+                    setSelectedImportTripId("new") // Reset
+                    // Refresh trip data if active
+                    if (activeTripId === selectedImportTripId) {
+                        // Force refresh current trip
+                        mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
+                    }
+                } else {
+                    toast.error(data.detail || "Import failed")
+                }
             }
         } catch { toast.error("Save failed") }
         finally { setIsSaving(false) }
@@ -781,9 +821,30 @@ export function ToolsView() {
                                     <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
                                     <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
                                     {aiResult?.items && (
-                                        <div className="p-4 bg-stone-100 rounded-xl">
-                                            <p className="text-sm text-green-600 mb-2">{aiResult.items.length} {t('items_generated')}</p>
-                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
+                                        <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                            <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
+
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
+                                                    <SelectTrigger className="w-full bg-white">
+                                                        <SelectValue placeholder="選擇儲存位置" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                        {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
+                                                        {trips.map((trip: any) => (
+                                                            <SelectItem key={trip.id} value={trip.id}>
+                                                                📂 {trip.title} (Day {trip.days?.length || 1})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -813,9 +874,30 @@ export function ToolsView() {
                                     <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
                                     <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
                                     {mdResult?.items && (
-                                        <div className="p-4 bg-stone-100 rounded-xl">
-                                            <p className="text-sm text-green-600 mb-2">{mdResult.items.length} {t('items_parsed')}</p>
-                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>{isSaving ? <><Loader2 className="animate-spin mr-2" />儲存中...</> : t('save_trip')}</Button>
+                                        <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                            <p className="text-sm text-green-600 font-medium">✅ 已解析 {mdResult.items.length} 個地點</p>
+
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
+                                                    <SelectTrigger className="w-full bg-white">
+                                                        <SelectValue placeholder="選擇儲存位置" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                        {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
+                                                        {trips.map((trip: any) => (
+                                                            <SelectItem key={trip.id} value={trip.id}>
+                                                                📂 {trip.title} ({trip.share_code})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                            </Button>
                                         </div>
                                     )}
                                 </div>

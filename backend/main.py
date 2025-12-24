@@ -946,6 +946,80 @@ async def save_itinerary(request: SaveItineraryRequest):
         print(f"   Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# 🔥 功能 3.0.1: 匯入到現有行程
+class ImportToTripRequest(BaseModel):
+    trip_id: str
+    items: List[ItineraryItem]
+    # 👇 更新與合併用的資料
+    daily_locations: Optional[dict] = {}
+    day_notes: Optional[dict] = {}
+    day_costs: Optional[dict] = {}
+    day_tickets: Optional[dict] = {}
+
+@app.post("/api/import-to-trip")
+async def import_to_trip(request: ImportToTripRequest):
+    print(f"📥 正在匯入至現有行程 ID: {request.trip_id}...")
+    
+    try:
+        # 1. 檢查行程是否存在並獲取現有資料
+        trip_res = supabase.table("itineraries").select("*").eq("id", request.trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到指定的行程")
+            
+        existing_trip = trip_res.data[0]
+        existing_content = existing_trip.get("content") or {}
+        
+        # 2. 合併 content 資料 (深度合併)
+        # 用戶匯入的新資料優先於舊資料（或者保留舊資料？通常匯入是為了充實，所以合併）
+        def merge_dicts(old_d, new_d):
+            if not new_d: return old_d or {}
+            if not old_d: return new_d
+            result = old_d.copy()
+            result.update(new_d) # 簡單的 key-level update
+            return result
+            
+        updated_content = {
+            "daily_locations": merge_dicts(existing_content.get("daily_locations"), request.daily_locations),
+            "day_notes": merge_dicts(existing_content.get("day_notes"), request.day_notes),
+            "day_costs": merge_dicts(existing_content.get("day_costs"), request.day_costs),
+            "day_tickets": merge_dicts(existing_content.get("day_tickets"), request.day_tickets)
+        }
+        
+        # 3. 更新主行程 content
+        supabase.table("itineraries").update({"content": updated_content}).eq("id", request.trip_id).execute()
+        
+        # 4. 插入細項 (Children)
+        items_data = []
+        for item in request.items:
+            items_data.append({
+                "itinerary_id": request.trip_id,
+                "day_number": item.day_number,
+                "time_slot": item.time_slot,
+                "place_name": item.place_name,
+                "original_name": item.original_name,
+                "category": item.category,
+                "notes": item.desc,
+                "location_lat": item.lat,
+                "location_lng": item.lng,
+                "cost_amount": item.cost_amount,
+                "reservation_code": item.reservation_code,
+                "tags": item.tags,
+                "sub_items": item.sub_items,
+                "link_url": item.link_url
+            })
+            
+        if items_data:
+            print(f"   📦 準備插入 {len(items_data)} 個細項...")
+            supabase.table("itinerary_items").insert(items_data).execute()
+            
+        return {"status": "success", "message": f"成功匯入 {len(items_data)} 個項目"}
+
+    except Exception as e:
+        import traceback
+        print(f"🔥 Import Error: {e}")
+        print(f"   Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 🔥 功能 3.1: 加入行程
 @app.post("/api/join-trip")
 async def join_trip(request: JoinTripRequest):
