@@ -2056,7 +2056,8 @@ async def stream_chat_generator(
     api_key: str,
     history: List[dict],
     message: str,
-    thought_signatures: Optional[List[dict]] = None
+    thought_signatures: Optional[List[dict]] = None,
+    sources: Optional[List[dict]] = None  # 🆕 v3.7.1: 來源 URLs
 ):
     """
     SSE Generator for streaming AI responses
@@ -2151,8 +2152,13 @@ async def stream_chat_generator(
             yield f'event: text\ndata: {json.dumps({"text": full_text})}\n\n'
             raw_parts = [{"text": full_text}]
         
-        # 發送完成事件
-        yield f'event: done\ndata: {json.dumps({"model_used": model_name, "raw_parts": raw_parts})}\n\n'
+        # 發送完成事件 (🆕 v3.7.1: 包含來源 URLs)
+        done_data = {
+            "model_used": model_name,
+            "raw_parts": raw_parts,
+            "sources": sources or []  # 🆕 v3.7.1: 來源 URLs
+        }
+        yield f'event: done\ndata: {json.dumps(done_data)}\n\n'
         
     except Exception as e:
         print(f"🔥 Stream Error: {e}")
@@ -2273,6 +2279,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     
     # 🆕 v3.7: 景點偵測 + 三源資料注入
     enriched_message = request.message
+    poi_sources = []  # 🆕 v3.7.1: 收集來源 URLs
     try:
         # 偵測景點相關關鍵字 (簡單方法: 檢查是否包含景點名稱模式)
         poi_keywords = ["怎麼樣", "推薦", "介紹", "告訴我", "什麼", "好玩", "好吃", "值得"]
@@ -2294,10 +2301,13 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
                 print(f"🔍 偵測到景點查詢: {place_name}")
                 
                 # 調用三源整合
-                from services.poi_service import enrich_poi_complete, format_enriched_poi_for_ai
+                from services.poi_service import enrich_poi_complete, format_enriched_poi_for_ai, get_source_urls
                 poi = {"name": place_name, "wikidata_id": ""}
                 enriched_poi = await enrich_poi_complete(poi)
                 formatted_info = format_enriched_poi_for_ai(enriched_poi)
+                
+                # 🆕 v3.7.1: 收集來源 URLs
+                poi_sources = get_source_urls(enriched_poi, place_name)
                 
                 if formatted_info and len(formatted_info) > 20:
                     # 將三源資料注入到訊息前
@@ -2309,7 +2319,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
 用戶原始問題：{request.message}
 
 請根據以上資料回答用戶問題，使用你的 Ryan 旅遊達人風格！"""
-                    print(f"✅ 三源資料已注入 ({len(formatted_info)} 字)")
+                    print(f"✅ 三源資料已注入 ({len(formatted_info)} 字), 來源數: {len(poi_sources)}")
     except Exception as e:
         print(f"⚠️ 三源資料注入失敗 (不影響主流程): {e}")
     
@@ -2318,7 +2328,8 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
             api_key=api_key,
             history=full_history,
             message=enriched_message,
-            thought_signatures=request.thought_signatures
+            thought_signatures=request.thought_signatures,
+            sources=poi_sources  # 🆕 v3.7.1: 傳遞來源
         ),
         media_type="text/event-stream",
         headers={

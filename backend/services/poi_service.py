@@ -674,3 +674,41 @@ def format_enriched_poi_for_ai(poi: Dict) -> str:
         lines.append(f"🔗 官網: {poi['official_url']}")
     
     return "\n".join(lines)
+
+
+def get_source_urls(poi: Dict, place_name: str) -> list:
+    """
+    🆕 v3.7.1: 提取來源 URLs 用於前端引用標示
+    
+    Returns:
+        [
+            {"title": "Wikipedia: 金閣寺", "url": "https://..."},
+            {"title": "WikiVoyage: 金閣寺", "url": "https://..."}
+        ]
+    """
+    sources = []
+    
+    # Wikipedia 來源
+    if poi.get("cultural_desc"):
+        # Wikipedia URL 格式
+        wiki_url = f"https://zh.wikipedia.org/wiki/{quote(place_name)}"
+        sources.append({
+            "title": f"Wikipedia: {place_name}",
+            "url": wiki_url
+        })
+    
+    # WikiVoyage 來源
+    if poi.get("wikivoyage_url"):
+        sources.append({
+            "title": f"WikiVoyage: {place_name}",
+            "url": poi["wikivoyage_url"]
+        })
+    
+    # 官方網站
+    if poi.get("official_url"):
+        sources.append({
+            "title": "官方網站",
+            "url": poi["official_url"]
+        })
+    
+    return sources

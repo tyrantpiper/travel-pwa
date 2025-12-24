@@ -17,7 +17,11 @@ export interface SSEHandlers {
     onText?: (text: string) => void
     onTool?: (toolCall: { name: string; args: Record<string, unknown> }) => void
     onSignature?: (thought: string) => void
-    onDone?: (data: { model_used: string; raw_parts: { text: string }[] }) => void
+    onDone?: (data: {
+        model_used: string;
+        raw_parts: { text: string }[];
+        sources?: Array<{ title: string; url: string }>  // 🆕 v3.7.1
+    }) => void
     onError?: (error: { message: string; code: number }) => void
     onHeartbeat?: () => void
 }
