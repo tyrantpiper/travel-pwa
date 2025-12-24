@@ -43,7 +43,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
     // 判斷是否隱藏地圖按鈕 (內外邏輯一致)
     const hideMapBtn =
         (activity.sub_items && activity.sub_items.length > 0) ||
-        ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => activity.place!.includes(k)) ||
+        ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => (activity.place || "").includes(k)) ||
         (activity.category === 'transport' && !activity.link_url && !activity.lat) ||
         isHeader;
 
@@ -55,7 +55,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
         } else if (activity.lat && activity.lng) {
             url = `https://www.google.com/maps/search/?api=1&query=${activity.lat},${activity.lng}`
         } else {
-            url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place)}`
+            url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place || "")}`
         }
         window.open(url, '_blank')
     }
