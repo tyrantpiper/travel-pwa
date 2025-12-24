@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
-    StickyNote, Star, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, Save, X, Info, Plus
+    StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -12,36 +12,17 @@ import {
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+    Table, TableBody, TableCell, TableRow,
 } from "@/components/ui/table"
 
-interface SubItem {
-    name: string
-    desc?: string
-    link?: string
-}
-
-interface Activity {
-    id?: string
-    time: string
-    place: string
-    category?: string
-    desc?: string
-    memo?: string
-    lat?: number
-    lng?: number
-    link_url?: string
-    sub_items?: SubItem[]
-    tags?: string[]
-    is_highlight?: boolean
-    image_url?: string
-}
+import { Activity, SubItem } from "@/lib/itinerary-types"
 
 interface TimelineCardProps {
     activity: Activity
@@ -50,19 +31,19 @@ interface TimelineCardProps {
     onEdit: (item: Activity) => void
     onDelete: (id: string) => void
     onUpdateMemo: (id: string, memo: string) => Promise<boolean>
-    onUpdateSubItems: (id: string, items: any[]) => Promise<boolean> // 新增：更新連結列表
+    onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean> // 新增：更新連結列表
 }
 
 export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: TimelineCardProps) {
     const [showDetail, setShowDetail] = useState(false)
 
     // 判斷是否為 Header 卡片
-    const isHeader = activity.category === 'header' || activity.time === '00:00'
+    const isHeader = activity.category === 'header' || (activity.time || activity.time_slot || "00:00") === '00:00'
 
     // 判斷是否隱藏地圖按鈕 (內外邏輯一致)
     const hideMapBtn =
         (activity.sub_items && activity.sub_items.length > 0) ||
-        ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => activity.place.includes(k)) ||
+        ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => activity.place!.includes(k)) ||
         (activity.category === 'transport' && !activity.link_url && !activity.lat) ||
         isHeader;
 
@@ -82,7 +63,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
     const getIcon = () => {
         if (isHeader) return <Lightbulb className="w-3.5 h-3.5" />
         const cat = activity.category ? activity.category.toLowerCase().trim() : "sightseeing"
-        const title = activity.place.toLowerCase()
+        const title = (activity.place || "").toLowerCase()
         if (cat === "food" || title.includes("餐廳")) return <Utensils className="w-3.5 h-3.5" />
         if (cat === "transport" || title.includes("車站") || title.includes("機場")) return <Train className="w-3.5 h-3.5" />
         if (cat === "shopping" || title.includes("百貨") || title.includes("超市")) return <ShoppingBag className="w-3.5 h-3.5" />
@@ -94,14 +75,14 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
         <>
             {/* Spot Photo */}
             {activity.image_url && (
-                <div className="mb-3 rounded-lg overflow-hidden h-32 w-full">
-                    <img src={activity.image_url} alt={activity.place} className="w-full h-full object-cover" />
+                <div className="mb-3 rounded-lg overflow-hidden h-32 w-full relative">
+                    <Image src={activity.image_url} alt={activity.place || "Activity"} fill className="object-cover" />
                 </div>
             )}
 
             <div className="flex justify-between items-start mb-1 pr-6">
                 <h3 className={cn("font-bold text-slate-900 leading-tight", isHeader ? "text-xl" : "text-lg")}>
-                    {activity.place}
+                    {activity.place || "Unknown Place"}
                 </h3>
             </div>
 
@@ -192,7 +173,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
         <div className="flex gap-3 relative group">
             {/* 左側：時間 + 序號 */}
             <div className="flex flex-col items-center w-12 shrink-0">
-                {!isHeader && <span className="text-xs font-mono font-bold text-slate-500">{activity.time}</span>}
+                {!isHeader && <span className="text-xs font-mono font-bold text-slate-500">{activity.time || activity.time_slot || "00:00"}</span>}
                 {isHeader ? (
                     <div className="w-6 h-6 rounded-full mt-1 bg-amber-100 text-amber-600 flex items-center justify-center border-2 border-white shadow-sm z-10">
                         <Lightbulb className="w-3 h-3" strokeWidth={3} />
@@ -235,14 +216,14 @@ interface DetailDialogProps {
     onMap: (e: React.MouseEvent) => void
     hideMapBtn: boolean
     onUpdateMemo: (id: string, memo: string) => Promise<boolean>
-    onUpdateSubItems: (id: string, items: any[]) => Promise<boolean> // 新增
+    onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean> // 新增
 }
 
 function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdateMemo, onUpdateSubItems }: DetailDialogProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [note, setNote] = useState(activity.memo || "")
     // 👇 新增：連結列表狀態
-    const [links, setLinks] = useState<any[]>(activity.sub_items || [])
+    const [links, setLinks] = useState<SubItem[]>(activity.sub_items || [])
     const [saving, setSaving] = useState(false)
 
     // 當 activity 改變或打開彈窗時，重置內容
@@ -265,7 +246,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
     // 連結操作
     const addLink = () => setLinks([...links, { name: "", desc: "", link: "" }])
     const removeLink = (idx: number) => setLinks(links.filter((_, i) => i !== idx))
-    const updateLink = (idx: number, field: string, val: string) => {
+    const updateLink = (idx: number, field: keyof SubItem, val: string) => {
         const newLinks = [...links]; newLinks[idx][field] = val; setLinks(newLinks)
     }
 
@@ -274,7 +255,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
             <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-stone-50 gap-0">
                 <div className="p-6 bg-white border-b border-slate-100">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl font-serif font-bold text-slate-900">{activity.place}</DialogTitle>
+                        <DialogTitle className="text-2xl font-serif font-bold text-slate-900">{activity.place || "Details"}</DialogTitle>
                     </DialogHeader>
                 </div>
                 <ScrollArea className="max-h-[60vh]">
@@ -348,7 +329,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                         <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm bg-white">
                                             <Table>
                                                 <TableBody>
-                                                    {links.map((item: any, i: number) => (
+                                                    {links.map((item: SubItem, i: number) => (
                                                         <TableRow key={i} className="hover:bg-slate-50">
                                                             <TableCell className="py-2 px-3 align-top">
                                                                 <div className="text-xs font-bold text-slate-700">{item.name}</div>

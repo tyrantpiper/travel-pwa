@@ -25,7 +25,7 @@ export interface ItineraryItemState {
     lat?: number | string | null
     lng?: number | string | null
     image_url?: string
-    sub_items?: Record<string, unknown>[]
+    sub_items?: SubItem[]
     memo?: string
 }
 
@@ -39,6 +39,12 @@ export interface DayWeather {
     time: string
     temp: number
     code: number
+}
+
+export interface SubItem {
+    name: string
+    desc?: string
+    link?: string
 }
 
 export interface Activity {
@@ -56,8 +62,10 @@ export interface Activity {
     lng?: number
     image_url?: string
     tags?: string[]
-    memo?: string
-    sub_items?: Record<string, unknown>[]
+    memo?: string // User's private memo
+    sub_items?: SubItem[]
+    link_url?: string // External link for the place itself
+    is_highlight?: boolean
 }
 
 export interface TripDay {
