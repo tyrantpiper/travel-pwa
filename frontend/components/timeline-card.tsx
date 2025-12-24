@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
@@ -52,9 +52,14 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
         let url = ""
         if (activity.link_url) {
             url = activity.link_url
+        } else if (activity.lat && activity.lng && activity.place) {
+            // 使用經緯度定位 + 商家名稱搜尋（最精準）
+            url = `https://www.google.com/maps/search/${encodeURIComponent(activity.place)}/@${activity.lat},${activity.lng},17z`
         } else if (activity.lat && activity.lng) {
+            // 只有經緯度
             url = `https://www.google.com/maps/search/?api=1&query=${activity.lat},${activity.lng}`
         } else {
+            // 只有名稱
             url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place || "")}`
         }
         window.open(url, '_blank')
@@ -186,7 +191,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
                 {!isLast && <div className="w-px flex-1 bg-slate-200 my-1" />}
             </div>
             {/* 右側：卡片內容 */}
-            <div className={cn("flex-1 min-w-0 mb-6 relative p-4 rounded-xl border transition-all cursor-default overflow-hidden",
+            <div className={cn("timeline-card flex-1 min-w-0 mb-6 relative p-4 rounded-xl border cursor-default overflow-hidden",
                 isHeader ? "bg-amber-50/30 border-amber-200/50" :
                     activity.is_highlight ? "bg-amber-50/50 border-amber-200" : "bg-white border-transparent hover:border-slate-200 shadow-sm"
             )}>
@@ -220,18 +225,22 @@ interface DetailDialogProps {
 }
 
 function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdateMemo, onUpdateSubItems }: DetailDialogProps) {
+    // Use activity.id + open as key to reset state when activity changes
     const [isEditing, setIsEditing] = useState(false)
     const [note, setNote] = useState(activity.memo || "")
     // 👇 新增：連結列表狀態
     const [links, setLinks] = useState<SubItem[]>(activity.sub_items || [])
     const [saving, setSaving] = useState(false)
+    // Track the activity id to detect changes
+    const [lastActivityId, setLastActivityId] = useState(activity.id)
 
-    // 當 activity 改變或打開彈窗時，重置內容
-    useEffect(() => {
+    // Reset state when activity changes or dialog opens (using conditional logic instead of useEffect)
+    if (activity.id !== lastActivityId || (open && note !== (activity.memo || "") && !isEditing)) {
+        setLastActivityId(activity.id)
         setNote(activity.memo || "")
         setLinks(activity.sub_items || [])
         setIsEditing(false)
-    }, [activity, open])
+    }
 
     const handleSave = async () => {
         setSaving(true)

@@ -119,13 +119,91 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 /* 🔧 PWA 優化：禁止水平滑動，讓操作更像 App */
-html, body {
+html,
+body {
   overflow-x: hidden;
   overscroll-behavior-x: none;
+}
+
+/* 🚀 滾動性能優化 */
+html {
+  scroll-behavior: smooth;
+}
+
+/* iOS 滾動優化 */
+body,
+.scroll-container,
+[data-scroll="true"] {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* GPU 加速滾動內容 */
+.scroll-smooth {
+  will-change: scroll-position;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* 減少重繪的卡片優化 */
+.card,
+[class*="Card"] {
+  contain: layout style paint;
+}
+
+/* 動畫元素 GPU 加速 */
+[class*="motion"] {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* ✨ 微動畫：按鈕按壓回饋 */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+button:not(:disabled):active,
+[role="button"]:not(:disabled):active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* ✨ 微動畫：日期切換按鈕過渡 */
+.day-btn {
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.day-btn:active {
+  transform: scale(0.95);
+}
+
+/* ✨ 微動畫：卡片懸停效果 (桌面) */
+@media (hover: hover) {
+  .timeline-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .timeline-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ♿ 無障礙：尊重使用者動畫偏好 */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

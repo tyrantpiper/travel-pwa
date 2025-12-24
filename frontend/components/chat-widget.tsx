@@ -127,7 +127,7 @@ export default function ChatWidget() {
             try {
                 const pos = JSON.parse(saved)
                 setPosition(pos)
-            } catch (e) { }
+            } catch { }
         }
     }, [])
 
@@ -571,6 +571,7 @@ export default function ChatWidget() {
                         <div className="p-3 bg-white border-t border-slate-100">
                             {selectedImage && (
                                 <div className="mb-2 relative inline-block">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={selectedImage} alt="Selected" className="h-16 w-auto rounded-lg border border-slate-200" />
                                     <button
                                         onClick={() => setSelectedImage(null)}

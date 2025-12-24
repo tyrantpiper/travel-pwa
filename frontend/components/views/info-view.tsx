@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
-    Plane, Bed, Save, Edit3, Clock, MapPin, Ticket,
+    Plane, Bed, Save, Edit3, Clock, MapPin,
     Copy, ExternalLink, Phone, Wifi, Link as LinkIcon, Plus, Trash2, Info, Navigation2, Search, Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -19,6 +19,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
+import { COUNTRY_REGIONS } from "@/lib/constants"
 
 // API URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -65,21 +66,6 @@ interface FlightData {
     date?: string  // Legacy fallback
 }
 
-// 國家-地區對照表 (與 itinerary-view 同步)
-const COUNTRY_REGIONS: { [key: string]: string[] } = {
-    "Japan": ["Tokyo 東京", "Osaka 大阪", "Kyoto 京都", "Hokkaido 北海道", "Okinawa 沖繩", "Fukuoka 福岡", "Nagoya 名古屋", "Yokohama 橫濱", "Nara 奈良", "Hiroshima 廣島"],
-    "Taiwan": ["Taipei 台北", "Kaohsiung 高雄", "Taichung 台中", "Tainan 台南", "Hualien 花蓮", "Yilan 宜蘭", "Taitung 台東"],
-    "South Korea": ["Seoul 首爾", "Busan 釜山", "Jeju 濟州島", "Incheon 仁川", "Daegu 大邱"],
-    "Thailand": ["Bangkok 曼谷", "Chiang Mai 清邁", "Phuket 普吉島", "Pattaya 芒達雅"],
-    "Vietnam": ["Ho Chi Minh City 胡志明市", "Hanoi 河內", "Da Nang 峴港", "Hoi An 會安"],
-    "Hong Kong": ["Central 中環", "Tsim Sha Tsui 尖沙咀", "Mong Kok 旺角", "Causeway Bay 銅鑑灣"],
-    "Singapore": ["Marina Bay 濱海灣", "Sentosa 聖淘沙", "Chinatown 牛車水", "Orchard 烏節路"],
-    "USA": ["New York 紐約", "Los Angeles 洛杉磯", "San Francisco 舊金山", "Las Vegas 拉斯維加斯", "Chicago 芝加哥"],
-    "UK": ["London 倫敦", "Edinburgh 愛丁堡", "Manchester 曼徹斯特", "Oxford 牛津"],
-    "France": ["Paris 巴黎", "Nice 尼斯", "Lyon 里昂", "Marseille 馬賽"],
-    "Italy": ["Rome 羅馬", "Milan 米蘭", "Venice 威尼斯", "Florence 佛羅倫斯"],
-}
-
 export function InfoView() {
     const { t } = useLanguage()
     const { activeTripId } = useTripContext()
@@ -91,6 +77,10 @@ export function InfoView() {
     const [detailOpen, setDetailOpen] = useState(false)
     const [currentHotelIdx, setCurrentHotelIdx] = useState<number | null>(null)
 
+    // 🔧 使用 ref 來追蹤當前索引，解決異步回調的閉包問題
+    const currentHotelIdxRef = useRef<number | null>(null)
+    currentHotelIdxRef.current = currentHotelIdx
+
     // 🏨 飯店地點搜尋狀態
     const [hotelSearchQuery, setHotelSearchQuery] = useState("")
     const [hotelSearchCountry, setHotelSearchCountry] = useState("")
@@ -98,6 +88,7 @@ export function InfoView() {
     const [hotelSearchResults, setHotelSearchResults] = useState<PlaceSearchResult[]>([])
     const [isHotelSearching, setIsHotelSearching] = useState(false)
     const [searchingHotelIdx, setSearchingHotelIdx] = useState<number | null>(null)
+    const [flightTab, setFlightTab] = useState<'outbound' | 'inbound'>('outbound')
 
     useEffect(() => {
         const fetchInfo = async () => {
@@ -164,9 +155,20 @@ export function InfoView() {
     }
 
     const updateHotel = (index: number, field: string, value: string | number | null | undefined | { title: string; url: string }[]) => {
-        const newHotels = [...hotels]
-        newHotels[index] = { ...newHotels[index], [field]: value }
-        setHotels(newHotels)
+        setHotels(prev => {
+            const newHotels = [...prev]
+            newHotels[index] = { ...newHotels[index], [field]: value }
+            return newHotels
+        })
+    }
+
+    // 🆕 批量更新多個欄位（避免競態條件）
+    const updateHotelFields = (index: number, fields: Partial<Hotel>) => {
+        setHotels(prev => {
+            const newHotels = [...prev]
+            newHotels[index] = { ...newHotels[index], ...fields }
+            return newHotels
+        })
     }
     const addHotel = () => setHotels([...hotels, DEFAULT_HOTEL])
     const removeHotel = (index: number) => {
@@ -198,11 +200,14 @@ export function InfoView() {
         }
     }
 
-    // 🎯 選擇搜尋結果
+    // 🎯 選擇搜尋結果（使用批量更新避免競態條件）
     const handleSelectHotelPlace = (hotelIdx: number, place: PlaceSearchResult) => {
-        updateHotel(hotelIdx, 'address', place.name || place.display_name)
-        updateHotel(hotelIdx, 'lat', place.latitude || place.lat)
-        updateHotel(hotelIdx, 'lng', place.longitude || place.lng)
+        // 一次更新所有欄位，避免 race condition
+        updateHotelFields(hotelIdx, {
+            address: place.name || place.display_name || '',
+            lat: place.latitude || place.lat || null,
+            lng: place.longitude || place.lng || null
+        })
         setHotelSearchResults([])
         setHotelSearchQuery("")
         setSearchingHotelIdx(null)
@@ -255,35 +260,65 @@ export function InfoView() {
                         </div>
                     ) : (
                         <>
-                            <section>
+                            <motion.section
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut" }}
+                            >
                                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <Plane className="w-4 h-4" /> {t('flight_details')}
                                 </h2>
-                                <Tabs defaultValue="outbound" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl">
-                                        <TabsTrigger value="outbound" className="rounded-lg data-[state=active]:bg-white">{t('outbound')}</TabsTrigger>
-                                        <TabsTrigger value="inbound" className="rounded-lg data-[state=active]:bg-white">{t('inbound')}</TabsTrigger>
-                                    </TabsList>
-                                    <TabsContent value="outbound">
-                                        <FlightCard
-                                            data={flights.outbound}
-                                            isEditing={isEditing}
-                                            onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
-                                            onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
-                                        />
-                                    </TabsContent>
-                                    <TabsContent value="inbound">
-                                        <FlightCard
-                                            data={flights.inbound}
-                                            isEditing={isEditing}
-                                            onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
-                                            onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
-                                        />
-                                    </TabsContent>
-                                </Tabs>
-                            </section>
+                                {/* Flight Tabs with Sliding Indicator */}
+                                <div className="w-full">
+                                    <div className="grid grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl relative">
+                                        {(['outbound', 'inbound'] as const).map((tab) => (
+                                            <button
+                                                key={tab}
+                                                onClick={() => setFlightTab(tab)}
+                                                className={`relative z-10 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${flightTab === tab ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                            >
+                                                {flightTab === tab && (
+                                                    <motion.div
+                                                        layoutId="flight-tab-indicator"
+                                                        className="absolute inset-0 bg-white rounded-lg shadow-sm -z-10"
+                                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                                    />
+                                                )}
+                                                {tab === 'outbound' ? t('outbound') : t('inbound')}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <motion.div
+                                        key={flightTab}
+                                        initial={{ opacity: 0, x: flightTab === 'outbound' ? -20 : 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.3, ease: "easeOut" }}
+                                    >
+                                        {flightTab === 'outbound' && (
+                                            <FlightCard
+                                                data={flights.outbound}
+                                                isEditing={isEditing}
+                                                onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
+                                                onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
+                                            />
+                                        )}
+                                        {flightTab === 'inbound' && (
+                                            <FlightCard
+                                                data={flights.inbound}
+                                                isEditing={isEditing}
+                                                onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
+                                                onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
+                                            />
+                                        )}
+                                    </motion.div>
+                                </div>
+                            </motion.section>
 
-                            <section>
+                            <motion.section
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+                            >
                                 <div className="flex justify-between items-center mb-3">
                                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                         <Bed className="w-4 h-4" /> {t('accommodation')}
@@ -291,140 +326,188 @@ export function InfoView() {
                                     {isEditing && <Button size="sm" variant="ghost" onClick={addHotel} className="h-6 text-xs text-blue-600">{t('add_hotel')}</Button>}
                                 </div>
 
-                                <div className="space-y-3">
-                                    {hotels.map((item, idx) => (
-                                        <Card key={idx} className="border-0 shadow-sm relative group overflow-hidden">
-                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
-                                            <CardContent className="p-4 pl-6">
-                                                {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
+                                <motion.div
+                                    className="space-y-3"
+                                    initial="hidden"
+                                    animate="visible"
+                                    variants={{
+                                        hidden: {},
+                                        visible: {
+                                            transition: {
+                                                staggerChildren: 0.08,
+                                                delayChildren: 0.2
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <AnimatePresence mode="popLayout">
+                                        {hotels.map((item, idx) => (
+                                            <motion.div
+                                                key={idx}
+                                                layout
+                                                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                                transition={{ duration: 0.35, ease: "easeOut" }}
+                                            >
+                                                <Card className="border-0 shadow-sm relative group overflow-hidden">
+                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
+                                                    <CardContent className="p-4 pl-6">
+                                                        {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
 
-                                                <div className="space-y-3">
-                                                    <div className="space-y-1">
-                                                        <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
-                                                        <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        {/* Place Search (替代原本的 Address) */}
-                                                        <div className="space-y-1">
-                                                            <Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1">
-                                                                <MapPin className="w-3 h-3" /> Place
-                                                                {item.address && (
-                                                                    <a
-                                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`}
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        className="ml-auto text-blue-500 hover:text-blue-700"
-                                                                        title="Open in Google Maps"
-                                                                    >
-                                                                        <Navigation2 className="w-3 h-3" />
-                                                                    </a>
-                                                                )}
-                                                            </Label>
-                                                            {isEditing ? (
-                                                                <div className="space-y-2">
-                                                                    <div className="flex gap-1">
-                                                                        <select
-                                                                            className="h-8 text-xs rounded-md border border-slate-200 bg-white px-1 w-24"
-                                                                            value={hotelSearchCountry}
-                                                                            onChange={e => { setHotelSearchCountry(e.target.value); setHotelSearchRegion("") }}
-                                                                        >
-                                                                            <option value="">🌍 Country</option>
-                                                                            <option value="Japan">🇯🇵 Japan</option>
-                                                                            <option value="Taiwan">🇹🇼 Taiwan</option>
-                                                                            <option value="South Korea">🇰🇷 Korea</option>
-                                                                            <option value="Thailand">🇹🇭 Thailand</option>
-                                                                            <option value="Hong Kong">🇭🇰 HK</option>
-                                                                            <option value="Singapore">🇸🇬 SG</option>
-                                                                        </select>
-                                                                        {hotelSearchCountry && COUNTRY_REGIONS[hotelSearchCountry] && (
+                                                        <div className="space-y-3">
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
+                                                                <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
+                                                            </div>
+                                                            {/* Place Search - 全寬顯示 */}
+                                                            <div className="space-y-2">
+                                                                <Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1">
+                                                                    <MapPin className="w-3 h-3" /> Place
+                                                                </Label>
+                                                                {isEditing ? (
+                                                                    <div className="space-y-2">
+                                                                        <div className="flex gap-1">
                                                                             <select
-                                                                                className="h-8 text-xs rounded-md border border-slate-200 bg-white px-1 flex-1"
-                                                                                value={hotelSearchRegion}
-                                                                                onChange={e => setHotelSearchRegion(e.target.value)}
+                                                                                className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2"
+                                                                                value={hotelSearchCountry}
+                                                                                onChange={e => { setHotelSearchCountry(e.target.value); setHotelSearchRegion("") }}
                                                                             >
-                                                                                <option value="">🏙️ Region</option>
-                                                                                {COUNTRY_REGIONS[hotelSearchCountry].map(r => (
-                                                                                    <option key={r} value={r}>{r}</option>
-                                                                                ))}
+                                                                                <option value="">🌍 Country</option>
+                                                                                <option value="Japan">🇯🇵 Japan</option>
+                                                                                <option value="Taiwan">🇹🇼 Taiwan</option>
+                                                                                <option value="South Korea">🇰🇷 Korea</option>
+                                                                                <option value="Thailand">🇹🇭 Thailand</option>
+                                                                                <option value="Hong Kong">🇭🇰 HK</option>
+                                                                                <option value="Singapore">🇸🇬 SG</option>
                                                                             </select>
+                                                                            {hotelSearchCountry && COUNTRY_REGIONS[hotelSearchCountry] && (
+                                                                                <select
+                                                                                    className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2 flex-1"
+                                                                                    value={hotelSearchRegion}
+                                                                                    onChange={e => setHotelSearchRegion(e.target.value)}
+                                                                                >
+                                                                                    <option value="">🏙️ Region</option>
+                                                                                    {COUNTRY_REGIONS[hotelSearchCountry].map(r => (
+                                                                                        <option key={r} value={r}>{r}</option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex gap-1">
+                                                                            <Input
+                                                                                className="h-8 text-xs flex-1"
+                                                                                placeholder="搜尋飯店..."
+                                                                                value={hotelSearchQuery}
+                                                                                onChange={e => setHotelSearchQuery(e.target.value)}
+                                                                                onKeyDown={e => e.key === 'Enter' && handleSearchHotelPlace(idx)}
+                                                                            />
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-8 px-2"
+                                                                                onClick={() => handleSearchHotelPlace(idx)}
+                                                                                disabled={isHotelSearching && searchingHotelIdx === idx}
+                                                                            >
+                                                                                {isHotelSearching && searchingHotelIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                                                            </Button>
+                                                                        </div>
+                                                                        {/* 搜尋結果 */}
+                                                                        {searchingHotelIdx === idx && hotelSearchResults.length > 0 && (
+                                                                            <div className="bg-slate-50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto border border-slate-200">
+                                                                                {hotelSearchResults.map((place, pIdx) => (
+                                                                                    <button
+                                                                                        key={pIdx}
+                                                                                        className="w-full text-left p-2 text-xs rounded hover:bg-indigo-50 transition-colors"
+                                                                                        onClick={() => handleSelectHotelPlace(idx, place)}
+                                                                                    >
+                                                                                        <div className="font-bold text-slate-700">{place.name}</div>
+                                                                                        <div className="text-slate-400 text-[10px] line-clamp-2">{place.display_name}</div>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                        {/* 已選擇的地點 - 顯示商家名稱（不是經緯度）*/}
+                                                                        {(item.address || (item.lat && item.lng)) && (
+                                                                            <div className="text-sm text-slate-700 bg-green-50 p-2.5 rounded-lg flex items-center gap-2 border border-green-200">
+                                                                                <MapPin className="w-4 h-4 text-green-600 shrink-0" />
+                                                                                <span className="font-medium">
+                                                                                    {/* 優先顯示地址/名稱，沒有才顯示經緯度 */}
+                                                                                    {item.address || item.name || `${item.lat?.toFixed(4)}, ${item.lng?.toFixed(4)}`}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        {/* 手動輸入經緯度 */}
+                                                                        <div className="flex gap-2 items-center">
+                                                                            <span className="text-[10px] text-slate-400">📍 手動座標:</span>
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="any"
+                                                                                className="h-7 text-xs w-24 text-center font-mono"
+                                                                                placeholder="緯度 Lat"
+                                                                                value={item.lat ?? ''}
+                                                                                onChange={e => updateHotel(idx, 'lat', e.target.value ? parseFloat(e.target.value) : null)}
+                                                                            />
+                                                                            <Input
+                                                                                type="number"
+                                                                                step="any"
+                                                                                className="h-7 text-xs w-24 text-center font-mono"
+                                                                                placeholder="經度 Lng"
+                                                                                value={item.lng ?? ''}
+                                                                                onChange={e => updateHotel(idx, 'lng', e.target.value ? parseFloat(e.target.value) : null)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2">
+                                                                        {/* 非編輯模式：顯示商家名稱 */}
+                                                                        {item.address || item.name ? (
+                                                                            <span className="text-sm text-slate-700 font-medium">{item.address || item.name}</span>
+                                                                        ) : item.lat && item.lng ? (
+                                                                            <span className="text-sm text-slate-500">{item.lat.toFixed(4)}, {item.lng.toFixed(4)}</span>
+                                                                        ) : (
+                                                                            <span className="text-sm text-slate-400 italic">未設定地點</span>
                                                                         )}
                                                                     </div>
-                                                                    <div className="flex gap-1">
-                                                                        <Input
-                                                                            className="h-8 text-xs flex-1"
-                                                                            placeholder="搜尋飯店..."
-                                                                            value={hotelSearchQuery}
-                                                                            onChange={e => setHotelSearchQuery(e.target.value)}
-                                                                            onKeyDown={e => e.key === 'Enter' && handleSearchHotelPlace(idx)}
-                                                                        />
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="h-8 px-2"
-                                                                            onClick={() => handleSearchHotelPlace(idx)}
-                                                                            disabled={isHotelSearching && searchingHotelIdx === idx}
-                                                                        >
-                                                                            {isHotelSearching && searchingHotelIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                                                                        </Button>
-                                                                    </div>
-                                                                    {/* 搜尋結果 */}
-                                                                    {searchingHotelIdx === idx && hotelSearchResults.length > 0 && (
-                                                                        <div className="bg-slate-50 rounded-lg p-2 space-y-1 max-h-32 overflow-y-auto">
-                                                                            {hotelSearchResults.map((place, pIdx) => (
-                                                                                <button
-                                                                                    key={pIdx}
-                                                                                    className="w-full text-left p-2 text-xs rounded hover:bg-indigo-50 transition-colors"
-                                                                                    onClick={() => handleSelectHotelPlace(idx, place)}
-                                                                                >
-                                                                                    <div className="font-bold text-slate-700">{place.name}</div>
-                                                                                    <div className="text-slate-400 text-[10px] line-clamp-1">{place.display_name}</div>
-                                                                                </button>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
-                                                                    {/* 已選擇的地址 */}
-                                                                    {item.address && (
-                                                                        <div className="text-xs text-slate-600 bg-green-50 p-1.5 rounded flex items-center gap-1">
-                                                                            <MapPin className="w-3 h-3 text-green-600" />
-                                                                            {item.address}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-sm text-slate-600">{item.address || "—"}</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="space-y-1"><Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Ticket className="w-3 h-3" /> Booking ID</Label><Input disabled={!isEditing} value={item.booking_id} onChange={e => updateHotel(idx, 'booking_id', e.target.value)} className={isEditing ? "bg-white h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-sm font-mono text-indigo-600 shadow-none focus-visible:ring-0"} placeholder="Booking ID..." /></div>
-                                                    </div>
+                                                                )}
+                                                            </div>
 
-                                                    <div className="pt-2 border-t border-slate-100 mt-2 flex gap-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="flex-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
-                                                            onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
-                                                        >
-                                                            <Info className="w-3 h-3 mr-2" /> {t('details')}
-                                                        </Button>
-                                                        {item.address && (
-                                                            <a
-                                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="flex items-center gap-1 px-3 h-8 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
-                                                            >
-                                                                <Navigation2 className="w-3 h-3" /> Maps
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </section>
+                                                            <div className="pt-2 border-t border-slate-100 mt-2 flex gap-2">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
+                                                                    onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
+                                                                >
+                                                                    <Info className="w-3 h-3 mr-2" /> {t('details')}
+                                                                </Button>
+                                                                {/* 導航按鈕：使用經緯度定位 + 商家名稱搜尋 */}
+                                                                {(item.lat && item.lng) || item.address || item.name ? (
+                                                                    <a
+                                                                        href={
+                                                                            // 使用經緯度定位 + 商家名稱搜尋
+                                                                            item.lat && item.lng && (item.address || item.name)
+                                                                                ? `https://www.google.com/maps/search/${encodeURIComponent(item.address || item.name || '')}/@${item.lat},${item.lng},17z`
+                                                                                : item.lat && item.lng
+                                                                                    ? `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`
+                                                                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address || item.name || '')}`
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="flex items-center gap-1 px-3 h-8 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                                                                    >
+                                                                        <Navigation2 className="w-3 h-3" /> Maps
+                                                                    </a>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </motion.div>
+                            </motion.section>
                         </>
                     )}
                 </div>
@@ -489,8 +572,36 @@ export function InfoView() {
                                         </Label>
                                         <ImageUpload
                                             value={hotels[currentHotelIdx].image_url}
-                                            onChange={(url) => updateHotel(currentHotelIdx, 'image_url', url)}
-                                            onRemove={() => updateHotel(currentHotelIdx, 'image_url', '')}
+                                            onChange={(url) => {
+                                                // 使用 ref 獲取最新的索引值
+                                                const idx = currentHotelIdxRef.current
+                                                if (idx === null) {
+                                                    console.warn('❌ currentHotelIdxRef is null')
+                                                    return
+                                                }
+                                                console.log('🖼️ Image uploaded:', url.substring(0, 50) + '...', 'for hotel index:', idx)
+                                                setHotels(prev => {
+                                                    const newHotels = [...prev]
+                                                    if (newHotels[idx]) {
+                                                        newHotels[idx] = { ...newHotels[idx], image_url: url }
+                                                        console.log('✅ Hotel updated with image_url')
+                                                    } else {
+                                                        console.warn('❌ Hotel at index', idx, 'not found')
+                                                    }
+                                                    return newHotels
+                                                })
+                                            }}
+                                            onRemove={() => {
+                                                const idx = currentHotelIdxRef.current
+                                                if (idx === null) return
+                                                setHotels(prev => {
+                                                    const newHotels = [...prev]
+                                                    if (newHotels[idx]) {
+                                                        newHotels[idx] = { ...newHotels[idx], image_url: '' }
+                                                    }
+                                                    return newHotels
+                                                })
+                                            }}
                                             folder="ryan_travel/hotels"
                                         />
                                     </div>

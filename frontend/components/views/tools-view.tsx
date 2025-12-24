@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, ComponentType } from "react"
+import { motion } from "framer-motion"
 import { useSWRConfig } from "swr"
 import {
     Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
@@ -13,14 +14,13 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { createClient } from "@supabase/supabase-js"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -29,11 +29,6 @@ import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { SwipeableItem } from "@/components/ui/swipeable-item"
 import { useHaptic } from "@/lib/hooks"
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 // Type definitions
 interface Expense {
@@ -53,27 +48,34 @@ interface Expense {
     creator_name?: string
 }
 
+interface Trip {
+    id: string
+    title: string
+    days?: unknown[]
+    share_code?: string
+}
+
 interface ParseResult {
-    items?: any[]
+    items?: Record<string, unknown>[]
     title?: string
     start_date?: string
     end_date?: string
-    daily_locations?: Record<string, any>
-    day_notes?: Record<string, any>
-    day_costs?: Record<string, any>
-    day_tickets?: Record<string, any>
+    daily_locations?: Record<string, Record<string, unknown>>
+    day_notes?: Record<string, Record<string, unknown>>
+    day_costs?: Record<string, Record<string, unknown>>
+    day_tickets?: Record<string, Record<string, unknown>>
 }
 
 interface GenerateResult {
-    items?: any[]
-    data?: { items?: any[] }
+    items?: Record<string, unknown>[]
+    data?: { items?: Record<string, unknown>[] }
     title?: string
     start_date?: string
     end_date?: string
-    daily_locations?: Record<string, any>
-    day_notes?: Record<string, any>
-    day_costs?: Record<string, any>
-    day_tickets?: Record<string, any>
+    daily_locations?: Record<string, Record<string, unknown>>
+    day_notes?: Record<string, Record<string, unknown>>
+    day_costs?: Record<string, Record<string, unknown>>
+    day_tickets?: Record<string, Record<string, unknown>>
 }
 
 // 🆕 v3.8: 信用卡回饋功能
@@ -135,7 +137,6 @@ export function ToolsView() {
     const [cashback, setCashback] = useState("")
     const [expenseDate, setExpenseDate] = useState("")
     const [receiptUrl, setReceiptUrl] = useState("")
-    const [isUploading, setIsUploading] = useState(false)
     const [isSavingExpense, setIsSavingExpense] = useState(false)
     const haptic = useHaptic()
 
@@ -210,21 +211,22 @@ export function ToolsView() {
         fetchRate()
     }, [])
 
-    const fetchExpenses = async () => {
-        try {
-            if (activeTripId) {
-                const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/expenses`, {
-                    headers: { "X-User-ID": localStorage.getItem("user_uuid") || "" }
-                })
-                const data = await res.json()
-                setExpenses(data || [])
-            } else {
-                setExpenses([])
-            }
-        } catch (e) { console.error(e) }
-    }
-
-    useEffect(() => { fetchExpenses() }, [activeTripId])
+    useEffect(() => {
+        const fetchExpenses = async () => {
+            try {
+                if (activeTripId) {
+                    const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/expenses`, {
+                        headers: { "X-User-ID": localStorage.getItem("user_uuid") || "" }
+                    })
+                    const data = await res.json()
+                    setExpenses(data || [])
+                } else {
+                    setExpenses([])
+                }
+            } catch (e) { console.error(e) }
+        }
+        fetchExpenses()
+    }, [activeTripId])
 
     // Get all unique dates from expenses
     const allDates = useMemo(() => {
@@ -307,24 +309,19 @@ export function ToolsView() {
         return `${d.getMonth() + 1}/${d.getDate()} (${day})`
     }
 
-    const handleUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        setIsUploading(true)
+    // fetchExpenses function for use outside of useEffect
+    const fetchExpenses = async () => {
         try {
-            const fileExt = file.name.split('.').pop()
-            const fileName = `receipt-${Date.now()}.${fileExt}`
-            const { error } = await supabase.storage.from('uploads').upload(fileName, file)
-            if (error) throw error
-            const { data } = supabase.storage.from('uploads').getPublicUrl(fileName)
-            setReceiptUrl(data.publicUrl)
-            toast.success("Upload success")
-        } catch (err) {
-            console.error(err)
-            toast.error("Upload failed")
-        } finally {
-            setIsUploading(false)
-        }
+            if (activeTripId) {
+                const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/expenses`, {
+                    headers: { "X-User-ID": localStorage.getItem("user_uuid") || "" }
+                })
+                const data = await res.json()
+                setExpenses(data || [])
+            } else {
+                setExpenses([])
+            }
+        } catch (e) { console.error(e) }
     }
 
     const handleSaveExpense = async () => {
@@ -363,7 +360,7 @@ export function ToolsView() {
             } else {
                 throw new Error("API Error")
             }
-        } catch (_e) { haptic.error(); toast.error("Save failed") }
+        } catch { haptic.error(); toast.error("Save failed") }
         finally { setIsSavingExpense(false) }
     }
 
@@ -615,11 +612,29 @@ export function ToolsView() {
 
             <PullToRefresh onRefresh={async () => { await fetchExpenses(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
                 <Tabs value={activeSection} onValueChange={setActiveSection}>
-                    <TabsList className="grid w-full grid-cols-3 bg-white shadow-md rounded-xl p-1">
-                        <TabsTrigger value="cards">💳 卡片</TabsTrigger>
-                        <TabsTrigger value="expense">{t('expense')}</TabsTrigger>
-                        <TabsTrigger value="ai">{t('ai_tools')}</TabsTrigger>
-                    </TabsList>
+                    {/* Custom Sliding Tab Strip */}
+                    <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
+                        {[
+                            { value: 'cards', label: '💳 卡片' },
+                            { value: 'expense', label: t('expense') },
+                            { value: 'ai', label: t('ai_tools') }
+                        ].map((tab) => (
+                            <button
+                                key={tab.value}
+                                onClick={() => setActiveSection(tab.value)}
+                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {activeSection === tab.value && (
+                                    <motion.div
+                                        layoutId="tools-tab-indicator"
+                                        className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    />
+                                )}
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
 
                     {/* 🆕 v3.8: 信用卡回饋彙整 */}
                     <TabsContent value="cards" className="mt-4 space-y-4">
@@ -841,7 +856,7 @@ export function ToolsView() {
                                                     <SelectContent>
                                                         <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
                                                         {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                        {trips.map((trip: any) => (
+                                                        {trips.map((trip: Trip) => (
                                                             <SelectItem key={trip.id} value={trip.id}>
                                                                 📂 {trip.title} (Day {trip.days?.length || 1})
                                                             </SelectItem>
@@ -894,7 +909,7 @@ export function ToolsView() {
                                                     <SelectContent>
                                                         <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
                                                         {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                        {trips.map((trip: any) => (
+                                                        {trips.map((trip: Trip) => (
                                                             <SelectItem key={trip.id} value={trip.id}>
                                                                 📂 {trip.title} ({trip.share_code})
                                                             </SelectItem>

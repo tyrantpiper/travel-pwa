@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle } from "lucide-react"
@@ -27,6 +28,7 @@ import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
 import { getNowInZone } from "@/lib/timezone"
 import { POISearch } from "@/components/poi-search"
+import { COUNTRY_REGIONS } from "@/lib/constants"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -72,19 +74,6 @@ export function ItineraryView() {
     const [activitySearchCountry, setActivitySearchCountry] = useState<string>("")
     const [activitySearchRegion, setActivitySearchRegion] = useState<string>("")
 
-    const COUNTRY_REGIONS: { [key: string]: string[] } = {
-        "Japan": ["Tokyo 東京", "Osaka 大阪", "Kyoto 京都", "Hokkaido 北海道", "Okinawa 沖繩", "Fukuoka 福岡", "Nagoya 名古屋", "Yokohama 橫濱", "Nara 奈良", "Hiroshima 廣島"],
-        "Taiwan": ["Taipei 台北", "Kaohsiung 高雄", "Taichung 台中", "Tainan 台南", "Hualien 花蓮", "Yilan 宜蘭", "Taitung 台東"],
-        "South Korea": ["Seoul 首爾", "Busan 釜山", "Jeju 濟州島", "Incheon 仁川", "Daegu 大邱"],
-        "Thailand": ["Bangkok 曼谷", "Chiang Mai 清邁", "Phuket 普吉島", "Pattaya 芭達雅"],
-        "Vietnam": ["Ho Chi Minh City 胡志明市", "Hanoi 河內", "Da Nang 峴港", "Hoi An 會安"],
-        "Hong Kong": ["Central 中環", "Tsim Sha Tsui 尖沙咀", "Mong Kok 旺角", "Causeway Bay 銅鑼灣"],
-        "Singapore": ["Marina Bay 濱海灣", "Sentosa 聖淘沙", "Chinatown 牛車水", "Orchard 烏節路"],
-        "USA": ["New York 紐約", "Los Angeles 洛杉磯", "San Francisco 舊金山", "Las Vegas 拉斯維加斯", "Chicago 芝加哥"],
-        "UK": ["London 倫敦", "Edinburgh 愛丁堡", "Manchester 曼徹斯特", "Oxford 牛津"],
-        "France": ["Paris 巴黎", "Nice 尼斯", "Lyon 里昂", "Marseille 馬賽"],
-        "Italy": ["Rome 羅馬", "Milan 米蘭", "Venice 威尼斯", "Florence 佛羅倫斯"],
-    }
 
     useEffect(() => {
         if (currentTrip && currentTrip.daily_locations) {
@@ -588,7 +577,7 @@ export function ItineraryView() {
                         </DialogHeader>
                         <div className="py-4">
                             <p className="text-slate-600">
-                                確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: any) => t.id === deletingTripId)?.title}</span> 嗎？
+                                確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: Trip) => t.id === deletingTripId)?.title}</span> 嗎？
                             </p>
                             <p className="text-sm text-slate-500 mt-2">此操作無法復原，所有相關資料將會遺失。</p>
                         </div>
@@ -674,7 +663,15 @@ export function ItineraryView() {
                         const { date, week } = getDateInfo(d)
                         return (
                             <div key={d} className="relative group">
-                                <button onClick={() => setDay(d)} className={cn("flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border transition-all", day === d ? "bg-slate-900 text-white" : "bg-white hover:bg-slate-50")}>
+                                <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border", day === d ? "text-white" : "bg-white hover:bg-slate-50")}>
+                                    {/* Sliding Indicator */}
+                                    {day === d && (
+                                        <motion.div
+                                            layoutId="day-indicator"
+                                            className="absolute inset-0 bg-slate-900 rounded-lg -z-10"
+                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
                                     <span className="text-[10px] opacity-70">{week}</span>
                                     <span className="font-bold">{date}</span>
                                 </button>

@@ -5,6 +5,7 @@ import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2, X,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle
 } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -36,6 +37,7 @@ export function ProfileView() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
+    const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
 
     // 🆕 POI 推薦偏好設定
     const [poiPreferences, setPoiPreferences] = useState({
@@ -176,8 +178,14 @@ export function ProfileView() {
             <div className="px-6 relative -mt-20">
                 <div className="flex flex-col items-center">
                     <div className="relative group">
-                        {/* Avatar Display */}
-                        <Avatar className="w-28 h-28 border-4 border-white shadow-xl bg-white">
+                        {/* Avatar Display - 點擊可預覽 */}
+                        <Avatar
+                            className={cn(
+                                "w-28 h-28 border-4 border-white shadow-xl bg-white",
+                                profile.avatarUrl && "cursor-pointer hover:ring-4 hover:ring-blue-400 transition-all"
+                            )}
+                            onClick={() => profile.avatarUrl && setAvatarPreviewOpen(true)}
+                        >
                             <AvatarImage src={profile.avatarUrl || undefined} className="object-cover" />
                             <AvatarFallback className="bg-slate-100 text-slate-400 text-3xl font-bold">
                                 {profile.nickname.slice(0, 1).toUpperCase()}
@@ -206,6 +214,22 @@ export function ProfileView() {
                             </button>
                         )}
                     </div>
+
+                    {/* 頭像全螢幕預覽 */}
+                    <Dialog open={avatarPreviewOpen} onOpenChange={setAvatarPreviewOpen}>
+                        <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0 flex items-center justify-center">
+                            {profile.avatarUrl && (
+                                <Image
+                                    src={profile.avatarUrl}
+                                    alt="Avatar Preview"
+                                    fill
+                                    className="object-contain rounded-lg cursor-pointer"
+                                    onClick={() => setAvatarPreviewOpen(false)}
+                                    unoptimized
+                                />
+                            )}
+                        </DialogContent>
+                    </Dialog>
 
                     <div className="mt-4 text-center space-y-1 w-full flex flex-col items-center">
                         {isEditing ? (
@@ -510,7 +534,15 @@ export function ProfileView() {
     )
 }
 
-function MenuItem({ icon: Icon, label, value, isDestructive, onClick }: any) {
+interface MenuItemProps {
+    icon: React.ComponentType<{ className?: string }>
+    label: string
+    value?: string
+    isDestructive?: boolean
+    onClick?: () => void
+}
+
+function MenuItem({ icon: Icon, label, value, isDestructive, onClick }: MenuItemProps) {
     return (
         <div className={cn("flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 transition-colors", isDestructive ? "text-red-500 hover:bg-red-50" : "text-slate-700")} onClick={onClick}>
             <div className="flex items-center gap-3"><Icon className={cn("w-5 h-5", isDestructive ? "text-red-400" : "text-slate-400")} /><span className="text-sm font-medium">{label}</span></div>

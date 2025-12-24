@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Camera, Loader2, X } from "lucide-react"
+import Image from "next/image"
+import { Camera, Loader2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 interface ImageUploadProps {
     value?: string
@@ -16,8 +18,8 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon }: ImageUploadProps) {
     const [loading, setLoading] = useState(false)
-    // 🆕 v3.5: 上傳進度百分比
     const [progress, setProgress] = useState(0)
+    const [previewOpen, setPreviewOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,17 +32,16 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
             const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY
 
-            // Debug: Check env vars
             if (!cloudName || !apiKey) {
                 console.error("Missing Cloudinary env vars:", { cloudName: !!cloudName, apiKey: !!apiKey })
-                toast.error(`環境變數缺失！請確認 .env.local 並重啟前端。\nCloud Name: ${cloudName ? '✅' : '❌'}\nAPI Key: ${apiKey ? '✅' : '❌'}`)
+                toast.error(`環境變數缺失！請確認 .env.local 並重啟前端。`)
+                setLoading(false)
                 return
             }
 
             const timestamp = Math.round((new Date).getTime() / 1000);
             const paramsToSign = { timestamp, folder };
 
-            // Get signature from our API
             const res = await fetch("/api/sign-cloudinary", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -51,12 +52,12 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                 const errText = await res.text()
                 console.error("Sign API error:", errText)
                 toast.error(`簽名 API 錯誤: ${res.status}`)
+                setLoading(false)
                 return
             }
 
             const { signature } = await res.json();
 
-            // 🆕 Upload to Cloudinary with XMLHttpRequest for progress
             const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
             const data = new FormData()
             data.append("file", file)
@@ -65,7 +66,6 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             data.append("signature", signature)
             data.append("api_key", apiKey)
 
-            // 使用 XMLHttpRequest 以獲取上傳進度
             const xhr = new XMLHttpRequest()
 
             xhr.upload.onprogress = (event) => {
@@ -109,50 +109,83 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
         }
     }
 
-    return (
-        <div className={cn("relative flex items-center gap-4", className)}>
-            {value ? (
-                <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-slate-200 group shrink-0">
-                    <img src={value} alt="Upload" className="h-full w-full object-cover" />
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onRemove?.(); onChange(""); }}
-                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                        <X className="w-4 h-4 text-white" />
-                    </button>
-                </div>
-            ) : icon && className?.includes("rounded-full") ? (
-                // Compact mode: just show a circular button with the icon
-                <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className={cn("flex items-center justify-center cursor-pointer", className)}
-                >
-                    {loading ? (
-                        <span className="text-[10px] font-mono text-blue-500">{progress}%</span>
-                    ) : icon}
-                </div>
-            ) : (
-                <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-16 w-16 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 transition-colors shrink-0"
-                >
-                    {loading ? (
-                        <div className="flex flex-col items-center">
-                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                            <span className="text-[10px] text-blue-500 font-mono mt-1">{progress}%</span>
-                        </div>
-                    ) : (icon || <Camera className="w-5 h-5 text-slate-400" />)}
-                </div>
-            )}
+    const handleRemove = () => {
+        onRemove?.()
+        onChange("")
+    }
 
-            <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handleUpload}
-            />
-        </div>
+    return (
+        <>
+            <div className={cn("relative flex items-center gap-3", className)}>
+                {/* 已上傳的圖片 - 點擊可預覽 */}
+                {value && (
+                    <div className="flex flex-col items-center gap-1">
+                        <div
+                            className="relative h-16 w-16 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+                            onClick={() => setPreviewOpen(true)}
+                        >
+                            <Image src={value} alt="Upload" fill className="object-cover" unoptimized />
+                        </div>
+                        {/* 移除按鈕 - 在圖片下方 */}
+                        <button
+                            type="button"
+                            onClick={handleRemove}
+                            className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-0.5 border border-dashed border-slate-300 hover:border-red-400 px-1.5 py-0.5 rounded transition-colors"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            移除
+                        </button>
+                    </div>
+                )}
+
+                {/* 上傳按鈕 - 永遠顯示（可以上傳/替換圖片）*/}
+                {icon && className?.includes("rounded-full") ? (
+                    <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className={cn("flex items-center justify-center cursor-pointer", className)}
+                    >
+                        {loading ? (
+                            <span className="text-[10px] font-mono text-blue-500">{progress}%</span>
+                        ) : icon}
+                    </div>
+                ) : (
+                    <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-16 w-16 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-blue-400 transition-colors shrink-0"
+                    >
+                        {loading ? (
+                            <div className="flex flex-col items-center">
+                                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                                <span className="text-[10px] text-blue-500 font-mono mt-1">{progress}%</span>
+                            </div>
+                        ) : (icon || <Camera className="w-5 h-5 text-slate-400" />)}
+                    </div>
+                )}
+
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleUpload}
+                />
+            </div>
+
+            {/* 全螢幕預覽 Dialog */}
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0">
+                    {value && (
+                        <Image
+                            src={value}
+                            alt="Preview"
+                            fill
+                            className="object-contain cursor-pointer"
+                            onClick={() => setPreviewOpen(false)}
+                            unoptimized
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }

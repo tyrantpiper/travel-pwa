@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/lib/LanguageContext"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { TripProvider } from "@/lib/trip-context"
 import ChatWidget from "@/components/chat-widget"
+import { SplashScreen } from "@/components/ui/splash-screen"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,6 +41,7 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <TripProvider>
+              <SplashScreen />
               {children}
               <ChatWidget />
             </TripProvider>
@@ -50,4 +52,3 @@ export default function RootLayout({
     </html>
   );
 }
-
