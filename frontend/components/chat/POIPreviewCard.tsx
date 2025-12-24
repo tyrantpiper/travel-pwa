@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { MapPin, Clock, Star, Check, X, Map, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { MapPin, Clock, Star, Check, X, Map, Loader2, ExternalLink, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -9,6 +9,18 @@ import { useTripContext } from "@/lib/trip-context"
 
 // API Base URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// 三源整合資料結構
+interface EnrichedPOI {
+    display_name?: {
+        primary: string
+        secondary: string
+    }
+    cultural_desc?: string
+    travel_tips?: string
+    official_url?: string
+    wikivoyage_url?: string
+}
 
 // Function call args 結構
 interface POIData {
@@ -43,6 +55,37 @@ export default function POIPreviewCard({
     const { activeTripId, mutate } = useTripContext()
     const [isAdding, setIsAdding] = useState(false)
     const [isAdded, setIsAdded] = useState(false)
+    const [enriched, setEnriched] = useState<EnrichedPOI | null>(null)
+    const [isLoadingEnrich, setIsLoadingEnrich] = useState(false)
+
+    // 🆕 v3.7: 自動獲取三源整合資料
+    useEffect(() => {
+        const fetchEnrichedData = async () => {
+            if (!poiData.place_name) return
+
+            setIsLoadingEnrich(true)
+            try {
+                const response = await fetch(`${API_BASE}/api/poi/enrich`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: poiData.place_name })
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    if (data.success && data.poi) {
+                        setEnriched(data.poi)
+                    }
+                }
+            } catch (error) {
+                console.log("三源資料獲取失敗 (不影響主流程):", error)
+            } finally {
+                setIsLoadingEnrich(false)
+            }
+        }
+
+        fetchEnrichedData()
+    }, [poiData.place_name])
 
     // 分類顏色映射
     const categoryColors: Record<string, string> = {
@@ -180,13 +223,49 @@ export default function POIPreviewCard({
             </div>
 
             {/* Body */}
-            {poiData.desc && (
-                <div className="px-3 pb-2">
-                    <p className="text-xs text-slate-600 line-clamp-2">
-                        {poiData.desc}
+            {/* 🆕 v3.7: 三源整合顯示 */}
+            <div className="px-3 pb-2 space-y-1">
+                {/* 副標題 (日文/英文名) */}
+                {enriched?.display_name?.secondary && (
+                    <p className="text-[10px] text-slate-400">
+                        {enriched.display_name.secondary}
                     </p>
-                </div>
-            )}
+                )}
+
+                {/* 描述：優先使用三源資料，fallback 到原始 desc */}
+                <p className="text-xs text-slate-600 line-clamp-2">
+                    {enriched?.cultural_desc || poiData.desc || ""}
+                </p>
+
+                {/* 旅遊指南摘要 */}
+                {enriched?.travel_tips && (
+                    <p className="text-[10px] text-blue-600 line-clamp-1 flex items-center gap-1">
+                        <BookOpen className="w-3 h-3" />
+                        {enriched.travel_tips.slice(0, 50)}...
+                    </p>
+                )}
+
+                {/* 官網連結 */}
+                {enriched?.official_url && (
+                    <a
+                        href={enriched.official_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
+                    >
+                        <ExternalLink className="w-3 h-3" />
+                        官方網站
+                    </a>
+                )}
+
+                {/* Loading 指示器 */}
+                {isLoadingEnrich && (
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        載入更多資訊...
+                    </p>
+                )}
+            </div>
 
             {/* Meta */}
             <div className="px-3 pb-2 flex items-center gap-3 text-[10px] text-slate-500">
