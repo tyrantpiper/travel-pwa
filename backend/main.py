@@ -2271,11 +2271,53 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     
     full_history = system_history + processed_history
     
+    # 🆕 v3.7: 景點偵測 + 三源資料注入
+    enriched_message = request.message
+    try:
+        # 偵測景點相關關鍵字 (簡單方法: 檢查是否包含景點名稱模式)
+        poi_keywords = ["怎麼樣", "推薦", "介紹", "告訴我", "什麼", "好玩", "好吃", "值得"]
+        place_indicators = ["寺", "神社", "城", "塔", "公園", "站", "車站", "廟", "宮", "殿", "館", "園"]
+        
+        message_lower = request.message.lower()
+        has_poi_question = any(kw in request.message for kw in poi_keywords)
+        has_place = any(ind in request.message for ind in place_indicators)
+        
+        if has_poi_question and has_place:
+            # 嘗試提取景點名稱 (簡單方法: 找到包含指示詞的詞)
+            import re
+            # 尋找景點名稱: 2-10 個中文字符，後面跟著指示詞
+            place_pattern = r'([\u4e00-\u9fa5]{2,10}(?:寺|神社|城|塔|公園|站|車站|廟|宮|殿|館|園))'
+            matches = re.findall(place_pattern, request.message)
+            
+            if matches:
+                place_name = matches[0]
+                print(f"🔍 偵測到景點查詢: {place_name}")
+                
+                # 調用三源整合
+                from services.poi_service import enrich_poi_complete, format_enriched_poi_for_ai
+                poi = {"name": place_name, "wikidata_id": ""}
+                enriched_poi = await enrich_poi_complete(poi)
+                formatted_info = format_enriched_poi_for_ai(enriched_poi)
+                
+                if formatted_info and len(formatted_info) > 20:
+                    # 將三源資料注入到訊息前
+                    enriched_message = f"""用戶詢問關於「{place_name}」的問題。
+
+📚 以下是來自維基百科/維基導遊的參考資料：
+{formatted_info}
+
+用戶原始問題：{request.message}
+
+請根據以上資料回答用戶問題，使用你的 Ryan 旅遊達人風格！"""
+                    print(f"✅ 三源資料已注入 ({len(formatted_info)} 字)")
+    except Exception as e:
+        print(f"⚠️ 三源資料注入失敗 (不影響主流程): {e}")
+    
     return StreamingResponse(
         stream_chat_generator(
             api_key=api_key,
             history=full_history,
-            message=request.message,
+            message=enriched_message,
             thought_signatures=request.thought_signatures
         ),
         media_type="text/event-stream",
