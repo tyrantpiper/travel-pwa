@@ -14,6 +14,7 @@ import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
 import { streamChat } from "@/lib/sse-parser"
+import { toast } from "sonner"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
