@@ -1026,16 +1026,16 @@ export function ItineraryView() {
                                     folder="ryan_travel/spots"
                                 />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Time</Label>
-                                <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="col-span-3" />
+                            <div className="space-y-1.5">
+                                <Label>Time</Label>
+                                <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="w-full" />
                             </div>
 
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label className="text-right pt-2">Filter</Label>
-                                <div className="col-span-3 flex flex-wrap gap-2">
+                            <div className="space-y-1.5">
+                                <Label>Filter</Label>
+                                <div className="grid grid-cols-2 gap-2">
                                     <select
-                                        className="min-w-[100px] flex-1 h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                        className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                         value={activitySearchCountry}
                                         onChange={(e) => {
                                             setActivitySearchCountry(e.target.value)
@@ -1058,7 +1058,7 @@ export function ItineraryView() {
 
                                     {activitySearchCountry && COUNTRY_REGIONS[activitySearchCountry] ? (
                                         <select
-                                            className="min-w-[100px] flex-1 h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950"
+                                            className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                             value={activitySearchRegion}
                                             onChange={(e) => setActivitySearchRegion(e.target.value)}
                                         >
@@ -1070,16 +1070,16 @@ export function ItineraryView() {
                                     ) : (
                                         <Input
                                             placeholder="🏙️ Region"
-                                            className="min-w-[100px] flex-1"
+                                            className="w-full"
                                             value={activitySearchRegion}
                                             onChange={(e) => setActivitySearchRegion(e.target.value)}
                                         />
                                     )}
                                 </div>
                             </div>
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label className="text-right pt-2">Place</Label>
-                                <div className="col-span-3 space-y-2">
+                            <div className="space-y-1.5">
+                                <Label>Place</Label>
+                                <div className="space-y-2">
                                     <div className="flex gap-2">
                                         <Input
                                             value={editItem.place}
@@ -1203,15 +1203,15 @@ export function ItineraryView() {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Notes</Label>
-                                <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="col-span-3" />
+                            <div className="space-y-1.5">
+                                <Label>Notes</Label>
+                                <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="w-full" />
                             </div>
 
                             {/* 🆕 分類選擇器 - 圖示按鈕 */}
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label className="text-right pt-2">Category</Label>
-                                <div className="col-span-3 flex flex-wrap gap-2">
+                            <div className="space-y-1.5">
+                                <Label>Category</Label>
+                                <div className="flex flex-wrap gap-2">
                                     {[
                                         { id: 'sightseeing', icon: '🎯', label: '景點' },
                                         { id: 'food', icon: '🍽️', label: '美食' },
@@ -1227,8 +1227,8 @@ export function ItineraryView() {
                                             className={cn(
                                                 "px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all",
                                                 editItem.category === cat.id
-                                                    ? "bg-slate-800 text-white shadow-sm"
-                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                                             )}
                                         >
                                             <span>{cat.icon}</span>
@@ -1239,9 +1239,9 @@ export function ItineraryView() {
                             </div>
 
                             {/* 🆕 標籤編輯器 */}
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label className="text-right pt-2">Tags</Label>
-                                <div className="col-span-3 space-y-2">
+                            <div className="space-y-1.5">
+                                <Label>Tags</Label>
+                                <div className="space-y-2">
                                     <div className="flex flex-wrap gap-1">
                                         {(editItem.tags || []).map((tag: string, i: number) => (
                                             <span key={i} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
@@ -1293,9 +1293,9 @@ export function ItineraryView() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-4 items-start gap-4 pt-2 border-t border-dashed">
-                                <Label className="text-right pt-2 text-xs text-slate-400">Coordinates</Label>
-                                <div className="col-span-3 space-y-2">
+                            <div className="space-y-1.5 pt-2 border-t border-dashed">
+                                <Label className="text-xs text-muted-foreground">Coordinates</Label>
+                                <div className="space-y-2">
                                     <div className="flex gap-2">
                                         <Input placeholder="Lat" className="text-xs font-mono" value={editItem.lat || ''} onChange={(e) => setEditItem({ ...editItem, lat: e.target.value })} />
                                         <Input placeholder="Lng" className="text-xs font-mono" value={editItem.lng || ''} onChange={(e) => setEditItem({ ...editItem, lng: e.target.value })} />

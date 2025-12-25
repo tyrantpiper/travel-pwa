@@ -119,14 +119,14 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
     return (
         <div className={className}>
             {/* 類別快速按鈕列 */}
-            <div className="flex gap-2 overflow-x-auto py-2 no-scrollbar">
+            <div className="flex flex-wrap gap-2 py-2">
                 {POI_CATEGORIES.map((cat) => (
                     <button
                         key={cat.id}
                         onClick={() => handleCategoryClick(cat.id)}
                         className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-all ${selectedCategory === cat.id
                             ? "bg-amber-500 text-white shadow-md"
-                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            : "bg-secondary border border-input text-secondary-foreground hover:bg-secondary/80"
                             }`}
                     >
                         <span>{cat.icon}</span>
@@ -182,7 +182,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                                     {pois.slice(0, 10).map((poi) => (
                                         <div
                                             key={poi.id}
-                                            className="p-3 bg-white rounded-lg border border-slate-100 hover:border-amber-300 hover:shadow-sm transition-all cursor-pointer"
+                                            className="p-3 bg-card rounded-lg border border-border hover:border-amber-300 hover:shadow-sm transition-all cursor-pointer"
                                             onClick={() => onSelectPOI?.(poi)}
                                         >
                                             <div className="flex justify-between items-start">

@@ -1,4 +1,16 @@
 # Ryan Travel API v1.2 - Auto-sync enabled
+
+# Fix Windows console Unicode encoding issues (prevents cp950 crash on emoji)
+import sys
+import io
+if sys.stdout and hasattr(sys.stdout, 'buffer'):
+    try:
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        pass  # Ignore if stdout is not a standard stream
+
 import os
 import json
 import random
@@ -60,9 +72,9 @@ async def health_check():
 # 4. 載入 ArcGIS API Key (地理編碼用，可選)
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 if ARCGIS_API_KEY:
-    print("🗺️ ArcGIS Geocoding: 已啟用")
+    print("[ArcGIS] Geocoding: Enabled")
 else:
-    print("🗺️ ArcGIS Geocoding: 未設定，使用 Nominatim 備援")
+    print("[ArcGIS] Geocoding: Not configured, using Nominatim fallback")
 
 # --- AI 模型設定區 (2.5 版混合動力引擎) ---
 # 1. 主力模型 (支援 Maps, 500 RPD)
