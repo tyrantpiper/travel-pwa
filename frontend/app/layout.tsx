@@ -6,8 +6,14 @@ import { Toaster } from "@/components/ui/sonner"
 import { LanguageProvider } from "@/lib/LanguageContext"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { TripProvider } from "@/lib/trip-context"
-import ChatWidget from "@/components/chat-widget"
 import { SplashScreen } from "@/components/ui/splash-screen"
+import dynamic from "next/dynamic"
+
+// Dynamic import for ChatWidget - reduces initial bundle size
+const ChatWidget = dynamic(() => import("@/components/chat-widget"), {
+  ssr: false,
+  loading: () => null // No loading state needed for chat widget
+})
 
 const inter = Inter({ subsets: ["latin"] });
 

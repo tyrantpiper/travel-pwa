@@ -9,13 +9,13 @@ import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
-import { ImageUpload } from "@/components/ui/image-upload"
 import { ItineraryItemState, LocationInfo, DailyLocation, DayWeather, Trip, Activity, GeocodeResult, SubItem } from "@/lib/itinerary-types"
+import { ActivityEditModal } from "@/components/itinerary/ActivityEditModal"
+import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDialogs"
 
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import DailyTips from "@/components/daily-tips"
@@ -27,7 +27,6 @@ import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
 import { getNowInZone } from "@/lib/timezone"
-import { POISearch } from "@/components/poi-search"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 
 const DEFAULT_START_DATE = new Date()
@@ -44,21 +43,12 @@ export function ItineraryView() {
     const [isDeleting, setIsDeleting] = useState(false)
 
     const [isCreateOpen, setIsCreateOpen] = useState(false)
-    const [newTripTitle, setNewTripTitle] = useState("")
-    const [newTripStart, setNewTripStart] = useState("2026-02-02")
-    const [newTripEnd, setNewTripEnd] = useState("2026-02-10")
-    const [newTripCover, setNewTripCover] = useState("")
-    const [isCreating, setIsCreating] = useState(false)
-    const [joinCode, setJoinCode] = useState("")
-    const [isJoinLoading, setIsJoinLoading] = useState(false)
     const haptic = useHaptic()
     const isOnline = useOnlineStatus()  // 🆕 離線狀態偵測
 
     const [editItem, setEditItem] = useState<ItineraryItemState | null>(null)
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isAddMode, setIsAddMode] = useState(false)
-    const [placeSearchResults, setPlaceSearchResults] = useState<LocationInfo[]>([])
-    const [isPlaceSearching, setIsPlaceSearching] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
 
     const [day, setDay] = useState(1)
@@ -71,8 +61,7 @@ export function ItineraryView() {
     const [searchCountry, setSearchCountry] = useState<string>("")  // 國家篩選：空=全球, Japan, Taiwan, etc.
     const [dailyLocSearchRegion, setDailyLocSearchRegion] = useState<string>("") // 每日地點搜尋區域
     const [currentTimezone, setCurrentTimezone] = useState<string>("Asia/Tokyo")  // 當前顯示地點的時區
-    const [activitySearchCountry, setActivitySearchCountry] = useState<string>("")
-    const [activitySearchRegion, setActivitySearchRegion] = useState<string>("")
+
 
 
     useEffect(() => {
@@ -229,51 +218,6 @@ export function ItineraryView() {
         }
     }
 
-    const handleManualCreate = async () => {
-        if (isCreating) return // 防止重複點擊
-        haptic.tap()
-
-        const userName = localStorage.getItem("user_nickname")
-        const activeUserId = localStorage.getItem("user_uuid") || userId
-        if (!activeUserId || !newTripTitle) { haptic.error(); return }
-
-        setIsCreating(true)
-        try {
-            await fetch(`${API_BASE}/api/trip/create-manual`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: newTripTitle, start_date: newTripStart, end_date: newTripEnd,
-                    creator_name: userName, user_id: activeUserId,
-                    cover_image: newTripCover
-                })
-            })
-            haptic.success()
-            setIsCreateOpen(false)
-            setNewTripCover("")
-            reloadTrips()
-        } catch { haptic.error(); toast.error("Create failed") }
-        finally { setIsCreating(false) }
-    }
-
-    const handleJoinTrip = async () => {
-        if (joinCode.length !== 4) { toast.warning("Please enter 4-digit code"); return }
-        setIsJoinLoading(true)
-        const userName = localStorage.getItem("user_nickname")
-        const activeUserId = localStorage.getItem("user_uuid") || userId
-        try {
-            const res = await fetch(`${API_BASE}/api/join-trip`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ share_code: joinCode, user_id: activeUserId, user_name: userName })
-            })
-            if (!res.ok) throw new Error("Invalid code")
-            toast.success("Joined!")
-            setJoinCode("")
-            reloadTrips()
-        } catch { toast.error("Trip not found") }
-        finally { setIsJoinLoading(false) }
-    }
 
     const handleSearchLocation = async () => {
         if (!newLocName.trim()) return
@@ -538,33 +482,13 @@ export function ItineraryView() {
                 </header>
 
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="h-24 border-2 border-dashed border-slate-300 bg-transparent text-slate-400 hover:bg-slate-100 rounded-2xl flex flex-col gap-2"><Plus className="w-6 h-6" /><span className="text-xs font-bold uppercase">{t('new_trip')}</span></Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader><DialogTitle>{t('create_trip')}</DialogTitle></DialogHeader>
-                            <div className="space-y-4 py-4">
-                                {/* Cover Image Upload */}
-                                <div className="flex justify-center">
-                                    <ImageUpload
-                                        value={newTripCover}
-                                        onChange={setNewTripCover}
-                                        onRemove={() => setNewTripCover("")}
-                                        folder="ryan_travel/covers"
-                                    />
-                                </div>
-                                <div className="space-y-2"><Label>{t('trip_name')}</Label><Input value={newTripTitle} onChange={e => setNewTripTitle(e.target.value)} placeholder="Tokyo 2026" /></div>
-                                <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>{t('start_date')}</Label><Input type="date" value={newTripStart} onChange={e => setNewTripStart(e.target.value)} /></div><div className="space-y-2"><Label>{t('end_date')}</Label><Input type="date" value={newTripEnd} onChange={e => setNewTripEnd(e.target.value)} /></div></div>
-                                <div className="flex gap-2 pt-2"><Button className="flex-1" onClick={handleManualCreate} disabled={isCreating}>{isCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />創建中...</> : t('create')}</Button><Button variant="outline" className="flex-1" onClick={() => toast.info("Go to Tools page for AI import")}>{t('ai_import')}</Button></div>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
-
-                    <Dialog>
-                        <DialogTrigger asChild><Button className="h-24 bg-slate-900 text-white hover:bg-slate-800 rounded-2xl flex flex-col gap-2 shadow-lg"><Hash className="w-6 h-6 text-amber-400" /><span className="text-xs font-bold uppercase">{t('join_code')}</span></Button></DialogTrigger>
-                        <DialogContent className="sm:max-w-xs"><DialogHeader><DialogTitle>{t('enter_trip_code')}</DialogTitle></DialogHeader><div className="space-y-4 py-4"><Input placeholder="8821" className="text-center text-2xl tracking-[0.5em] font-mono uppercase h-14" maxLength={4} value={joinCode} onChange={(e) => setJoinCode(e.target.value)} /><Button className="w-full" onClick={handleJoinTrip} disabled={isJoinLoading}>{isJoinLoading ? t('joining') : t('join_trip')}</Button></div></DialogContent>
-                    </Dialog>
+                    <CreateTripModal
+                        isOpen={isCreateOpen}
+                        onOpenChange={setIsCreateOpen}
+                        userId={userId || ""}
+                        onSuccess={reloadTrips}
+                    />
+                    <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
                 </div>
 
                 <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
@@ -964,9 +888,6 @@ export function ItineraryView() {
                                             image_url: item.image_url,
                                             tags: item.tags || []
                                         })
-                                        // Reset search filters when opening edit
-                                        setActivitySearchCountry("")
-                                        setActivitySearchRegion("")
                                         setIsEditOpen(true)
                                     }}
                                     onDelete={(id) => {
@@ -995,9 +916,6 @@ export function ItineraryView() {
                                 }
                                 setIsAddMode(true);
                                 setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] });
-                                // Reset search filters when opening add
-                                setActivitySearchCountry("")
-                                setActivitySearchRegion("")
                                 setIsEditOpen(true);
                             }}
                         >
@@ -1012,310 +930,16 @@ export function ItineraryView() {
                 </div>
             </PullToRefresh >
 
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>{isAddMode ? "Add Activity" : "Edit Activity"}</DialogTitle></DialogHeader>
-                    {editItem && (
-                        <div className="space-y-4 py-4">
-                            {/* Spot Photo Upload */}
-                            <div className="flex justify-center mb-2">
-                                <ImageUpload
-                                    value={editItem.image_url}
-                                    onChange={(url) => setEditItem({ ...editItem, image_url: url })}
-                                    onRemove={() => setEditItem({ ...editItem, image_url: "" })}
-                                    folder="ryan_travel/spots"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Time</Label>
-                                <Input type="time" value={editItem.time} onChange={(e) => setEditItem({ ...editItem, time: e.target.value })} className="w-full" />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label>Filter</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <select
-                                        className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        value={activitySearchCountry}
-                                        onChange={(e) => {
-                                            setActivitySearchCountry(e.target.value)
-                                            setActivitySearchRegion("") // Reset region when country changes
-                                        }}
-                                    >
-                                        <option value="">🌍 Country</option>
-                                        <option value="Japan">🇯🇵 Japan</option>
-                                        <option value="Taiwan">🇹🇼 Taiwan</option>
-                                        <option value="South Korea">🇰🇷 Korea</option>
-                                        <option value="Thailand">🇹🇭 Thailand</option>
-                                        <option value="Vietnam">🇻🇳 Vietnam</option>
-                                        <option value="Hong Kong">🇭🇰 Hong Kong</option>
-                                        <option value="Singapore">🇸🇬 Singapore</option>
-                                        <option value="USA">🇺🇸 USA</option>
-                                        <option value="UK">🇬🇧 UK</option>
-                                        <option value="France">🇫🇷 France</option>
-                                        <option value="Italy">🇮🇹 Italy</option>
-                                    </select>
-
-                                    {activitySearchCountry && COUNTRY_REGIONS[activitySearchCountry] ? (
-                                        <select
-                                            className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                            value={activitySearchRegion}
-                                            onChange={(e) => setActivitySearchRegion(e.target.value)}
-                                        >
-                                            <option value="">🏙️ Region (All)</option>
-                                            {COUNTRY_REGIONS[activitySearchCountry].map(region => (
-                                                <option key={region} value={region}>{region}</option>
-                                            ))}
-                                        </select>
-                                    ) : (
-                                        <Input
-                                            placeholder="🏙️ Region"
-                                            className="w-full"
-                                            value={activitySearchRegion}
-                                            onChange={(e) => setActivitySearchRegion(e.target.value)}
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Place</Label>
-                                <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={editItem.place}
-                                            onChange={(e) => setEditItem({ ...editItem, place: e.target.value })}
-                                            placeholder="輸入商家/景點名稱..."
-                                            onKeyDown={(e) => e.key === 'Enter' && (async () => {
-                                                if (!editItem.place?.trim()) return
-                                                setIsPlaceSearching(true)
-                                                try {
-                                                    const res = await fetch(`${API_BASE}/api/geocode/search`, {
-                                                        method: "POST",
-                                                        headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({
-                                                            query: `${editItem.place} ${activitySearchRegion} ${activitySearchCountry}`.trim(),
-                                                            limit: 5
-                                                        })
-                                                    })
-                                                    const data = await res.json()
-                                                    setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
-                                                        name: item.name,
-                                                        display_name: item.address || item.name,
-                                                        lat: item.lat,
-                                                        lng: item.lng,
-                                                        type: item.type || "place",
-                                                        source: item.source
-                                                    })))
-                                                } catch { toast.error('搜尋失敗') }
-                                                finally { setIsPlaceSearching(false) }
-                                            })()}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            disabled={isPlaceSearching}
-                                            onClick={async () => {
-                                                if (!editItem.place?.trim()) return
-                                                setIsPlaceSearching(true)
-                                                try {
-                                                    const res = await fetch(`${API_BASE}/api/geocode/search`, {
-                                                        method: "POST",
-                                                        headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({
-                                                            query: `${editItem.place} ${activitySearchRegion} ${activitySearchCountry}`.trim(),
-                                                            limit: 5
-                                                        })
-                                                    })
-                                                    const data = await res.json()
-                                                    setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
-                                                        name: item.name,
-                                                        display_name: item.address || item.name,
-                                                        lat: item.lat,
-                                                        lng: item.lng,
-                                                        type: item.type || "place",
-                                                        source: item.source
-                                                    })))
-                                                } catch { toast.error('搜尋失敗') }
-                                                finally { setIsPlaceSearching(false) }
-                                            }}
-                                        >
-                                            {isPlaceSearching ? '...' : '🔍'}
-                                        </Button>
-                                    </div>
-
-                                    {placeSearchResults.length > 0 && (
-                                        <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2 bg-slate-50">
-                                            {placeSearchResults.map((loc, idx) => {
-                                                const typeLabels: { [key: string]: string } = {
-                                                    restaurant: '🍽️', cafe: '☕', fast_food: '🍔',
-                                                    station: '🚉', bus_stop: '🚌', subway_entrance: '🚇',
-                                                    hotel: '🏨', hostel: '🛏️', attraction: '🎯',
-                                                    museum: '🏛️', park: '🌳', temple: '⛩️', shrine: '⛩️',
-                                                    shop: '🛍️', mall: '🏬', supermarket: '🛒',
-                                                }
-                                                const icon = typeLabels[loc.type || ''] || '📍'
-                                                return (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        className="w-full text-left p-2 rounded hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
-                                                        onClick={() => {
-                                                            setEditItem({ ...editItem, place: loc.name, lat: loc.lat, lng: loc.lng })
-                                                            setPlaceSearchResults([])
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <span>{icon}</span>
-                                                            <span className="font-bold text-sm text-slate-800">{loc.name}</span>
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-400 line-clamp-1 ml-6">{loc.display_name}</div>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 🆕 POI 快速搜索 */}
-                            {(editItem.lat && editItem.lng) || (dailyLocs[day]?.lat && dailyLocs[day]?.lng) ? (
-                                <div className="border-t border-dashed pt-4 mt-2">
-                                    <Label className="text-xs text-slate-500 mb-2 block">📍 附近搜索</Label>
-                                    <POISearch
-                                        centerLat={Number(editItem.lat) || dailyLocs[day]?.lat || 35.6895}
-                                        centerLng={Number(editItem.lng) || dailyLocs[day]?.lng || 139.6917}
-                                        onSelectPOI={(poi) => {
-                                            setEditItem({
-                                                ...editItem,
-                                                place: poi.name,
-                                                lat: poi.lat,
-                                                lng: poi.lng,
-                                                desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : editItem.desc
-                                            })
-                                            toast.success(`已選擇: ${poi.name}`)
-                                        }}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="text-xs text-slate-400 text-center py-2 border-t border-dashed mt-2">
-                                    💡 先搜索地點以啟用附近 POI 搜索
-                                </div>
-                            )}
-
-                            <div className="space-y-1.5">
-                                <Label>Notes</Label>
-                                <Input value={editItem.desc} onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })} className="w-full" />
-                            </div>
-
-                            {/* 🆕 分類選擇器 - 圖示按鈕 */}
-                            <div className="space-y-1.5">
-                                <Label>Category</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {[
-                                        { id: 'sightseeing', icon: '🎯', label: '景點' },
-                                        { id: 'food', icon: '🍽️', label: '美食' },
-                                        { id: 'hotel', icon: '🏨', label: '住宿' },
-                                        { id: 'transport', icon: '🚃', label: '交通' },
-                                        { id: 'shopping', icon: '🛍️', label: '購物' },
-                                        { id: 'activity', icon: '🎭', label: '活動' },
-                                    ].map(cat => (
-                                        <button
-                                            key={cat.id}
-                                            type="button"
-                                            onClick={() => setEditItem({ ...editItem, category: cat.id })}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all",
-                                                editItem.category === cat.id
-                                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                                            )}
-                                        >
-                                            <span>{cat.icon}</span>
-                                            <span>{cat.label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* 🆕 標籤編輯器 */}
-                            <div className="space-y-1.5">
-                                <Label>Tags</Label>
-                                <div className="space-y-2">
-                                    <div className="flex flex-wrap gap-1">
-                                        {(editItem.tags || []).map((tag: string, i: number) => (
-                                            <span key={i} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
-                                                {tag}
-                                                <button
-                                                    type="button"
-                                                    className="hover:text-red-800"
-                                                    onClick={() => setEditItem({
-                                                        ...editItem,
-                                                        tags: (editItem.tags || []).filter((_: string, idx: number) => idx !== i)
-                                                    })}
-                                                >×</button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            id="tag-input"
-                                            placeholder="新增標籤"
-                                            className="text-sm flex-1"
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault()
-                                                    const input = e.target as HTMLInputElement
-                                                    const newTag = input.value.trim()
-                                                    if (newTag && !(editItem.tags || []).includes(newTag)) {
-                                                        setEditItem({ ...editItem, tags: [...(editItem.tags || []), newTag] })
-                                                        input.value = ''
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                                const input = document.getElementById('tag-input') as HTMLInputElement
-                                                const newTag = input?.value?.trim()
-                                                if (newTag && !(editItem.tags || []).includes(newTag)) {
-                                                    setEditItem({ ...editItem, tags: [...(editItem.tags || []), newTag] })
-                                                    input.value = ''
-                                                }
-                                            }}
-                                        >
-                                            +
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5 pt-2 border-t border-dashed">
-                                <Label className="text-xs text-muted-foreground">Coordinates</Label>
-                                <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <Input placeholder="Lat" className="text-xs font-mono" value={editItem.lat || ''} onChange={(e) => setEditItem({ ...editItem, lat: e.target.value })} />
-                                        <Input placeholder="Lng" className="text-xs font-mono" value={editItem.lng || ''} onChange={(e) => setEditItem({ ...editItem, lng: e.target.value })} />
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[10px] text-slate-400">{editItem.lat && editItem.lng ? "Precise" : "Search mode"}</span>
-                                        <Button type="button" variant="ghost" size="sm" className="h-6 text-[10px] text-red-400" onClick={() => setEditItem({ ...editItem, lat: null, lng: null })}>Clear</Button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <DialogFooter>
-                                <Button onClick={handleSaveEdit} disabled={isSavingActivity}>
-                                    {isSavingActivity ? "儲存中..." : (isAddMode ? "Add" : "Save")}
-                                </Button>
-                            </DialogFooter>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <ActivityEditModal
+                isOpen={isEditOpen}
+                onOpenChange={setIsEditOpen}
+                editItem={editItem}
+                setEditItem={setEditItem}
+                isAddMode={isAddMode}
+                isSaving={isSavingActivity}
+                onSave={handleSaveEdit}
+                dailyLoc={dailyLocs[day]}
+            />
         </div >
     )
 }

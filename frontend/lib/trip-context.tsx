@@ -1,7 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, useEffect, ReactNode } from "react"
 import { useTrips } from "./hooks"
+import { useTripStore } from "./stores/tripStore"
 
 interface TripContextType {
     activeTripId: string | null
@@ -16,18 +17,27 @@ interface TripContextType {
 const TripContext = createContext<TripContextType | undefined>(undefined)
 
 export function TripProvider({ children }: { children: ReactNode }) {
-    const [userId, setUserId] = useState<string | null>(null)
-    const [activeTripId, setActiveTripId] = useState<string | null>(null)
+    // Use Zustand store for state management
+    const activeTripId = useTripStore((s) => s.activeTripId)
+    const userId = useTripStore((s) => s.userId)
+    const setActiveTripId = useTripStore((s) => s.setActiveTripId)
+    const setUserId = useTripStore((s) => s.setUserId)
+    const setActiveTripTitle = useTripStore((s) => s.setActiveTripTitle)
 
-    // 初始化時從 localStorage 讀取 user_uuid
+    // 初始化時從 localStorage 讀取 user_uuid (保持向後兼容)
     useEffect(() => {
         if (typeof window !== "undefined") {
-            setUserId(localStorage.getItem("user_uuid"))
-            // 嘗試恢復上次選中的行程
+            const storedUserId = localStorage.getItem("user_uuid")
+            if (storedUserId && storedUserId !== userId) {
+                setUserId(storedUserId)
+            }
+            // 如果 store 沒有 activeTripId，嘗試從舊的 localStorage 恢復
             const savedTripId = localStorage.getItem("active_trip_id")
-            if (savedTripId) setActiveTripId(savedTripId)
+            if (savedTripId && !activeTripId) {
+                setActiveTripId(savedTripId)
+            }
         }
-    }, [])
+    }, [activeTripId, userId, setActiveTripId, setUserId])
 
     const { trips, isLoading, mutate } = useTrips(userId)
 
@@ -35,47 +45,50 @@ export function TripProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (!isLoading && trips.length > 0) {
             if (activeTripId) {
-                // 🆕 檢查快取的 ID 是否存在於 trips 中
+                // 檢查快取的 ID 是否存在於 trips 中
                 const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
                 if (!tripExists) {
                     console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
                     const latestTrip = trips[0]
                     setActiveTripId(latestTrip.id)
-                    localStorage.setItem("active_trip_id", latestTrip.id)
+                    setActiveTripTitle(latestTrip.title || null)
                 }
             } else {
                 // 沒有選中行程時，預設選中最新的行程
                 const latestTrip = trips[0]
                 setActiveTripId(latestTrip.id)
-                localStorage.setItem("active_trip_id", latestTrip.id)
+                setActiveTripTitle(latestTrip.title || null)
             }
         }
-    }, [isLoading, trips, activeTripId])
+    }, [isLoading, trips, activeTripId, setActiveTripId, setActiveTripTitle])
 
-    // 當切換行程時，儲存到 localStorage
+    // 當切換行程時的處理函數
     const handleSetActiveTripId = (id: string | null) => {
         setActiveTripId(id)
         if (id) {
+            // 同步到舊的 localStorage 格式 (向後兼容)
             localStorage.setItem("active_trip_id", id)
-            // 🆕 儲存行程標題，供 ChatWidget 使用
             const trip = trips.find((t: { id: string }) => t.id === id)
             if (trip?.title) {
                 localStorage.setItem("active_trip_title", trip.title)
+                setActiveTripTitle(trip.title)
             }
         } else {
             localStorage.removeItem("active_trip_id")
             localStorage.removeItem("active_trip_title")
+            setActiveTripTitle(null)
         }
     }
 
     const activeTrip = trips.find((t: { id: string; title?: string }) => t.id === activeTripId) || null
 
-    // 🆕 當 activeTrip 變更時，也更新 localStorage
+    // 當 activeTrip 變更時，更新 title
     useEffect(() => {
         if (activeTrip?.title) {
             localStorage.setItem("active_trip_title", activeTrip.title)
+            setActiveTripTitle(activeTrip.title)
         }
-    }, [activeTrip])
+    }, [activeTrip, setActiveTripTitle])
 
     return (
         <TripContext.Provider value={{
@@ -99,3 +112,4 @@ export function useTripContext() {
     }
     return context
 }
+
