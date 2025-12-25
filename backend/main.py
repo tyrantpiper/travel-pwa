@@ -1131,6 +1131,60 @@ async def delete_trip(trip_id: str):
         print(f"🔥 Delete Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# 🔥 功能 3.3.5: 更新每日資訊 (notes/costs/tickets)
+class UpdateDayDataRequest(BaseModel):
+    day: int
+    day_notes: Optional[dict] = None
+    day_costs: Optional[dict] = None
+    day_tickets: Optional[dict] = None
+
+@app.put("/api/trips/{trip_id}/day-data")
+async def update_day_data(trip_id: str, request: UpdateDayDataRequest):
+    """更新特定天的注意事項、預估花費、交通票券"""
+    try:
+        print(f"📝 更新 Day {request.day} 資訊 for Trip {trip_id}")
+        
+        # 1. 取得現有行程
+        trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="Trip not found")
+        
+        content = trip_res.data[0].get("content") or {}
+        
+        # 2. 更新對應的資料 (注意: 前端傳來的 key 是字串或整數，需統一處理)
+        day_key = str(request.day)
+        
+        if request.day_notes is not None:
+            existing_notes = content.get("day_notes", {})
+            # 前端傳來的格式: { "1": [...] } 或 { 1: [...] }
+            new_data = request.day_notes.get(day_key) or request.day_notes.get(request.day) or []
+            existing_notes[day_key] = new_data
+            content["day_notes"] = existing_notes
+            
+        if request.day_costs is not None:
+            existing_costs = content.get("day_costs", {})
+            new_data = request.day_costs.get(day_key) or request.day_costs.get(request.day) or []
+            existing_costs[day_key] = new_data
+            content["day_costs"] = existing_costs
+            
+        if request.day_tickets is not None:
+            existing_tickets = content.get("day_tickets", {})
+            new_data = request.day_tickets.get(day_key) or request.day_tickets.get(request.day) or []
+            existing_tickets[day_key] = new_data
+            content["day_tickets"] = existing_tickets
+        
+        # 3. 寫回資料庫
+        update_res = supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+        
+        print(f"✅ Day {request.day} 資訊更新成功")
+        return {"status": "success", "day": request.day}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Update Day Data Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # 🔥 功能 3.4: 追加細項到現有行程
 class AppendItemsRequest(BaseModel):
     items: List[ItineraryItem]

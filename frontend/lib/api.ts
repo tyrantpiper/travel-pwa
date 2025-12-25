@@ -163,6 +163,21 @@ export const tripsApi = {
         if (!res.ok) throw new Error("Failed to delete day")
         return res.json()
     },
+
+    /** Update day data (notes, costs, tickets) */
+    updateDayData: async (tripId: string, day: number, data: {
+        day_notes?: Record<number, { icon?: string; title: string; content: string }[]>
+        day_costs?: Record<number, { item: string; amount: string; note?: string }[]>
+        day_tickets?: Record<number, { name: string; price: string; note?: string }[]>
+    }) => {
+        const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ day, ...data })
+        })
+        if (!res.ok) throw new Error("Failed to update day data")
+        return res.json()
+    },
 }
 
 /**

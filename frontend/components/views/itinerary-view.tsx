@@ -18,7 +18,8 @@ import { ActivityEditModal } from "@/components/itinerary/ActivityEditModal"
 import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDialogs"
 
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
-import DailyTips from "@/components/daily-tips"
+import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
+import { tripsApi } from "@/lib/api"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
@@ -851,11 +852,28 @@ export function ItineraryView() {
 
 
 
-                <DailyTips
+                <EditableDailyTips
+                    tripId={activeTripId || ""}
                     day={day}
-                    notes={currentTrip?.day_notes?.[day]}
-                    costs={currentTrip?.day_costs?.[day]}
-                    tickets={currentTrip?.day_tickets?.[day]}
+                    notes={currentTrip?.day_notes?.[day] || []}
+                    costs={currentTrip?.day_costs?.[day] || []}
+                    tickets={currentTrip?.day_tickets?.[day] || []}
+                    onUpdate={async (type, data) => {
+                        if (!activeTripId) return false
+                        try {
+                            const updatePayload: Record<string, unknown> = {}
+                            if (type === "notes") updatePayload.day_notes = { [day]: data }
+                            if (type === "costs") updatePayload.day_costs = { [day]: data }
+                            if (type === "tickets") updatePayload.day_tickets = { [day]: data }
+                            await tripsApi.updateDayData(activeTripId, day, updatePayload as Parameters<typeof tripsApi.updateDayData>[2])
+                            await reloadTripDetail()
+                            return true
+                        } catch (e) {
+                            console.error("Failed to update day data:", e)
+                            toast.error("更新失敗")
+                            return false
+                        }
+                    }}
                 />
 
                 <div className="px-5 py-6 space-y-1">
