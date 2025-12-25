@@ -1,10 +1,34 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import Map, { Marker, Popup, Source, Layer, NavigationControl } from "react-map-gl/maplibre"
+import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Bus, Car, Footprints } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon } from "lucide-react"
+import { MAP_STYLES } from "@/lib/constants"
+
+// Activity 類型定義
+interface Activity {
+    id?: string
+    lat?: number
+    lng?: number
+    place?: string
+    time?: string
+    desc?: string
+    category?: string
+}
+
+// Marker 必須有座標
+interface MarkerData {
+    id?: string
+    lat: number
+    lng: number
+    place?: string
+    time?: string
+    desc?: string
+    category?: string
+    number: number
+}
 
 // 路線顏色對照
 const routeColors = {
@@ -17,7 +41,7 @@ const routeColors = {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 // 路線規劃 Hook (使用後端 /api/route 代理)
-function useRoute(markersKey: string, markers: any[], mode: string, optimize: boolean = false) {
+function useRoute(markersKey: string, markers: MarkerData[], mode: string, optimize: boolean = false) {
     const [route, setRoute] = useState<GeoJSON.Feature | null>(null)
     const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; source?: string } | null>(null)
     const [loading, setLoading] = useState(false)
@@ -119,29 +143,86 @@ function useRoute(markersKey: string, markers: any[], mode: string, optimize: bo
 }
 
 interface DayMapProps {
-    activities: any[]
+    activities: Activity[]
 }
 
 export default function DayMap({ activities }: DayMapProps) {
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
-    const [popupInfo, setPopupInfo] = useState<any>(null)
-    const [mapLoaded, setMapLoaded] = useState(false)  // 🆕 地圖載入狀態
+    const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
+    const [mapLoaded, setMapLoaded] = useState(false)
+
+    // 🆕 Terra-Cognita: 底圖模式 (標準/衛星)
+    const [mapMode, setMapMode] = useState<'standard' | 'satellite'>('standard')
+
+    // 🆕 Zoom 等級顯示
+    const [zoomLevel, setZoomLevel] = useState(13)
 
     // 過濾出有座標的地點
     const markers = activities
-        .filter(a => a.lat && a.lng)
+        .filter((a): a is Activity & { lat: number; lng: number } =>
+            typeof a.lat === 'number' && typeof a.lng === 'number'
+        )
         .map((a, index) => ({
             ...a,
             number: index + 1
-        }))
+        })) as MarkerData[]
 
     const markersKey = markers.map(m => `${m.lat},${m.lng}`).join('|')
     const { route, routeInfo, loading } = useRoute(markersKey, markers, mode)
 
-    // 自動縮放到所有點
+    // 🆕 Terra-Cognita: 切換圖層可見性
+    const updateLayerVisibility = useCallback((isSatellite: boolean) => {
+        const map = mapRef.current?.getMap()
+        if (!map || !map.isStyleLoaded()) return
+
+        const layers = map.getStyle()?.layers || []
+
+        layers.forEach(layer => {
+            const layerId = layer.id.toLowerCase()
+
+            // 衛星模式：隱藏背景類圖層
+            if (MAP_STYLES.LAYERS_HIDE_ON_SATELLITE.some(hide => layerId.includes(hide))) {
+                map.setLayoutProperty(layer.id, 'visibility', isSatellite ? 'none' : 'visible')
+            }
+
+            // 衛星模式：調整道路透明度
+            if (MAP_STYLES.LAYERS_TRANSPARENT_ON_SATELLITE.some(road => layerId.includes(road))) {
+                if (layer.type === 'line') {
+                    try {
+                        map.setPaintProperty(
+                            layer.id,
+                            'line-opacity',
+                            isSatellite ? MAP_STYLES.ROAD_OPACITY_ON_SATELLITE : 1
+                        )
+                    } catch (_e) {
+                        // 某些圖層可能不支援此屬性
+                    }
+                }
+            }
+        })
+
+        // 切換衛星圖層可見性
+        if (map.getLayer('satellite-layer')) {
+            map.setLayoutProperty('satellite-layer', 'visibility', isSatellite ? 'visible' : 'none')
+        }
+    }, [])
+
+    // 模式切換時更新圖層
+    useEffect(() => {
+        if (mapLoaded) {
+            updateLayerVisibility(mapMode === 'satellite')
+        }
+    }, [mapMode, mapLoaded, updateLayerVisibility])
+
+    // 自動縮放到所有點 (只在初次載入時執行)
+    const hasInitialized = useRef(false)
+
     const fitBounds = useCallback(() => {
-        if (markers.length === 0 || !mapRef.current || !mapLoaded) return  // 🆕 檢查 mapLoaded
+        if (markers.length === 0 || !mapRef.current || !mapLoaded) return
+        if (hasInitialized.current) return  // 🆕 只執行一次
+
+        hasInitialized.current = true
 
         if (markers.length === 1) {
             mapRef.current.flyTo({
@@ -159,12 +240,78 @@ export default function DayMap({ activities }: DayMapProps) {
         ]
 
         mapRef.current.fitBounds(bounds, { padding: 60, duration: 500 })
-    }, [markers, mapLoaded])  // 🆕 加入 mapLoaded 依賴
+    }, [markers, mapLoaded])
 
     useEffect(() => {
         const timer = setTimeout(fitBounds, 100)
         return () => clearTimeout(timer)
     }, [fitBounds])
+
+    // 🆕 地圖載入後添加衛星圖層
+    const handleMapLoad = useCallback(() => {
+        setMapLoaded(true)
+
+        const map = mapRef.current?.getMap()
+        if (!map) return
+
+        // 添加 Esri 衛星 Source
+        if (!map.getSource('satellite')) {
+            map.addSource('satellite', {
+                type: 'raster',
+                tiles: [MAP_STYLES.SATELLITE],
+                tileSize: 256,
+                attribution: '© Esri'
+            })
+        }
+
+        // 添加衛星圖層 (最底層，預設隱藏)
+        if (!map.getLayer('satellite-layer')) {
+            const firstLayerId = map.getStyle()?.layers?.[0]?.id
+            map.addLayer({
+                id: 'satellite-layer',
+                type: 'raster',
+                source: 'satellite',
+                layout: { visibility: 'none' },
+                paint: { 'raster-opacity': 1 }
+            }, firstLayerId)
+        }
+
+        // 🆕 3D 建築層 (OpenMapTiles Schema)
+        if (!map.getLayer('3d-buildings')) {
+            // 找出文字標籤層的 ID (確保 3D 建築插在文字下面)
+            const layers = map.getStyle()?.layers || []
+            const labelLayerId = layers.find(
+                (layer) => layer.type === 'symbol' && 'layout' in layer && layer.layout?.['text-field']
+            )?.id
+
+            map.addLayer({
+                id: '3d-buildings',
+                source: 'openmaptiles',
+                'source-layer': 'building',
+                filter: ['==', 'extrude', 'true'],
+                type: 'fill-extrusion',
+                minzoom: MAP_STYLES.BUILDING_3D.MIN_ZOOM,
+                paint: {
+                    'fill-extrusion-color': MAP_STYLES.BUILDING_3D.COLOR,
+                    'fill-extrusion-height': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15, 0,
+                        15.05, ['get', 'render_height']
+                    ],
+                    'fill-extrusion-base': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15, 0,
+                        15.05, ['get', 'render_min_height']
+                    ],
+                    'fill-extrusion-opacity': MAP_STYLES.BUILDING_3D.OPACITY
+                }
+            }, labelLayerId)
+        }
+    }, [])
 
     if (markers.length === 0) {
         return (
@@ -181,7 +328,7 @@ export default function DayMap({ activities }: DayMapProps) {
 
     return (
         <div className="space-y-2">
-            {/* 交通模式選擇器 */}
+            {/* 交通模式選擇器 + 底圖切換 */}
             <div className="flex items-center justify-between">
                 <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
                     <button
@@ -210,14 +357,30 @@ export default function DayMap({ activities }: DayMapProps) {
                     </button>
                 </div>
 
-                {/* 路線資訊 */}
-                {routeInfo && (
-                    <div className="flex items-center gap-3 text-xs">
-                        <span className="text-slate-500">📏 {routeInfo.distance}</span>
-                        <span className="text-slate-500">⏱️ {routeInfo.duration}</span>
-                        {loading && <span className="text-amber-500 animate-pulse">載入中...</span>}
-                    </div>
-                )}
+                {/* 🆕 底圖切換按鈕 */}
+                <div className="flex items-center gap-2">
+                    {routeInfo && (
+                        <div className="flex items-center gap-3 text-xs">
+                            <span className="text-slate-500">📏 {routeInfo.distance}</span>
+                            <span className="text-slate-500">⏱️ {routeInfo.duration}</span>
+                            {loading && <span className="text-amber-500 animate-pulse">載入中...</span>}
+                        </div>
+                    )}
+                    <button
+                        onClick={() => setMapMode(m => m === 'standard' ? 'satellite' : 'standard')}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${mapMode === 'satellite'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                            }`}
+                        title={mapMode === 'satellite' ? '切換到標準地圖' : '切換到衛星圖'}
+                    >
+                        {mapMode === 'satellite' ? (
+                            <><MapIcon className="w-3.5 h-3.5" /> 標準</>
+                        ) : (
+                            <><Satellite className="w-3.5 h-3.5" /> 衛星</>
+                        )}
+                    </button>
+                </div>
             </div>
 
             {/* 地圖容器 */}
@@ -230,10 +393,22 @@ export default function DayMap({ activities }: DayMapProps) {
                         zoom: 13
                     }}
                     style={{ width: "100%", height: "100%" }}
-                    mapStyle="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-                    onLoad={() => setMapLoaded(true)}  // 🆕 地圖載入完成
+                    mapStyle={MAP_STYLES.VECTOR}
+                    onLoad={handleMapLoad}
+                    onZoom={(e) => setZoomLevel(Math.round(e.viewState.zoom * 10) / 10)}
+                    attributionControl={false}
                 >
                     <NavigationControl position="top-right" />
+                    <AttributionControl
+                        customAttribution="© OpenStreetMap · © OpenFreeMap · © Esri"
+                        position="bottom-right"
+                        compact={true}
+                    />
+
+                    {/* 🆕 Zoom 顯示器 */}
+                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-mono px-1.5 py-0.5 rounded z-10">
+                        Z: {zoomLevel.toFixed(1)} {zoomLevel >= 15 && '🏢'}
+                    </div>
 
                     {/* 路線繪製 */}
                     {route && (
@@ -323,6 +498,7 @@ export default function DayMap({ activities }: DayMapProps) {
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> 起點</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-800"></span> 途經</span>
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 終點</span>
+                {mapMode === 'satellite' && <span className="flex items-center gap-1">🛰️ 衛星模式</span>}
             </div>
         </div>
     )

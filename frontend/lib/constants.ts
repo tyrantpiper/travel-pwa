@@ -20,3 +20,43 @@ export const COUNTRY_REGIONS: { [key: string]: string[] } = {
     "France": ["Paris 巴黎", "Nice 尼斯", "Lyon 里昂", "Marseille 馬賽"],
     "Italy": ["Rome 羅馬", "Milan 米蘭", "Venice 威尼斯", "Florence 佛羅倫斯"],
 }
+
+/**
+ * 地圖樣式配置 (Terra-Cognita 架構)
+ * 可透過環境變數覆寫實現解耦
+ */
+export const MAP_STYLES = {
+    // OpenFreeMap 向量底圖 (免費、無限制、無 API Key)
+    VECTOR: process.env.NEXT_PUBLIC_MAP_STYLE_VECTOR || "https://tiles.openfreemap.org/styles/liberty",
+
+    // Esri 衛星影像 (免費，需標註來源)
+    SATELLITE: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+
+    // 3D 建築設定
+    BUILDING_3D: {
+        MIN_ZOOM: 15,           // 只在 zoom >= 15 時渲染 3D
+        MAX_HEIGHT: 200,        // 最大高度限制 (米)
+        OPACITY: 0.8,
+        COLOR: "#dcdcdc",
+    },
+
+    // 衛星模式下需隱藏的圖層 (背景類)
+    LAYERS_HIDE_ON_SATELLITE: [
+        "background",
+        "land",
+        "landcover",
+        "landuse",
+        "water",
+        "waterway",
+    ],
+
+    // 衛星模式下需調整透明度的圖層 (道路類)
+    LAYERS_TRANSPARENT_ON_SATELLITE: [
+        "road",
+        "bridge",
+        "tunnel",
+    ],
+
+    // 衛星模式道路透明度
+    ROAD_OPACITY_ON_SATELLITE: 0.7,
+}
