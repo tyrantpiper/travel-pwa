@@ -19,6 +19,7 @@ import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDial
 
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
+import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
 import { tripsApi } from "@/lib/api"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
@@ -870,6 +871,27 @@ export function ItineraryView() {
                             return true
                         } catch (e) {
                             console.error("Failed to update day data:", e)
+                            toast.error("更新失敗")
+                            return false
+                        }
+                    }}
+                />
+
+                {/* 🆕 行前清單 */}
+                <EditableDailyChecklist
+                    tripId={activeTripId || ""}
+                    day={day}
+                    items={currentTrip?.day_checklists?.[day] || []}
+                    onUpdate={async (items) => {
+                        if (!activeTripId) return false
+                        try {
+                            await tripsApi.updateDayData(activeTripId, day, {
+                                day_checklists: { [day]: items }
+                            })
+                            await reloadTripDetail()
+                            return true
+                        } catch (e) {
+                            console.error("Failed to update checklist:", e)
                             toast.error("更新失敗")
                             return false
                         }

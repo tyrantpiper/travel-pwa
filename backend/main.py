@@ -1137,6 +1137,7 @@ class UpdateDayDataRequest(BaseModel):
     day_notes: Optional[dict] = None
     day_costs: Optional[dict] = None
     day_tickets: Optional[dict] = None
+    day_checklists: Optional[dict] = None  # 🆕 行前清單
 
 @app.put("/api/trips/{trip_id}/day-data")
 async def update_day_data(trip_id: str, request: UpdateDayDataRequest):
@@ -1172,6 +1173,13 @@ async def update_day_data(trip_id: str, request: UpdateDayDataRequest):
             new_data = request.day_tickets.get(day_key) or request.day_tickets.get(request.day) or []
             existing_tickets[day_key] = new_data
             content["day_tickets"] = existing_tickets
+        
+        # 🆕 行前清單
+        if request.day_checklists is not None:
+            existing_checklists = content.get("day_checklists", {})
+            new_data = request.day_checklists.get(day_key) or request.day_checklists.get(request.day) or []
+            existing_checklists[day_key] = new_data
+            content["day_checklists"] = existing_checklists
         
         # 3. 寫回資料庫
         update_res = supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()

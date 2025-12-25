@@ -164,11 +164,12 @@ export const tripsApi = {
         return res.json()
     },
 
-    /** Update day data (notes, costs, tickets) */
+    /** Update day data (notes, costs, tickets, checklists) */
     updateDayData: async (tripId: string, day: number, data: {
         day_notes?: Record<number, { icon?: string; title: string; content: string }[]>
         day_costs?: Record<number, { item: string; amount: string; note?: string }[]>
         day_tickets?: Record<number, { name: string; price: string; note?: string }[]>
+        day_checklists?: Record<number, { id: string; text: string; checked: boolean }[]>
     }) => {
         const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
             method: "PUT",
