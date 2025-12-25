@@ -79,10 +79,15 @@ export default function ChatWidget() {
         return null
     }, [activeTrip])
 
-    // 🆕 產生精簡版行程供 AI 使用
+    // 🆕 產生精簡版行程供 AI 使用 (含 day_notes/costs)
     const leanItinerary: LeanItinerary | null = useMemo(() => {
         if (!activeTrip || !tripDetail?.items) return null
-        return getLeanItinerary(activeTrip, tripDetail.items)
+        return getLeanItinerary(
+            activeTrip,
+            tripDetail.items,
+            tripDetail.day_notes,  // 🆕 每日注意事項
+            tripDetail.day_costs   // 🆕 每日預估花費
+        )
     }, [activeTrip, tripDetail])
 
     const [isOpen, setIsOpen] = useState(false)
