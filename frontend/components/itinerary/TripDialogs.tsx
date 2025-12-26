@@ -16,7 +16,7 @@ interface CreateTripModalProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
     userId: string
-    onSuccess: () => void
+    onSuccess: (trip?: any) => void
 }
 
 export function CreateTripModal({
@@ -46,7 +46,7 @@ export function CreateTripModal({
 
         setIsCreating(true)
         try {
-            await tripsApi.create({
+            const newTrip = await tripsApi.create({
                 title,
                 start_date: startDate,
                 end_date: endDate,
@@ -58,7 +58,7 @@ export function CreateTripModal({
             onOpenChange(false)
             setCoverImage("")
             setTitle("")
-            onSuccess()
+            onSuccess(newTrip) // Pass the new trip back
         } catch {
             haptic.error()
             toast.error("Create failed")

@@ -422,6 +422,15 @@ export function ToolsView() {
         setAiLoading(true)
         setGenerateProgress("🤖 AI 正在生成行程...")
         const apiKey = localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
+
+        // 🛡️ 安全檢查：API Key 必須存在
+        if (!apiKey) {
+            toast.error("請先在設定中輸入 Gemini API Key")
+            setAiLoading(false)
+            setGenerateProgress(null)
+            return
+        }
+
         try {
             const response = await fetch(`${API_BASE}/api/ai-generate`, {
                 method: "POST",
@@ -462,6 +471,7 @@ export function ToolsView() {
 
         if (!userId || !userName) {
             toast.error("Please login first")
+            setIsSaving(false)  // 🛡️ 防止按鈕永久禁用
             return
         }
 

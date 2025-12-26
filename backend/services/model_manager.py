@@ -79,6 +79,12 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
             temperature=0.2,
             max_output_tokens=500,
         )
+    elif intent_type == "POI_ENRICH":
+        # 🆕 v4.0: POI 增強模式：快速摘要，JSON 輸出
+        return types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=1024,
+        )
     else:
         # 一般聊天
         return types.GenerateContentConfig(

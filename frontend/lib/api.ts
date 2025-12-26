@@ -187,10 +187,23 @@ export const tripsApi = {
 export const itemsApi = {
     /** Create a new item */
     create: async (params: CreateItemParams) => {
+        // 欄位轉換：前端 → 後端格式
+        const backendPayload = {
+            itinerary_id: params.trip_id,
+            day_number: params.day,
+            time_slot: params.time,
+            place_name: params.place,
+            category: params.category || "activity",
+            notes: params.desc,
+            lat: typeof params.lat === "string" ? parseFloat(params.lat) : params.lat,
+            lng: typeof params.lng === "string" ? parseFloat(params.lng) : params.lng,
+            image_url: params.image_url,  // 🆕 修復：圖片 URL
+            tags: params.tags             // 🆕 修復：標籤陣列
+        }
         const res = await fetch(API.ITEMS, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(params)
+            body: JSON.stringify(backendPayload)
         })
         if (!res.ok) throw new Error("Failed to create item")
         return res.json()

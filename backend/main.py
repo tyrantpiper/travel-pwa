@@ -20,7 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 from supabase import create_client, Client
-from google import genai  # 🆕 新版 SDK
+from google import genai
+from google.genai import types # 🆕 Import types
 import httpx  # For async HTTP requests (geocoding)
 from dotenv import load_dotenv
 
@@ -216,7 +217,11 @@ async def generate_itinerary(
         
         response = client.models.generate_content(
             model=PRIMARY_MODEL,
-            contents=prompt
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                max_output_tokens=8192
+            )
         )
         text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
@@ -745,9 +750,17 @@ async def ai_generate(
         ⚠️ 再次提醒：day_number 不可超過使用者指定的天數！
         """
         
-        # 🆕 v3.5: 使用統一的 Model Manager
-        from services.model_manager import call_extraction
-        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
+        # 🆕 Fix: 直接使用 Client + JSON Mode，確保不被截斷
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=PRIMARY_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                max_output_tokens=8192
+            )
+        )
+        raw_text = response.text
         
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         parsed_data = json.loads(cleaned_text)
@@ -2358,6 +2371,78 @@ async def summarize_history(request: SummarizeRequest, api_key: str = Depends(ge
     except Exception as e:
         print(f"🔥 摘要失敗：{e}")
         raise HTTPException(status_code=500, detail=f"摘要失敗: {str(e)}")
+
+
+# 🆕 v4.0: POI AI 增強 (Progressive Intelligence Layer 2)
+class POIAIEnrichRequest(BaseModel):
+    name: str
+    type: str
+    lat: float
+    lng: float
+    api_key: Optional[str] = None
+
+
+@app.post("/api/poi/ai-enrich")
+async def ai_enrich_poi(request: POIAIEnrichRequest):
+    """
+    AI 增強 POI 端點 - 使用 Gemini + Grounding 取得評論摘要
+    
+    Returns:
+        {
+            "summary": "AI 懶人包",
+            "must_try": ["推薦 1", "推薦 2"],
+            "rating": 4.5,
+            "business_status": "OPERATIONAL"
+        }
+    """
+    try:
+        api_key = request.api_key
+        if not api_key:
+            raise HTTPException(status_code=400, detail="需要 API Key")
+        
+        from services.model_manager import call_extraction
+        
+        prompt = f"""
+You are a travel guide assistant. Search the web for information about this place and provide a structured response.
+
+Target:
+- Name: {request.name}
+- Type: {request.type}
+- Location: {request.lat}, {request.lng}
+
+Please search for reviews, ratings, and popular items (if it's a restaurant).
+
+Output in this EXACT JSON format (no markdown, pure JSON):
+{{
+    "summary": "A 1-2 sentence vibe check in Traditional Chinese (e.g., 氛圍舒適的咖啡廳，適合約會或工作)",
+    "must_try": ["Item 1", "Item 2", "Item 3"],
+    "rating": 4.5,
+    "business_status": "OPERATIONAL"
+}}
+
+If it's not a restaurant, put relevant highlights in must_try field (e.g., ["夜景絕美", "拍照聖地"]).
+Rating should be a number from 1-5 based on general web sentiment.
+"""
+        
+        result = await call_extraction(api_key, prompt, "POI_ENRICH")
+        
+        # 解析 JSON
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', result)
+        if json_match:
+            data = json.loads(json_match.group())
+            return data
+        else:
+            return {
+                "summary": result[:200],
+                "must_try": [],
+                "rating": 0,
+                "business_status": "UNKNOWN"
+            }
+        
+    except Exception as e:
+        print(f"🔥 AI POI 增強失敗：{e}")
+        raise HTTPException(status_code=500, detail=f"AI 增強失敗: {str(e)}")
 
 
 # 🆕 v3.7: POI 三源整合 API

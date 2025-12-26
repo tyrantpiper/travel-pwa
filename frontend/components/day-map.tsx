@@ -4,8 +4,12 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Bus, Car, Footprints, Satellite, Map as MapIcon } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, Sparkles, MapPin, Clock } from "lucide-react"
 import { MAP_STYLES } from "@/lib/constants"
+import { Input } from "@/components/ui/input"
+import { geocodeApi } from "@/lib/api"
+import { motion, AnimatePresence } from "framer-motion"
+import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 
 // Activity 類型定義
 interface Activity {
@@ -39,6 +43,37 @@ const routeColors = {
 
 // API 基礎路徑
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// 搜尋結果類型
+interface SearchResult {
+    lat: number
+    lng: number
+    name: string
+    address?: string
+    type?: string
+}
+
+// 搜尋歷史 Hook
+const HISTORY_KEY = "map_search_history"
+function useSearchHistory() {
+    const [history, setHistory] = useState<SearchResult[]>(() => {
+        if (typeof window === 'undefined') return []
+        try {
+            const stored = localStorage.getItem(HISTORY_KEY)
+            return stored ? JSON.parse(stored) : []
+        } catch { return [] }
+    })
+
+    const addToHistory = useCallback((item: SearchResult) => {
+        setHistory(prev => {
+            const updated = [item, ...prev.filter(h => h.name !== item.name)].slice(0, 5)
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(updated))
+            return updated
+        })
+    }, [])
+
+    return { history, addToHistory }
+}
 
 // 路線規劃 Hook (使用後端 /api/route 代理)
 function useRoute(markersKey: string, markers: MarkerData[], mode: string, optimize: boolean = false) {
@@ -144,9 +179,10 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
 
 interface DayMapProps {
     activities: Activity[]
+    onAddPOI?: (poi: POIBasicData, time: string, notes?: string) => void
 }
 
-export default function DayMap({ activities }: DayMapProps) {
+export default function DayMap({ activities, onAddPOI }: DayMapProps) {
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
     const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
@@ -155,8 +191,126 @@ export default function DayMap({ activities }: DayMapProps) {
     // 🆕 Terra-Cognita: 底圖模式 (標準/衛星)
     const [mapMode, setMapMode] = useState<'standard' | 'satellite'>('standard')
 
-    // 🆕 Zoom 等級顯示
-    const [zoomLevel, setZoomLevel] = useState(13)
+    // 🆕 POI Detail Drawer 狀態
+    // 🆕 POI Detail Drawer 狀態
+    const [poiDrawerOpen, setPoiDrawerOpen] = useState(false)
+    const [selectedPOI, setSelectedPOI] = useState<POIBasicData | null>(null)
+
+    // 🔍 搜尋狀態
+    const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [query, setQuery] = useState("")
+    const [results, setResults] = useState<SearchResult[]>([])
+    const [isSearching, setIsSearching] = useState(false)
+    const [aiSearching, setAiSearching] = useState(false)
+    const { history, addToHistory } = useSearchHistory()
+    const inputRef = useRef<HTMLInputElement>(null)
+
+    // Debounced 搜尋
+    useEffect(() => {
+        if (!isSearchOpen || query.length < 2) {
+            setResults([])
+            return
+        }
+
+        const timer = setTimeout(async () => {
+            setIsSearching(true)
+            try {
+                const data = await geocodeApi.search({ query, limit: 5 })
+                setResults(data.results || [])
+            } catch {
+                setResults([])
+            } finally {
+                setIsSearching(false)
+            }
+        }, 300)
+
+        return () => clearTimeout(timer)
+    }, [query, isSearchOpen])
+
+    // 自動 focus
+    useEffect(() => {
+        if (isSearchOpen && inputRef.current) {
+            setTimeout(() => inputRef.current?.focus(), 100)
+        }
+    }, [isSearchOpen])
+
+    // 飛到指定位置
+    const flyTo = useCallback((result: SearchResult) => {
+        console.log("✈️ FlyTo triggered:", result)
+        addToHistory(result)
+        setQuery(result.name)
+        setIsSearchOpen(false)
+
+        if (!mapRef.current) {
+            console.error("❌ Map ref is null")
+            return
+        }
+
+        const lng = Number(result.lng)
+        const lat = Number(result.lat)
+
+        if (isNaN(lng) || isNaN(lat)) {
+            console.error("❌ Invalid coordinates:", result)
+            return
+        }
+
+        mapRef.current.flyTo({
+            center: [lng, lat],
+            zoom: 16,
+            duration: 1500
+        })
+
+        // 建立 POI 並開啟 Drawer
+        setSelectedPOI({
+            name: result.name,
+            type: result.type || "place",
+            lat: result.lat,
+            lng: result.lng,
+            address: result.address
+        })
+        setPoiDrawerOpen(true)
+    }, [addToHistory])
+
+    // AI 語意搜尋
+    const handleAISearch = useCallback(async () => {
+        if (!query) return
+
+        const center = mapRef.current?.getCenter()
+        const lat = center?.lat || 35.6895
+        const lng = center?.lng || 139.6917
+
+        setAiSearching(true)
+        try {
+            const response = await fetch(
+                `${API_BASE}/api/poi/ai-enrich`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: query,
+                        type: "semantic_search",
+                        lat,
+                        lng,
+                        api_key: localStorage.getItem("user_gemini_key")
+                    })
+                }
+            )
+
+            if (response.ok) {
+                const data = await response.json()
+                if (data.summary) {
+                    flyTo({
+                        lat,
+                        lng,
+                        name: query,
+                        address: data.summary
+                    })
+                }
+            }
+        } catch { /* silent */ } finally {
+            setAiSearching(false)
+        }
+    }, [query, flyTo])
 
     // 過濾出有座標的地點
     const markers = activities
@@ -311,6 +465,53 @@ export default function DayMap({ activities }: DayMapProps) {
                 }
             }, labelLayerId)
         }
+
+        // 🆕 POI 點擊事件 (Progressive Intelligence Layer 1)
+        map.on('click', (e) => {
+            // 查詢點擊位置的 POI 圖層
+            const features = map.queryRenderedFeatures(e.point, {
+                layers: map.getStyle()?.layers
+                    ?.filter(l => l.id.includes('poi') || l.id.includes('label'))
+                    .map(l => l.id) || []
+            })
+
+            if (features.length > 0) {
+                const feature = features[0]
+                const props = feature.properties || {}
+                const coords = feature.geometry.type === 'Point'
+                    ? (feature.geometry as GeoJSON.Point).coordinates
+                    : [e.lngLat.lng, e.lngLat.lat]
+
+                // 構建 POI 基礎資料
+                const poiData: POIBasicData = {
+                    name: props.name || props.name_en || '未知地點',
+                    type: props.class || props.subclass || props.type || 'place',
+                    lat: coords[1] as number,
+                    lng: coords[0] as number,
+                    address: props.address || props.addr_street,
+                    phone: props.phone,
+                    website: props.website,
+                    opening_hours: props.opening_hours
+                }
+
+                setSelectedPOI(poiData)
+                setPoiDrawerOpen(true)
+            }
+        })
+
+        // 🆕 POI Hover 游標優化
+        const poiLayers = map.getStyle()?.layers
+            ?.filter(l => l.id.includes('poi') || l.id.includes('label'))
+            .map(l => l.id) || []
+
+        poiLayers.forEach(layerId => {
+            map.on('mouseenter', layerId, () => {
+                map.getCanvas().style.cursor = 'pointer'
+            })
+            map.on('mouseleave', layerId, () => {
+                map.getCanvas().style.cursor = ''
+            })
+        })
     }, [])
 
     if (markers.length === 0) {
@@ -383,8 +584,114 @@ export default function DayMap({ activities }: DayMapProps) {
                 </div>
             </div>
 
-            {/* 地圖容器 */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-72 w-full z-0 relative">
+            {/* 地圖容器 - 全裝置統一加大 h-[480px]，防止捲動干擾 + 消除震動 */}
+            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[480px] w-full z-0 relative touch-none overscroll-none">
+                {/* 🔍 搜尋按鈕 (左下角) */}
+                <button
+                    onClick={() => setIsSearchOpen(true)}
+                    className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-md rounded-lg p-3 shadow-md hover:bg-white transition-all"
+                    title="搜尋地點"
+                >
+                    <Search className="w-5 h-5 text-slate-600" />
+                </button>
+
+                {/* 🔍 搜尋 Overlay (底部展開) */}
+                <AnimatePresence>
+                    {isSearchOpen && (
+                        <motion.div
+                            initial={{ y: "100%" }}
+                            animate={{ y: 0 }}
+                            exit={{ y: "100%" }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className="absolute inset-x-0 bottom-0 z-20 bg-white rounded-t-2xl shadow-2xl flex flex-col"
+                            style={{ height: "85%" }}
+                        >
+                            {/* 搜尋輸入區 */}
+                            <div className="p-4 border-b shrink-0 flex gap-2">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                                    <Input
+                                        ref={inputRef}
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        placeholder="搜尋地點..."
+                                        className="h-9 pl-9 pr-8 text-base shadow-none border-slate-200 focus-visible:ring-1"
+                                    />
+                                    {query && (
+                                        <button
+                                            onClick={() => setQuery("")}
+                                            className="absolute right-2 top-2.5 text-slate-400"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setIsSearchOpen(false)}
+                                    className="px-2 text-sm text-slate-500 font-medium"
+                                >
+                                    取消
+                                </button>
+                            </div>
+
+                            {/* 結果列表 (可滾動，防止連鎖捲動) */}
+                            <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
+                                {/* 歷史 */}
+                                {query.length === 0 && history.length > 0 && (
+                                    <>
+                                        <div className="px-4 py-2 text-xs font-medium text-slate-400 uppercase bg-slate-50/50">最近搜尋</div>
+                                        {history.map((h, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => flyTo(h)}
+                                                className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-center gap-3 border-b border-slate-50"
+                                            >
+                                                <Clock className="w-4 h-4 text-slate-400" />
+                                                <span className="text-sm line-clamp-1">{h.name}</span>
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
+
+                                {/* 結果 */}
+                                {results.map((r, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => flyTo(r)}
+                                        className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-start gap-3 border-b border-slate-50"
+                                    >
+                                        <MapPin className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" />
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium truncate">{r.name}</div>
+                                            {r.address && <div className="text-xs text-slate-500 truncate">{r.address}</div>}
+                                        </div>
+                                    </button>
+                                ))}
+
+                                {/* AI 選項 */}
+                                {query.length >= 2 && results.length === 0 && !isSearching && (
+                                    <button
+                                        onClick={handleAISearch}
+                                        disabled={aiSearching}
+                                        className="w-full px-4 py-4 text-left hover:bg-purple-50 flex items-center gap-3 text-sm"
+                                    >
+                                        {aiSearching ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+                                                <span className="text-purple-600">正在詢問 AI...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="w-4 h-4 text-purple-500" />
+                                                <span className="text-purple-600 font-medium">✨ 使用 AI 搜尋「{query}」</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
                 <Map
                     ref={mapRef}
                     initialViewState={{
@@ -395,8 +702,9 @@ export default function DayMap({ activities }: DayMapProps) {
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
-                    onZoom={(e) => setZoomLevel(Math.round(e.viewState.zoom * 10) / 10)}
                     attributionControl={false}
+                    minZoom={3}
+                    maxZoom={20}
                 >
                     <NavigationControl position="top-right" />
                     <AttributionControl
@@ -405,10 +713,7 @@ export default function DayMap({ activities }: DayMapProps) {
                         compact={true}
                     />
 
-                    {/* 🆕 Zoom 顯示器 */}
-                    <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-mono px-1.5 py-0.5 rounded z-10">
-                        Z: {zoomLevel.toFixed(1)} {zoomLevel >= 15 && '🏢'}
-                    </div>
+
 
                     {/* 路線繪製 */}
                     {route && (
@@ -500,6 +805,43 @@ export default function DayMap({ activities }: DayMapProps) {
                 <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 終點</span>
                 {mapMode === 'satellite' && <span className="flex items-center gap-1">🛰️ 衛星模式</span>}
             </div>
+
+
+
+            {/* 🆕 POI Detail Drawer (Progressive Intelligence) */}
+            <POIDetailDrawer
+                isOpen={poiDrawerOpen}
+                onClose={() => setPoiDrawerOpen(false)}
+                poi={selectedPOI}
+                suggestedTime={(() => {
+                    // 智慧時間計算：最後活動 +1.5 小時
+                    if (activities.length > 0) {
+                        const lastActivity = activities[activities.length - 1]
+                        if (lastActivity.time) {
+                            const [h, m] = lastActivity.time.split(":").map(Number)
+                            const totalMinutes = h * 60 + m + 90
+                            const newH = Math.min(23, Math.floor(totalMinutes / 60))
+                            const newM = totalMinutes % 60
+                            return `${newH.toString().padStart(2, "0")}:${newM.toString().padStart(2, "0")}`
+                        }
+                    }
+                    return "10:00"
+                })()}
+                onAddToItinerary={(poi, time, aiSummary) => {
+                    // 調用父層 callback
+                    if (onAddPOI) {
+                        const notes = aiSummary
+                            ? `${aiSummary.summary}\n必點: ${aiSummary.must_try?.join(', ') || ''}`
+                            : undefined
+                        onAddPOI(poi, time, notes)
+                    } else {
+                        console.log('📍 Add to itinerary:', poi, time)
+                        if (aiSummary) {
+                            console.log('🧠 AI Summary:', aiSummary)
+                        }
+                    }
+                }}
+            />
         </div>
     )
 }

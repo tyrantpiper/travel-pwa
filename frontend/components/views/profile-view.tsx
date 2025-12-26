@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import {
     Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion"
@@ -218,6 +219,9 @@ export function ProfileView() {
                     {/* 頭像全螢幕預覽 */}
                     <Dialog open={avatarPreviewOpen} onOpenChange={setAvatarPreviewOpen}>
                         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0 flex items-center justify-center">
+                            <VisuallyHidden>
+                                <DialogTitle>頭像預覽</DialogTitle>
+                            </VisuallyHidden>
                             {profile.avatarUrl && (
                                 <Image
                                     src={profile.avatarUrl}

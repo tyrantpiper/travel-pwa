@@ -81,7 +81,13 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
             {/* Spot Photo */}
             {activity.image_url && (
                 <div className="mb-3 rounded-lg overflow-hidden h-32 w-full relative">
-                    <Image src={activity.image_url} alt={activity.place || "Activity"} fill className="object-cover" />
+                    <Image
+                        src={activity.image_url}
+                        alt={activity.place || "Activity"}
+                        fill
+                        className="object-cover"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
                 </div>
             )}
 

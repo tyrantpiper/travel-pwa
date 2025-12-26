@@ -5,7 +5,8 @@ import Image from "next/image"
 import { Camera, Loader2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 interface ImageUploadProps {
     value?: string
@@ -174,6 +175,9 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             {/* 全螢幕預覽 Dialog */}
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
                 <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0">
+                    <VisuallyHidden>
+                        <DialogTitle>圖片預覽</DialogTitle>
+                    </VisuallyHidden>
                     {value && (
                         <Image
                             src={value}

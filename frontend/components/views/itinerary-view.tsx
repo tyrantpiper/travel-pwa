@@ -20,7 +20,8 @@ import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDial
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
 import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
-import { tripsApi } from "@/lib/api"
+import { tripsApi, itemsApi } from "@/lib/api"
+import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
@@ -52,6 +53,32 @@ export function ItineraryView() {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isAddMode, setIsAddMode] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
+
+    // 🆕 處理從地圖加入 POI
+    const handleAddPOI = async (poi: POIBasicData, time: string, notes?: string) => {
+        if (!activeTripId) return
+
+        try {
+            await itemsApi.create({
+                trip_id: activeTripId,
+                day: day,
+                time: time,
+                place: poi.name,
+                desc: notes || poi.address || "",
+                category: poi.type || "sightseeing",
+                lat: poi.lat,
+                lng: poi.lng,
+                image_url: (poi as any).photo_url || (poi as any).image_url
+            })
+
+            toast.success("已加入行程")
+            // 立即重整
+            await reloadTripDetail()
+        } catch (error) {
+            console.error(error)
+            toast.error("加入失敗")
+        }
+    }
 
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
@@ -100,6 +127,9 @@ export function ItineraryView() {
             }
             return null
         }
+
+        // 🛡️ AbortController 防止競爭條件
+        const controller = new AbortController()
 
         const fetchWeather = async () => {
             let lat = 35.6895  // Default: Tokyo
@@ -166,7 +196,8 @@ export function ItineraryView() {
 
             try {
                 const res = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto&forecast_days=1`
+                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto&forecast_days=1`,
+                    { signal: controller.signal }
                 )
                 const data = await res.json()
                 const temps = data.hourly.temperature_2m
@@ -181,9 +212,17 @@ export function ItineraryView() {
                     })
                 }
                 setWeatherData(forecast)
-            } catch (e) { console.error("Weather error", e) }
+            } catch (e) {
+                // 忽略 AbortError（正常的取消操作）
+                if ((e as Error).name !== 'AbortError') {
+                    console.error("Weather error", e)
+                }
+            }
         }
         fetchWeather()
+
+        // 🛡️ Cleanup: 組件卸載或依賴變化時取消請求
+        return () => controller.abort()
     }, [day, dailyLocs, currentTrip])
 
     const handleDeleteTrip = async (tripId: string) => {
@@ -322,7 +361,9 @@ export function ItineraryView() {
                         category: editItem.category,
                         notes: editItem.desc,
                         lat: finalLat ? Number(finalLat) : null,
-                        lng: finalLng ? Number(finalLng) : null
+                        lng: finalLng ? Number(finalLng) : null,
+                        image_url: editItem.image_url,  // 🆕 新增圖片 URL
+                        tags: editItem.tags             // 🆕 修復：標籤陣列
                     })
                 })
             } else {
@@ -488,7 +529,11 @@ export function ItineraryView() {
                         isOpen={isCreateOpen}
                         onOpenChange={setIsCreateOpen}
                         userId={userId || ""}
-                        onSuccess={reloadTrips}
+                        onSuccess={() => {
+                            reloadTrips()
+                            // Double check to ensure consistency
+                            setTimeout(() => reloadTrips(), 500)
+                        }}
                     />
                     <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
                 </div>
@@ -965,7 +1010,7 @@ export function ItineraryView() {
 
                     <div className="mt-8">
                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
-                        <DayMap activities={currentDayData} />
+                        <DayMap activities={currentDayData} onAddPOI={handleAddPOI} />
                     </div>
                 </div>
             </PullToRefresh >
