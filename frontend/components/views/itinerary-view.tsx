@@ -633,7 +633,7 @@ export function ItineraryView() {
                     {dayNumbers.map((d) => {
                         const { date, week } = getDateInfo(d)
                         return (
-                            <div key={d} className="relative group">
+                            <div key={d} className="relative flex flex-col items-center">
                                 <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border", day === d ? "text-white" : "bg-white hover:bg-slate-50")}>
                                     {/* Sliding Indicator */}
                                     {day === d && (
@@ -646,12 +646,17 @@ export function ItineraryView() {
                                     <span className="text-[10px] opacity-70">{week}</span>
                                     <span className="font-bold">{date}</span>
                                 </button>
-                                {totalDays > 1 && (
+                                {/* 📱 手機友善刪除按鈕 - 長按當前選中的日期才顯示 */}
+                                {totalDays > 1 && day === d && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
-                                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center shadow-sm touch-manipulation border border-white"
+                                        className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
+                                                   text-red-400 bg-red-50/80 backdrop-blur-sm
+                                                   border border-red-200/60 rounded-full shadow-sm 
+                                                   active:scale-95 active:bg-red-100
+                                                   transition-transform duration-100"
                                     >
-                                        ×
+                                        移除此天
                                     </button>
                                 )}
                             </div>

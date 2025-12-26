@@ -180,9 +180,10 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
 interface DayMapProps {
     activities: Activity[]
     onAddPOI?: (poi: POIBasicData, time: string, notes?: string) => void
+    dailyLoc?: { lat: number; lng: number; name?: string }  // 🆕 當日預設中心點
 }
 
-export default function DayMap({ activities, onAddPOI }: DayMapProps) {
+export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) {
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
     const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
@@ -514,18 +515,12 @@ export default function DayMap({ activities, onAddPOI }: DayMapProps) {
         })
     }, [])
 
-    if (markers.length === 0) {
-        return (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 h-48 w-full flex flex-col items-center justify-center text-slate-400">
-                <div className="text-3xl mb-2">🗺️</div>
-                <div className="text-sm font-bold">暫無地圖資料</div>
-                <div className="text-xs mt-1">活動需要座標才能顯示路線圖</div>
-                <div className="text-[10px] mt-2 text-slate-300">提示：編輯活動並搜尋地點以獲取座標</div>
-            </div>
-        )
-    }
-
-    const center = { longitude: markers[0].lng, latitude: markers[0].lat }
+    // 🆕 即使沒有活動也顯示地圖 (使用 dailyLoc 或東京預設值)
+    const center = markers.length > 0
+        ? { longitude: markers[0].lng, latitude: markers[0].lat }
+        : dailyLoc
+            ? { longitude: dailyLoc.lng, latitude: dailyLoc.lat }
+            : { longitude: 121.5654, latitude: 25.0330 }  // 台北預設
 
     return (
         <div className="space-y-2">
@@ -694,6 +689,7 @@ export default function DayMap({ activities, onAddPOI }: DayMapProps) {
                 </AnimatePresence>
                 <Map
                     ref={mapRef}
+                    reuseMaps={true}
                     initialViewState={{
                         longitude: center.longitude,
                         latitude: center.latitude,
