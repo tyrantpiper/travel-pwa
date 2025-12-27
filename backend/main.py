@@ -30,10 +30,10 @@ load_dotenv()
 
 app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
 
-# 2. CORS 設定 (使用環境變數控制，避免寫死)
-# 設定 CORS_ORIGINS 環境變數，多個來源用逗號分隔
-# 預設值涵蓋開發常用來源
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000").split(",")
+# 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
+# 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
+CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "*")
+CORS_ORIGINS = ["*"] if CORS_ORIGINS_RAW == "*" else CORS_ORIGINS_RAW.split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,

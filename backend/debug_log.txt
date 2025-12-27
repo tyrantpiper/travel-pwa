@@ -160,3 +160,5 @@ API Key present: False
 API Key present: False
 === SERVER STARTED ===
 API Key present: False
+=== SERVER STARTED ===
+API Key present: False
