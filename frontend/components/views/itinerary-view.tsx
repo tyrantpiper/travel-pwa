@@ -529,8 +529,9 @@ export function ItineraryView() {
             optimisticTrip.days.push({ day: newDay, activities: [] })
 
             // Force Clean Daily Locations (Crucial for Ghostbuster UI)
+            // Use undefined to indicate no location set yet (type-safe approach)
             if (!optimisticTrip.daily_locations) optimisticTrip.daily_locations = {}
-            optimisticTrip.daily_locations[newDay] = {}
+            delete optimisticTrip.daily_locations[newDay]  // Remove any ghost data
 
             // 🧹 Force Clean ALL Other Data Fields (The Grim Reaper Fix)
             if (!optimisticTrip.day_notes) optimisticTrip.day_notes = {}
@@ -546,7 +547,11 @@ export function ItineraryView() {
             optimisticTrip.day_checklists[newDay] = []
 
             // Update Local State Immediately (The "Flash" Fix)
-            setDailyLocs(prev => ({ ...prev, [newDay]: {} as DailyLocation }))
+            setDailyLocs(prev => {
+                const updated = { ...prev }
+                delete updated[newDay]  // Remove ghost data from state
+                return updated
+            })
 
             // Update SWR Cache Immediately
             // revalidate: false ensures we don't fetch from server immediately, allowing the user to see the change
