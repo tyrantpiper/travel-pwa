@@ -26,7 +26,6 @@ import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
-import ErrorBoundary from "@/components/ui/error-boundary"
 import { toast } from "sonner"
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
@@ -522,13 +521,12 @@ export function ItineraryView() {
             const newDay = maxDay + 1
 
             // 2. Create Fake New Trip Object
-            const optimisticDate = new Date() // Date doesn't matter for UI instant feedback
             // Deep copy to avoid reference issues (structuredClone is faster than JSON.parse/stringify)
             const optimisticTrip = structuredClone(currentTrip)
 
             // Append Day to array
             if (!optimisticTrip.days) optimisticTrip.days = []
-            optimisticTrip.days.push({ day: newDay, activities: [], date: optimisticDate.toISOString() })
+            optimisticTrip.days.push({ day: newDay, activities: [] })
 
             // Force Clean Daily Locations (Crucial for Ghostbuster UI)
             if (!optimisticTrip.daily_locations) optimisticTrip.daily_locations = {}
