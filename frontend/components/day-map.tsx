@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, Sparkles, MapPin, Clock } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, Sparkles, MapPin, Clock, Crosshair } from "lucide-react"
 import { MAP_STYLES } from "@/lib/constants"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
@@ -205,6 +205,43 @@ export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) 
     const [aiSearching, setAiSearching] = useState(false)
     const { history, addToHistory } = useSearchHistory()
     const inputRef = useRef<HTMLInputElement>(null)
+
+    // 📍 自定義定位功能 (取代有 bug 的 GeolocateControl)
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [isLocating, setIsLocating] = useState(false)
+
+    const handleLocateMe = () => {
+        if (!("geolocation" in navigator)) {
+            alert("您的瀏覽器不支援定位功能")
+            return
+        }
+        setIsLocating(true)
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords
+                setUserLocation({ lat: latitude, lng: longitude })
+                setIsLocating(false)
+                // 飛到用戶位置
+                if (mapRef.current) {
+                    mapRef.current.flyTo({
+                        center: [longitude, latitude],
+                        zoom: 15,
+                        duration: 2000
+                    })
+                }
+            },
+            (error) => {
+                setIsLocating(false)
+                console.error("Geolocation error:", error)
+                if (error.code === error.PERMISSION_DENIED) {
+                    alert("定位權限被拒絕，請允許瀏覽器獲取您的位置")
+                } else {
+                    alert("無法獲取位置: " + error.message)
+                }
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+        )
+    }
 
     // Debounced 搜尋
     useEffect(() => {
@@ -409,6 +446,15 @@ export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) 
         const map = mapRef.current?.getMap()
         if (!map) return
 
+        // 🆕 處理缺失的圖標（靜默替換為空圖片，避免 console 錯誤）
+        map.on('styleimagemissing', (e) => {
+            const id = e.id
+            // 建立 1x1 透明圖片作為 fallback
+            if (!map.hasImage(id)) {
+                map.addImage(id, { width: 1, height: 1, data: new Uint8Array([0, 0, 0, 0]) })
+            }
+        })
+
         // 添加 Esri 衛星 Source
         if (!map.getSource('satellite')) {
             map.addSource('satellite', {
@@ -515,12 +561,15 @@ export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) 
         })
     }, [])
 
-    // 🆕 即使沒有活動也顯示地圖 (使用 dailyLoc 或東京預設值)
+    // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
     const center = markers.length > 0
         ? { longitude: markers[0].lng, latitude: markers[0].lat }
         : dailyLoc
             ? { longitude: dailyLoc.lng, latitude: dailyLoc.lat }
-            : { longitude: 121.5654, latitude: 25.0330 }  // 台北預設
+            : { longitude: 120.9, latitude: 23.5 }  // 台灣中心點
+
+    // 預設縮放等級：有活動時 zoom 13，無活動時 zoom 7 (顯示全台灣)
+    const defaultZoom = markers.length > 0 || dailyLoc ? 13 : 7
 
     return (
         <div className="space-y-2">
@@ -693,7 +742,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) 
                     initialViewState={{
                         longitude: center.longitude,
                         latitude: center.latitude,
-                        zoom: 13
+                        zoom: defaultZoom
                     }}
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={MAP_STYLES.VECTOR}
@@ -702,14 +751,41 @@ export default function DayMap({ activities, onAddPOI, dailyLoc }: DayMapProps) 
                     minZoom={3}
                     maxZoom={20}
                 >
-                    <NavigationControl position="top-right" />
+                    {/* 📍 自定義定位按鈕 (取代有 bug 的 GeolocateControl) */}
+                    <button
+                        onClick={handleLocateMe}
+                        disabled={isLocating}
+                        className="absolute top-28 right-2 z-10 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 disabled:opacity-50 transition-all"
+                        title="定位我的位置"
+                    >
+                        {isLocating ? (
+                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                        ) : (
+                            <Crosshair className="w-5 h-5 text-gray-600" />
+                        )}
+                    </button>
+                    <NavigationControl position="top-right" showCompass={true} />
                     <AttributionControl
                         customAttribution="© OpenStreetMap · © OpenFreeMap · © Esri"
                         position="bottom-right"
                         compact={true}
                     />
 
-
+                    {/* 📍 用戶位置藍點標記 */}
+                    {userLocation && (
+                        <Marker
+                            longitude={userLocation.lng}
+                            latitude={userLocation.lat}
+                            anchor="center"
+                        >
+                            <div className="relative">
+                                {/* 外層脈動圓 */}
+                                <div className="absolute -inset-3 bg-blue-400/30 rounded-full animate-ping" />
+                                {/* 藍點 */}
+                                <div className="w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg" />
+                            </div>
+                        </Marker>
+                    )}
 
                     {/* 路線繪製 */}
                     {route && (
