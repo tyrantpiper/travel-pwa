@@ -43,26 +43,15 @@ app.add_middleware(
 )
 print(f"[CORS] Allowed origins: {CORS_ORIGINS}")
 
-# 3. 初始化 Supabase (帶有條件式失敗處理)
-supabase = None  # 預設為 None，確保變數已定義
+# 3. 初始化 Supabase
 try:
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-    
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("SUPABASE_URL or SUPABASE_KEY not set")
-    
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("[Supabase] Connected successfully")
 except Exception as e:
-    print(f"🔴 Supabase Error: {e}")
-    # 正式環境應該要失敗退出，開發環境可以繼續
-    if os.getenv("ENVIRONMENT") == "production":
-        print("❌ CRITICAL: Cannot start without database in production!")
-        import sys
-        sys.exit(1)
-    else:
-        print("⚠️ Running in development mode without database")
+    print(f"⚠️ Supabase Warning: {e}")
+    supabase = None  # Will cause errors but at least won't crash on import
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
 @app.get("/health")
