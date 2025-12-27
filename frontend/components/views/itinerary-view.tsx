@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ItineraryItemState, LocationInfo, DailyLocation, DayWeather, Trip, Activity, GeocodeResult, SubItem } from "@/lib/itinerary-types"
@@ -20,11 +21,12 @@ import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDial
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
 import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
-import { tripsApi, itemsApi } from "@/lib/api"
+import { tripsApi, itemsApi, geocodeApi } from "@/lib/api"
 import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+import ErrorBoundary from "@/components/ui/error-boundary"
 import { toast } from "sonner"
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
@@ -68,7 +70,7 @@ export function ItineraryView() {
                 category: poi.type || "sightseeing",
                 lat: poi.lat,
                 lng: poi.lng,
-                image_url: (poi as any).photo_url || (poi as any).image_url
+                image_url: poi.photo_url || poi.image_url
             })
 
             toast.success("已加入行程")
@@ -94,8 +96,10 @@ export function ItineraryView() {
 
 
     useEffect(() => {
-        if (currentTrip && currentTrip.daily_locations) {
-            setDailyLocs(currentTrip.daily_locations)
+        // 🔄 State Sync Fix: Always sync state with props, defaulting to empty object if null
+        // This ensures that if backend clears data (e.g. Ghostbuster clean), the frontend state is also cleared.
+        if (currentTrip) {
+            setDailyLocs(currentTrip.daily_locations || {})
         }
     }, [currentTrip])
 
@@ -260,6 +264,18 @@ export function ItineraryView() {
     }
 
 
+    // 🧠 計算位置權重 (Sequential Location Bias)
+    // 旅人軌跡演算法：優先使用當日地點 > 前一日地點 > ... > 第一天
+    const calculateBiasLocation = (targetDay: number) => {
+        if (!dailyLocs) return undefined
+        for (let d = targetDay; d >= 1; d--) {
+            if (dailyLocs[d] && dailyLocs[d].lat && dailyLocs[d].lng) {
+                return { lat: dailyLocs[d].lat, lng: dailyLocs[d].lng }
+            }
+        }
+        return undefined
+    }
+
     const handleSearchLocation = async () => {
         if (!newLocName.trim()) return
         setIsLocSearching(true)
@@ -267,13 +283,15 @@ export function ItineraryView() {
             // 組合搜尋詞：關鍵字 + 地區 + 國家
             const queryWithCountry = `${newLocName.trim()} ${dailyLocSearchRegion} ${searchCountry}`.trim()
 
-            // 使用後端統一地理編碼 API（ArcGIS + Photon）
-            const res = await fetch(`${API_BASE}/api/geocode/search`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: queryWithCountry, limit: 8 })
+            // 🆕 使用智能地理編碼 API（支援 tripTitle 國家判斷 & 位置權重）
+            const bias = calculateBiasLocation(day) // 取得當前或前一天的位置作為權重
+            const data = await geocodeApi.search({
+                query: queryWithCountry,
+                limit: 8,
+                tripTitle: currentTrip?.title,  // 🆕 智能國家判斷
+                lat: bias?.lat,                 // 🆕 位置權重 (Sequential Bias)
+                lng: bias?.lng                  // 🆕 位置權重
             })
-            const data = await res.json()
 
             if (!data.results || data.results.length === 0) {
                 toast.warning("找不到此地點，請嘗試其他關鍵字")
@@ -306,6 +324,7 @@ export function ItineraryView() {
     }
 
 
+
     const handleSelectLocation = async (loc: LocationInfo) => {
         if (!currentTrip) return
         try {
@@ -334,13 +353,12 @@ export function ItineraryView() {
         let finalLng = editItem?.lng
         if (editItem?.place && (!finalLat || !finalLng)) {
             try {
-                // 使用後端統一地理編碼 API
-                const res = await fetch(`${API_BASE}/api/geocode/search`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ query: editItem.place, limit: 1 })
+                // 🆕 使用智能地理編碼 API
+                const data = await geocodeApi.search({
+                    query: editItem.place,
+                    limit: 1,
+                    tripTitle: currentTrip?.title  // 🆕 智能國家判斷
                 })
-                const data = await res.json()
                 if (data.results && data.results.length > 0) {
                     finalLat = data.results[0].lat
                     finalLng = data.results[0].lng
@@ -452,39 +470,143 @@ export function ItineraryView() {
         }
     }
 
-    // 🆕 新增天數
-    const handleAddDay = async (position: "before" | "end") => {
+    // 🧠 Smart Clone 狀態
+    const [isClonePromptOpen, setIsClonePromptOpen] = useState(false)
+    const [pendingAddDayPosition, setPendingAddDayPosition] = useState<"before" | "end" | null>(null)
+    const [cloneSourceDay, setCloneSourceDay] = useState<number | null>(null)
+
+    // 🧠 檢查是否有可移植的資料
+    const checkHasCloneableData = (position: "before" | "end") => {
+        if (!currentTrip) return false
+
+        let sourceDay = -1
+        if (position === "end") {
+            const maxDay = Math.max(...(currentTrip.days?.map(d => d.day) || [0]),
+                Object.keys(dailyLocs || {}).map(Number).reduce((a, b) => Math.max(a, b), 0))
+            sourceDay = maxDay
+        } else {
+            sourceDay = 1
+        }
+
+        setCloneSourceDay(sourceDay)
+
+        const hasLoc = dailyLocs && dailyLocs[sourceDay] && dailyLocs[sourceDay].name
+        const hasNotes = currentTrip.day_notes && currentTrip.day_notes[sourceDay] && currentTrip.day_notes[sourceDay].length > 0
+        const hasChecklist = currentTrip.day_checklists && currentTrip.day_checklists[sourceDay] && currentTrip.day_checklists[sourceDay].length > 0
+
+        return !!(hasLoc || hasNotes || hasChecklist)
+    }
+
+    // 🧠 Add Day Loading State
+    const [isAddingDay, setIsAddingDay] = useState(false)
+
+    // ⚡ 實際執行新增 API
+    const executeAddDay = async (position: "before" | "end", cloneContent: boolean) => {
         if (!currentTrip) return
+
+        // 🔔 Haptic Feedback (Immediate Response)
+        haptic.tap()
 
         const insertPos = position === "before" ? `before:1` : "end"
 
-        // Optimistic update: add a new empty day
-        const optimisticData = {
-            ...currentTrip,
-            // 不需要調整 days，因為新天數是空的
+        // 🚀 Optimistic Logic: Only for "Append End" & "No Clone" (Simple Case)
+        // This makes the standard "Add Day" feel INSTANT.
+        const isOptimistic = position === "end" && !cloneContent
+
+        if (isOptimistic) {
+            // 🏎️ Optimistic Update
+            // 1. Calculate new day
+            const currentDays = currentTrip.days || []
+            // Safe Max Day Calc
+            const maxDay = currentDays.length > 0 ? Math.max(...currentDays.map(d => d.day)) : 0
+            const newDay = maxDay + 1
+
+            // 2. Create Fake New Trip Object
+            const optimisticDate = new Date() // Date doesn't matter for UI instant feedback
+            // Deep copy to avoid reference issues (structuredClone is faster than JSON.parse/stringify)
+            const optimisticTrip = structuredClone(currentTrip)
+
+            // Append Day to array
+            if (!optimisticTrip.days) optimisticTrip.days = []
+            optimisticTrip.days.push({ day: newDay, activities: [], date: optimisticDate.toISOString() })
+
+            // Force Clean Daily Locations (Crucial for Ghostbuster UI)
+            if (!optimisticTrip.daily_locations) optimisticTrip.daily_locations = {}
+            optimisticTrip.daily_locations[newDay] = {}
+
+            // 🧹 Force Clean ALL Other Data Fields (The Grim Reaper Fix)
+            if (!optimisticTrip.day_notes) optimisticTrip.day_notes = {}
+            optimisticTrip.day_notes[newDay] = []
+
+            if (!optimisticTrip.day_costs) optimisticTrip.day_costs = {}
+            optimisticTrip.day_costs[newDay] = []
+
+            if (!optimisticTrip.day_tickets) optimisticTrip.day_tickets = {}
+            optimisticTrip.day_tickets[newDay] = []
+
+            if (!optimisticTrip.day_checklists) optimisticTrip.day_checklists = {}
+            optimisticTrip.day_checklists[newDay] = []
+
+            // Update Local State Immediately (The "Flash" Fix)
+            setDailyLocs(prev => ({ ...prev, [newDay]: {} as DailyLocation }))
+
+            // Update SWR Cache Immediately
+            // revalidate: false ensures we don't fetch from server immediately, allowing the user to see the change
+            // We will fetch real data after the API call completes.
+            reloadTripDetail(() => optimisticTrip, false)
+
+            toast.success(`已快速新增 Day ${newDay}`)
+
+        } else {
+            // ⏳ Show Loading for Complex Operations (Insert/Clone)
+            setIsAddingDay(true)
         }
-        reloadTripDetail(optimisticData, false)
 
         try {
             const res = await fetch(`${API_BASE}/api/trips/${currentTrip.id}/days`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ position: insertPos })
+                body: JSON.stringify({ position: insertPos, clone_content: cloneContent })
             })
 
             if (!res.ok) throw new Error("API failed")
 
             const data = await res.json()
-            toast.success(`已新增 Day ${data.new_day}`)
 
-            // 刷新取得正確的天數資料
-            reloadTripDetail()
+            // Only toast if we didn't do it optimistically (to avoid double toast)
+            if (!isOptimistic) {
+                toast.success(cloneContent ? `已新增 Day ${data.new_day} (並移植內容)` : `已新增 Day ${data.new_day}`)
+            }
 
-            // 如果是新增到開頭，切換到第一天
-            if (position === "before") setDay(1)
-        } catch {
+            // Sync True Data from Server (Ghostbuster Verification)
+            await reloadTripDetail()
+
+            // 🚀 Auto-navigate to new day (Only after API success to avoid ghost day)
+            if (position === "before") {
+                setDay(1)
+            } else if (position === "end") {
+                setDay(data.new_day)
+            }
+
+        } catch (e) {
+            console.error(e)
             toast.error("新增失敗")
+            // Rollback if failed
             reloadTripDetail()
+        } finally {
+            setIsClonePromptOpen(false)
+            setPendingAddDayPosition(null)
+            setIsAddingDay(false)
+        }
+    }
+
+    // 🆕 新增天數 (Wrapper)
+    const handleAddDay = (position: "before" | "end") => {
+        if (checkHasCloneableData(position)) {
+            setPendingAddDayPosition(position)
+            setIsClonePromptOpen(true)
+        } else {
+            executeAddDay(position, false)
         }
     }
 
@@ -668,6 +790,7 @@ export function ItineraryView() {
                         onClick={() => handleAddDay("end")}
                         className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
                         title="在結尾新增一天"
+                        aria-label="在結尾新增一天"
                     >
                         +
                     </button>
@@ -677,6 +800,37 @@ export function ItineraryView() {
             <PullToRefresh onRefresh={async () => { await reloadTripDetail() }} className="flex-1">
                 <div className="py-6 px-6 bg-stone-50/50">
                     <div className="flex items-center justify-between mb-4">
+                        {/* 🆕 Smart Clone Confirmation Dialog */}
+                        <AlertDialog open={isClonePromptOpen} onOpenChange={setIsClonePromptOpen}>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>是否移植鄰近天數的內容？</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        我們發現 Day {cloneSourceDay} 有設定 <b>地點、筆記或行前清單</b>。
+                                        <br /><br />
+                                        您想要將這些設定複製到新的一天嗎？
+                                        <br />
+                                        <span className="text-xs text-slate-500">(注意：預估花費與交通票券不會被複製)</span>
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel
+                                        disabled={isAddingDay}
+                                        onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, false)}
+                                    >
+                                        {isAddingDay ? "處理中..." : "新增空白天數"}
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                        disabled={isAddingDay}
+                                        onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, true)}
+                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400"
+                                    >
+                                        {isAddingDay ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />處理中...</> : "✨ 是，移植內容"}
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
                         <Dialog open={isLocEditOpen} onOpenChange={(open) => {
                             if (open) {
                                 // Reset filters when opening
@@ -904,6 +1058,7 @@ export function ItineraryView() {
 
 
                 <EditableDailyTips
+                    key={`tips-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
                     notes={currentTrip?.day_notes?.[day] || []}
@@ -929,6 +1084,7 @@ export function ItineraryView() {
 
                 {/* 🆕 行前清單 */}
                 <EditableDailyChecklist
+                    key={`checklist-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
                     items={currentTrip?.day_checklists?.[day] || []}
@@ -1015,7 +1171,11 @@ export function ItineraryView() {
 
                     <div className="mt-8">
                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
-                        <DayMap activities={currentDayData} onAddPOI={handleAddPOI} />
+                        <DayMap
+                            activities={currentDayData}
+                            onAddPOI={handleAddPOI}
+                            tripTitle={currentTrip?.title}  // 🆕 傳遞行程標題用於智能搜尋
+                        />
                     </div>
                 </div>
             </PullToRefresh >
@@ -1029,6 +1189,8 @@ export function ItineraryView() {
                 isSaving={isSavingActivity}
                 onSave={handleSaveEdit}
                 dailyLoc={dailyLocs[day]}
+                tripTitle={currentTrip?.title}  // 🆕 智能搜尋
+                biasLoc={calculateBiasLocation(day)} // 🆕 注入位置權重 (Sequential Bias)
             />
         </div >
     )

@@ -39,6 +39,8 @@ interface ActivityEditModalProps {
     isSaving: boolean
     onSave: () => void
     dailyLoc?: DailyLocation
+    tripTitle?: string  // 🆕 智能搜尋用
+    biasLoc?: { lat: number, lng: number } // 🆕 Smart Geocoding Bias
 }
 
 export function ActivityEditModal({
@@ -50,6 +52,8 @@ export function ActivityEditModal({
     isSaving,
     onSave,
     dailyLoc,
+    tripTitle,  // 🆕 智能搜尋用
+    biasLoc,    // 🆕 Smart Geocoding Bias
 }: ActivityEditModalProps) {
     const [searchCountry, setSearchCountry] = useState("")
     const [searchRegion, setSearchRegion] = useState("")
@@ -60,9 +64,18 @@ export function ActivityEditModal({
         if (!editItem?.place?.trim()) return
         setIsSearching(true)
         try {
+            // 🧠 決定位置權重 (Location Bias)
+            // 優先順序: 1. 當前編輯項目的座標 (若是修改) 2. 外部傳入的偏差座標 (Sequential) 3. 當日位置
+            const targetLat = (editItem.lat ? Number(editItem.lat) : undefined) || biasLoc?.lat || dailyLoc?.lat
+            const targetLng = (editItem.lng ? Number(editItem.lng) : undefined) || biasLoc?.lng || dailyLoc?.lng
+
+            // 🆕 使用智能地理編碼 API
             const data = await geocodeApi.search({
                 query: `${editItem.place} ${searchRegion} ${searchCountry}`.trim(),
-                limit: 5
+                limit: 5,
+                tripTitle,  // 🆕 智能國家判斷
+                lat: targetLat, // 🆕 位置權重
+                lng: targetLng  // 🆕 位置權重
             })
             setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
                 name: item.name,

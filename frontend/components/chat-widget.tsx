@@ -119,6 +119,13 @@ export default function ChatWidget() {
     // 🆕 v3.5: AbortController for stopping generation
     const abortControllerRef = useRef<AbortController | null>(null)
 
+    // 🛡️ Cleanup AbortController on unmount to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            abortControllerRef.current?.abort()
+        }
+    }, [])
+
     // Draggable state
     const [position, setPosition] = useState<Position>({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)

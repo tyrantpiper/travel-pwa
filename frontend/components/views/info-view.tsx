@@ -20,6 +20,7 @@ import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 import { COUNTRY_REGIONS } from "@/lib/constants"
+import { geocodeApi } from "@/lib/api"
 
 // API URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -68,7 +69,7 @@ interface FlightData {
 
 export function InfoView() {
     const { t } = useLanguage()
-    const { activeTripId } = useTripContext()
+    const { activeTripId, activeTrip } = useTripContext()
     const [isEditing, setIsEditing] = useState(false)
 
     const [flights, setFlights] = useState(DEFAULT_FLIGHTS)
@@ -185,12 +186,23 @@ export function InfoView() {
         setSearchingHotelIdx(hotelIdx)
         try {
             const queryWithFilters = `${hotelSearchQuery.trim()} ${hotelSearchRegion} ${hotelSearchCountry}`.trim()
-            const res = await fetch(`${API_BASE}/api/geocode/search`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: queryWithFilters, limit: 5 })
+
+            // 🧠 Sequential Hotel Bias (旅人軌跡：優先參考上一間飯店的位置)
+            let biasLat: number | undefined
+            let biasLng: number | undefined
+            if (hotelIdx > 0 && hotels[hotelIdx - 1]?.lat && hotels[hotelIdx - 1]?.lng) {
+                biasLat = hotels[hotelIdx - 1].lat!
+                biasLng = hotels[hotelIdx - 1].lng!
+            }
+
+            // 🆕 使用智能地理編碼 API
+            const data = await geocodeApi.search({
+                query: queryWithFilters,
+                limit: 5,
+                tripTitle: activeTrip?.title,  // 🆕 智能國家判斷
+                lat: biasLat,   // 🆕 位置權重 (Sequential Bias)
+                lng: biasLng    // 🆕 位置權重
             })
-            const data = await res.json()
             setHotelSearchResults(data.results || [])
         } catch (e) {
             console.error("Hotel search failed:", e)

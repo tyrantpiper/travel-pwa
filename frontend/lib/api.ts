@@ -69,6 +69,9 @@ export interface UpdateItemParams {
 export interface GeocodeSearchParams {
     query: string
     limit?: number
+    tripTitle?: string  // 行程標題（用於智能國家判斷）
+    lat?: number        // 🆕 地圖中心緯度
+    lng?: number        // 🆕 地圖中心經度
 }
 
 // === API Functions ===
@@ -232,11 +235,24 @@ export const itemsApi = {
  * Geocode API Functions
  */
 export const geocodeApi = {
-    /** Search for locations */
+    /** Search for locations with smart translation */
     search: async (params: GeocodeSearchParams) => {
+        const geminiKey = typeof window !== 'undefined'
+            ? localStorage.getItem("user_gemini_key")
+            : null
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json"
+        }
+        if (geminiKey) {
+            headers["X-Gemini-Key"] = geminiKey
+        }
+
+        console.log("🌍 Geocode Search Payload:", { query: params.query, tripTitle: params.tripTitle, hasKey: !!geminiKey })
+
         const res = await fetch(API.GEOCODE, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(params)
         })
         if (!res.ok) throw new Error("Search failed")
