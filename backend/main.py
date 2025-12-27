@@ -968,8 +968,8 @@ async def smart_geocode_logic(query: str, limit: int, trip_title: str = None, ap
     return {"results": unique[:limit], "source": found_source}
 
 def log_debug(msg):
-    with open("debug_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{msg}\n")
+    # Use print instead of file write (HF Spaces has read-only filesystem)
+    print(f"[DEBUG] {msg}")
 
 @app.on_event("startup")
 async def startup_test():
