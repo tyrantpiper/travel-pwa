@@ -27,10 +27,10 @@ try:
         UserPreferences, MarkdownImportRequest, GenerateTripRequest, SimplePromptRequest,
         GeocodeSearchRequest, GeocodeReverseRequest, ItineraryItem, SaveItineraryRequest,
         JoinTripRequest, CreateManualTripRequest, UpdateItemRequest, CreateItemRequest,
-        ImportToTripRequest, UpdateDayInfoRequest, AddDayRequest, CloneTripRequest,
-        UpdateCoverRequest, UpdateInfoRequest, RouteStop, RouteRequest, ExpenseRequest,
-        UpdateTripTitleRequest, UpdateExpenseRequest, ChatRequest, SummarizeRequest,
-        POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest
+        ImportToTripRequest, UpdateDayDataRequest, AddDayRequest, AppendItemsRequest,
+        CloneTripRequest, UpdateCoverRequest, UpdateLocationRequest, UpdateInfoRequest,
+        RouteStop, RouteRequest, ExpenseRequest, UpdateTripTitleRequest, UpdateExpenseRequest,
+        ChatRequest, SummarizeRequest, POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest
     )
     print("[Modules] ✅ Loaded models from models.base")
 except ImportError as e:
@@ -164,24 +164,10 @@ async def call_ai_parser(api_key: str, prompt: str, use_tools: bool = True):
             print(f"✅ {SMART_NO_TOOL_MODEL} 成功回應")
             return response.text
 
-# --- 資料模型 ---
-class UserPreferences(BaseModel):
-    destination: str
-    days: int
-    budget: str
-    interests: List[str]
 
-# 接收 Markdown 的模型
-class MarkdownImportRequest(BaseModel):
-    markdown_text: str
-    itinerary_id: Optional[str] = None # 如果是要匯入到現有行程
-
-# 新增：生成請求模型
-class GenerateTripRequest(BaseModel):
-    origin: str
-    destination: str
-    days: int
-    interests: str
+# --- 資料模型 (已移至 models/base.py) ---
+# UserPreferences, MarkdownImportRequest, GenerateTripRequest 等模型
+# 現在從 models.base 導入，詳見檔案頂部的 import 區塊
 
 # --- 嚴謹的依賴注入 (Dependency Injection) ---
 # 🔒 完全 BYOK 模式：使用者必須自己提供 API Key
@@ -870,17 +856,7 @@ def filter_results_by_country(results: list, country_code: str, strict: bool = T
 
 
 # 🌍 地理編碼 API 端點（供前端使用）
-
-class GeocodeSearchRequest(BaseModel):
-    query: str
-    limit: int = 5
-    tripTitle: str = None  # 行程標題（用於智能國家判斷）
-    lat: Optional[float] = None  # 🆕 地圖中心緯度（用於位置權重）
-    lng: Optional[float] = None  # 🆕 地圖中心經度（用於位置權重）
-
-class GeocodeReverseRequest(BaseModel):
-    lat: float
-    lng: float
+# GeocodeSearchRequest, GeocodeReverseRequest 已移至 models/base.py
 
 async def detect_country_from_query(query: str, api_key: str = None) -> str:
     """🧠 從搜尋關鍵字推斷國家（當標題失效時的 Fallback）"""
@@ -1306,9 +1282,8 @@ async def generate_trip(
         raise HTTPException(status_code=400, detail=f"生成失敗: {str(e)}")
 
 
-# 簡化的 AI 生成請求 (只接受 prompt)
-class SimplePromptRequest(BaseModel):
-    prompt: str
+
+# 簡化的 AI 生成請求 (SimplePromptRequest 已移至 models/base.py)
 
 # 🔥 簡化版 AI 生成 API (接受自由 prompt)
 @app.post("/api/ai-generate")
@@ -1383,80 +1358,10 @@ async def ai_generate(
         raise HTTPException(status_code=400, detail=f"生成失敗: {str(e)}")
 
 
-# --- 新增：存檔 API 需要的資料模型 ---
-class ItineraryItem(BaseModel):
-    day_number: int
-    time_slot: str
-    place_name: str
-    original_name: Optional[str] = None
-    category: str
-    desc: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    cost_amount: Optional[float] = 0
-    tags: Optional[List[str]] = []  # 新增：標籤
-    reservation_code: Optional[str] = ""  # 新增：預約代碼
-    # 👇 新增：用來存表格資料 (例如超市列表)
-    sub_items: List[dict] = []
-    # 👇 新增：使用者提供的連結
-    link_url: Optional[str] = None
 
-class SaveItineraryRequest(BaseModel):
-    title: str
-    creator_name: str
-    user_id: str
-    items: List[ItineraryItem]
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    daily_locations: Optional[dict] = {}
-    # 👇 新增：每日貼士資訊
-    day_notes: Optional[dict] = {}
-    day_costs: Optional[dict] = {}
-    day_tickets: Optional[dict] = {}
-
-class JoinTripRequest(BaseModel):
-    share_code: str
-    user_id: str
-    user_name: str
-
-# 新增：手動建立行程的模型
-class CreateManualTripRequest(BaseModel):
-    title: str
-    start_date: str
-    end_date: str
-    creator_name: str
-    user_id: str
-    cover_image: Optional[str] = None
-
-# 新增：更新項目模型
-class UpdateItemRequest(BaseModel):
-    time_slot: Optional[str] = None
-    place_name: Optional[str] = None
-    notes: Optional[str] = None
-    cost_amount: Optional[float] = 0
-    # 👇 座標欄位
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    # 👇 備忘錄欄位
-    memo: Optional[str] = None
-    # 👇 新增：連結列表 (sub_items)
-    sub_items: Optional[List[dict]] = None
-    # 👇 新增：圖片網址
-    image_url: Optional[str] = None
-    # 👇 新增：分類與標籤
-    category: Optional[str] = None
-    tags: Optional[List[str]] = None
-
-# 新增：單筆行程新增模型
-class CreateItemRequest(BaseModel):
-    itinerary_id: str
-    day_number: int
-    time_slot: str
-    place_name: str
-    category: str
-    notes: Optional[str] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
+# --- 存檔/行程相關資料模型 ---
+# ItineraryItem, SaveItineraryRequest, JoinTripRequest, CreateManualTripRequest,
+# UpdateItemRequest, CreateItemRequest 已移至 models/base.py
 
 # 產生 4 位數房間代碼
 def generate_room_code():
@@ -1571,15 +1476,7 @@ async def save_itinerary(request: SaveItineraryRequest):
         print(f"   Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 3.0.1: 匯入到現有行程
-class ImportToTripRequest(BaseModel):
-    trip_id: str
-    items: List[ItineraryItem]
-    # 👇 更新與合併用的資料
-    daily_locations: Optional[dict] = {}
-    day_notes: Optional[dict] = {}
-    day_costs: Optional[dict] = {}
-    day_tickets: Optional[dict] = {}
+# 🔥 功能 3.0.1: 匯入到現有行程 (ImportToTripRequest 已移至 models/base.py)
 
 @app.post("/api/import-to-trip")
 async def import_to_trip(request: ImportToTripRequest):
@@ -1741,13 +1638,7 @@ async def delete_trip(trip_id: str):
         print(f"🔥 Delete Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 3.3.5: 更新每日資訊 (notes/costs/tickets)
-class UpdateDayDataRequest(BaseModel):
-    day: int
-    day_notes: Optional[dict] = None
-    day_costs: Optional[dict] = None
-    day_tickets: Optional[dict] = None
-    day_checklists: Optional[dict] = None  # 🆕 行前清單
+# 🔥 功能 3.3.5: 更新每日資訊 (UpdateDayDataRequest 已移至 models/base.py)
 
 @app.put("/api/trips/{trip_id}/day-data")
 async def update_day_data(trip_id: str, request: UpdateDayDataRequest):

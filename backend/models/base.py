@@ -141,16 +141,24 @@ class ImportToTripRequest(BaseModel):
 
 # === Day 管理模型 ===
 
-class UpdateDayInfoRequest(BaseModel):
+class UpdateDayDataRequest(BaseModel):
     """更新每日資訊請求"""
+    day: int
     day_notes: Optional[dict] = None
     day_costs: Optional[dict] = None
     day_tickets: Optional[dict] = None
+    day_checklists: Optional[dict] = None  # 🆕 行前清單
 
 
 class AddDayRequest(BaseModel):
     """新增天數請求"""
-    position: str  # "start" or "end"
+    position: str = "end"  # "end" 或 "before:N"
+    clone_content: bool = False  # 🆕 是否移植鄰近天數的內容
+
+
+class AppendItemsRequest(BaseModel):
+    """追加細項到行程請求"""
+    items: List[ItineraryItem]
 
 
 class CloneTripRequest(BaseModel):
@@ -162,6 +170,14 @@ class CloneTripRequest(BaseModel):
 class UpdateCoverRequest(BaseModel):
     """更新封面圖請求"""
     cover_image: str
+
+
+class UpdateLocationRequest(BaseModel):
+    """更新每日地點請求"""
+    day: int
+    name: str
+    lat: float
+    lng: float
 
 
 # === 行程資訊模型 ===
