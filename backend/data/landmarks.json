@@ -1,5 +1,5 @@
 {
-    "__comment": "Tokyo Expansion - Phase 1 & 2: City Center, Airport, Metro, Shopping",
+    "__comment": "Tokyo Expansion - Phase 1 & 2 & 3: City Center, Airport, Metro, Major Shopping, Yokohama, Kamakura, Hakone, Fuji",
     "穴守稻荷車站": {
         "aliases": [
             "anamori inari",
@@ -1077,5 +1077,335 @@
         "country": "JP",
         "lat": 35.6587,
         "lng": 139.7027
+    },
+    "橫濱站": {
+        "aliases": [
+            "yokohama station",
+            "横浜駅"
+        ],
+        "search": "Yokohama Station",
+        "display": "橫濱車站",
+        "country": "JP",
+        "lat": 35.4658,
+        "lng": 139.6223
+    },
+    "櫻木町站": {
+        "aliases": [
+            "sakuragicho",
+            "桜木町駅"
+        ],
+        "search": "Sakuragicho Station",
+        "display": "櫻木町車站",
+        "country": "JP",
+        "lat": 35.5009,
+        "lng": 139.6310
+    },
+    "橫濱港未來21": {
+        "aliases": [
+            "minato mirai",
+            "みなとみらい"
+        ],
+        "search": "Minato Mirai 21",
+        "display": "橫濱港未來21",
+        "country": "JP",
+        "lat": 35.4560,
+        "lng": 139.6315
+    },
+    "橫濱紅磚倉庫": {
+        "aliases": [
+            "red brick warehouse",
+            "akarenga",
+            "赤レンガ倉庫"
+        ],
+        "search": "Yokohama Red Brick Warehouse",
+        "display": "橫濱紅磚倉庫",
+        "country": "JP",
+        "lat": 35.4526,
+        "lng": 139.6429
+    },
+    "合味道紀念館": {
+        "aliases": [
+            "cup noodles museum",
+            "컵누들박물관",
+            "カップヌードルミュージアム"
+        ],
+        "search": "Cup Noodles Museum Yokohama",
+        "display": "橫濱合味道紀念館",
+        "country": "JP",
+        "lat": 35.4555,
+        "lng": 139.6401
+    },
+    "橫濱中華街": {
+        "aliases": [
+            "yokohama chinatown",
+            "横浜中華街"
+        ],
+        "search": "Yokohama Chinatown",
+        "display": "橫濱中華街",
+        "country": "JP",
+        "lat": 35.4416,
+        "lng": 139.6468
+    },
+    "山下公園": {
+        "aliases": [
+            "yamashita park",
+            "山下公園"
+        ],
+        "search": "Yamashita Park",
+        "display": "山下公園",
+        "country": "JP",
+        "lat": 35.4457,
+        "lng": 139.6496
+    },
+    "鎌倉站": {
+        "aliases": [
+            "kamakura station",
+            "鎌倉駅"
+        ],
+        "search": "Kamakura Station",
+        "display": "鎌倉車站",
+        "country": "JP",
+        "lat": 35.3190,
+        "lng": 139.5504
+    },
+    "江之島站": {
+        "aliases": [
+            "enoshima station",
+            "江ノ島駅"
+        ],
+        "search": "Enoshima Station",
+        "display": "江之島車站",
+        "country": "JP",
+        "lat": 35.3113,
+        "lng": 139.4883
+    },
+    "鎌倉高校前站": {
+        "aliases": [
+            "kamakurakokomae",
+            "slam dunk crossing",
+            "灌籃高手平交道",
+            "鎌倉高校前駅"
+        ],
+        "search": "Kamakurakokomae Station",
+        "display": "鎌倉高校前車站 (灌籃高手)",
+        "country": "JP",
+        "lat": 35.3067,
+        "lng": 139.5019
+    },
+    "江之島": {
+        "aliases": [
+            "enoshima island",
+            "江の島"
+        ],
+        "search": "Enoshima",
+        "display": "江之島",
+        "country": "JP",
+        "lat": 35.3006,
+        "lng": 139.4808
+    },
+    "鎌倉大佛": {
+        "aliases": [
+            "great buddha of kamakura",
+            "kotoku-in",
+            "高德院",
+            "鎌倉大仏"
+        ],
+        "search": "Kotoku-in",
+        "display": "鎌倉大佛 (高德院)",
+        "country": "JP",
+        "lat": 35.3167,
+        "lng": 139.5361
+    },
+    "長谷寺": {
+        "aliases": [
+            "hasedera",
+            "hase temple",
+            "長谷寺"
+        ],
+        "search": "Hasedera",
+        "display": "鎌倉長谷寺",
+        "country": "JP",
+        "lat": 35.3125,
+        "lng": 139.5332
+    },
+    "鶴岡八幡宮": {
+        "aliases": [
+            "tsurugaoka hachimangu",
+            "鶴岡八幡宮"
+        ],
+        "search": "Tsurugaoka Hachimangu",
+        "display": "鶴岡八幡宮",
+        "country": "JP",
+        "lat": 35.3260,
+        "lng": 139.5564
+    },
+    "箱根湯本站": {
+        "aliases": [
+            "hakone-yumoto",
+            "箱根湯本駅"
+        ],
+        "search": "Hakone-Yumoto Station",
+        "display": "箱根湯本車站",
+        "country": "JP",
+        "lat": 35.2334,
+        "lng": 139.1038
+    },
+    "強羅站": {
+        "aliases": [
+            "gora station",
+            "強羅駅"
+        ],
+        "search": "Gora Station",
+        "display": "強羅車站",
+        "country": "JP",
+        "lat": 35.2505,
+        "lng": 139.0487
+    },
+    "大涌谷": {
+        "aliases": [
+            "owakudani",
+            "大涌谷"
+        ],
+        "search": "Owakudani",
+        "display": "箱根大涌谷",
+        "country": "JP",
+        "lat": 35.2427,
+        "lng": 139.0191
+    },
+    "蘆之湖": {
+        "aliases": [
+            "lake ashi",
+            "ashinoko",
+            "芦ノ湖"
+        ],
+        "search": "Lake Ashi",
+        "display": "蘆之湖",
+        "country": "JP",
+        "lat": 35.2045,
+        "lng": 139.0315
+    },
+    "箱根神社": {
+        "aliases": [
+            "hakone shrine",
+            "箱根神社"
+        ],
+        "search": "Hakone Shrine",
+        "display": "箱根神社",
+        "country": "JP",
+        "lat": 35.2047,
+        "lng": 139.0255
+    },
+    "箱根雕刻森林美術館": {
+        "aliases": [
+            "hakone open air museum",
+            "箱根彫刻の森美術館"
+        ],
+        "search": "The Hakone Open-Air Museum",
+        "display": "箱根雕刻森林美術館",
+        "country": "JP",
+        "lat": 35.2447,
+        "lng": 139.0515
+    },
+    "河口湖站": {
+        "aliases": [
+            "kawaguchiko station",
+            "河口湖駅"
+        ],
+        "search": "Kawaguchiko Station",
+        "display": "河口湖車站",
+        "country": "JP",
+        "lat": 35.4982,
+        "lng": 138.7688
+    },
+    "河口湖": {
+        "aliases": [
+            "lake kawaguchi",
+            "kawaguchiko",
+            "河口湖"
+        ],
+        "search": "Lake Kawaguchi",
+        "display": "河口湖",
+        "country": "JP",
+        "lat": 35.5173,
+        "lng": 138.7512
+    },
+    "下吉田站": {
+        "aliases": [
+            "shimoyoshida",
+            "下吉田駅"
+        ],
+        "search": "Shimoyoshida Station",
+        "display": "下吉田車站 (新倉山淺間公園)",
+        "country": "JP",
+        "lat": 35.4925,
+        "lng": 138.8038
+    },
+    "忠靈塔": {
+        "aliases": [
+            "chureito pagoda",
+            "新倉山淺間公園",
+            "忠霊塔"
+        ],
+        "search": "Chureito Pagoda",
+        "display": "忠靈塔 (新倉山淺間公園)",
+        "country": "JP",
+        "lat": 35.5012,
+        "lng": 138.8016
+    },
+    "大石公園": {
+        "aliases": [
+            "oishi park",
+            "大石公園"
+        ],
+        "search": "Oishi Park",
+        "display": "大石公園",
+        "country": "JP",
+        "lat": 35.5228,
+        "lng": 138.7454
+    },
+    "富士急樂園": {
+        "aliases": [
+            "fuji-q highland",
+            "fuji q",
+            "富士急ハイランド"
+        ],
+        "search": "Fuji-Q Highland",
+        "display": "富士急樂園",
+        "country": "JP",
+        "lat": 35.4869,
+        "lng": 138.7806
+    },
+    "富士山五合目": {
+        "aliases": [
+            "mt fuji 5th station",
+            "富士山五合目"
+        ],
+        "search": "Mt. Fuji 5th Station",
+        "display": "富士山五合目",
+        "country": "JP",
+        "lat": 35.3606,
+        "lng": 138.7278
+    },
+    "御殿場站": {
+        "aliases": [
+            "gotemba station",
+            "御殿場駅"
+        ],
+        "search": "Gotemba Station",
+        "display": "御殿場車站",
+        "country": "JP",
+        "lat": 35.3003,
+        "lng": 138.9341
+    },
+    "御殿場Outlet": {
+        "aliases": [
+            "gotemba premium outlets",
+            "御殿場アウトレット"
+        ],
+        "search": "Gotemba Premium Outlets",
+        "display": "御殿場 Premium Outlets",
+        "country": "JP",
+        "lat": 35.3080,
+        "lng": 138.9663
     }
 }
