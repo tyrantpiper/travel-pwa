@@ -4,6 +4,7 @@ Extracted from main.py for modularization
 """
 
 import os
+import json
 import httpx
 from google import genai
 from google.genai import types
@@ -537,6 +538,20 @@ LANDMARKS_DB = {
     "海洋公園": {"aliases": ["ocean park", "海洋公園"], "search": "Ocean Park Hong Kong", "display": "海洋公園", "country": "HK"},
     "香港機場": {"aliases": ["hong kong airport", "hkg", "赤鱲角"], "search": "Hong Kong International Airport", "display": "香港國際機場", "country": "HK"},
 }
+
+# 🆕 Load External JSON for Massive Expansion
+try:
+    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "landmarks.json")
+    if os.path.exists(data_path):
+        with open(data_path, "r", encoding="utf-8") as f:
+            external_data = json.load(f)
+            # Remove example key
+            if "example_key" in external_data:
+                del external_data["example_key"]
+            LANDMARKS_DB.update(external_data)
+            print(f"📦 Loaded {len(external_data)} external landmarks from landmarks.json")
+except Exception as e:
+    print(f"⚠️ Failed to load external landmarks: {e}")
 
 # 預先計算排序後的鍵（最長優先匹配）
 LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)

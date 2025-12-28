@@ -1,0 +1,12 @@
+{
+    "example_key": {
+        "aliases": [
+            "example alias"
+        ],
+        "search": "Search Term",
+        "display": "Display Name",
+        "country": "JP",
+        "lat": 0.0,
+        "lng": 0.0
+    }
+}
