@@ -69,7 +69,7 @@ interface FlightData {
 
 export function InfoView() {
     const { t } = useLanguage()
-    const { activeTripId, activeTrip } = useTripContext()
+    const { activeTripId, activeTrip, mutate: tripMutate } = useTripContext()
     const [isEditing, setIsEditing] = useState(false)
 
     const [flights, setFlights] = useState(DEFAULT_FLIGHTS)
@@ -138,6 +138,7 @@ export function InfoView() {
                     .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
                 setHotels(parsedHotels)
                 toast.success("資料已更新")
+                tripMutate() // 🔄 Refresh global context
             }
         } catch (e) { console.error(e) }
     }
@@ -150,8 +151,10 @@ export function InfoView() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ flight_info: flights, hotel_info: hotels })
             })
+
             toast.success("Done")
             setIsEditing(false)
+            tripMutate() // 🔄 Refresh global context
         } catch { toast.error("Save failed") }
     }
 
