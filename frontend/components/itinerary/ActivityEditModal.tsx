@@ -69,13 +69,15 @@ export function ActivityEditModal({
             const targetLat = (editItem.lat ? Number(editItem.lat) : undefined) || biasLoc?.lat || dailyLoc?.lat
             const targetLng = (editItem.lng ? Number(editItem.lng) : undefined) || biasLoc?.lng || dailyLoc?.lng
 
-            // 🆕 使用智能地理編碼 API
+            // 🆕 使用結構化參數（取代字串拼接）
             const data = await geocodeApi.search({
-                query: `${editItem.place} ${searchRegion} ${searchCountry}`.trim(),
+                query: editItem.place.trim(),       // 純淨的搜尋字串
                 limit: 5,
-                tripTitle,  // 🆕 智能國家判斷
-                lat: targetLat, // 🆕 位置權重
-                lng: targetLng  // 🆕 位置權重
+                tripTitle,
+                lat: targetLat,
+                lng: targetLng,
+                country: searchCountry || undefined,  // 🆕 結構化國家過濾
+                region: searchRegion || undefined     // 🆕 結構化區域過濾
             })
             setPlaceSearchResults((data.results || []).map((item: GeocodeResult) => ({
                 name: item.name,

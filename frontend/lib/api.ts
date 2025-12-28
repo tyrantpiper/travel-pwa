@@ -72,6 +72,8 @@ export interface GeocodeSearchParams {
     tripTitle?: string  // 行程標題（用於智能國家判斷）
     lat?: number        // 🆕 地圖中心緯度
     lng?: number        // 🆕 地圖中心經度
+    country?: string    // 🆕 國家過濾 (如 "Japan", "Taiwan")
+    region?: string     // 🆕 區域過濾 (如 "Tokyo 東京")
 }
 
 // === API Functions ===

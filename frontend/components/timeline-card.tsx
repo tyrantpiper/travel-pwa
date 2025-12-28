@@ -41,9 +41,13 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
     // 判斷是否為 Header 卡片
     const isHeader = activity.category === 'header' || (activity.time || activity.time_slot || "00:00") === '00:00'
 
-    // 判斷是否隱藏地圖按鈕 (內外邏輯一致)
+    // 🔧 FIX: 導航按鈕邏輯 - sub_items 和導航應並存，不互斥
+    // 只有在以下情況才隱藏導航按鈕：
+    // 1. 地點名稱包含非實體地點關鍵字
+    // 2. 是交通類別但沒有連結也沒有座標
+    // 3. 是 Header 卡片
+    // 🆕 移除：有 sub_items 就隱藏（這是錯誤的互斥邏輯）
     const hideMapBtn =
-        (activity.sub_items && activity.sub_items.length > 0) ||
         ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => (activity.place || "").includes(k)) ||
         (activity.category === 'transport' && !activity.link_url && !activity.lat) ||
         isHeader;

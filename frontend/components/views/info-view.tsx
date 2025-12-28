@@ -188,8 +188,6 @@ export function InfoView() {
         setIsHotelSearching(true)
         setSearchingHotelIdx(hotelIdx)
         try {
-            const queryWithFilters = `${hotelSearchQuery.trim()} ${hotelSearchRegion} ${hotelSearchCountry}`.trim()
-
             // 🧠 Sequential Hotel Bias (旅人軌跡：優先參考上一間飯店的位置)
             let biasLat: number | undefined
             let biasLng: number | undefined
@@ -198,13 +196,15 @@ export function InfoView() {
                 biasLng = hotels[hotelIdx - 1].lng!
             }
 
-            // 🆕 使用智能地理編碼 API
+            // 🆕 使用結構化參數（取代字串拼接）
             const data = await geocodeApi.search({
-                query: queryWithFilters,
+                query: hotelSearchQuery.trim(),  // 純淨的搜尋字串
                 limit: 5,
-                tripTitle: activeTrip?.title,  // 🆕 智能國家判斷
-                lat: biasLat,   // 🆕 位置權重 (Sequential Bias)
-                lng: biasLng    // 🆕 位置權重
+                tripTitle: activeTrip?.title,
+                lat: biasLat,
+                lng: biasLng,
+                country: hotelSearchCountry || undefined,  // 🆕 結構化國家過濾
+                region: hotelSearchRegion || undefined     // 🆕 結構化區域過濾
             })
             setHotelSearchResults(data.results || [])
         } catch (e) {

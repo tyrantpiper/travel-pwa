@@ -3,9 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Sparkles, Loader2, MapPin, Clock, Minimize2 } from "lucide-react"
+import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Sparkles, Loader2, MapPin, Clock } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MAP_STYLES } from "@/lib/constants"
 import { geocodeApi } from "@/lib/api"
@@ -44,6 +43,7 @@ interface FullscreenMapModalProps {
     initialViewState: ViewState
     activities: Activity[]
     onAddPOI?: (poi: POIBasicData, time: string, notes?: string) => void
+    tripTitle?: string  // 🆕 行程標題（用於智能搜尋）
 }
 
 // 搜尋歷史 Hook
@@ -73,7 +73,8 @@ export default function FullscreenMapModal({
     onClose,
     initialViewState,
     activities,
-    onAddPOI
+    onAddPOI,
+    tripTitle  // 🆕 行程標題
 }: FullscreenMapModalProps) {
     const mapRef = useRef<MapRef>(null)
     const inputRef = useRef<HTMLInputElement>(null)
@@ -105,7 +106,13 @@ export default function FullscreenMapModal({
         const timer = setTimeout(async () => {
             setIsSearching(true)
             try {
-                const data = await geocodeApi.search({ query, limit: 5 })
+                const data = await geocodeApi.search({
+                    query,
+                    limit: 5,
+                    tripTitle,  // 🆕 智能國家判斷
+                    lat: initialViewState.latitude,   // 🆕 位置權重
+                    lng: initialViewState.longitude   // 🆕 位置權重
+                })
                 setResults(data.results || [])
             } catch {
                 setResults([])
@@ -115,7 +122,7 @@ export default function FullscreenMapModal({
         }, 300)
 
         return () => clearTimeout(timer)
-    }, [query])
+    }, [query, tripTitle, initialViewState.latitude, initialViewState.longitude])
 
     // Esc 鍵退出
     useEffect(() => {

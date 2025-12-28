@@ -762,19 +762,98 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
     except Exception:
         return None
 
-async def smart_geocode_logic(query: str, limit: int, trip_title: str = None, api_key: str = None, lat: float = None, lng: float = None) -> dict:
+# 🆕 國家名稱 → 代碼映射 (全小寫，大小寫不敏感)
+COUNTRY_NAME_TO_CODE = {
+    # 日本
+    "japan": "JP", "日本": "JP",
+    # 台灣 (兩種寫法)
+    "taiwan": "TW", "台灣": "TW", "臺灣": "TW",
+    # 韓國
+    "south korea": "KR", "korea": "KR", "韓國": "KR", "한국": "KR",
+    # 泰國
+    "thailand": "TH", "泰國": "TH", "ประเทศไทย": "TH",
+    # 越南
+    "vietnam": "VN", "越南": "VN",
+    # 新加坡
+    "singapore": "SG", "新加坡": "SG",
+    # 香港
+    "hong kong": "HK", "香港": "HK",
+    # 🆕 美國
+    "usa": "US", "united states": "US", "美國": "US", "美国": "US",
+    # 🆕 英國
+    "uk": "GB", "united kingdom": "GB", "england": "GB", "britain": "GB", "英國": "GB", "英国": "GB",
+    # 🆕 法國
+    "france": "FR", "法國": "FR", "法国": "FR",
+    # 🆕 義大利
+    "italy": "IT", "義大利": "IT", "意大利": "IT",
+    # 🆕 澳洲
+    "australia": "AU", "澳洲": "AU", "澳大利亞": "AU",
+    # 🆕 德國
+    "germany": "DE", "德國": "DE", "德国": "DE",
+    # 🆕 西班牙
+    "spain": "ES", "西班牙": "ES",
+    # 🆕 加拿大
+    "canada": "CA", "加拿大": "CA",
+    # 🆕 中國
+    "china": "CN", "中國": "CN", "中国": "CN",
+    # 🆕 馬來西亞
+    "malaysia": "MY", "馬來西亞": "MY", "马来西亚": "MY",
+    # 🆕 印尼
+    "indonesia": "ID", "印尼": "ID", "印度尼西亞": "ID",
+    # 🆕 菲律賓
+    "philippines": "PH", "菲律賓": "PH", "菲律宾": "PH",
+}
+
+def extract_region_for_search(region: str) -> str:
+    """從 'Tokyo 東京' 提取英文部分 'Tokyo'"""
+    if not region:
+        return ""
+    # 取第一個空格前的部分（英文）
+    parts = region.split(" ")
+    return parts[0] if parts else region
+
+async def smart_geocode_logic(
+    query: str, 
+    limit: int, 
+    trip_title: str = None, 
+    api_key: str = None, 
+    lat: float = None, 
+    lng: float = None,
+    country: str = None,    # 🆕 前端傳入的國家過濾
+    region: str = None      # 🆕 前端傳入的區域過濾
+) -> dict:
     """共用的智能地理編碼邏輯"""
-    log_debug(f"🔍 [SmartGeo] Start search: '{query}' (Trip: {trip_title}, Bias: {lat},{lng})")
+    log_debug(f"🔍 [SmartGeo] Start search: '{query}' (Trip: {trip_title}, Country: {country}, Region: {region}, Bias: {lat},{lng})")
     
     # 🧠 Step 0: 智能國家判斷和翻譯
     country_code = None
     search_queries = [query]
     chinese_display = None  # 🆕 中文顯示名稱
     
-    # 🆕 第一優先級：關鍵字規則（確定性，零延遲，無需 API Key）
-    country_code = detect_country_from_keywords(query)
-    if country_code:
-        log_debug(f"   🔑 Keyword Match → {country_code}")
+    # 🆕 第零優先級：前端明確指定的國家 (最高優先，大小寫不敏感)
+    if country:
+        normalized_country = country.strip().lower()
+        country_code = COUNTRY_NAME_TO_CODE.get(normalized_country) or COUNTRY_NAME_TO_CODE.get(country)
+        if country_code:
+            log_debug(f"   🎯 Frontend Country Filter → {country_code}")
+    
+    # 🆕 如果有區域，提取英文部分加入搜尋 query
+    if region:
+        clean_region = extract_region_for_search(region)
+        # 如果沒有國家碼，嘗試從 region 推測
+        if not country_code:
+            country_code = detect_country_from_keywords(region)
+        # 🆕 將區域加入搜尋（只在 query 中不包含時）
+        if clean_region and clean_region.lower() not in query.lower():
+            search_queries = [f"{query} {clean_region}"]
+            log_debug(f"   📍 Region added to query: '{query}' → '{query} {clean_region}'")
+    
+    # 第一優先級：關鍵字規則（確定性，零延遲，無需 API Key）
+    if not country_code:
+        country_code = detect_country_from_keywords(query)
+        if country_code:
+            log_debug(f"   🔑 Keyword Match → {country_code}")
+
     
     # 第二優先級：AI 判斷（需要 API Key）
     if not country_code and api_key:

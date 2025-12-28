@@ -44,6 +44,9 @@ class GeocodeSearchRequest(BaseModel):
     tripTitle: str = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    # 🆕 結構化過濾參數 (取代字串拼接)
+    country: Optional[str] = None   # 國家名稱 (如 "Japan", "Taiwan")
+    region: Optional[str] = None    # 區域名稱 (如 "Tokyo 東京")
 
 
 class GeocodeReverseRequest(BaseModel):

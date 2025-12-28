@@ -28,15 +28,19 @@ async def geocode_search(
     2. Photon 中文優化
     3. Nominatim 降級
     4. ArcGIS 最終降級
+    
+    🆕 支援結構化過濾參數 (country/region)
     """
-    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', bias={request.lat},{request.lng}")
+    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', country={request.country}, region={request.region}, bias={request.lat},{request.lng}")
     return await smart_geocode_logic(
         request.query, 
         request.limit, 
         request.tripTitle, 
         x_gemini_key, 
         request.lat, 
-        request.lng
+        request.lng,
+        request.country,    # 🆕 傳遞國家過濾
+        request.region      # 🆕 傳遞區域過濾
     )
 
 

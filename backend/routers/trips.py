@@ -484,20 +484,46 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
         existing_trip = trip_res.data[0]
         existing_content = existing_trip.get("content") or {}
         
-        # 2. 合併 content 資料 (深度合併)
-        # 用戶匯入的新資料優先於舊資料（或者保留舊資料？通常匯入是為了充實，所以合併）
+        # 2. 合併 content 資料
+        # 🆕 區分兩種合併模式：
+        #    - merge_dicts: 用於 daily_locations (一天只有一個中心點，覆蓋)
+        #    - deep_merge_day_arrays: 用於 notes/costs/tickets (同一天可追加)
+        
         def merge_dicts(old_d, new_d):
+            """簡單的 key-level 合併 (新值覆蓋舊值)"""
             if not new_d: return old_d or {}
             if not old_d: return new_d
             result = old_d.copy()
-            result.update(new_d) # 簡單的 key-level update
+            result.update(new_d)
+            return result
+        
+        def deep_merge_day_arrays(old_d: dict, new_d: dict) -> dict:
+            """陣列型每日資料的深度合併 (追加而非覆蓋)
+            
+            用途：同一天分批匯入時，day_notes/costs/tickets 會追加合併
+            範例：
+              舊資料: {"1": [{"item": "交通", "amount": "¥1200"}]}
+              新資料: {"1": [{"item": "午餐", "amount": "¥1000"}]}
+              結果:   {"1": [{"item": "交通", "amount": "¥1200"}, {"item": "午餐", "amount": "¥1000"}]}
+            """
+            if not new_d: return old_d or {}
+            if not old_d: return new_d
+            result = old_d.copy()
+            for day_key, new_items in new_d.items():
+                existing = result.get(day_key, [])
+                if isinstance(existing, list) and isinstance(new_items, list):
+                    result[day_key] = existing + new_items  # 追加合併
+                else:
+                    result[day_key] = new_items  # 非陣列則覆蓋
             return result
             
         updated_content = {
+            # daily_locations: 保持覆蓋 (一天只有一個地點中心)
             "daily_locations": merge_dicts(existing_content.get("daily_locations"), request.daily_locations),
-            "day_notes": merge_dicts(existing_content.get("day_notes"), request.day_notes),
-            "day_costs": merge_dicts(existing_content.get("day_costs"), request.day_costs),
-            "day_tickets": merge_dicts(existing_content.get("day_tickets"), request.day_tickets)
+            # 🆕 以下使用深度追加合併，支援分批匯入
+            "day_notes": deep_merge_day_arrays(existing_content.get("day_notes"), request.day_notes),
+            "day_costs": deep_merge_day_arrays(existing_content.get("day_costs"), request.day_costs),
+            "day_tickets": deep_merge_day_arrays(existing_content.get("day_tickets"), request.day_tickets)
         }
         
         # 3. 更新主行程 content

@@ -311,17 +311,16 @@ export function ItineraryView() {
         if (!newLocName.trim()) return
         setIsLocSearching(true)
         try {
-            // 組合搜尋詞：關鍵字 + 地區 + 國家
-            const queryWithCountry = `${newLocName.trim()} ${dailyLocSearchRegion} ${searchCountry}`.trim()
-
-            // 🆕 使用智能地理編碼 API（支援 tripTitle 國家判斷 & 位置權重）
+            // 🆕 使用智能地理編碼 API（支援結構化 country/region）
             const bias = calculateBiasLocation(day) // 取得當前或前一天的位置作為權重
             const data = await geocodeApi.search({
-                query: queryWithCountry,
+                query: newLocName.trim(),           // 純淨的搜尋字串（不再拼接）
                 limit: 8,
-                tripTitle: currentTrip?.title,  // 🆕 智能國家判斷
-                lat: bias?.lat,                 // 🆕 位置權重 (Sequential Bias)
-                lng: bias?.lng                  // 🆕 位置權重
+                tripTitle: currentTrip?.title,
+                lat: bias?.lat,
+                lng: bias?.lng,
+                country: searchCountry || undefined,         // 🆕 結構化國家過濾
+                region: dailyLocSearchRegion || undefined    // 🆕 結構化區域過濾
             })
 
             if (!data.results || data.results.length === 0) {
