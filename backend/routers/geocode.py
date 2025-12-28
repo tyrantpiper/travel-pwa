@@ -9,6 +9,7 @@ from models.base import GeocodeSearchRequest, GeocodeReverseRequest
 from services.geocode_service import (
     smart_geocode_logic,
     reverse_geocode_with_photon,
+    reverse_geocode_with_ai_enhancement,  # 🆕 AI 增強版
     log_debug
 )
 

@@ -12,10 +12,18 @@ from google import genai
 from google.genai import types
 from typing import Optional, List, Dict, Any
 
-# --- 模型常數 ---
-GEMINI_3_FLASH = "gemini-3-flash-preview"  # Primary (免費脈絡快取)
-GEMINI_25_PRO = "gemini-2.5-pro"            # Fallback (複雜推理)
-GEMINI_25_FLASH = "gemini-2.5-flash"        # Verifier (快速驗證)
+# --- 模型常數 (從 ai_config 導入) ---
+from utils.ai_config import (
+    CREATIVE_MODEL,      # gemini-3-flash-preview
+    SEARCH_MODEL,        # gemini-2.5-flash
+    LITE_MODEL,          # gemini-2.5-flash-lite
+    WORKHORSE_MODEL      # gemma-3-27b-it (14,400 RPD)
+)
+
+# 向後兼容別名
+GEMINI_3_FLASH = CREATIVE_MODEL
+GEMINI_25_PRO = WORKHORSE_MODEL  # gemini-2.5-pro 不可用，用 gemma 替代
+GEMINI_25_FLASH = SEARCH_MODEL
 
 # --- 🆕 v3.5: 診斷意圖偵測 ---
 DIAGNOSIS_KEYWORDS = [
@@ -152,11 +160,11 @@ async def call_with_fallback(
         else:
             print(f"⚠️ {primary_model} 錯誤 (可能模型不存在或其他): {e}")
         
-        print(f"🔄 自動降級至 {GEMINI_25_PRO}...")
+        print(f"🔄 自動降級至 {WORKHORSE_MODEL} (gemma)...")
         
-        # Fallback to Gemini 2.5 Pro
+        # Fallback to Gemma (14,400 RPD workhorse)
         try:
-            fallback_model = GEMINI_25_PRO
+            fallback_model = WORKHORSE_MODEL
             chat = client.chats.create(
                 model=fallback_model,
                 history=chat_history,
@@ -241,10 +249,10 @@ async def call_extraction(
     except Exception as e:
         print(f"⚠️ {primary_model} 失敗: {e}")
         
-        # Fallback to Gemini 2.5 Pro
+        # Fallback to Gemma (14,400 RPD workhorse)
         try:
-            fallback_model = GEMINI_25_PRO
-            print(f"🔄 降級至 {fallback_model}...")
+            fallback_model = WORKHORSE_MODEL
+            print(f"🔄 降級至 {fallback_model} (gemma)...")
             response = client.models.generate_content(
                 model=fallback_model,
                 contents=prompt,
@@ -256,9 +264,9 @@ async def call_extraction(
         except Exception as e2:
             print(f"⚠️ {fallback_model} 也失敗: {e2}")
             
-            # 最後嘗試 Flash
-            last_model = GEMINI_25_FLASH
-            print(f"🔄 最後嘗試 {last_model}...")
+            # 最後嘗試 Lite
+            last_model = LITE_MODEL
+            print(f"🔄 最後嘗試 {last_model} (lite)...")
             response = client.models.generate_content(
                 model=last_model,
                 contents=prompt,

@@ -8,6 +8,9 @@ import httpx
 from google import genai
 from google.genai import types
 
+# Import AI model config
+from utils.ai_config import WORKHORSE_MODEL
+
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 
@@ -149,6 +152,84 @@ async def reverse_geocode_with_photon(lat: float, lng: float):
     except Exception as e:
         print(f"🔍 Photon reverse error: {e}")
     return None
+
+
+async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: str = None):
+    """
+    🆕 AI 增強反向地理編碼
+    
+    使用 gemma-3-27b-it 提供：
+    1. 中文友好名稱
+    2. 地點類型分類
+    3. 一句話描述
+    
+    Args:
+        lat, lng: 座標
+        api_key: Gemini API Key (可選，無則返回基本結果)
+    
+    Returns:
+        {name, address, display_name?, type?, description?}
+    """
+    import json
+    
+    # Step 1: Photon 原生查詢
+    base_result = await reverse_geocode_with_photon(lat, lng)
+    
+    if not base_result:
+        return {"name": "Unknown", "address": "", "lat": lat, "lng": lng}
+    
+    # 如果沒有 API key，返回基本結果
+    if not api_key:
+        return {**base_result, "lat": lat, "lng": lng}
+    
+    # Step 2: AI 增強 (中文優化顯示)
+    try:
+        client = genai.Client(api_key=api_key)
+        
+        prompt = f"""根據座標 ({lat:.6f}, {lng:.6f}) 和地名 "{base_result.get('name', 'Unknown')}"，
+地址：{base_result.get('address', '')}
+
+請提供：
+1. display_name: 中文友好名稱（如果已經是中文則優化顯示）
+2. type: 地點類型（餐廳/景點/交通站/購物/住宿/其他）
+3. description: 一句話描述（20字內）
+
+嚴格按以下 JSON 格式回傳，不要額外說明：
+{{"display_name": "...", "type": "...", "description": "..."}}"""
+
+        response = await client.aio.models.generate_content(
+            model=WORKHORSE_MODEL,  # gemma-3-27b-it
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0,
+                max_output_tokens=150
+            )
+        )
+        
+        # 解析 JSON
+        text = response.text.strip()
+        # 處理可能的 markdown 包裝
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        
+        enhanced = json.loads(text)
+        
+        result = {
+            **base_result,
+            "lat": lat,
+            "lng": lng,
+            "display_name": enhanced.get("display_name", base_result.get("name")),
+            "type": enhanced.get("type", "其他"),
+            "description": enhanced.get("description", "")
+        }
+        print(f"🤖 AI 增強反向地理: {base_result.get('name')} → {result.get('display_name')}")
+        return result
+        
+    except Exception as e:
+        print(f"🤖 AI 增強失敗，返回基本結果: {e}")
+        return {**base_result, "lat": lat, "lng": lng}
 
 
 async def geocode_place(place_name: str, lat: float = None, lng: float = None):
@@ -568,7 +649,7 @@ Senso-ji
 淺草寺"""
 
         response = await client.aio.models.generate_content(
-            model="gemini-2.0-flash-exp",
+            model=WORKHORSE_MODEL,  # gemma-3-27b-it (多語言專家)
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0,

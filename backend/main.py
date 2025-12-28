@@ -162,70 +162,8 @@ if ARCGIS_API_KEY:
 else:
     print("[ArcGIS] Geocoding: Not configured, using Nominatim fallback")
 
-# --- AI 模型設定區 (2.5 版混合動力引擎) ---
-# 1. 主力模型 (支援 Maps, 500 RPD)
-PRIMARY_MODEL = "gemini-2.5-flash"
-
-# 2. 輕量模型 (支援 Maps, 500 RPD)
-LITE_MODEL = "gemini-2.5-flash-lite"
-
-# 3. 智力模型 (無工具, 無 RPD 限制, 速度快)
-SMART_NO_TOOL_MODEL = "gemini-3-flash-preview"
-
-# 4. 🆕 推理模型 (免費無限, 複雜推理, 行程診斷)
-REASONING_MODEL = "gemini-2.5-pro"
-
-# --- AI 服務函式 (包含降級機制) ---
-async def call_ai_parser(api_key: str, prompt: str, use_tools: bool = True):
-    """
-    智能 AI 調用函數，支持自動降級
-    使用新版 google-genai SDK
-    
-    Args:
-        api_key: Gemini API Key
-        prompt: 提示詞
-        use_tools: 是否嘗試使用 Google Maps 工具 (目前未實作)
-    
-    Returns:
-        str: AI 生成的文本
-    """
-    # 🆕 使用新版 Client API
-    client = genai.Client(api_key=api_key)
-    
-    # 策略 A: 優先使用主力模型
-    try:
-        print(f"🤖 嘗試使用 {PRIMARY_MODEL}...")
-        response = client.models.generate_content(
-            model=PRIMARY_MODEL,
-            contents=prompt
-        )
-        print(f"✅ {PRIMARY_MODEL} 成功回應")
-        return response.text
-        
-    except Exception as e:
-        print(f"⚠️ {PRIMARY_MODEL} 失敗: {e}")
-        
-        # 策略 B: 降級到 Lite 模型
-        try:
-            print(f"🤖 切換至備用模型 {LITE_MODEL}...")
-            response = client.models.generate_content(
-                model=LITE_MODEL,
-                contents=prompt
-            )
-            print(f"✅ {LITE_MODEL} 成功回應")
-            return response.text
-        except Exception as e2:
-            print(f"⚠️ {LITE_MODEL} 也失敗: {e2}")
-            
-            # 策略 C: 使用最聰明的模型
-            print(f"🤖 切換至 {SMART_NO_TOOL_MODEL}...")
-            response = client.models.generate_content(
-                model=SMART_NO_TOOL_MODEL,
-                contents=prompt
-            )
-            print(f"✅ {SMART_NO_TOOL_MODEL} 成功回應")
-            return response.text
-
+# --- AI 模型設定已移至 utils/ai_config.py ---
+# 所有 AI 調用已統一使用 services/model_manager.py
 
 # --- 資料模型 (已移至 models/base.py) ---
 # UserPreferences, MarkdownImportRequest, GenerateTripRequest 等模型
