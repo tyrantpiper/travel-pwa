@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,12 +73,48 @@ export default function EditableDailyTips({
 
     const [saving, setSaving] = useState(false)
 
+    // 🆕 Exchange rates for conversion display
+    const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ JPY: 0.22 }) // Default JPY→TWD
+
+    // Fetch exchange rates on mount
+    useEffect(() => {
+        const fetchRates = async () => {
+            try {
+                const res = await fetch(
+                    "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/twd.json"
+                )
+                const data = await res.json()
+                if (data.twd) {
+                    // Convert to "X currency → TWD" rates
+                    const rates: Record<string, number> = {}
+                    for (const [cur, rate] of Object.entries(data.twd)) {
+                        if (typeof rate === 'number' && rate > 0) {
+                            rates[cur.toUpperCase()] = 1 / rate // Invert: TWD per unit
+                        }
+                    }
+                    setExchangeRates(rates)
+                }
+            } catch { /* Use default rates */ }
+        }
+        fetchRates()
+    }, [])
+
     // === Helpers ===
     const formatCurrency = (amount: string, currency: string = DEFAULT_CURRENCY) => {
         // Try to parse number
         const num = parseFloat(amount.replace(/,/g, ''))
         if (isNaN(num)) return amount // invalid number
-        return `${currency} ${num.toLocaleString()}`
+
+        // Base display
+        const baseDisplay = `${currency} ${num.toLocaleString()}`
+
+        // 🆕 Add TWD conversion if not already TWD
+        if (currency !== 'TWD' && exchangeRates[currency]) {
+            const twdAmount = Math.round(num * exchangeRates[currency])
+            return `${baseDisplay} (≈NT$${twdAmount.toLocaleString()})`
+        }
+
+        return baseDisplay
     }
 
     const calculateTotal = (items: { amount?: string, price?: string, currency?: string }[]) => {

@@ -790,10 +790,10 @@ export function ToolsView() {
                                     <div className="space-y-3">
                                         {creditCards.map((card) => (
                                             <div key={card.id} className="relative group">
-                                                {/* 🆕 Trash button (visible on hover/touch) */}
+                                                {/* 🆕 Trash button: always visible on mobile, hover on desktop */}
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
-                                                    className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
                                                     aria-label="刪除卡片"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5 text-white" />
