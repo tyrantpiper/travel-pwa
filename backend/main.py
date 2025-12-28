@@ -2583,7 +2583,7 @@ async def delete_user_data(user_id: str):
         deleted_counts = {}
         
         # 1. 先取得該用戶創建的所有行程 ID
-        trips_res = supabase.table("itineraries").select("id").eq("creator_id", user_id).execute()
+        trips_res = supabase.table("itineraries").select("id").eq("created_by", user_id).execute()
         trip_ids = [t["id"] for t in trips_res.data] if trips_res.data else []
         print(f"   📋 找到 {len(trip_ids)} 個行程")
         
@@ -2606,7 +2606,7 @@ async def delete_user_data(user_id: str):
         print(f"   ✅ 成員關係: {deleted_counts['members']} 筆")
         
         # 5. 刪除主行程 (by creator_id)
-        trip_res = supabase.table("itineraries").delete().eq("creator_id", user_id).execute()
+        trip_res = supabase.table("itineraries").delete().eq("created_by", user_id).execute()
         deleted_counts["trips"] = len(trip_res.data) if trip_res.data else 0
         print(f"   ✅ 主行程: {deleted_counts['trips']} 筆")
         

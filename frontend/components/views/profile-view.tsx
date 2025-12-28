@@ -116,7 +116,9 @@ export function ProfileView() {
 
     const handleClearCache = () => {
         if (confirm("This will clear all app cache. Continue?")) {
+            const uuid = localStorage.getItem("user_uuid")  // 🆕 Preserve UUID
             localStorage.clear()
+            if (uuid) localStorage.setItem("user_uuid", uuid)  // 🆕 Restore UUID
             window.location.reload()
         }
     }
