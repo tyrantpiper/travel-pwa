@@ -119,7 +119,7 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTrip, activeTripId, mutate: tripMutate } = useTripContext()
+    const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")
     const [expenses, setExpenses] = useState<Expense[]>([])
