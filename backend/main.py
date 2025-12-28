@@ -93,11 +93,17 @@ from routers.geocode import router as geocode_router
 from routers.expenses import router as expenses_router
 from routers.ai import router as ai_router
 from routers.trips import router as trips_router
+from routers.gdpr import router as gdpr_router
+from routers.route import router as route_router
+from routers.poi import router as poi_router
 app.include_router(geocode_router)
 app.include_router(expenses_router)
 app.include_router(ai_router)
 app.include_router(trips_router)
-print("[Routers] ✅ Registered: geocode, expenses, ai, trips")
+app.include_router(gdpr_router)
+app.include_router(route_router)
+app.include_router(poi_router)
+print("[Routers] ✅ Registered: geocode, expenses, ai, trips, gdpr, route, poi")
 
 # 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
 # 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
