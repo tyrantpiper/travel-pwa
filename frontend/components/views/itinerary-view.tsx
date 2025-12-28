@@ -97,8 +97,15 @@ export function ItineraryView() {
     useEffect(() => {
         // 🔄 State Sync Fix: Always sync state with props, defaulting to empty object if null
         // This ensures that if backend clears data (e.g. Ghostbuster clean), the frontend state is also cleared.
+        // 🐛 FIX: Backend stores keys as strings ("1", "2"), but frontend uses numbers (1, 2)
+        // Convert string keys to number keys to ensure dailyLocs[day] works correctly
         if (currentTrip) {
-            setDailyLocs(currentTrip.daily_locations || {})
+            const rawLocs = currentTrip.daily_locations || {}
+            const normalizedLocs: Record<number, DailyLocation> = {}
+            for (const [key, value] of Object.entries(rawLocs)) {
+                normalizedLocs[Number(key)] = value as DailyLocation
+            }
+            setDailyLocs(normalizedLocs)
         }
     }, [currentTrip])
 
