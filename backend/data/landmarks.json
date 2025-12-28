@@ -1,5 +1,30 @@
 {
-    "__comment": "Tokyo Expansion - Phase 1 & 2 & 3: City Center, Airport, Metro, Major Shopping, Yokohama, Kamakura, Hakone, Fuji",
+    "__comment": "Tokyo Expansion - Phase 1 & 2 & 3: City Center, Airport, Metro, Major Shopping, Yokohama, Kamakura, Hakone, Fuji + FIX: Disney",
+    "東京迪士尼樂園": {
+        "aliases": [
+            "tokyo disneyland",
+            "disneyland",
+            "迪士尼",
+            "東京迪士尼"
+        ],
+        "search": "Tokyo Disneyland",
+        "display": "東京迪士尼樂園",
+        "country": "JP",
+        "lat": 35.6329,
+        "lng": 139.8804
+    },
+    "東京迪士尼海洋": {
+        "aliases": [
+            "tokyo disneysea",
+            "disneysea",
+            "迪士尼海洋"
+        ],
+        "search": "Tokyo DisneySea",
+        "display": "東京迪士尼海洋",
+        "country": "JP",
+        "lat": 35.6267,
+        "lng": 139.8851
+    },
     "穴守稻荷車站": {
         "aliases": [
             "anamori inari",
