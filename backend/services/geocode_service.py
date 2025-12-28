@@ -461,6 +461,7 @@ LANDMARKS_DB = {
     "難波站": {"aliases": ["namba station", "難波駅", "なんば"], "search": "Namba Station", "display": "難波站", "country": "JP", "lat": 34.6659, "lng": 135.5013},
     "博多站": {"aliases": ["hakata station", "博多駅"], "search": "Hakata Station", "display": "博多站", "country": "JP", "lat": 33.5897, "lng": 130.4207},
     "名古屋站": {"aliases": ["nagoya station", "名古屋駅"], "search": "Nagoya Station", "display": "名古屋站", "country": "JP", "lat": 35.1709, "lng": 136.8815},
+    "穴守稻荷車站": {"aliases": ["anamori inari", "anamoriinari", "穴守稻荷", "穴守稲荷", "穴守稲荷駅"], "search": "Anamori Inari Station", "display": "穴守稻荷車站", "country": "JP", "lat": 35.5502, "lng": 139.7470},
     
     # ═══════════════════════════════════════════════════════════════
     # 韓國 (含座標，可秒回)
