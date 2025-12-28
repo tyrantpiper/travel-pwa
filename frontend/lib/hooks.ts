@@ -26,7 +26,10 @@ export function useTripDetail(tripId: string | null) {
     const { data, error, mutate } = useSWR(
         tripId ? `${API_BASE}/api/trips/${tripId}` : null,
         fetcher,
-        { revalidateOnFocus: false }
+        {
+            revalidateOnFocus: false,
+            revalidateOnMount: true  // 🔧 FIX: Always fetch fresh data on page load/refresh
+        }
     )
     return {
         trip: data,

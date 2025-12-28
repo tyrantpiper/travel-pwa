@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tabidachi-v3'
-const STATIC_CACHE = 'tabidachi-static-v3'
+const CACHE_NAME = 'tabidachi-v4'
+const STATIC_CACHE = 'tabidachi-static-v4'
 
 // 需要緩存的靜態資源
 const STATIC_ASSETS = [
@@ -46,10 +46,14 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((networkResponse) => {
+                    // 🐛 FIX: Clone response IMMEDIATELY before any other operation
+                    // to avoid "Response body is already used" error
+                    const responseToCache = networkResponse.clone()
+
                     // 只緩存成功的 GET 請求，供離線使用
                     if (networkResponse.ok) {
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, networkResponse.clone())
+                            cache.put(request, responseToCache)
                         })
                     }
                     return networkResponse

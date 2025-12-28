@@ -101,10 +101,12 @@ export function ItineraryView() {
         // Convert string keys to number keys to ensure dailyLocs[day] works correctly
         if (currentTrip) {
             const rawLocs = currentTrip.daily_locations || {}
+            console.log("🔍 DEBUG: currentTrip.daily_locations =", JSON.stringify(rawLocs))
             const normalizedLocs: Record<number, DailyLocation> = {}
             for (const [key, value] of Object.entries(rawLocs)) {
                 normalizedLocs[Number(key)] = value as DailyLocation
             }
+            console.log("🔍 DEBUG: normalizedLocs (after conversion) =", JSON.stringify(normalizedLocs))
             setDailyLocs(normalizedLocs)
         }
     }, [currentTrip])
