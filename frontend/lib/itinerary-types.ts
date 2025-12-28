@@ -101,6 +101,7 @@ export interface Trip {
     cover_image?: string
     share_code?: string
     creator_name?: string
+    owner_id?: string
     daily_locations?: Record<number, DailyLocation>
     day_notes?: Record<number, NoteItem[]>
     day_costs?: Record<number, CostItem[]>

@@ -616,6 +616,38 @@ async def update_trip_location(trip_id: str, request: UpdateLocationRequest, sup
 
 
 @router.patch("/trips/{trip_id}/info")
+
+@router.post("/trips/{trip_id}/leave")
+async def leave_trip(
+    trip_id: str,
+    user_id: str = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
+    """👋 退出行程"""
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Missing X-User-ID")
+
+    try:
+        # 1. Check trip ownership
+        trip_res = supabase.table("itineraries").select("owner_id").eq("id", trip_id).single().execute()
+        if trip_res.data and trip_res.data.get("owner_id") == user_id:
+            raise HTTPException(status_code=400, detail="Owner cannot leave trip. Please delete the trip instead.")
+
+        # 2. Remove from trip_members
+        res = supabase.table("trip_members").delete().eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
+        
+        if res.count == 0:
+            return {"message": "User was not in trip or already left"}
+
+        return {"message": "Successfully left the trip"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Leave Trip Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 async def update_trip_info(trip_id: str, request: UpdateInfoRequest, supabase=Depends(get_supabase)):
     """✈️ 更新行程資訊 (航班、住宿、信用卡)"""
     try:

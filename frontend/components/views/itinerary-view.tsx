@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -234,6 +234,31 @@ export function ItineraryView() {
         // 🛡️ Cleanup: 組件卸載或依賴變化時取消請求
         return () => controller.abort()
     }, [day, dailyLocs, currentTrip])
+
+    const handleLeaveTrip = async (tripId: string) => {
+        if (!confirm(t('confirm_delete') ? "您確定要退出此行程嗎？" : "Are you sure you want to leave this trip?")) return
+
+        try {
+            const res = await fetch(`${API_BASE}/api/trips/${tripId}/leave`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-User-ID": userId || ""
+                }
+            })
+
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.detail || "Failed to leave trip")
+            }
+
+            toast.success("已成功退出行程")
+            reloadTrips() // 刷新列表，行程會立即消失
+        } catch (e) {
+            console.error(e)
+            toast.error("退出行程失敗")
+        }
+    }
 
     const handleDeleteTrip = async (tripId: string) => {
         setDeletingTripId(tripId)
@@ -727,6 +752,20 @@ export function ItineraryView() {
                                 </div>
                                 <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
                                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
+                                    {/* 退出行程按鈕 (僅限非擁有者) */}
+                                    {userId && trip.owner_id && trip.owner_id !== userId && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleLeaveTrip(trip.id)
+                                            }}
+                                        >
+                                            <LogOut className="w-3 h-3" /> 退出
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </Card>
