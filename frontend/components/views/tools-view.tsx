@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -173,6 +174,8 @@ export function ToolsView() {
     }, [localCards, sharedCards])
 
     const [cardDialogOpen, setCardDialogOpen] = useState(false)
+    const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
+    const [isDeletingCard, setIsDeletingCard] = useState(false)
     const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
     const [newCardName, setNewCardName] = useState("")
     const [newRewardRate, setNewRewardRate] = useState("")
@@ -688,23 +691,44 @@ export function ToolsView() {
         }
     }
 
-    const handleDeleteCard = async (cardId: string) => {
-        if (!confirm("確定刪除此卡片？")) return
+    const handleDeleteCard = (cardId: string) => {
+        // 🔧 FIX: Use AlertDialog instead of native confirm()
+        setDeletingCardId(cardId)
+    }
 
+    const confirmDeleteCard = async () => {
+        if (!deletingCardId || isDeletingCard) return
+
+        setIsDeletingCard(true)
+        const cardId = deletingCardId
         const targetIsPublic = sharedCards.some(c => c.id === cardId)
 
-        if (targetIsPublic) {
-            const updatedShared = sharedCards.filter(c => c.id !== cardId)
-            setSharedCards(updatedShared)
-            await saveTripInfo(updatedShared)
-        } else {
-            const updatedLocal = localCards.filter(c => c.id !== cardId)
-            setLocalCards(updatedLocal)
-            saveCardsToLocalStorage(updatedLocal)
-        }
+        // Optimistic UI: save old state for rollback
+        const oldShared = [...sharedCards]
+        const oldLocal = [...localCards]
 
-        toast.success("卡片已刪除")
-        haptic.success()
+        try {
+            if (targetIsPublic) {
+                const updatedShared = sharedCards.filter(c => c.id !== cardId)
+                setSharedCards(updatedShared)
+                await saveTripInfo(updatedShared)
+            } else {
+                const updatedLocal = localCards.filter(c => c.id !== cardId)
+                setLocalCards(updatedLocal)
+                saveCardsToLocalStorage(updatedLocal)
+            }
+            toast.success("卡片已刪除")
+            haptic.success()
+        } catch (_e) {
+            // Rollback on error
+            setSharedCards(oldShared)
+            setLocalCards(oldLocal)
+            toast.error("刪除失敗，請重試")
+            haptic.error()
+        } finally {
+            setIsDeletingCard(false)
+            setDeletingCardId(null)
+        }
     }
 
     return (
@@ -719,7 +743,7 @@ export function ToolsView() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={async () => { await fetchExpenses(); await tripMutate(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
+            <PullToRefresh onRefresh={async () => { await Promise.all([fetchExpenses(), tripMutate(), fetchRate()]); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
                 <Tabs value={activeSection} onValueChange={setActiveSection}>
                     {/* Custom Sliding Tab Strip */}
                     <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
@@ -765,7 +789,15 @@ export function ToolsView() {
                                 ) : (
                                     <div className="space-y-3">
                                         {creditCards.map((card) => (
-                                            <SwipeableItem key={card.id} onDelete={() => handleDeleteCard(card.id)}>
+                                            <div key={card.id} className="relative group">
+                                                {/* 🆕 Trash button (visible on hover/touch) */}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
+                                                    className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    aria-label="刪除卡片"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5 text-white" />
+                                                </button>
                                                 <div
                                                     onClick={() => openEditCardDialog(card)}
                                                     className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
@@ -797,7 +829,7 @@ export function ToolsView() {
                                                         <p className="text-xs text-slate-400 mt-2 line-clamp-2">📝 {card.notes}</p>
                                                     )}
                                                 </div>
-                                            </SwipeableItem>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
@@ -1049,6 +1081,29 @@ export function ToolsView() {
                     </TabsContent>
                 </Tabs>
             </PullToRefresh>
+
+            {/* 🆕 Card Delete Confirmation Dialog */}
+            <AlertDialog open={!!deletingCardId} onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>確定刪除此卡片？</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            刪除後將無法恢復。如果是共享卡片，其他成員也將無法看到。
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeletingCard}>取消</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDeleteCard}
+                            disabled={isDeletingCard}
+                            className="bg-red-500 hover:bg-red-600"
+                        >
+                            {isDeletingCard ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                            刪除
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Expense Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
