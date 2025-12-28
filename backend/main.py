@@ -476,36 +476,36 @@ def detect_country_from_keywords(query: str) -> str:
                 return country_code
     return None
 
-# 🆕 擴展版地標資料庫（支援別名、中文顯示、國家識別）
+# 🆕 擴展版地標資料庫（支援別名、中文顯示、國家識別、座標直接回傳）
 LANDMARKS_DB = {
     # ═══════════════════════════════════════════════════════════════
-    # 日本 - 主題公園
+    # 日本 - 主題公園 (含座標，可秒回)
     # ═══════════════════════════════════════════════════════════════
-    "東京迪士尼": {"aliases": ["东京迪士尼", "tokyo disneyland", "tdl", "東京ディズニーランド"], "search": "Tokyo Disneyland", "display": "東京迪士尼樂園", "country": "JP"},
-    "東京迪士尼海洋": {"aliases": ["东京迪士尼海洋", "tokyo disneysea", "tds", "東京ディズニーシー"], "search": "Tokyo DisneySea", "display": "東京迪士尼海洋", "country": "JP"},
-    "大阪環球影城": {"aliases": ["日本環球影城", "usj", "universal studios japan", "ユニバーサル"], "search": "Universal Studios Japan", "display": "日本環球影城", "country": "JP"},
-    "富士急樂園": {"aliases": ["富士急ハイランド", "fuji-q", "fujiq"], "search": "Fuji-Q Highland", "display": "富士急樂園", "country": "JP"},
+    "東京迪士尼": {"aliases": ["东京迪士尼", "tokyo disneyland", "tdl", "東京ディズニーランド"], "search": "Tokyo Disneyland", "display": "東京迪士尼樂園", "country": "JP", "lat": 35.6329, "lng": 139.8804},
+    "東京迪士尼海洋": {"aliases": ["东京迪士尼海洋", "tokyo disneysea", "tds", "東京ディズニーシー"], "search": "Tokyo DisneySea", "display": "東京迪士尼海洋", "country": "JP", "lat": 35.6267, "lng": 139.8850},
+    "大阪環球影城": {"aliases": ["日本環球影城", "usj", "universal studios japan", "ユニバーサル"], "search": "Universal Studios Japan", "display": "日本環球影城", "country": "JP", "lat": 34.6654, "lng": 135.4323},
+    "富士急樂園": {"aliases": ["富士急ハイランド", "fuji-q", "fujiq"], "search": "Fuji-Q Highland", "display": "富士急樂園", "country": "JP", "lat": 35.4833, "lng": 138.7778},
     
     # ═══════════════════════════════════════════════════════════════
-    # 日本 - 東京景點
+    # 日本 - 東京景點 (含座標，可秒回)
     # ═══════════════════════════════════════════════════════════════
-    "淺草寺": {"aliases": ["浅草寺", "senso-ji", "sensoji", "雷門"], "search": "Senso-ji Temple", "display": "淺草寺", "country": "JP"},
-    "東京鐵塔": {"aliases": ["东京塔", "tokyo tower", "東京タワー"], "search": "Tokyo Tower", "display": "東京鐵塔", "country": "JP"},
-    "晴空塔": {"aliases": ["天空樹", "skytree", "tokyo skytree", "スカイツリー", "东京晴空塔"], "search": "Tokyo Skytree", "display": "東京晴空塔", "country": "JP"},
-    "明治神宮": {"aliases": ["meiji shrine", "meiji jingu", "明治神宫"], "search": "Meiji Shrine", "display": "明治神宮", "country": "JP"},
-    "皇居": {"aliases": ["imperial palace", "皇居東御苑", "东京皇居"], "search": "Imperial Palace Tokyo", "display": "皇居", "country": "JP"},
-    "上野公園": {"aliases": ["ueno park", "上野恩賜公園"], "search": "Ueno Park", "display": "上野公園", "country": "JP"},
-    "新宿御苑": {"aliases": ["shinjuku gyoen", "新宿御苑"], "search": "Shinjuku Gyoen", "display": "新宿御苑", "country": "JP"},
-    "東京車站": {"aliases": ["东京站", "tokyo station", "東京駅"], "search": "Tokyo Station", "display": "東京車站", "country": "JP"},
-    "澀谷十字路口": {"aliases": ["涩谷", "shibuya crossing", "shibuya scramble", "スクランブル交差点"], "search": "Shibuya Crossing", "display": "澀谷十字路口", "country": "JP"},
-    "秋葉原": {"aliases": ["akihabara", "アキバ", "秋叶原"], "search": "Akihabara", "display": "秋葉原電器街", "country": "JP"},
-    "銀座": {"aliases": ["ginza", "銀座"], "search": "Ginza Tokyo", "display": "銀座", "country": "JP"},
-    "原宿": {"aliases": ["harajuku", "竹下通", "原宿竹下通"], "search": "Harajuku", "display": "原宿", "country": "JP"},
-    "池袋": {"aliases": ["ikebukuro", "池袋サンシャイン"], "search": "Ikebukuro", "display": "池袋", "country": "JP"},
-    "六本木": {"aliases": ["roppongi", "roppongi hills", "六本木ヒルズ"], "search": "Roppongi", "display": "六本木", "country": "JP"},
-    "台場": {"aliases": ["odaiba", "お台場", "彩虹大橋"], "search": "Odaiba", "display": "台場", "country": "JP"},
-    "築地市場": {"aliases": ["tsukiji", "tsukiji market", "築地"], "search": "Tsukiji Market", "display": "築地市場", "country": "JP"},
-    "豐洲市場": {"aliases": ["toyosu", "toyosu market", "豊洲市場"], "search": "Toyosu Market", "display": "豐洲市場", "country": "JP"},
+    "淺草寺": {"aliases": ["浅草寺", "senso-ji", "sensoji", "雷門"], "search": "Senso-ji Temple", "display": "淺草寺", "country": "JP", "lat": 35.7148, "lng": 139.7967},
+    "東京鐵塔": {"aliases": ["东京塔", "tokyo tower", "東京タワー"], "search": "Tokyo Tower", "display": "東京鐵塔", "country": "JP", "lat": 35.6586, "lng": 139.7454},
+    "晴空塔": {"aliases": ["天空樹", "skytree", "tokyo skytree", "スカイツリー", "东京晴空塔"], "search": "Tokyo Skytree", "display": "東京晴空塔", "country": "JP", "lat": 35.7101, "lng": 139.8107},
+    "明治神宮": {"aliases": ["meiji shrine", "meiji jingu", "明治神宫"], "search": "Meiji Shrine", "display": "明治神宮", "country": "JP", "lat": 35.6764, "lng": 139.6993},
+    "皇居": {"aliases": ["imperial palace", "皇居東御苑", "东京皇居"], "search": "Imperial Palace Tokyo", "display": "皇居", "country": "JP", "lat": 35.6852, "lng": 139.7528},
+    "上野公園": {"aliases": ["ueno park", "上野恩賜公園"], "search": "Ueno Park", "display": "上野公園", "country": "JP", "lat": 35.7146, "lng": 139.7732},
+    "新宿御苑": {"aliases": ["shinjuku gyoen", "新宿御苑"], "search": "Shinjuku Gyoen", "display": "新宿御苑", "country": "JP", "lat": 35.6852, "lng": 139.7100},
+    "東京車站": {"aliases": ["东京站", "tokyo station", "東京駅"], "search": "Tokyo Station", "display": "東京車站", "country": "JP", "lat": 35.6812, "lng": 139.7671},
+    "澀谷十字路口": {"aliases": ["涩谷", "shibuya crossing", "shibuya scramble", "スクランブル交差点", "渋谷"], "search": "Shibuya Crossing", "display": "澀谷十字路口", "country": "JP", "lat": 35.6595, "lng": 139.7004},
+    "秋葉原": {"aliases": ["akihabara", "アキバ", "秋叶原"], "search": "Akihabara", "display": "秋葉原電器街", "country": "JP", "lat": 35.7023, "lng": 139.7745},
+    "銀座": {"aliases": ["ginza", "銀座"], "search": "Ginza Tokyo", "display": "銀座", "country": "JP", "lat": 35.6717, "lng": 139.7649},
+    "原宿": {"aliases": ["harajuku", "竹下通", "原宿竹下通"], "search": "Harajuku", "display": "原宿", "country": "JP", "lat": 35.6702, "lng": 139.7027},
+    "池袋": {"aliases": ["ikebukuro", "池袋サンシャイン"], "search": "Ikebukuro", "display": "池袋", "country": "JP", "lat": 35.7295, "lng": 139.7109},
+    "六本木": {"aliases": ["roppongi", "roppongi hills", "六本木ヒルズ"], "search": "Roppongi", "display": "六本木", "country": "JP", "lat": 35.6628, "lng": 139.7313},
+    "台場": {"aliases": ["odaiba", "お台場", "彩虹大橋"], "search": "Odaiba", "display": "台場", "country": "JP", "lat": 35.6295, "lng": 139.7753},
+    "築地市場": {"aliases": ["tsukiji", "tsukiji market", "築地"], "search": "Tsukiji Market", "display": "築地市場", "country": "JP", "lat": 35.6654, "lng": 139.7707},
+    "豐洲市場": {"aliases": ["toyosu", "toyosu market", "豊洲市場"], "search": "Toyosu Market", "display": "豐洲市場", "country": "JP", "lat": 35.6455, "lng": 139.7853},
     
     # ═══════════════════════════════════════════════════════════════
     # 日本 - 京都景點
@@ -641,7 +641,7 @@ LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)
 def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
     """🏰 確定性翻譯著名景點（無需 AI）
     
-    Returns: (search_terms: list, display_name: str) 或 ([query], None)
+    Returns: (search_terms: list, display_name: str, landmark_data: dict|None) 或 ([query], None, None)
     """
     query_lower = query.lower().strip()
     
@@ -652,22 +652,23 @@ def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
         # 檢查主關鍵字（必須是關鍵字在查詢中，而不是反過來）
         if landmark_key.lower() in query_lower:
             print(f"🏰 Landmark Match: '{query}' → '{landmark['display']}'")
-            return ([landmark["search"], query], landmark["display"])
+            return ([landmark["search"], query], landmark["display"], landmark)
         
         # 檢查別名（同樣只檢查別名是否在查詢中）
         for alias in landmark.get("aliases", []):
             if alias.lower() in query_lower:
                 print(f"🏰 Alias Match: '{alias}' → '{landmark['display']}'")
-                return ([landmark["search"], query], landmark["display"])
+                return ([landmark["search"], query], landmark["display"], landmark)
     
     # 特殊處理：如果包含「迪士尼」和日本相關詞彙
     if "迪士尼" in query or "disney" in query_lower:
         if country_code == "JP" or any(jp in query.lower() for jp in ["東京", "tokyo", "日本", "japan"]):
-            return (["Tokyo Disneyland", "東京ディズニーランド", query], "東京迪士尼樂園")
+            disney = LANDMARKS_DB.get("東京迪士尼")
+            return (["Tokyo Disneyland", "東京ディズニーランド", query], "東京迪士尼樂園", disney)
         elif country_code == "HK" or "香港" in query:
-            return (["Hong Kong Disneyland", query], "香港迪士尼樂園")
+            return (["Hong Kong Disneyland", query], "香港迪士尼樂園", None)
     
-    return ([query], None)
+    return ([query], None, None)
 
 async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -> str:
     """🧠 使用 Gemini 從行程標題判斷目的地國家
@@ -869,9 +870,23 @@ async def smart_geocode_logic(query: str, limit: int, trip_title: str = None, ap
 
     # 🆕 Step 1: 先嘗試確定性著名景點翻譯（無需 API Key）
     landmark_result = translate_famous_landmark(query, country_code)
-    search_terms, display_name = landmark_result
+    search_terms, display_name, landmark_data = landmark_result
     
-    if display_name:  # 匹配到著名景點
+    # 🚀 INSTANT RETURN: 如果景點有座標，直接回傳，完全跳過 API 調用
+    if landmark_data and landmark_data.get("lat") and landmark_data.get("lng"):
+        instant_result = {
+            "lat": landmark_data["lat"],
+            "lng": landmark_data["lng"],
+            "name": landmark_data.get("display", display_name),
+            "address": f"{landmark_data.get('display', display_name)}, {landmark_data.get('country', '')}",
+            "type": "landmark",
+            "source": "landmarks_db",
+            "original_name": query
+        }
+        log_debug(f"   ⚡ INSTANT RETURN: {display_name} ({landmark_data['lat']}, {landmark_data['lng']})")
+        return {"results": [instant_result], "source": "landmarks_db"}
+    
+    if display_name:  # 匹配到著名景點（但沒有座標，需要搜索）
         search_queries = search_terms
         chinese_display = display_name
         log_debug(f"   🏰 Landmark Translated: {search_queries} → Display: {chinese_display}")

@@ -264,6 +264,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
         const timer = setTimeout(async () => {
             setIsSearching(true)
+            setResults([])  // 🆕 Anti-flicker: clear old results before new search
             try {
                 // 執行搜尋 (帶位置權重)
                 const center = mapRef.current?.getCenter()
