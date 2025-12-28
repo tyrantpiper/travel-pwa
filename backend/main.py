@@ -90,8 +90,10 @@ app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
 
 # 🆕 Phase 4: 註冊 Routers
 from routers.geocode import router as geocode_router
+from routers.expenses import router as expenses_router
 app.include_router(geocode_router)
-print("[Routers] ✅ Registered: geocode")
+app.include_router(expenses_router)
+print("[Routers] ✅ Registered: geocode, expenses")
 
 # 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
 # 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
@@ -1663,54 +1665,17 @@ async def calculate_route(request: RouteRequest):
         print(f"   ❌ OSRM 也失敗: {e}")
         raise HTTPException(status_code=500, detail="無法計算路線")
 
-# 🔥 功能 12: 記帳相關 API (ExpenseRequest 已移至 models/base.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+# � Expense Endpoints - MOVED TO routers/expenses.py
+# ═══════════════════════════════════════════════════════════════════════════════
+# The following endpoints have been modularized:
+# - POST /api/expenses → add_expense
+# - GET /api/trips/{trip_id}/expenses → get_expenses
+# - PATCH /api/expenses/{expense_id} → update_expense
+# - DELETE /api/expenses/{expense_id} → delete_expense
+# Import from: routers.expenses (registered at app startup)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-@app.post("/api/expenses")
-async def add_expense(request: ExpenseRequest):
-    try:
-        print(f"📝 [Expense] Creating expense: {request.title}, amount: {request.amount_jpy}, user: {request.created_by}")
-        payload = {
-            "itinerary_id": request.itinerary_id,
-            "title": request.title,
-            "amount": request.amount_jpy,
-            "currency": "JPY",
-            "category": request.category,
-            "is_public": request.is_public,
-            "created_by": request.created_by,
-            "payment_method": request.payment_method,
-            "exchange_rate": request.exchange_rate,
-            "card_name": request.card_name,
-            "cashback_rate": request.cashback_rate,
-            "image_url": request.image_url,
-            "incurred_at": request.expense_date  # 🔧 FIX: DB column is 'incurred_at' not 'expense_date'
-        }
-        print(f"   Payload: {payload}")
-        result = supabase.table("expenses").insert(payload).execute()
-        print(f"   ✅ Success: {result}")
-        return {"status": "success"}
-    except Exception as e:
-        print(f"   ❌ Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/trips/{trip_id}/expenses")
-async def get_expenses(trip_id: str, user_id: str = Header(None, alias="X-User-ID")):
-    try:
-        # 邏輯：抓出 (該行程的所有公帳) OR (該行程中 我建立的私帳)
-        res = supabase.table("expenses").select("*").eq("itinerary_id", trip_id).execute()
-        all_expenses = res.data
-        
-        filtered = []
-        for exp in all_expenses:
-            # 如果是公帳 -> 顯示
-            if exp['is_public']:
-                filtered.append(exp)
-            # 如果是私帳 -> 檢查是否為本人
-            elif exp['created_by'] == user_id:
-                filtered.append(exp)
-                
-        return filtered
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # 🔥 功能 13: 修改行程標題 (UpdateTripTitleRequest 已移至 models/base.py)
 
@@ -1718,29 +1683,6 @@ async def get_expenses(trip_id: str, user_id: str = Header(None, alias="X-User-I
 async def update_trip_title(trip_id: str, request: UpdateTripTitleRequest):
     try:
         supabase.table("itineraries").update({"title": request.title}).eq("id", trip_id).execute()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# 🔥 功能 14: 修改/刪除記帳 (UpdateExpenseRequest 已移至 models/base.py)
-
-
-@app.patch("/api/expenses/{expense_id}")
-async def update_expense(expense_id: str, request: UpdateExpenseRequest):
-    try:
-        data = request.dict(exclude_unset=True)
-        if 'amount_jpy' in data:
-            data['amount'] = data.pop('amount_jpy') # 對應 DB 欄位
-        
-        supabase.table("expenses").update(data).eq("id", expense_id).execute()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/api/expenses/{expense_id}")
-async def delete_expense(expense_id: str):
-    try:
-        supabase.table("expenses").delete().eq("id", expense_id).execute()
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
