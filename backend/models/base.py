@@ -183,9 +183,10 @@ class UpdateLocationRequest(BaseModel):
 # === 行程資訊模型 ===
 
 class UpdateInfoRequest(BaseModel):
-    """更新行程資訊請求（航班/飯店）"""
+    """更新行程資訊請求（航班/飯店/卡片）"""
     flight_info: dict
     hotel_info: dict
+    credit_cards: list[dict] | None = None  # 🆕 v3.8: 信用卡回饋資訊
 
 
 # === 路線規劃模型 ===

@@ -132,6 +132,7 @@ async def get_trip_by_id(trip_id: str, supabase=Depends(get_supabase)):
 
             "flight_info": trip.get("flight_info") or {},
             "hotel_info": trip.get("hotel_info") or {},
+            "credit_cards": (trip.get("content") or {}).get("credit_cards", []), # 🆕 信用卡資訊
             "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
         }
 
@@ -607,15 +608,58 @@ async def update_trip_location(trip_id: str, request: UpdateLocationRequest, sup
 
 @router.patch("/trips/{trip_id}/info")
 async def update_trip_info(trip_id: str, request: UpdateInfoRequest, supabase=Depends(get_supabase)):
-    """✈️ 更新行程資訊 (航班、住宿)"""
+    """✈️ 更新行程資訊 (航班、住宿、信用卡)"""
     try:
+        # 1. 如果有更新信用卡，執行 Safe Merge
+        if request.credit_cards is not None:
+            # A. 抓取現有資料
+            res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+            content = res.data['content'] or {}
+            existing_cards = content.get("credit_cards", [])
+            
+            # B. 建立 ID 對照表 (以新傳入的為主)
+            # 邏輯：前端傳來的 list 是「該使用者希望的最新狀態」
+            # 但為了避免覆蓋其他人剛加的卡片，我們應該採取「Union」策略嗎？
+            # 不，這裡的 Safe Merge 定義是：
+            # "保留不在 request 但存在於 DB 的卡片 (可能是別人加的)" -> 不對，這樣刪除會失效
+            # "更新存在於 request 的卡片，保留 request 沒有但 DB 有的卡片" -> 這樣無法刪除
+            # 
+            # 修正 Safe Merge 策略：
+            # 前端應當先 fetch 最新資料，然後再送出完整清單。
+            # 但為了防止 race condition，我們這裡做簡單的 ID based merge:
+            # 1. 讀取 DB 現有卡片
+            # 2. 將 Request 裡的卡片覆寫/新增進去
+            # 3. 只有當 Request 顯式包含的 ID 才會被更新，沒包含的 ID 保持原樣 (這樣也導致無法刪除)
+            # 
+            # 為了支援刪除，前端必須送出「完整清單」。
+            # 若要防止覆蓋別人新增的卡片 (Race Condition)，我們假設前端在編輯前有 polling。
+            # 這裡我們採取：直接更新 content.credit_cards = request.credit_cards
+            # 因為這不是 append only，而是管理 list。
+            # 為了符合 User 的 "Safe Merge" 期待 (防止覆蓋別人同時新增的卡片):
+            # 我們可以做: DB = (DB - RequestIDs) + Request
+            # 這樣如果別人新增了 ID_99，而我更新 ID_01，ID_99 不會被我洗掉。
+            
+            incoming_ids = {c["id"] for c in request.credit_cards}
+            merged_cards = [c for c in existing_cards if c["id"] not in incoming_ids] # 保留沒動到的
+            merged_cards.extend(request.credit_cards) # 加上新的/更新的
+            
+            content["credit_cards"] = merged_cards
+            
+            # 更新 content
+            supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+
+        # 2. 更新 Flight/Hotel (Legacy columns)
+        # 注意：這兩個欄位在 DB 是獨立 column，不是在 content 裡 (根據 models 定義)
+        # 不需要 Safe Merge，直接覆蓋即可 (因為通常是一個人在編輯)
         data = {
             "flight_info": request.flight_info,
             "hotel_info": request.hotel_info
         }
         supabase.table("itineraries").update(data).eq("id", trip_id).execute()
+        
         return {"status": "success"}
     except Exception as e:
+        print(f"Update Info Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

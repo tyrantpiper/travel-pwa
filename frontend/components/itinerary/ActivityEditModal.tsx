@@ -365,6 +365,29 @@ export function ActivityEditModal({
                         </div>
                     </div>
 
+                    {/* Private Mode Toggle */}
+                    <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-slate-50 dark:bg-slate-800">
+                        <div className="space-y-0.5">
+                            <Label className="text-sm font-medium">Private Activity</Label>
+                            <p className="text-[10px] text-slate-500">Only visible to you (Local Tag)</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={(editItem.tags || []).includes("Private")}
+                                onChange={(e) => {
+                                    const currentTags = editItem.tags || []
+                                    if (e.target.checked) {
+                                        setEditItem({ ...editItem, tags: [...currentTags, "Private"] })
+                                    } else {
+                                        setEditItem({ ...editItem, tags: currentTags.filter(t => t !== "Private") })
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
+
                     <DialogFooter>
                         <Button onClick={onSave} disabled={isSaving}>
                             {isSaving ? "儲存中..." : (isAddMode ? "Add" : "Save")}

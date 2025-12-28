@@ -48,13 +48,43 @@ export function LandingPage() {
         setIsLoggedIn(true)
     }
 
-    const handleRecover = () => {
+    const handleRecover = async () => {
         if (!recoverCode.trim()) { toast.warning("Please enter recovery code"); return }
         if (recoverCode.length < 10) { toast.error("Invalid code format"); return }
-        localStorage.setItem("user_uuid", recoverCode)
-        localStorage.setItem("user_nickname", nickname || "Returned Traveler")
-        toast.success("Account recovered!")
-        window.location.reload()
+
+        // 🆕 Async fetch profile
+        const toastId = toast.loading("Verifying identity...")
+        try {
+            // Default nickname fallback
+            const fallbackName = nickname || "Returned Traveler"
+            let fetchedName = fallbackName
+
+            // Call API
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${recoverCode}/profile`)
+            if (response.ok) {
+                const data = await response.json()
+                if (data.nickname) fetchedName = data.nickname
+            }
+
+            localStorage.setItem("user_uuid", recoverCode)
+            localStorage.setItem("user_nickname", fetchedName)
+
+            toast.dismiss(toastId)
+            toast.success(`Welcome back, ${fetchedName}!`)
+
+            // Give UI a moment to show success before reload
+            setTimeout(() => window.location.reload(), 1000)
+
+        } catch (e) {
+            console.error("Recovery Error", e)
+            toast.dismiss(toastId)
+
+            // Fallback anyway to allow recovery even if API fails
+            localStorage.setItem("user_uuid", recoverCode)
+            localStorage.setItem("user_nickname", nickname || "Returned Traveler")
+            toast.success("Account recovered (Offline Mode)")
+            setTimeout(() => window.location.reload(), 1000)
+        }
     }
 
     if (!mounted) return null;

@@ -53,6 +53,9 @@ interface Trip {
     title: string
     days?: unknown[]
     share_code?: string
+    credit_cards?: CreditCard[]  // 🆕 Type Safety
+    flight_info?: Record<string, unknown>
+    hotel_info?: Record<string, unknown>
 }
 
 interface ParseResult {
@@ -85,6 +88,8 @@ interface CreditCard {
     rewardRate: number     // 回饋趴數 (%)
     rewardLimit: number    // 回饋上限 (TWD)
     notes: string          // 備忘錄
+    is_public?: boolean     // 🆕 true = 存雲端 (Trip Content), false = 存本地
+    creator_id?: string     // 🆕 識別是誰建立的
 }
 
 interface ExpenseItemProps {
@@ -157,13 +162,24 @@ export function ToolsView() {
     const [selectedImportTripId, setSelectedImportTripId] = useState<string>("new")
 
     // 🆕 v3.8: 信用卡回饋彙整
-    const [creditCards, setCreditCards] = useState<CreditCard[]>([])
+    const [localCards, setLocalCards] = useState<CreditCard[]>([])
+    const [sharedCards, setSharedCards] = useState<CreditCard[]>([])
+
+    // Computed: Merged Card List (Display)
+    const creditCards = useMemo(() => {
+        const sharedIds = new Set(sharedCards.map(c => c.id))
+        const uniqueLocal = localCards.filter(c => !sharedIds.has(c.id))
+        return [...uniqueLocal, ...sharedCards]
+    }, [localCards, sharedCards])
+
     const [cardDialogOpen, setCardDialogOpen] = useState(false)
     const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
     const [newCardName, setNewCardName] = useState("")
     const [newRewardRate, setNewRewardRate] = useState("")
     const [newRewardLimit, setNewRewardLimit] = useState("")
     const [newCardNotes, setNewCardNotes] = useState("")
+    const [newCardIsPublic, setNewCardIsPublic] = useState(false) // 🆕
+    const [isSavingCard, setIsSavingCard] = useState(false) // 🆕 Prevent double-click
 
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
@@ -172,17 +188,45 @@ export function ToolsView() {
         setHasApiKey(!!storedKey)
     }, [])
 
-    // 🆕 v3.8: 載入信用卡資料
+    // 🆕 v3.8: 載入信用卡資料 (Local)
     useEffect(() => {
         try {
             const saved = localStorage.getItem("credit_cards")
             if (saved) {
-                setCreditCards(JSON.parse(saved))
+                setLocalCards(JSON.parse(saved))
             }
         } catch (e) {
-            console.error("Failed to load credit cards:", e)
+            console.error("Failed to load local credit cards:", e)
         }
     }, [])
+
+    // 🆕 v3.8: 載入信用卡資料 (Shared)
+    useEffect(() => {
+        if (activeTrip && (activeTrip as Trip).credit_cards) {
+            setSharedCards((activeTrip as Trip).credit_cards || [])
+        } else {
+            setSharedCards([])
+        }
+    }, [activeTrip])
+
+    const saveTripInfo = async (mergedSharedCards: CreditCard[]) => {
+        if (!activeTripId) return
+        try {
+            await fetch(`${API_BASE}/api/trips/${activeTripId}/info`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    flight_info: (activeTrip as Trip)?.flight_info || {},
+                    hotel_info: (activeTrip as Trip)?.hotel_info || {},
+                    credit_cards: mergedSharedCards // 🆕 Sync Shared Cards
+                })
+            })
+            // Re-fetch trip data
+            mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
+        } catch (e) {
+            console.error("Failed to sync shared cards:", e)
+        }
+    }
 
     useEffect(() => {
         const fetchRate = async () => {
@@ -559,6 +603,7 @@ export function ToolsView() {
         setNewRewardRate("")
         setNewRewardLimit("")
         setNewCardNotes("")
+        setNewCardIsPublic(false) // Default Private
         setCardDialogOpen(true)
     }
 
@@ -568,42 +613,88 @@ export function ToolsView() {
         setNewRewardRate(String(card.rewardRate))
         setNewRewardLimit(String(card.rewardLimit))
         setNewCardNotes(card.notes)
+        setNewCardIsPublic(!!card.is_public)
         setCardDialogOpen(true)
     }
 
-    const handleSaveCard = () => {
-        if (!newCardName.trim()) {
-            toast.error("請輸入卡片名稱")
-            return
-        }
+    const handleSaveCard = async () => {
+        if (!newCardName.trim()) { toast.error("請輸入卡片名稱"); return }
+        if (isSavingCard) return // 🛡️ Prevent double-click
 
+        setIsSavingCard(true) // 🆕 Start loading
+        const userId = localStorage.getItem("user_uuid")
+
+        // 1. Construct Card Data
         const cardData: CreditCard = {
             id: editingCard?.id || crypto.randomUUID(),
             name: newCardName.trim(),
             rewardRate: parseFloat(newRewardRate) || 0,
             rewardLimit: parseFloat(newRewardLimit) || 0,
-            notes: newCardNotes.trim()
+            notes: newCardNotes.trim(),
+            is_public: newCardIsPublic,
+            creator_id: userId || undefined
         }
 
-        let updatedCards: CreditCard[]
-        if (editingCard) {
-            updatedCards = creditCards.map(c => c.id === editingCard.id ? cardData : c)
-            toast.success("卡片已更新")
+        // 2. Logic Split: Public vs Private
+        if (newCardIsPublic) {
+            if (!activeTripId) { toast.error("需要選擇行程才能共享卡片"); return }
+
+            // A. Add/Update in Shared List
+            const updatedShared = editingCard
+                ? sharedCards.map(c => c.id === cardData.id ? cardData : c)
+                : [...sharedCards, cardData]
+
+            // B. Remove from Local (Migration case)
+            const updatedLocal = localCards.filter(c => c.id !== cardData.id)
+
+            setSharedCards(updatedShared)
+            setLocalCards(updatedLocal)
+            saveCardsToLocalStorage(updatedLocal)
+
+            // C. Sync to Cloud
+            await saveTripInfo(updatedShared)
+            toast.success("卡片已儲存 (已共享)")
+
         } else {
-            updatedCards = [...creditCards, cardData]
-            toast.success("卡片已新增")
+            // A. Add/Update in Local List
+            const updatedLocal = editingCard
+                ? localCards.map(c => c.id === cardData.id ? cardData : c)
+                : [...localCards, cardData]
+
+            // B. Remove from Shared (Migration case: Public -> Private)
+            const updatedShared = sharedCards.filter(c => c.id !== cardData.id)
+
+            setLocalCards(updatedLocal)
+            setSharedCards(updatedShared)
+            saveCardsToLocalStorage(updatedLocal)
+
+            // C. Sync Cloud (if we removed something)
+            if (updatedShared.length !== sharedCards.length) {
+                await saveTripInfo(updatedShared)
+            }
+            toast.success("卡片已儲存 (私人)")
         }
 
-        setCreditCards(updatedCards)
-        saveCardsToLocalStorage(updatedCards)
         setCardDialogOpen(false)
+        setIsSavingCard(false) // 🆕 End loading
         haptic.success()
     }
 
-    const handleDeleteCard = (cardId: string) => {
-        const updatedCards = creditCards.filter(c => c.id !== cardId)
-        setCreditCards(updatedCards)
-        saveCardsToLocalStorage(updatedCards)
+    const handleDeleteCard = async (cardId: string) => {
+        if (!confirm("確定刪除此卡片？")) return
+
+        const targetIsPublic = sharedCards.some(c => c.id === cardId)
+
+        if (targetIsPublic) {
+            const updatedShared = sharedCards.filter(c => c.id !== cardId)
+            setSharedCards(updatedShared)
+            await saveTripInfo(updatedShared)
+        } else {
+            const updatedLocal = localCards.filter(c => c.id !== cardId)
+            setLocalCards(updatedLocal)
+            saveCardsToLocalStorage(updatedLocal)
+        }
+
         toast.success("卡片已刪除")
         haptic.success()
     }
@@ -673,7 +764,18 @@ export function ToolsView() {
                                                 >
                                                     <div className="flex justify-between items-start">
                                                         <div>
-                                                            <p className="font-semibold text-lg">{card.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-semibold text-lg">{card.name}</p>
+                                                                {card.is_public ? (
+                                                                    <div className="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                        <Users className="w-3 h-3" /> 共享
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                        <User className="w-3 h-3" /> 私有
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                             <p className="text-slate-300 text-sm mt-1">
                                                                 回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
                                                                 {card.rewardLimit > 0 && (
@@ -1095,8 +1197,15 @@ export function ToolsView() {
                                 rows={3}
                             />
                         </div>
-                        <Button className="w-full bg-slate-900" onClick={handleSaveCard}>
-                            {editingCard ? "更新" : "新增"}
+
+                        <div className="flex items-center justify-between bg-slate-100 p-3 rounded-xl">
+                            <Label className="flex items-center gap-2 text-sm text-slate-700">
+                                {newCardIsPublic ? <><Users className="w-4 h-4 text-blue-500" /> 公開給行程成員</> : <><User className="w-4 h-4 text-amber-500" /> 僅存於此裝置</>}
+                            </Label>
+                            <Switch checked={newCardIsPublic} onCheckedChange={setNewCardIsPublic} />
+                        </div>
+                        <Button className="w-full bg-slate-900" onClick={handleSaveCard} disabled={isSavingCard}>
+                            {isSavingCard ? "儲存中..." : (editingCard ? "更新" : "新增")}
                         </Button>
                     </div>
                 </DialogContent>

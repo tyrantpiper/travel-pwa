@@ -51,6 +51,8 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
         if (!key.trim()) return
         localStorage.setItem("user_gemini_key", key)
         onKeySaved(key)
+        // 🆕 Real-time update event
+        window.dispatchEvent(new CustomEvent('gemini-key-updated', { detail: key }))
         setOpen(false)
         toast.success("API Key 設定成功！")
     }
@@ -58,6 +60,8 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
     const handleClear = () => {
         setKey("")
         localStorage.removeItem("user_gemini_key")
+        // 🆕 Real-time create event
+        window.dispatchEvent(new CustomEvent('gemini-key-updated', { detail: '' }))
         toast.info("API Key 已清除")
     }
 
