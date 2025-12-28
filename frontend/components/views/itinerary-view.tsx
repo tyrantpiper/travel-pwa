@@ -188,8 +188,7 @@ export function ItineraryView() {
                     lat = activityLoc.lat
                     lng = activityLoc.lng
                     locationName = activityLoc.name
-                    // Auto-update dailyLocs for display
-                    setDailyLocs((prev) => ({ ...prev, [day]: activityLoc }))
+                    // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                 } else if (currentTrip?.title) {
                     // Priority 3: Parse city from trip title
                     for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
@@ -198,8 +197,7 @@ export function ItineraryView() {
                             lng = coords.lng
                             locationName = coords.name
                             setCurrentTimezone(coords.timezone)  // 設定時區
-                            // Auto-update dailyLocs for display
-                            setDailyLocs((prev) => ({ ...prev, [day]: { lat, lng, name: locationName } }))
+                            // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                             break
                         }
                     }
@@ -855,6 +853,7 @@ export function ItineraryView() {
                                 <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
                                     <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
                                     <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
+                                        {/* 🔍 DEBUG */ console.log("🔍 RENDER: day=", day, "dailyLocs=", dailyLocs, "dailyLocs[day]=", dailyLocs[day])}
                                         {dailyLocs[day]?.name || "Tokyo (Default)"}
                                     </span>
                                     <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
