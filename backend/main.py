@@ -19,6 +19,23 @@ from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+
+# 🆕 模組化：從 models.base 導入所有 Pydantic 模型
+# （原有的 class 定義暫時保留，確認無誤後再移除）
+try:
+    from models.base import (
+        UserPreferences, MarkdownImportRequest, GenerateTripRequest, SimplePromptRequest,
+        GeocodeSearchRequest, GeocodeReverseRequest, ItineraryItem, SaveItineraryRequest,
+        JoinTripRequest, CreateManualTripRequest, UpdateItemRequest, CreateItemRequest,
+        ImportToTripRequest, UpdateDayInfoRequest, AddDayRequest, CloneTripRequest,
+        UpdateCoverRequest, UpdateInfoRequest, RouteStop, RouteRequest, ExpenseRequest,
+        UpdateTripTitleRequest, UpdateExpenseRequest, ChatRequest, SummarizeRequest,
+        POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest
+    )
+    print("[Modules] ✅ Loaded models from models.base")
+except ImportError as e:
+    print(f"[Modules] ⚠️ Failed to import models.base: {e}, using inline definitions")
+
 from supabase import create_client, Client
 from google import genai
 from google.genai import types # 🆕 Import types
