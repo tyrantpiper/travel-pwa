@@ -443,21 +443,33 @@ export function ItineraryView() {
     }
 
     const handleUpdateMemo = async (id: string, newMemo: string) => {
-        await fetch(`${API_BASE}/api/items/${id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ memo: newMemo })
-        })
-        reloadTripDetail()
-        return true
+        try {
+            const res = await fetch(`${API_BASE}/api/items/${id}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ memo: newMemo })
+            })
+            if (!res.ok) throw new Error("Failed to save memo")
+            reloadTripDetail()
+            return true
+        } catch {
+            toast.error("儲存備忘錄失敗")
+            return false
+        }
     }
 
     const handleUpdateSubItems = async (id: string, newItems: SubItem[]) => {
-        await fetch(`${API_BASE}/api/items/${id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sub_items: newItems })
-        })
-        reloadTripDetail()
-        return true
+        try {
+            const res = await fetch(`${API_BASE}/api/items/${id}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sub_items: newItems })
+            })
+            if (!res.ok) throw new Error("Failed to save sub items")
+            reloadTripDetail()
+            return true
+        } catch {
+            toast.error("儲存連結失敗")
+            return false
+        }
     }
 
     const handleDeleteItem = async (id: string) => {

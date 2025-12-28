@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table"
 
 import { Activity, SubItem } from "@/lib/itinerary-types"
+import { toast } from "sonner"
 
 interface TimelineCardProps {
     activity: Activity
@@ -237,25 +238,32 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
     // 👇 新增：連結列表狀態
     const [links, setLinks] = useState<SubItem[]>(activity.sub_items || [])
     const [saving, setSaving] = useState(false)
-    // Track the activity id to detect changes
-    const [lastActivityId, setLastActivityId] = useState(activity.id)
-
-    // Reset state when activity changes or dialog opens (using conditional logic instead of useEffect)
-    if (activity.id !== lastActivityId || (open && note !== (activity.memo || "") && !isEditing)) {
-        setLastActivityId(activity.id)
-        setNote(activity.memo || "")
-        setLinks(activity.sub_items || [])
-        setIsEditing(false)
-    }
+    // 🔧 FIX: Use proper useEffect for state sync (was causing render-during-render)
+    useEffect(() => {
+        // Reset state when dialog opens or activity changes
+        if (open) {
+            setNote(activity.memo || "")
+            setLinks(activity.sub_items || [])
+            setIsEditing(false)
+        }
+    }, [open, activity.id, activity.memo, activity.sub_items])
 
     const handleSave = async () => {
+        if (saving) return // 防止重複點擊
         setSaving(true)
-        // 同時更新 memo 和 sub_items
-        const p1 = onUpdateMemo(activity.id || '', note)
-        const p2 = onUpdateSubItems(activity.id || '', links)
-        await Promise.all([p1, p2])
-        setSaving(false)
-        setIsEditing(false)
+        try {
+            // 同時更新 memo 和 sub_items
+            const [memoSuccess, linksSuccess] = await Promise.all([
+                onUpdateMemo(activity.id || '', note),
+                onUpdateSubItems(activity.id || '', links)
+            ])
+            if (memoSuccess && linksSuccess) {
+                toast.success("已儲存")
+                setIsEditing(false)
+            }
+        } finally {
+            setSaving(false)
+        }
     }
 
     // 連結操作
