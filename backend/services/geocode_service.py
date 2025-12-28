@@ -581,7 +581,7 @@ def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
     # 特殊處理：如果包含「迪士尼」和日本相關詞彙
     if "迪士尼" in query or "disney" in query_lower:
         if country_code == "JP" or any(jp in query.lower() for jp in ["東京", "tokyo", "日本", "japan"]):
-            disney = LANDMARKS_DB.get("東京迪士尼")
+            disney = LANDMARKS_DB.get("東京迪士尼樂園")
             return (["Tokyo Disneyland", "東京ディズニーランド", query], "東京迪士尼樂園", disney)
         elif country_code == "HK" or "香港" in query:
             return (["Hong Kong Disneyland", query], "香港迪士尼樂園", None)
