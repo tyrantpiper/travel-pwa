@@ -629,8 +629,8 @@ async def leave_trip(
 
     try:
         # 1. Check trip ownership
-        trip_res = supabase.table("itineraries").select("owner_id").eq("id", trip_id).single().execute()
-        if trip_res.data and trip_res.data.get("owner_id") == user_id:
+        trip_res = supabase.table("itineraries").select("created_by").eq("id", trip_id).single().execute()
+        if trip_res.data and trip_res.data.get("created_by") == user_id:
             raise HTTPException(status_code=400, detail="Owner cannot leave trip. Please delete the trip instead.")
 
         # 2. Remove from trip_members
