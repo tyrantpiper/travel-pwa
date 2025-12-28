@@ -88,6 +88,11 @@ load_dotenv()
 
 app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
 
+# 🆕 Phase 4: 註冊 Routers
+from routers.geocode import router as geocode_router
+app.include_router(geocode_router)
+print("[Routers] ✅ Registered: geocode")
+
 # 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
 # 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
 CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "*")
@@ -319,30 +324,14 @@ async def startup_test():
         except Exception as e:
             log_debug(f"Startup Test Failed: {e}")
 
-@app.post("/api/geocode/search")
-async def geocode_search(
-    request: GeocodeSearchRequest,
-    x_gemini_key: str = Header(None, alias="X-Gemini-Key")
-):
-    """🔍 智能地理編碼搜尋（四層架構）"""
-    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', bias={request.lat},{request.lng}")
-    return await smart_geocode_logic(request.query, request.limit, request.tripTitle, x_gemini_key, request.lat, request.lng)
-
-
-@app.post("/api/geocode/reverse")
-async def geocode_reverse(request: GeocodeReverseRequest):
-    """反向地理編碼：座標 → 地名
-    
-    使用 Photon（免費無限制）
-    """
-    print(f"🔍 Reverse geocode: ({request.lat}, {request.lng})")
-    
-    # 使用 Photon 反向地理編碼
-    result = await reverse_geocode_with_photon(request.lat, request.lng)
-    if result:
-        return {"success": True, **result}
-    
-    return {"success": False, "name": "Unknown", "address": ""}
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🗺️ Geocode Endpoints - MOVED TO routers/geocode.py
+# ═══════════════════════════════════════════════════════════════════════════════
+# The following endpoints have been modularized:
+# - POST /api/geocode/search → geocode_search
+# - POST /api/geocode/reverse → geocode_reverse
+# Import from: routers.geocode (registered at app startup)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 @app.post("/api/parse-md")
