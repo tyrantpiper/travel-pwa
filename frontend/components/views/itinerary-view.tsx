@@ -732,7 +732,12 @@ export function ItineraryView() {
                     {!isTripsLoading && trips.map((trip: Trip) => (
                         <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
                             <div className="absolute top-2 right-2 z-20">
-                                <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}><Trash2 className="w-4 h-4 text-white" /></Button>
+                                {/* 擁有者顯示刪除按鈕 */}
+                                {userId && trip.owner_id === userId && (
+                                    <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}>
+                                        <Trash2 className="w-4 h-4 text-white" />
+                                    </Button>
+                                )}
                             </div>
                             <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
                                 <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
@@ -753,7 +758,7 @@ export function ItineraryView() {
                                 <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
                                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
                                     {/* 退出行程按鈕 (僅限非擁有者) */}
-                                    {userId && trip.owner_id && trip.owner_id !== userId && (
+                                    {userId && trip.owner_id !== userId && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
