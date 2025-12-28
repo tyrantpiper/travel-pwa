@@ -36,6 +36,26 @@ try:
 except ImportError as e:
     print(f"[Modules] ⚠️ Failed to import models.base: {e}, using inline definitions")
 
+# 🆕 Phase 3: 嘗試載入 geocode_service（保留原函數作為備援）
+try:
+    from services.geocode_service import (
+        smart_geocode_logic as _smart_geocode_logic,
+        geocode_with_photon as _geocode_with_photon,
+        reverse_geocode_with_photon as _reverse_geocode_with_photon,
+        geocode_place as _geocode_place,
+        detect_country_from_keywords as _detect_country_from_keywords,
+        translate_famous_landmark as _translate_famous_landmark,
+        filter_results_by_country as _filter_results_by_country,
+        # 資料結構
+        COUNTRY_BOUNDS as _COUNTRY_BOUNDS,
+        LANDMARKS_DB as _LANDMARKS_DB,
+    )
+    _GEOCODE_SERVICE_LOADED = True
+    print("[Services] ✅ Loaded geocode_service")
+except ImportError as e:
+    _GEOCODE_SERVICE_LOADED = False
+    print(f"[Services] ⚠️ geocode_service not available: {e}")
+
 from supabase import create_client, Client
 from google import genai
 from google.genai import types # 🆕 Import types
