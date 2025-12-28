@@ -529,7 +529,7 @@ LANDMARKS_DB = {
     # ═══════════════════════════════════════════════════════════════
     "太平山頂": {"aliases": ["victoria peak", "the peak", "山頂纜車"], "search": "Victoria Peak", "display": "太平山頂", "country": "HK"},
     "維多利亞港": {"aliases": ["victoria harbour", "維港", "幻彩詠香江"], "search": "Victoria Harbour", "display": "維多利亞港", "country": "HK"},
-    "香港迪士尼": {"aliases": ["hong kong disneyland", "hkdl", "迪士尼"], "search": "Hong Kong Disneyland", "display": "香港迪士尼樂園", "country": "HK"},
+    "香港迪士尼": {"aliases": ["hong kong disneyland", "hkdl", "香港迪士尼樂園"], "search": "Hong Kong Disneyland", "display": "香港迪士尼樂園", "country": "HK"},
     "尖沙咀": {"aliases": ["tsim sha tsui", "tst", "尖沙嘴"], "search": "Tsim Sha Tsui", "display": "尖沙咀", "country": "HK"},
     "旺角": {"aliases": ["mong kok", "女人街", "波鞋街"], "search": "Mong Kok", "display": "旺角", "country": "HK"},
     "銅鑼灣": {"aliases": ["causeway bay", "时代广场"], "search": "Causeway Bay", "display": "銅鑼灣", "country": "HK"},
@@ -545,11 +545,13 @@ try:
     if os.path.exists(data_path):
         with open(data_path, "r", encoding="utf-8") as f:
             external_data = json.load(f)
-            # Remove example key
-            if "example_key" in external_data:
-                del external_data["example_key"]
-            LANDMARKS_DB.update(external_data)
-            print(f"📦 Loaded {len(external_data)} external landmarks from landmarks.json")
+            # 🔧 Filter: Skip metadata keys (starting with _) and non-dict entries
+            valid_entries = {
+                k: v for k, v in external_data.items()
+                if isinstance(v, dict) and not k.startswith("_")
+            }
+            LANDMARKS_DB.update(valid_entries)
+            print(f"📦 Loaded {len(valid_entries)} external landmarks from landmarks.json")
 except Exception as e:
     print(f"⚠️ Failed to load external landmarks: {e}")
 
