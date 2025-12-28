@@ -22,7 +22,9 @@ from models.base import (
     ImportToTripRequest,
     UpdateDayDataRequest,
     UpdateLocationRequest,
-    UpdateInfoRequest
+    UpdateInfoRequest,
+    CreateItemRequest,
+    UpdateItemRequest
 )
 from utils.deps import get_supabase
 from utils.helpers import generate_room_code
@@ -612,4 +614,93 @@ async def update_trip_info(trip_id: str, request: UpdateInfoRequest, supabase=De
         supabase.table("itineraries").update(data).eq("id", trip_id).execute()
         return {"status": "success"}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Items CRUD (Batch 3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/items")
+async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)):
+    """➕ 新增單筆行程項目"""
+    try:
+        data = {
+            "itinerary_id": request.itinerary_id,
+            "day_number": request.day_number,
+            "time_slot": request.time_slot,
+            "place_name": request.place_name,
+            "category": request.category,
+            "notes": request.notes,
+            "location_lat": request.lat,
+            "location_lng": request.lng
+        }
+        
+        res = supabase.table("itinerary_items").insert(data).execute()
+        
+        if not res.data:
+            raise HTTPException(status_code=500, detail="插入失敗")
+        
+        print(f"✅ 單筆行程新增成功：{request.place_name}")
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        print(f"🔥 Create Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/items/{item_id}")
+async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends(get_supabase)):
+    """📝 修改單一細項"""
+    print(f"📝 嘗試更新細項 {item_id}: {request}")
+    try:
+        # 只更新有值的欄位
+        data = {}
+        if request.time_slot is not None: data["time_slot"] = request.time_slot
+        if request.place_name is not None: data["place_name"] = request.place_name
+        if request.notes is not None: data["notes"] = request.notes
+        if request.cost_amount is not None: data["cost_amount"] = request.cost_amount
+        # 👇 寫入資料庫
+        if request.lat is not None: data["location_lat"] = request.lat
+        if request.lng is not None: data["location_lng"] = request.lng
+        # 👇 新增：處理備忘錄
+        if request.memo is not None: data["memo"] = request.memo
+        # 👇 新增：處理 sub_items (連結列表)
+        if request.sub_items is not None: data["sub_items"] = request.sub_items
+        # 👇 新增：處理分類與標籤
+        if request.category is not None: data["category"] = request.category
+        if request.tags is not None: data["tags"] = request.tags
+        
+        if not data:
+            print("⚠️ 沒有資料需要更新")
+            return {"status": "no_change"}
+
+        res = supabase.table("itinerary_items").update(data).eq("id", item_id).execute()
+        
+        if not res.data:
+            print(f"❌ 更新失敗：找不到 ID {item_id}")
+            raise HTTPException(status_code=404, detail="Item not found")
+
+        print("✅ 更新成功")
+        return {"status": "success", "data": res.data}
+    except Exception as e:
+        print(f"🔥 Update Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/items/{item_id}")
+async def delete_item(item_id: str, supabase=Depends(get_supabase)):
+    """🗑️ 刪除單一細項"""
+    print(f"🗑️ 嘗試刪除細項 {item_id}")
+    try:
+        res = supabase.table("itinerary_items").delete().eq("id", item_id).execute()
+        
+        if not res.data:
+             print(f"❌ 刪除失敗：找不到 ID {item_id}")
+             # 這裡不噴錯，因為可能已經被刪掉了
+             return {"status": "success", "message": "Item might already be deleted"}
+             
+        print("✅ 刪除成功")
+        return {"status": "success"}
+    except Exception as e:
+        print(f"🔥 Delete Item Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
