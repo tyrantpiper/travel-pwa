@@ -24,10 +24,12 @@ from models.base import (
     UpdateLocationRequest,
     UpdateInfoRequest,
     CreateItemRequest,
-    UpdateItemRequest
+    UpdateItemRequest,
+    AddDayRequest
 )
 from utils.deps import get_supabase
 from utils.helpers import generate_room_code
+from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
 router = APIRouter(prefix="/api", tags=["trips"])
 
@@ -703,4 +705,240 @@ async def delete_item(item_id: str, supabase=Depends(get_supabase)):
         return {"status": "success"}
     except Exception as e:
         print(f"🔥 Delete Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Day Management - HIGH RISK (Batch 4)
+# ⚠️ Contains complex algorithms: Ghostbuster, Scorched Earth, Smart Clone
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.delete("/trips/{trip_id}/days/{day_number}")
+async def delete_day(trip_id: str, day_number: int, supabase=Depends(get_supabase)):
+    """🗑️ 刪除整天行程 (Deep Logic Fix)
+    
+    包含 Deep Content Shift 算法，用於防止「幽靈資料」：
+    - 刪除的天數資料必須清空
+    - 後面的資料必須往前補
+    """
+    print(f"🗑️ 嘗試刪除行程 {trip_id} 的第 {day_number} 天 (With Deep Content Clean)")
+    try:
+        # 1. 取得現有行程與 content
+        trip = supabase.table("itineraries").select("start_date, end_date, content").eq("id", trip_id).single().execute()
+        if not trip.data:
+            raise HTTPException(status_code=404, detail="行程不存在")
+
+        # 2. 刪除該天的所有細項 (Activities)
+        res = supabase.table("itinerary_items")\
+            .delete()\
+            .eq("itinerary_id", trip_id)\
+            .eq("day_number", day_number)\
+            .execute()
+        deleted_count = len(res.data) if res.data else 0
+        
+        # 3. 調整後續天數的 activities (day_number - 1)
+        remaining = supabase.table("itinerary_items")\
+            .select("id, day_number")\
+            .eq("itinerary_id", trip_id)\
+            .gt("day_number", day_number)\
+            .execute()
+        
+        for item in remaining.data:
+             supabase.table("itinerary_items")\
+                .update({"day_number": item["day_number"] - 1})\
+                .eq("id", item["id"])\
+                .execute()
+
+        # 4. 🧠 Deep Content Shift (處理 content 內的 Map 結構)
+        # 用來防止「幽靈資料」：刪除的天數資料必須清空，後面的資料必須往前補
+        content = trip.data.get("content") or {}
+        
+        # 計算最大天數 (為了迴圈邊界)
+        start_date = datetime.strptime(trip.data["start_date"], "%Y-%m-%d") if trip.data.get("start_date") else None
+        end_date = datetime.strptime(trip.data["end_date"], "%Y-%m-%d") if trip.data.get("end_date") else None
+        current_max_day = (end_date - start_date).days + 1 if (start_date and end_date) else 30 # Fallback 30
+
+        for field in DAY_MAP_FIELDS:
+            if field in content and isinstance(content[field], dict):
+                # A. 先刪除目標天數的資料 (壁紙撕掉)
+                if str(day_number) in content[field]:
+                    del content[field][str(day_number)]
+                
+                # B. 後面的天數往前移 (10 -> 9, 9 -> 8 ... day_number+1 -> day_number)
+                # 必須從 day_number + 1 開始往後掃描直到 current_max_day
+                for i in range(day_number + 1, current_max_day + 2): # +2 for safety buffer
+                    old_key = str(i)
+                    new_key = str(i - 1)
+                    
+                    if old_key in content[field]:
+                        # 搬移資料
+                        content[field][new_key] = content[field][old_key]
+                        # 刪除舊位址 (這是關鍵，不然會變成複製)
+                        del content[field][old_key]
+
+        # 5. 更新行程 (Content + EndDate)
+        updates = {"content": content}
+        
+        if end_date:
+            new_end = end_date - timedelta(days=1)
+            updates["end_date"] = new_end.strftime("%Y-%m-%d")
+            
+        supabase.table("itineraries").update(updates).eq("id", trip_id).execute()
+
+        print(f"   ✅ Day {day_number} 刪除完成，Content 已校正，Activities 已位移")
+        return {"status": "success", "deleted_items": deleted_count}
+
+    except Exception as e:
+        print(f"🔥 Delete Day Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/trips/{trip_id}/days")
+async def add_day(trip_id: str, request: AddDayRequest, supabase=Depends(get_supabase)):
+    """➕ 新增天數 (With Ghostbuster)
+    
+    包含複雜算法：
+    - Ghostbuster: 偵測幽靈資料
+    - Deep Content Shift: 反向位移
+    - Scorched Earth Clean: 焦土清理
+    - Smart Clone: 智慧複製內容
+    """
+    print(f"➕ 嘗試新增天數到行程 {trip_id}, 位置: {request.position}, 移植內容: {request.clone_content} (With Ghostbuster)")
+    try:
+        # 1. 取得現有行程資訊
+        trip = supabase.table("itineraries").select("start_date, end_date, content").eq("id", trip_id).single().execute()
+        if not trip.data:
+            raise HTTPException(status_code=404, detail="行程不存在")
+            
+        content = trip.data.get("content") or {}
+
+        # 2. 計算目前的天數 (精確計算) & Ghostbuster 👻 找出隱藏的最大天數
+        start_date = datetime.strptime(trip.data["start_date"], "%Y-%m-%d") if trip.data.get("start_date") else datetime.now()
+        end_date = datetime.strptime(trip.data["end_date"], "%Y-%m-%d") if trip.data.get("end_date") else start_date
+        date_calculated_days = (end_date - start_date).days + 1
+        
+        # 🔍 Ghostbuster: 掃描 content 找出真正的 max key (解決字串排序問題 "10" < "2")
+        all_content_keys = []
+        for field in DAY_MAP_FIELDS:
+            if field in content and isinstance(content[field], dict):
+                all_content_keys.extend(content[field].keys())
+        
+        valid_day_nums = [int(k) for k in all_content_keys if k.isdigit()] # 強制轉 INT
+        content_max_day = max(valid_day_nums) if valid_day_nums else 0
+        
+        # 取最大的作為當前邊界，確保位移時能覆蓋到所有幽靈資料
+        # 但如果是 "新增到結尾"，我們應該忽略幽靈，直接覆蓋在正確的天數上
+        shift_limit_day = max(date_calculated_days, content_max_day)
+        
+        if content_max_day > date_calculated_days:
+            print(f"   👻 發現幽靈資料! Content Max: {content_max_day} > Date Max: {date_calculated_days}")
+
+        new_day = -1
+        source_day_for_clone = None
+
+        # 3. 根據 position 處理
+        if request.position == "end":
+            # 新增到最後一天之後 - 直接鎖定正確的日期順序，無視幽靈 (Overwrite)
+            new_day = date_calculated_days + 1
+            print(f"   ➕ 新增 Day {new_day} 到結尾 (覆蓋該位置可能的幽靈)")
+            source_day_for_clone = new_day - 1 # 若要複製，來源是原本的最後一天
+            
+        elif request.position.startswith("before:"):
+            # 插入到指定天之前
+            insert_before = int(request.position.split(":")[1])
+            insert_before = max(1, insert_before)
+            new_day = insert_before
+            source_day_for_clone = insert_before 
+            
+            # A. 調整 Activities
+            items_to_shift = supabase.table("itinerary_items")\
+                .select("id, day_number")\
+                .eq("itinerary_id", trip_id)\
+                .gte("day_number", insert_before)\
+                .order("day_number", desc=True)\
+                .execute()
+            
+            for item in items_to_shift.data:
+                supabase.table("itinerary_items")\
+                    .update({"day_number": item["day_number"] + 1})\
+                    .eq("id", item["id"])\
+                    .execute()
+            
+            # B. 🧠 Deep Content Shift (Reverse Order)
+            # 這裡必須使用 shift_limit_day，確保連同幽靈資料一起往後移，避免資料損失
+            for field in DAY_MAP_FIELDS:
+                if field not in content: content[field] = {}
+                if not isinstance(content[field], dict): content[field] = {}
+
+                for i in range(shift_limit_day, insert_before - 1, -1):
+                    old_key = str(i)
+                    new_key = str(i + 1)
+                    
+                    if old_key in content[field]:
+                        content[field][new_key] = content[field][old_key]
+                        del content[field][old_key]
+            
+            # 修正 Clone Source
+            if insert_before == 1:
+                source_day_for_clone = 2 
+            else:
+                source_day_for_clone = insert_before - 1
+
+            print(f"   ➕ 插入 Day {new_day}, Content 已反向位移")
+
+        else:
+            raise HTTPException(status_code=400, detail="無效的 position 格式")
+        
+        # 4. 🔥 Scorched Earth Clean (焦土清理)
+        # 強制清理 new_day 位置，不管之前有沒有幽靈，都得死
+        target_key = str(new_day)
+        print(f"   🔥 執行焦土清理 Day {new_day}")
+        
+        cleaned_count = 0
+        for field in DAY_MAP_FIELDS:
+             if field not in content: content[field] = {}
+             if target_key in content[field]:
+                 del content[field][target_key]
+                 print(f"      🧹 已清除殘留資料: {field}[{target_key}]")
+                 cleaned_count += 1
+        
+        if cleaned_count > 0:
+            print(f"   ✅ 焦土清理完成，共清除 {cleaned_count} 個欄位")
+
+        # 5. 🧠 Smart Clone 執行 (如果需要)
+        # 此時 new_day 已經絕對乾淨
+        if request.clone_content and source_day_for_clone:
+            print(f"   🌱 執行智慧移植: 從 Day {source_day_for_clone} -> Day {new_day}")
+            src_key = str(source_day_for_clone)
+            
+            import copy
+            for field in CLONEABLE_FIELDS: # 只複製允許的欄位
+                if field in content and src_key in content[field]:
+                    content[field][target_key] = copy.deepcopy(content[field][src_key])
+                    print(f"      ✅ 複製 {field}")
+
+        # 6. 更新行程 (Content + EndDate)
+        # 如果是 Append End: 總天數 = 舊天數 + 1
+        # 如果是 Insert Before: 總天數 = 舊天數 + 1 (因為所有東西都推後了一天)
+        # 注意：如果原本有幽靈資料 (Max > Date)，Insert 後 Max 也會 +1。
+        # 我們這裡只關心 "合法的行程長度"。如果原本有 5 天 (date), Insert 1 天 -> 變成 6 天。
+        # 不管 content max 是多少，end date 應該只反應合法的增加。
+        
+        final_total_days = date_calculated_days + 1
+        
+        new_end_date = start_date + timedelta(days=final_total_days - 1)
+        
+        updates = {
+            "content": content,
+            "end_date": new_end_date.strftime("%Y-%m-%d")
+        }
+        
+        supabase.table("itineraries").update(updates).eq("id", trip_id).execute()
+        
+        return {"status": "success", "new_day": new_day, "total_days": final_total_days}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Add Day Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
