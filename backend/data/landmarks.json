@@ -1,5 +1,5 @@
 {
-    "__comment": "Tokyo Expansion - Phase 1: City Center & Airport Vicinity",
+    "__comment": "Tokyo Expansion - Phase 1 & 2: City Center, Airport, Metro, Shopping",
     "穴守稻荷車站": {
         "aliases": [
             "anamori inari",
@@ -427,6 +427,139 @@
         "lat": 35.6917,
         "lng": 139.7709
     },
+    "銀座車站": {
+        "aliases": [
+            "ginza station",
+            "銀座駅"
+        ],
+        "search": "Ginza Station",
+        "display": "銀座車站",
+        "country": "JP",
+        "lat": 35.6721,
+        "lng": 139.7639
+    },
+    "大手町車站": {
+        "aliases": [
+            "otemachi",
+            "大手町駅"
+        ],
+        "search": "Otemachi Station",
+        "display": "大手町車站",
+        "country": "JP",
+        "lat": 35.6848,
+        "lng": 139.7661
+    },
+    "日本橋車站": {
+        "aliases": [
+            "nihombashi",
+            "日本橋駅"
+        ],
+        "search": "Nihombashi Station",
+        "display": "日本橋車站",
+        "country": "JP",
+        "lat": 35.6821,
+        "lng": 139.7735
+    },
+    "三越前車站": {
+        "aliases": [
+            "mitsukoshimae",
+            "三越前駅"
+        ],
+        "search": "Mitsukoshimae Station",
+        "display": "三越前車站",
+        "country": "JP",
+        "lat": 35.6853,
+        "lng": 139.7730
+    },
+    "表參道車站": {
+        "aliases": [
+            "omotesando station",
+            "表参道駅"
+        ],
+        "search": "Omotesando Station",
+        "display": "表參道車站",
+        "country": "JP",
+        "lat": 35.6653,
+        "lng": 139.7126
+    },
+    "青山一丁目車站": {
+        "aliases": [
+            "aoyama-itchome",
+            "青山一丁目駅"
+        ],
+        "search": "Aoyama-Itchome Station",
+        "display": "青山一丁目車站",
+        "country": "JP",
+        "lat": 35.6728,
+        "lng": 139.7238
+    },
+    "赤坂見附車站": {
+        "aliases": [
+            "akasaka-mitsuke",
+            "赤坂見附駅"
+        ],
+        "search": "Akasaka-Mitsuke Station",
+        "display": "赤坂見附車站",
+        "country": "JP",
+        "lat": 35.6766,
+        "lng": 139.7365
+    },
+    "虎之門車站": {
+        "aliases": [
+            "toranomon",
+            "虎ノ門駅"
+        ],
+        "search": "Toranomon Station",
+        "display": "虎之門車站",
+        "country": "JP",
+        "lat": 35.6702,
+        "lng": 139.7502
+    },
+    "溜池山王車站": {
+        "aliases": [
+            "tameike-sanno",
+            "溜池山王駅"
+        ],
+        "search": "Tameike-Sanno Station",
+        "display": "溜池山王車站",
+        "country": "JP",
+        "lat": 35.6715,
+        "lng": 139.7410
+    },
+    "六本木車站": {
+        "aliases": [
+            "roppongi station",
+            "六本木駅"
+        ],
+        "search": "Roppongi Station",
+        "display": "六本木車站",
+        "country": "JP",
+        "lat": 35.6640,
+        "lng": 139.7314
+    },
+    "中目黑車站": {
+        "aliases": [
+            "naka-meguro",
+            "中目黒駅",
+            "中目黒"
+        ],
+        "search": "Naka-Meguro Station",
+        "display": "中目黑車站",
+        "country": "JP",
+        "lat": 35.6443,
+        "lng": 139.6990
+    },
+    "新宿三丁目車站": {
+        "aliases": [
+            "shinjuku-sanchome",
+            "新宿三丁目駅"
+        ],
+        "search": "Shinjuku-Sanchome Station",
+        "display": "新宿三丁目車站",
+        "country": "JP",
+        "lat": 35.6912,
+        "lng": 139.7049
+    },
     "東京晴空塔": {
         "aliases": [
             "tokyo skytree",
@@ -555,6 +688,18 @@
         "lat": 35.6583,
         "lng": 139.7022
     },
+    "Miyashita Park": {
+        "aliases": [
+            "宮下公園",
+            "miyashita",
+            "ミヤシタパーク"
+        ],
+        "search": "Miyashita Park",
+        "display": "宮下公園",
+        "country": "JP",
+        "lat": 35.6616,
+        "lng": 139.7018
+    },
     "豐洲市場": {
         "aliases": [
             "toyosu market",
@@ -647,6 +792,41 @@
         "lat": 35.6717,
         "lng": 139.7649
     },
+    "銀座Six": {
+        "aliases": [
+            "ginza six",
+            "gsix",
+            "ギンザシックス",
+            "銀座シックス"
+        ],
+        "search": "GINZA SIX",
+        "display": "銀座Six",
+        "country": "JP",
+        "lat": 35.6696,
+        "lng": 139.7640
+    },
+    "銀座三越": {
+        "aliases": [
+            "ginza mitsukoshi",
+            "銀座三越百貨"
+        ],
+        "search": "Ginza Mitsukoshi",
+        "display": "銀座三越",
+        "country": "JP",
+        "lat": 35.6710,
+        "lng": 139.7646
+    },
+    "東急Plaza銀座": {
+        "aliases": [
+            "tokyu plaza ginza",
+            "東急プラザ銀座"
+        ],
+        "search": "Tokyu Plaza Ginza",
+        "display": "東急Plaza銀座",
+        "country": "JP",
+        "lat": 35.6723,
+        "lng": 139.7628
+    },
     "表參道": {
         "aliases": [
             "omotesando",
@@ -657,6 +837,18 @@
         "country": "JP",
         "lat": 35.6652,
         "lng": 139.7123
+    },
+    "表參道Hills": {
+        "aliases": [
+            "omotesando hills",
+            "表参道ヒルズ",
+            "表參道之丘"
+        ],
+        "search": "Omotesando Hills",
+        "display": "表參道Hills",
+        "country": "JP",
+        "lat": 35.6672,
+        "lng": 139.7090
     },
     "竹下通": {
         "aliases": [
@@ -681,7 +873,7 @@
         "lat": 35.7020,
         "lng": 139.7750
     },
-    "阿 美橫丁": {
+    "阿美橫丁": {
         "aliases": [
             "ameyoko",
             "ameyayokocho",
@@ -704,6 +896,30 @@
         "lat": 35.6938,
         "lng": 139.7018
     },
+    "Lumine EST新宿": {
+        "aliases": [
+            "lumine est",
+            "新宿lumine est",
+            "ルミネエスト"
+        ],
+        "search": "Lumine Est Shinjuku",
+        "display": "Lumine EST 新宿",
+        "country": "JP",
+        "lat": 35.6908,
+        "lng": 139.7013
+    },
+    "新宿伊勢丹": {
+        "aliases": [
+            "isetan shinjuku",
+            "伊勢丹新宿店",
+            "isetan"
+        ],
+        "search": "Isetan Shinjuku",
+        "display": "新宿伊勢丹",
+        "country": "JP",
+        "lat": 35.6916,
+        "lng": 139.7046
+    },
     "澀谷十字路口": {
         "aliases": [
             "shibuya crossing",
@@ -715,6 +931,29 @@
         "country": "JP",
         "lat": 35.6595,
         "lng": 139.7003
+    },
+    "澀谷Parco": {
+        "aliases": [
+            "shibuya parco",
+            "渋谷パルコ"
+        ],
+        "search": "Shibuya Parco",
+        "display": "澀谷Parco",
+        "country": "JP",
+        "lat": 35.6621,
+        "lng": 139.6987
+    },
+    "澀谷109": {
+        "aliases": [
+            "shibuya 109",
+            "109百貨",
+            "渋谷109"
+        ],
+        "search": "SHIBUYA109",
+        "display": "澀谷109",
+        "country": "JP",
+        "lat": 35.6595,
+        "lng": 139.6987
     },
     "池袋西口公園": {
         "aliases": [
@@ -738,6 +977,17 @@
         "country": "JP",
         "lat": 35.7293,
         "lng": 139.7181
+    },
+    "池袋Parco": {
+        "aliases": [
+            "ikebukuro parco",
+            "池袋パルコ"
+        ],
+        "search": "Ikebukuro Parco",
+        "display": "池袋Parco",
+        "country": "JP",
+        "lat": 35.7302,
+        "lng": 139.7112
     },
     "東京中城日比谷": {
         "aliases": [
