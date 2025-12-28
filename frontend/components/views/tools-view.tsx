@@ -231,30 +231,31 @@ export function ToolsView() {
         }
     }
 
-    useEffect(() => {
-        const fetchRate = async () => {
-            try {
-                // 主要來源：fawazahmed0/currency-api（無限制、CDN 緩存）
-                const res = await fetch(
-                    "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json"
-                )
-                const data = await res.json()
-                const rawRate = data.jpy?.twd
-                if (rawRate) {
-                    setRate(Math.round(rawRate * 100) / 100)  // 精確到小數點 2 位
-                    return
-                }
-            } catch { /* 嘗試備援 */ }
+    const fetchRate = async () => {
+        try {
+            // 主要來源：fawazahmed0/currency-api（無限制、CDN 緩存）
+            const res = await fetch(
+                "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json"
+            )
+            const data = await res.json()
+            const rawRate = data.jpy?.twd
+            if (rawRate) {
+                setRate(Math.round(rawRate * 100) / 100)  // 精確到小數點 2 位
+                return
+            }
+        } catch { /* 嘗試備援 */ }
 
-            // 備援來源：原 exchangerate-api
-            try {
-                const res = await fetch("https://api.exchangerate-api.com/v4/latest/JPY")
-                const data = await res.json()
-                if (data.rates?.TWD) {
-                    setRate(Math.round(data.rates.TWD * 100) / 100)
-                }
-            } catch { /* 使用預設值 */ }
-        }
+        // 備援來源：原 exchangerate-api
+        try {
+            const res = await fetch("https://api.exchangerate-api.com/v4/latest/JPY")
+            const data = await res.json()
+            if (data.rates?.TWD) {
+                setRate(Math.round(data.rates.TWD * 100) / 100)
+            }
+        } catch { /* 使用預設值 */ }
+    }
+
+    useEffect(() => {
         fetchRate()
     }, [])
 
