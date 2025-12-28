@@ -119,7 +119,7 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTripId, activeTrip, trips } = useTripContext()
+    const { activeTrip, activeTripId, mutate: tripMutate } = useTripContext()
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")
     const [expenses, setExpenses] = useState<Expense[]>([])
@@ -221,8 +221,8 @@ export function ToolsView() {
                     credit_cards: mergedSharedCards // 🆕 Sync Shared Cards
                 })
             })
-            // Re-fetch trip data
-            mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
+            // Re-fetch trip data using context mutate for proper SWR revalidation
+            tripMutate()
         } catch (e) {
             console.error("Failed to sync shared cards:", e)
         }
@@ -618,66 +618,74 @@ export function ToolsView() {
     }
 
     const handleSaveCard = async () => {
+        // 🛡️ Early validation BEFORE setting loading state
         if (!newCardName.trim()) { toast.error("請輸入卡片名稱"); return }
-        if (isSavingCard) return // 🛡️ Prevent double-click
+        if (isSavingCard) return // Prevent double-click
+        if (newCardIsPublic && !activeTripId) { toast.error("需要選擇行程才能共享卡片"); return }
 
-        setIsSavingCard(true) // 🆕 Start loading
-        const userId = localStorage.getItem("user_uuid")
+        setIsSavingCard(true)
 
-        // 1. Construct Card Data
-        const cardData: CreditCard = {
-            id: editingCard?.id || crypto.randomUUID(),
-            name: newCardName.trim(),
-            rewardRate: parseFloat(newRewardRate) || 0,
-            rewardLimit: parseFloat(newRewardLimit) || 0,
-            notes: newCardNotes.trim(),
-            is_public: newCardIsPublic,
-            creator_id: userId || undefined
-        }
+        try {
+            const userId = localStorage.getItem("user_uuid")
 
-        // 2. Logic Split: Public vs Private
-        if (newCardIsPublic) {
-            if (!activeTripId) { toast.error("需要選擇行程才能共享卡片"); return }
-
-            // A. Add/Update in Shared List
-            const updatedShared = editingCard
-                ? sharedCards.map(c => c.id === cardData.id ? cardData : c)
-                : [...sharedCards, cardData]
-
-            // B. Remove from Local (Migration case)
-            const updatedLocal = localCards.filter(c => c.id !== cardData.id)
-
-            setSharedCards(updatedShared)
-            setLocalCards(updatedLocal)
-            saveCardsToLocalStorage(updatedLocal)
-
-            // C. Sync to Cloud
-            await saveTripInfo(updatedShared)
-            toast.success("卡片已儲存 (已共享)")
-
-        } else {
-            // A. Add/Update in Local List
-            const updatedLocal = editingCard
-                ? localCards.map(c => c.id === cardData.id ? cardData : c)
-                : [...localCards, cardData]
-
-            // B. Remove from Shared (Migration case: Public -> Private)
-            const updatedShared = sharedCards.filter(c => c.id !== cardData.id)
-
-            setLocalCards(updatedLocal)
-            setSharedCards(updatedShared)
-            saveCardsToLocalStorage(updatedLocal)
-
-            // C. Sync Cloud (if we removed something)
-            if (updatedShared.length !== sharedCards.length) {
-                await saveTripInfo(updatedShared)
+            // 1. Construct Card Data
+            const cardData: CreditCard = {
+                id: editingCard?.id || crypto.randomUUID(),
+                name: newCardName.trim(),
+                rewardRate: parseFloat(newRewardRate) || 0,
+                rewardLimit: parseFloat(newRewardLimit) || 0,
+                notes: newCardNotes.trim(),
+                is_public: newCardIsPublic,
+                creator_id: userId || undefined
             }
-            toast.success("卡片已儲存 (私人)")
-        }
 
-        setCardDialogOpen(false)
-        setIsSavingCard(false) // 🆕 End loading
-        haptic.success()
+            // 2. Logic Split: Public vs Private
+            if (newCardIsPublic) {
+                // A. Add/Update in Shared List
+                const updatedShared = editingCard
+                    ? sharedCards.map(c => c.id === cardData.id ? cardData : c)
+                    : [...sharedCards, cardData]
+
+                // B. Remove from Local (Migration case)
+                const updatedLocal = localCards.filter(c => c.id !== cardData.id)
+
+                setSharedCards(updatedShared)
+                setLocalCards(updatedLocal)
+                saveCardsToLocalStorage(updatedLocal)
+
+                // C. Sync to Cloud
+                await saveTripInfo(updatedShared)
+                toast.success("卡片已儲存 (已共享)")
+
+            } else {
+                // A. Add/Update in Local List
+                const updatedLocal = editingCard
+                    ? localCards.map(c => c.id === cardData.id ? cardData : c)
+                    : [...localCards, cardData]
+
+                // B. Remove from Shared (Migration case: Public -> Private)
+                const updatedShared = sharedCards.filter(c => c.id !== cardData.id)
+
+                setLocalCards(updatedLocal)
+                setSharedCards(updatedShared)
+                saveCardsToLocalStorage(updatedLocal)
+
+                // C. Sync Cloud (if we removed something)
+                if (updatedShared.length !== sharedCards.length) {
+                    await saveTripInfo(updatedShared)
+                }
+                toast.success("卡片已儲存 (私人)")
+            }
+
+            setCardDialogOpen(false)
+            haptic.success()
+        } catch (e) {
+            console.error("Failed to save card:", e)
+            toast.error("儲存失敗，請稍後再試")
+            haptic.error()
+        } finally {
+            setIsSavingCard(false) // 🛡️ Always reset loading state
+        }
     }
 
     const handleDeleteCard = async (cardId: string) => {
@@ -711,7 +719,7 @@ export function ToolsView() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={async () => { await fetchExpenses(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
+            <PullToRefresh onRefresh={async () => { await fetchExpenses(); await tripMutate(); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
                 <Tabs value={activeSection} onValueChange={setActiveSection}>
                     {/* Custom Sliding Tab Strip */}
                     <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">

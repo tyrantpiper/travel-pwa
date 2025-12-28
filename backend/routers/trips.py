@@ -59,11 +59,20 @@ async def get_trips(
             .eq("user_id", user_id)\
             .execute()
             
-        # 整理資料結構
+        # 整理資料結構 - 🔧 FIX: 解析 content 欄位，將 daily_locations 提升到頂層
         trips = []
         for item in res.data:
             if item.get('itineraries'):  # 確保關聯存在
-                trips.append(item['itineraries'])
+                trip = item['itineraries']
+                content = trip.get('content') or {}
+                # 🆕 將 content 內的欄位提升到頂層，與 get_trip_by_id 格式一致
+                trip['daily_locations'] = content.get('daily_locations', {})
+                trip['day_notes'] = content.get('day_notes', {})
+                trip['day_costs'] = content.get('day_costs', {})
+                trip['day_tickets'] = content.get('day_tickets', {})
+                trip['day_checklists'] = content.get('day_checklists', {})
+                trip['credit_cards'] = content.get('credit_cards', [])
+                trips.append(trip)
         
         print(f"✅ 找到 {len(trips)} 個行程")
         return trips
