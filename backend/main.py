@@ -1694,9 +1694,7 @@ async def update_day_data(trip_id: str, request: UpdateDayDataRequest):
         print(f"🔥 Update Day Data Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 3.4: 追加細項到現有行程
-class AppendItemsRequest(BaseModel):
-    items: List[ItineraryItem]
+# 🔥 功能 3.4: 追加細項到現有行程 (AppendItemsRequest 已移至 models/base.py)
 
 @app.post("/api/trips/{trip_id}/items")
 async def append_items_to_trip(trip_id: str, request: AppendItemsRequest):
@@ -2055,10 +2053,7 @@ async def delete_day(trip_id: str, day_number: int):
         print(f"🔥 Delete Day Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🆕 功能 8.2: 新增天數 (Deep Logic Fix + Smart Clone + Ghostbuster)
-class AddDayRequest(BaseModel):
-    position: str = "end"  # "end" 或 "before:N" (例如 "before:3")
-    clone_content: bool = False # 🆕 是否移植鄰近天數的內容
+# 🆕 功能 8.2: 新增天數 (AddDayRequest 已移至 models/base.py)
 
 @app.post("/api/trips/{trip_id}/days")
 async def add_day(trip_id: str, request: AddDayRequest):
@@ -2208,12 +2203,7 @@ async def add_day(trip_id: str, request: AddDayRequest):
         print(f"🔥 Add Day Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 9: 更新行程的每日地點
-class UpdateLocationRequest(BaseModel):
-    day: int
-    name: str
-    lat: float
-    lng: float
+# 🔥 功能 9: 更新行程的每日地點 (UpdateLocationRequest 已移至 models/base.py)
 
 @app.patch("/api/trips/{trip_id}/location")
 async def update_trip_location(trip_id: str, request: UpdateLocationRequest):
@@ -2265,10 +2255,7 @@ async def create_item(request: CreateItemRequest):
         print(f"🔥 Create Item Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 11: 更新行程資訊 (航班/住宿)
-class UpdateInfoRequest(BaseModel):
-    flight_info: dict
-    hotel_info: dict
+# 🔥 功能 11: 更新行程資訊 (UpdateInfoRequest 已移至 models/base.py)
 
 @app.patch("/api/trips/{trip_id}/info")
 async def update_trip_info(trip_id: str, request: UpdateInfoRequest):
@@ -2282,16 +2269,8 @@ async def update_trip_info(trip_id: str, request: UpdateInfoRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 11.1: 路線規劃 API (ArcGIS + OSRM 雙引擎)
-class RouteStop(BaseModel):
-    lat: float
-    lng: float
-    name: Optional[str] = None
+# 🔥 功能 11.1: 路線規劃 API (RouteStop, RouteRequest 已移至 models/base.py)
 
-class RouteRequest(BaseModel):
-    stops: List[RouteStop]
-    mode: str = "walk"  # walk, drive, transit
-    optimize: bool = False  # 是否最佳化路線順序
 
 async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -> dict:
     """使用 ArcGIS Routing API 計算路線"""
@@ -2427,21 +2406,7 @@ async def calculate_route(request: RouteRequest):
         print(f"   ❌ OSRM 也失敗: {e}")
         raise HTTPException(status_code=500, detail="無法計算路線")
 
-# 🔥 功能 12: 記帳相關 API
-class ExpenseRequest(BaseModel):
-    itinerary_id: Optional[str] = None  # 設為 Optional 方便 Update 使用
-    title: Optional[str] = None
-    amount_jpy: Optional[float] = None
-    exchange_rate: Optional[float] = None
-    payment_method: Optional[str] = None
-    category: Optional[str] = None
-    is_public: Optional[bool] = None
-    created_by: Optional[str] = None
-    creator_name: Optional[str] = None
-    card_name: Optional[str] = None
-    cashback_rate: Optional[float] = 0
-    image_url: Optional[str] = None
-    expense_date: Optional[str] = None  # 🆕 新增：費用日期
+# 🔥 功能 12: 記帳相關 API (ExpenseRequest 已移至 models/base.py)
 
 @app.post("/api/expenses")
 async def add_expense(request: ExpenseRequest):
@@ -2490,9 +2455,7 @@ async def get_expenses(trip_id: str, user_id: str = Header(None, alias="X-User-I
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 13: 修改行程標題
-class UpdateTripTitleRequest(BaseModel):
-    title: str
+# 🔥 功能 13: 修改行程標題 (UpdateTripTitleRequest 已移至 models/base.py)
 
 @app.patch("/api/trips/{trip_id}/title")
 async def update_trip_title(trip_id: str, request: UpdateTripTitleRequest):
@@ -2502,15 +2465,8 @@ async def update_trip_title(trip_id: str, request: UpdateTripTitleRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🔥 功能 14: 修改/刪除記帳 (Expense)
-class UpdateExpenseRequest(BaseModel):
-    title: Optional[str] = None
-    amount_jpy: Optional[float] = None
-    is_public: Optional[bool] = None
-    payment_method: Optional[str] = None
-    image_url: Optional[str] = None
-    category: Optional[str] = None  # 🆕 新增
-    expense_date: Optional[str] = None  # 🆕 新增
+# 🔥 功能 14: 修改/刪除記帳 (UpdateExpenseRequest 已移至 models/base.py)
+
 
 @app.patch("/api/expenses/{expense_id}")
 async def update_expense(expense_id: str, request: UpdateExpenseRequest):
@@ -2639,15 +2595,8 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     lines.append("請參考以上行程回答用戶問題。\n")
     return "\n".join(lines)
 
-class ChatRequest(BaseModel):
-    message: str
-    history: List[dict] = []  # 對話歷史: [{"role": "user", "parts": [...]}] 或 [{"role": "user", "content": "..."}]
-    thought_signatures: Optional[List[dict]] = None  # 🆕 上一輪的思想簽名 (Round-Trip)
-    image: Optional[str] = None  # Base64 image string (optional)
-    location: Optional[dict] = None  # 當前位置: {"lat": float, "lng": float, "name": str}
-    # 🆕 v3.5: 行程上下文
-    current_itinerary: Optional[dict] = None  # 精簡版行程 JSON
-    focused_day: Optional[int] = None  # 用戶正在查看的天數
+# ChatRequest 已移至 models/base.py
+
 
 SYSTEM_PROMPT = """
 ### 角色定義 (Role)
@@ -2929,9 +2878,8 @@ async def stream_chat_generator(
         yield f'event: error\ndata: {json.dumps({"message": str(e), "code": 500})}\n\n'
 
 
-# 🆕 v3.6: 記憶摘要 API
-class SummarizeRequest(BaseModel):
-    history: List[Dict]  # 要摘要的對話歷史
+
+# 🆕 v3.6: 記憶摘要 API (SummarizeRequest 已移至 models/base.py)
 
 @app.post("/api/chat/summarize")
 async def summarize_history(request: SummarizeRequest, api_key: str = Depends(get_gemini_key)):
@@ -2972,14 +2920,8 @@ async def summarize_history(request: SummarizeRequest, api_key: str = Depends(ge
         raise HTTPException(status_code=500, detail=f"摘要失敗: {str(e)}")
 
 
-# 🆕 v4.0: POI AI 增強 (Progressive Intelligence Layer 2)
-class POIAIEnrichRequest(BaseModel):
-    name: str
-    type: str
-    lat: float
-    lng: float
-    api_key: Optional[str] = None
 
+# 🆕 v4.0: POI AI 增強 (POIAIEnrichRequest 已移至 models/base.py)
 
 @app.post("/api/poi/ai-enrich")
 async def ai_enrich_poi(request: POIAIEnrichRequest):
@@ -3044,13 +2986,8 @@ Rating should be a number from 1-5 based on general web sentiment.
         raise HTTPException(status_code=500, detail=f"AI 增強失敗: {str(e)}")
 
 
-# 🆕 v3.7: POI 三源整合 API
+# 🆕 v3.7: POI 三源整合 API (POIEnrichRequest 已移至 models/base.py)
 from services.poi_service import enrich_poi_complete, format_enriched_poi_for_ai
-
-
-class POIEnrichRequest(BaseModel):
-    name: str  # 景點名稱
-    wikidata_id: Optional[str] = None  # Wikidata ID (可選)
 
 
 @app.post("/api/poi/enrich")
@@ -3184,13 +3121,7 @@ from services.poi_service import (
     detect_poi_query
 )
 
-
-class POIRecommendRequest(BaseModel):
-    pois: List[dict]
-    user_query: str
-    api_key: str
-    user_preferences: Optional[dict] = None
-
+# POIRecommendRequest 已移至 models/base.py
 
 @app.get("/api/poi/nearby")
 async def search_nearby_poi(
