@@ -68,6 +68,14 @@ except ImportError as e:
     # 🔴 如果 geocode_service 加載失敗，伺服器不應啟動
     raise ImportError(f"Critical: geocode_service is required but failed to load: {e}")
 
+# 🆕 Phase 4: 導入共用依賴 (供 routers 使用)
+try:
+    from utils.deps import get_gemini_key, get_supabase
+    from utils.ai_config import PRIMARY_MODEL, LITE_MODEL, SMART_NO_TOOL_MODEL, REASONING_MODEL
+    print("[Utils] ✅ Loaded shared dependencies")
+except ImportError as e:
+    print(f"[Utils] ⚠️ Failed to import utils: {e}")
+    # 如果導入失敗，保留原有定義（這些會在後面定義）
 
 from supabase import create_client, Client
 from google import genai
@@ -102,6 +110,10 @@ try:
 except Exception as e:
     print(f"⚠️ Supabase Warning: {e}")
     supabase = None  # Will cause errors but at least won't crash on import
+
+# 🆕 Phase 4: 將 supabase 放入 app.state 供 routers 使用
+app.state.supabase = supabase
+
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
 @app.get("/health")
