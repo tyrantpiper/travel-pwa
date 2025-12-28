@@ -853,7 +853,6 @@ export function ItineraryView() {
                                 <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
                                     <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
                                     <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
-                                        {/* 🔍 DEBUG */ console.log("🔍 RENDER: day=", day, "dailyLocs=", dailyLocs, "dailyLocs[day]=", dailyLocs[day])}
                                         {dailyLocs[day]?.name || "Tokyo (Default)"}
                                     </span>
                                     <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
