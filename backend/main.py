@@ -753,6 +753,9 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
         return None
 
 
+# 🆕 翻譯結果緩存（減少重複 AI 調用）
+TRANSLATION_CACHE = {}  # {(query, country_code): [translations]}
+
 async def translate_place_name(query: str, country_code: str, api_key: str = None) -> list:
     """🔤 使用 Gemini 將地名翻譯成目標國家語言
     
@@ -760,6 +763,12 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
     """
     if not country_code or not api_key:
         return [query]
+    
+    # 🆕 緩存檢查
+    cache_key = (query.lower(), country_code)
+    if cache_key in TRANSLATION_CACHE:
+        print(f"🔤 CACHE HIT: '{query}' → {TRANSLATION_CACHE[cache_key]}")
+        return TRANSLATION_CACHE[cache_key]
     
     country_info = COUNTRY_BOUNDS.get(country_code)
     if not country_info:
@@ -797,8 +806,11 @@ Senso-ji
             # 確保原始查詢也在列表中
             if query not in lines:
                 lines.append(query)
-            print(f"🔤 Translated '{query}' → {lines}")
-            return lines[:3]  # 最多3個變體
+            result = lines[:3]  # 最多3個變體
+            # 🆕 存入緩存
+            TRANSLATION_CACHE[cache_key] = result
+            print(f"🔤 Translated '{query}' → {result} (cached)")
+            return result
         return [query]
     except Exception as e:
         print(f"🔤 Translation error: {e}")
