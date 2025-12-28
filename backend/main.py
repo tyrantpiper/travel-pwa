@@ -92,10 +92,12 @@ app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
 from routers.geocode import router as geocode_router
 from routers.expenses import router as expenses_router
 from routers.ai import router as ai_router
+from routers.trips import router as trips_router
 app.include_router(geocode_router)
 app.include_router(expenses_router)
 app.include_router(ai_router)
-print("[Routers] ✅ Registered: geocode, expenses, ai")
+app.include_router(trips_router)
+print("[Routers] ✅ Registered: geocode, expenses, ai, trips")
 
 # 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
 # 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
