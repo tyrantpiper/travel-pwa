@@ -23,11 +23,14 @@ export function useTrips(userId: string | null) {
 }
 
 export function useTripDetail(tripId: string | null, userId?: string | null) {
+    // 🔧 FIX: Include userId in cache key to ensure refetch when userId changes
+    // And only make the request when we have a valid userId to prevent unauthenticated fetches
     const { data, error, mutate } = useSWR(
-        tripId ? [`/api/trips/${tripId}`, userId || ""] : null,
+        // Only fetch when both tripId and userId are available
+        (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null,
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
-                headers: uid ? { "X-User-ID": uid } : {}
+                headers: { "X-User-ID": uid }
             }).then(r => r.json()),
         {
             revalidateOnFocus: false,

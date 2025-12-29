@@ -109,6 +109,9 @@ async def get_trip_by_id(
         if user_id:
             member_res = supabase.table("trip_members").select("user_id").eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
             is_member = len(member_res.data) > 0
+            print(f"🔍 [DEBUG] user_id={user_id}, trip_id={trip_id}, member_query_result={member_res.data}, is_member={is_member}")
+        else:
+            print(f"🔍 [DEBUG] No user_id provided, treating as non-member")
         
         # 2. 抓該行程的所有細項
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()

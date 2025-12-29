@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff } from "lucide-react"
+import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
@@ -78,6 +78,10 @@ export default function EditableDailyTips({
     const [newTicket, setNewTicket] = useState<TicketItem>({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
 
     const [saving, setSaving] = useState(false)
+
+    // 🆕 Per-item processing state for anti-spam
+    const [processingCosts, setProcessingCosts] = useState<Set<number>>(new Set())
+    const [processingTickets, setProcessingTickets] = useState<Set<number>>(new Set())
 
     // 🆕 Exchange rates for conversion display
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ JPY: 0.22 }) // Default JPY→TWD
@@ -179,27 +183,53 @@ export default function EditableDailyTips({
     }
 
     const handleRemoveCost = async (idx: number) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingCosts.has(idx)) return
+
         haptic.tap()
-        const updated = localCosts.filter((_, i) => i !== idx)
-        if (await onUpdate("costs", updated)) {
-            setLocalCosts(updated)
-            toast.success("已移除")
+        setProcessingCosts(prev => new Set(prev).add(idx))
+
+        try {
+            const updated = localCosts.filter((_, i) => i !== idx)
+            if (await onUpdate("costs", updated)) {
+                setLocalCosts(updated)
+                toast.success("已移除")
+            }
+        } finally {
+            setProcessingCosts(prev => {
+                const next = new Set(prev)
+                next.delete(idx)
+                return next
+            })
         }
     }
 
     // 🆕 Toggle privacy for costs
     const handleTogglePrivacyCost = async (idx: number) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingCosts.has(idx)) return
+
         haptic.tap()
-        const updated = localCosts.map((c, i) =>
-            i === idx ? {
-                ...c,
-                is_private: !c.is_private,
-                private_owner_id: !c.is_private ? userId : undefined
-            } : c
-        )
-        if (await onUpdate("costs", updated)) {
-            setLocalCosts(updated)
-            toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+        setProcessingCosts(prev => new Set(prev).add(idx))
+
+        try {
+            const updated = localCosts.map((c, i) =>
+                i === idx ? {
+                    ...c,
+                    is_private: !c.is_private,
+                    private_owner_id: !c.is_private ? userId : undefined
+                } : c
+            )
+            if (await onUpdate("costs", updated)) {
+                setLocalCosts(updated)
+                toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+            }
+        } finally {
+            setProcessingCosts(prev => {
+                const next = new Set(prev)
+                next.delete(idx)
+                return next
+            })
         }
     }
 
@@ -218,27 +248,53 @@ export default function EditableDailyTips({
     }
 
     const handleRemoveTicket = async (idx: number) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingTickets.has(idx)) return
+
         haptic.tap()
-        const updated = localTickets.filter((_, i) => i !== idx)
-        if (await onUpdate("tickets", updated)) {
-            setLocalTickets(updated)
-            toast.success("已移除")
+        setProcessingTickets(prev => new Set(prev).add(idx))
+
+        try {
+            const updated = localTickets.filter((_, i) => i !== idx)
+            if (await onUpdate("tickets", updated)) {
+                setLocalTickets(updated)
+                toast.success("已移除")
+            }
+        } finally {
+            setProcessingTickets(prev => {
+                const next = new Set(prev)
+                next.delete(idx)
+                return next
+            })
         }
     }
 
     // 🆕 Toggle privacy for tickets
     const handleTogglePrivacyTicket = async (idx: number) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingTickets.has(idx)) return
+
         haptic.tap()
-        const updated = localTickets.map((t, i) =>
-            i === idx ? {
-                ...t,
-                is_private: !t.is_private,
-                private_owner_id: !t.is_private ? userId : undefined
-            } : t
-        )
-        if (await onUpdate("tickets", updated)) {
-            setLocalTickets(updated)
-            toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+        setProcessingTickets(prev => new Set(prev).add(idx))
+
+        try {
+            const updated = localTickets.map((t, i) =>
+                i === idx ? {
+                    ...t,
+                    is_private: !t.is_private,
+                    private_owner_id: !t.is_private ? userId : undefined
+                } : t
+            )
+            if (await onUpdate("tickets", updated)) {
+                setLocalTickets(updated)
+                toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+            }
+        } finally {
+            setProcessingTickets(prev => {
+                const next = new Set(prev)
+                next.delete(idx)
+                return next
+            })
         }
     }
 
@@ -331,18 +387,37 @@ export default function EditableDailyTips({
                                         <>
                                             <button
                                                 onClick={() => handleTogglePrivacyCost(idx)}
+                                                disabled={processingCosts.has(idx)}
                                                 className={cn(
-                                                    "p-1 transition-all touch-manipulation",
+                                                    "p-1 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                    processingCosts.has(idx) && "opacity-50 cursor-not-allowed",
                                                     cost.is_private
                                                         ? "text-amber-500 hover:text-amber-600"
                                                         : "text-slate-300 hover:text-slate-500"
                                                 )}
                                                 title={cost.is_private ? "設為公開" : "設為私人"}
                                             >
-                                                {cost.is_private ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                                {processingCosts.has(idx) ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : cost.is_private ? (
+                                                    <EyeOff className="w-3 h-3" />
+                                                ) : (
+                                                    <Eye className="w-3 h-3" />
+                                                )}
                                             </button>
-                                            <button onClick={() => handleRemoveCost(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
-                                                <X className="w-3 h-3" />
+                                            <button
+                                                onClick={() => handleRemoveCost(idx)}
+                                                disabled={processingCosts.has(idx)}
+                                                className={cn(
+                                                    "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                    processingCosts.has(idx) && "opacity-50 cursor-not-allowed"
+                                                )}
+                                            >
+                                                {processingCosts.has(idx) ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <X className="w-3 h-3" />
+                                                )}
                                             </button>
                                         </>
                                     )}
@@ -421,18 +496,37 @@ export default function EditableDailyTips({
                                             <>
                                                 <button
                                                     onClick={() => handleTogglePrivacyTicket(idx)}
+                                                    disabled={processingTickets.has(idx)}
                                                     className={cn(
-                                                        "p-1 transition-all touch-manipulation",
+                                                        "p-1 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                        processingTickets.has(idx) && "opacity-50 cursor-not-allowed",
                                                         ticket.is_private
                                                             ? "text-amber-500 hover:text-amber-600"
                                                             : "text-blue-300 hover:text-blue-500"
                                                     )}
                                                     title={ticket.is_private ? "設為公開" : "設為私人"}
                                                 >
-                                                    {ticket.is_private ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                                    {processingTickets.has(idx) ? (
+                                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                                    ) : ticket.is_private ? (
+                                                        <EyeOff className="w-3 h-3" />
+                                                    ) : (
+                                                        <Eye className="w-3 h-3" />
+                                                    )}
                                                 </button>
-                                                <button onClick={() => handleRemoveTicket(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
-                                                    <X className="w-3 h-3" />
+                                                <button
+                                                    onClick={() => handleRemoveTicket(idx)}
+                                                    disabled={processingTickets.has(idx)}
+                                                    className={cn(
+                                                        "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                        processingTickets.has(idx) && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                >
+                                                    {processingTickets.has(idx) ? (
+                                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                                    ) : (
+                                                        <X className="w-3 h-3" />
+                                                    )}
                                                 </button>
                                             </>
                                         )}

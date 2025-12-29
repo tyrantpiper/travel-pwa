@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { CheckSquare, Square, Plus, X, Check, ListChecks, Eye, EyeOff } from "lucide-react"
+import { CheckSquare, Square, Plus, X, Check, ListChecks, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
@@ -39,6 +39,9 @@ export default function EditableDailyChecklist({
     const [isAdding, setIsAdding] = useState(false)
     const [newItemText, setNewItemText] = useState("")
     const [isUpdating, setIsUpdating] = useState(false)
+
+    // 🆕 Per-item processing state for anti-spam
+    const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
 
     // Debounce ref for toggle updates
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -116,7 +119,11 @@ export default function EditableDailyChecklist({
 
     // 刪除項目
     const removeItem = async (id: string) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingItems.has(id)) return
+
         haptic.tap()
+        setProcessingItems(prev => new Set(prev).add(id))
         const newItems = localItems.filter(item => item.id !== id)
         setLocalItems(newItems)
 
@@ -132,12 +139,21 @@ export default function EditableDailyChecklist({
             toast.error("刪除失敗")
         } finally {
             setIsUpdating(false)
+            setProcessingItems(prev => {
+                const next = new Set(prev)
+                next.delete(id)
+                return next
+            })
         }
     }
 
     // 🆕 Toggle privacy for checklist items
     const handleTogglePrivacy = async (id: string) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingItems.has(id)) return
+
         haptic.tap()
+        setProcessingItems(prev => new Set(prev).add(id))
         const newItems = localItems.map(item =>
             item.id === id ? {
                 ...item,
@@ -162,6 +178,11 @@ export default function EditableDailyChecklist({
             toast.error("更新失敗")
         } finally {
             setIsUpdating(false)
+            setProcessingItems(prev => {
+                const next = new Set(prev)
+                next.delete(id)
+                return next
+            })
         }
     }
 
@@ -275,24 +296,34 @@ export default function EditableDailyChecklist({
                                             e.stopPropagation()
                                             handleTogglePrivacy(item.id)
                                         }}
-                                        className={`flex-shrink-0 p-1 rounded transition-colors ${item.is_private
-                                                ? 'text-amber-500 hover:text-amber-600'
-                                                : 'text-indigo-300 hover:text-indigo-500'
+                                        className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
+                                                item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
                                             }`}
-                                        disabled={isUpdating}
+                                        disabled={processingItems.has(item.id) || isUpdating}
                                         title={item.is_private ? "設為公開" : "設為私人"}
                                     >
-                                        {item.is_private ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        {processingItems.has(item.id) ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : item.is_private ? (
+                                            <EyeOff className="w-4 h-4" />
+                                        ) : (
+                                            <Eye className="w-4 h-4" />
+                                        )}
                                     </button>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation()
                                             removeItem(item.id)
                                         }}
-                                        className="flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                                        disabled={isUpdating}
+                                        className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}
+                                        disabled={processingItems.has(item.id) || isUpdating}
                                     >
-                                        <X className="w-4 h-4" />
+                                        {processingItems.has(item.id) ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <X className="w-4 h-4" />
+                                        )}
                                     </button>
                                 </>
                             )}

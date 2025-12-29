@@ -1130,7 +1130,7 @@ export function ItineraryView() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                        <span className="text-xs text-slate-400 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
+                        <span className="text-xs text-slate-400 flex items-center gap-1 ml-2 shrink-0"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
                     </div >
 
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
