@@ -192,7 +192,6 @@ export function ItineraryView() {
                 if (activityLoc) {
                     lat = activityLoc.lat
                     lng = activityLoc.lng
-                    locationName = activityLoc.name
                     // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                 } else if (currentTrip?.title) {
                     // Priority 3: Parse city from trip title
@@ -200,7 +199,6 @@ export function ItineraryView() {
                         if (currentTrip.title.includes(cityName)) {
                             lat = coords.lat
                             lng = coords.lng
-                            locationName = coords.name
                             setCurrentTimezone(coords.timezone)  // 設定時區
                             // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                             break
@@ -699,7 +697,7 @@ export function ItineraryView() {
                             await reloadTrips()
                             haptic.success()
                             toast.success(t('update_success') || "已更新")
-                        } catch (e) {
+                        } catch (_e) {
                             haptic.error()
                             toast.error("更新失敗")
                         }

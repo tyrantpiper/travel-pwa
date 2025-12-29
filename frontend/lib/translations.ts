@@ -12,6 +12,7 @@ export const translations = {
         copy: "Copy",
         copied: "Copied!",
         confirm_delete: "Delete?",
+        update_success: "Updated!",
 
         // Landing Page
         landing_title: "Tabidachi",
@@ -139,6 +140,7 @@ export const translations = {
         copy: "複製",
         copied: "已複製！",
         confirm_delete: "確定刪除？",
+        update_success: "已更新！",
 
         // Landing Page
         landing_title: "Tabidachi",
