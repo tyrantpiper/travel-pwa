@@ -84,8 +84,17 @@ async def get_trips(
 
 
 @router.get("/trips/{trip_id}")
-async def get_trip_by_id(trip_id: str, supabase=Depends(get_supabase)):
-    """🆕 獲取特定行程 (by ID)"""
+async def get_trip_by_id(
+    trip_id: str, 
+    user_id: str = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
+    """🆕 獲取特定行程 (by ID)
+    
+    支援隱私過濾：
+    - 成員：看到所有項目 (包含私人)
+    - 非成員：私人項目會被過濾
+    """
     try:
         # 1. 查詢指定的行程
         trip_res = supabase.table("itineraries").select("*").eq("id", trip_id).execute()
@@ -94,6 +103,12 @@ async def get_trip_by_id(trip_id: str, supabase=Depends(get_supabase)):
             raise HTTPException(status_code=404, detail="Trip not found")
             
         trip = trip_res.data[0]
+        
+        # 🆕 判斷是否為成員 (擁有者或透過 Share Code 加入)
+        is_member = False
+        if user_id:
+            member_res = supabase.table("trip_members").select("user_id").eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
+            is_member = len(member_res.data) > 0
         
         # 2. 抓該行程的所有細項
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()
@@ -123,27 +138,49 @@ async def get_trip_by_id(trip_id: str, supabase=Depends(get_supabase)):
                     "sub_items": item.get("sub_items") or [],
                     "image_url": item.get("image_url")
                 })
+        
+        # 🆕 隱私過濾輔助函數
+        def filter_private_items(items_dict: dict) -> dict:
+            """過濾非成員的私人項目"""
+            if is_member:
+                return items_dict  # 成員看到全部
             
+            filtered = {}
+            for day_key, items_list in items_dict.items():
+                if isinstance(items_list, list):
+                    # 過濾掉 is_private=True 的項目
+                    filtered[day_key] = [
+                        item for item in items_list 
+                        if not item.get("is_private")
+                    ]
+                else:
+                    filtered[day_key] = items_list
+            return filtered
+        
+        # 取得 content 並過濾
+        content = trip.get("content") or {}
+        day_costs = filter_private_items(content.get("day_costs", {}))
+        day_tickets = filter_private_items(content.get("day_tickets", {}))
+        day_checklists = filter_private_items(content.get("day_checklists", {}))
+        
         return {
             "id": trip["id"],
             "title": trip["title"],
             "creator": trip.get("creator_name", "Guest"),
             "start_date": trip["start_date"],
-            "end_date": trip.get("end_date"),  # 🐛 FIX: 補上缺失的 end_date
+            "end_date": trip.get("end_date"),
             "share_code": trip.get("share_code", ""),
             "cover_image": trip.get("cover_image"),
-            # 🚑 修復：先判斷 content 是否為 None，再取值
-            "daily_locations": (trip.get("content") or {}).get("daily_locations", {}),
-            # 🆕 每日提示
-            "day_notes": (trip.get("content") or {}).get("day_notes", {}),
-            "day_costs": (trip.get("content") or {}).get("day_costs", {}),
-            "day_tickets": (trip.get("content") or {}).get("day_tickets", {}),
-            "day_checklists": (trip.get("content") or {}).get("day_checklists", {}),
-            "ai_review": (trip.get("content") or {}).get("ai_review", ""),
-
+            "daily_locations": content.get("daily_locations", {}),
+            "day_notes": content.get("day_notes", {}),
+            "day_costs": day_costs,
+            "day_tickets": day_tickets,
+            "day_checklists": day_checklists,
+            "ai_review": content.get("ai_review", ""),
             "flight_info": trip.get("flight_info") or {},
             "hotel_info": trip.get("hotel_info") or {},
-            "credit_cards": (trip.get("content") or {}).get("credit_cards", []), # 🆕 信用卡資訊
+            "credit_cards": content.get("credit_cards", []),
+            "is_member": is_member,  # 🆕 告訴前端是否為成員
             "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
         }
 

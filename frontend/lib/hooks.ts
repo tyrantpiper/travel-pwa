@@ -22,13 +22,16 @@ export function useTrips(userId: string | null) {
     }
 }
 
-export function useTripDetail(tripId: string | null) {
+export function useTripDetail(tripId: string | null, userId?: string | null) {
     const { data, error, mutate } = useSWR(
-        tripId ? `${API_BASE}/api/trips/${tripId}` : null,
-        fetcher,
+        tripId ? [`/api/trips/${tripId}`, userId || ""] : null,
+        ([url, uid]: [string, string]) =>
+            fetch(API_BASE + url, {
+                headers: uid ? { "X-User-ID": uid } : {}
+            }).then(r => r.json()),
         {
             revalidateOnFocus: false,
-            revalidateOnMount: true  // 🔧 FIX: Always fetch fresh data on page load/refresh
+            revalidateOnMount: true
         }
     )
     return {

@@ -41,8 +41,8 @@ export function ItineraryView() {
     const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading } = useTripContext()
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
-    // Use activeTripId from context
-    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void> }
+    // Use activeTripId from context, pass userId for privacy filtering
+    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId, userId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void> }
     const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -1165,6 +1165,7 @@ export function ItineraryView() {
                     notes={currentTrip?.day_notes?.[day] || []}
                     costs={currentTrip?.day_costs?.[day] || []}
                     tickets={currentTrip?.day_tickets?.[day] || []}
+                    userId={userId || undefined}
                     onUpdate={async (type, data) => {
                         if (!activeTripId) return false
                         try {
@@ -1189,6 +1190,7 @@ export function ItineraryView() {
                     tripId={activeTripId || ""}
                     day={day}
                     items={day === 1 ? [...(currentTrip?.day_checklists?.[0] || []), ...(currentTrip?.day_checklists?.[1] || [])] : (currentTrip?.day_checklists?.[day] || [])}
+                    userId={userId || undefined}
                     onUpdate={async (items) => {
                         if (!activeTripId) return false
                         try {

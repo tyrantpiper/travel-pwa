@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator } from "lucide-react"
+import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
@@ -17,16 +17,20 @@ interface NoteItem {
 
 interface CostItem {
     item: string
-    amount: string  // Keep as string for input flexibility, but parse for total
-    currency?: string // 🆕 Currency support
+    amount: string
+    currency?: string
     note?: string
+    is_private?: boolean
+    private_owner_id?: string
 }
 
 interface TicketItem {
     name: string
     price: string
-    currency?: string // 🆕 Currency support
+    currency?: string
     note?: string
+    is_private?: boolean
+    private_owner_id?: string
 }
 
 interface EditableDailyTipsProps {
@@ -37,6 +41,7 @@ interface EditableDailyTipsProps {
     tickets: TicketItem[]
     onUpdate: (type: "notes" | "costs" | "tickets", data: NoteItem[] | CostItem[] | TicketItem[]) => Promise<boolean>
     readOnly?: boolean
+    userId?: string  // 🆕 For tracking who set privacy
 }
 
 // Constants
@@ -51,7 +56,8 @@ export default function EditableDailyTips({
     costs,
     tickets,
     onUpdate,
-    readOnly = false
+    readOnly = false,
+    userId
 }: EditableDailyTipsProps) {
     const haptic = useHaptic()
 
@@ -181,6 +187,22 @@ export default function EditableDailyTips({
         }
     }
 
+    // 🆕 Toggle privacy for costs
+    const handleTogglePrivacyCost = async (idx: number) => {
+        haptic.tap()
+        const updated = localCosts.map((c, i) =>
+            i === idx ? {
+                ...c,
+                is_private: !c.is_private,
+                private_owner_id: !c.is_private ? userId : undefined
+            } : c
+        )
+        if (await onUpdate("costs", updated)) {
+            setLocalCosts(updated)
+            toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+        }
+    }
+
     // Tickets
     const handleAddTicket = async () => {
         if (!newTicket.name.trim() || !newTicket.price.trim()) { toast.error("請輸入票券名稱和價格"); return }
@@ -201,6 +223,22 @@ export default function EditableDailyTips({
         if (await onUpdate("tickets", updated)) {
             setLocalTickets(updated)
             toast.success("已移除")
+        }
+    }
+
+    // 🆕 Toggle privacy for tickets
+    const handleTogglePrivacyTicket = async (idx: number) => {
+        haptic.tap()
+        const updated = localTickets.map((t, i) =>
+            i === idx ? {
+                ...t,
+                is_private: !t.is_private,
+                private_owner_id: !t.is_private ? userId : undefined
+            } : t
+        )
+        if (await onUpdate("tickets", updated)) {
+            setLocalTickets(updated)
+            toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
         }
     }
 
@@ -273,17 +311,40 @@ export default function EditableDailyTips({
 
                     <div className="flex-1 space-y-2">
                         {localCosts.map((cost, idx) => (
-                            <div key={idx} className="flex justify-between items-center text-sm border-b border-slate-100 dark:border-slate-700 last:border-0 pb-2 last:pb-0 group">
-                                <span className="text-slate-600 dark:text-slate-400 font-medium">{cost.item}</span>
+                            <div
+                                key={idx}
+                                className={cn(
+                                    "flex justify-between items-center text-sm border-b border-slate-100 dark:border-slate-700 last:border-0 pb-2 last:pb-0 group",
+                                    cost.is_private && "opacity-60 border-dashed"
+                                )}
+                            >
+                                <span className="text-slate-600 dark:text-slate-400 font-medium">
+                                    {cost.is_private && <EyeOff className="w-3 h-3 inline mr-1 text-slate-400" />}
+                                    {cost.item}
+                                </span>
                                 <div className="flex items-center gap-2">
                                     <div className="text-right">
                                         <div className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(cost.amount, cost.currency)}</div>
                                         {cost.note && <div className="text-[10px] text-slate-400">{cost.note}</div>}
                                     </div>
                                     {!readOnly && (
-                                        <button onClick={() => handleRemoveCost(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
-                                            <X className="w-3 h-3" />
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => handleTogglePrivacyCost(idx)}
+                                                className={cn(
+                                                    "p-1 transition-all touch-manipulation",
+                                                    cost.is_private
+                                                        ? "text-amber-500 hover:text-amber-600"
+                                                        : "text-slate-300 hover:text-slate-500"
+                                                )}
+                                                title={cost.is_private ? "設為公開" : "設為私人"}
+                                            >
+                                                {cost.is_private ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                            </button>
+                                            <button onClick={() => handleRemoveCost(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -342,15 +403,38 @@ export default function EditableDailyTips({
 
                     <div className="flex-1 space-y-2">
                         {localTickets.map((ticket, idx) => (
-                            <div key={idx} className="bg-white/60 dark:bg-slate-800/60 rounded-lg p-2 text-sm border border-blue-100 dark:border-blue-800 group">
+                            <div
+                                key={idx}
+                                className={cn(
+                                    "bg-white/60 dark:bg-slate-800/60 rounded-lg p-2 text-sm border border-blue-100 dark:border-blue-800 group",
+                                    ticket.is_private && "opacity-60 border-dashed"
+                                )}
+                            >
                                 <div className="font-bold text-slate-800 dark:text-slate-200 flex justify-between">
-                                    <span>{ticket.name}</span>
+                                    <span>
+                                        {ticket.is_private && <EyeOff className="w-3 h-3 inline mr-1 text-blue-400" />}
+                                        {ticket.name}
+                                    </span>
                                     <div className="flex items-center gap-2">
                                         <span className="text-blue-600 dark:text-blue-400">{formatCurrency(ticket.price, ticket.currency)}</span>
                                         {!readOnly && (
-                                            <button onClick={() => handleRemoveTicket(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
-                                                <X className="w-3 h-3" />
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => handleTogglePrivacyTicket(idx)}
+                                                    className={cn(
+                                                        "p-1 transition-all touch-manipulation",
+                                                        ticket.is_private
+                                                            ? "text-amber-500 hover:text-amber-600"
+                                                            : "text-blue-300 hover:text-blue-500"
+                                                    )}
+                                                    title={ticket.is_private ? "設為公開" : "設為私人"}
+                                                >
+                                                    {ticket.is_private ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                                </button>
+                                                <button onClick={() => handleRemoveTicket(idx)} className="p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>

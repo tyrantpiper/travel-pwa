@@ -112,8 +112,12 @@ export const tripsApi = {
     },
 
     /** Get a single trip by ID */
-    get: async (tripId: string) => {
-        const res = await fetch(`${API.TRIPS}/${tripId}`)
+    get: async (tripId: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) {
+            headers["X-User-ID"] = userId
+        }
+        const res = await fetch(`${API.TRIPS}/${tripId}`, { headers })
         if (!res.ok) throw new Error("Failed to fetch trip")
         return res.json()
     },
