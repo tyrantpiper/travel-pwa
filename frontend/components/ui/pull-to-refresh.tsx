@@ -29,11 +29,19 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     const handleTouchMove = useCallback((e: React.TouchEvent) => {
         if (!isPulling.current || isRefreshing) return
 
+        // 🔧 FIX: Strictly check if we're still at the very top
+        // If user has scrolled down at all, cancel the pull gesture entirely
+        if (!containerRef.current || containerRef.current.scrollTop > 0) {
+            isPulling.current = false
+            setPullDistance(0)
+            return
+        }
+
         const currentY = e.touches[0].clientY
         const diff = currentY - startY.current
 
-        // Only allow pull down (positive diff)
-        if (diff > 0 && containerRef.current && containerRef.current.scrollTop <= 0) {
+        // Only allow pull down (positive diff) when at top
+        if (diff > 0) {
             // Add resistance
             const resistance = diff > pullThreshold ? 0.3 : 0.5
             const newDistance = Math.min(diff * resistance, pullThreshold * 1.5)
@@ -43,6 +51,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             if (diff > 10) {
                 e.preventDefault()
             }
+        } else {
+            // User is trying to scroll down (negative diff), cancel pull mode
+            isPulling.current = false
+            setPullDistance(0)
         }
     }, [isRefreshing, pullThreshold])
 
