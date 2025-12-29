@@ -37,7 +37,12 @@ async def parse_markdown(
     try:
         prompt = f"""
         你是一個專業的旅遊資料分析師。請「完整」分析 Markdown 行程表，轉換為結構化 JSON。
-        ⚠️ 重要：請勿遺漏任何表格、注意事項、花費、票券資訊！
+        
+        ⚠️ **黃金規則：完整保留，絕不省略**
+        - 輸入有 N 個活動/地點 = 輸出必須有 N 個 items
+        - 禁止使用「其他」「等等」「...」省略內容
+        - 每一行有意義的活動都必須獨立成為一個 item
+        - 如果擔心太長，仍然全部輸出，絕不刪減
         
         Markdown 內容：
         {request.markdown_text}
@@ -45,49 +50,68 @@ async def parse_markdown(
         任務：
         1. **解析詳細行程 (items)**
            - 每個時間點的活動都要抓取
+           - 有多少個地點就輸出多少個 items
            
-        2. **🔑 智慧分類：desc vs memo**
-           你需要智慧判斷資訊應該放在哪個欄位：
+        2. **🔑 智慧分類：desc vs memo（重要！）**
            
-           **desc (精華重點)** ← 一眼就能看到的精華
-           - 長度限制：< 30 字
-           - 放什麼：最重要的一句話、必吃必買標記、關鍵提醒
-           - 範例：「必吃！排隊名店」「預約制」「Day Pass 起點」「網美打卡點」
+           **desc (直接可見的備註)** ← 用戶不用點開就能看到！
+           - 長度建議：≤ 50 字
+           - 優先放：「必吃」「必買」「推薦」「限定」「預約制」「排隊」等提醒
+           - 範例：「必吃！招牌拉麵」「預約制，記得提前預訂」「限定版要早去」
            
-           **memo (詳細備忘)** ← 需要展開才看到的細節
-           - 長度限制：無限制
-           - 放什麼：較長的說明、路線指引、營業時間、預約資訊
-           - 範例：「從押上站 B3 出口右轉直走 2 分鐘，看到 7-11 左轉」「營業 10:00-22:00，週三公休」「建議提前 30 分到場排隊」
+           **memo (需點開的備忘錄)** ← 詳細說明，需要點入查看
+           - 長度：無限制
+           - 放什麼：路線指引、營業時間、Wi-Fi 密碼、門鎖密碼、詳細說明
+           - 範例：「從押上站 B3 出口右轉直走 2 分鐘，看到 7-11 左轉」
            
            **判斷原則**：
-           - 「一句話精華」→ desc
-           - 「需要花時間讀的細節」→ memo
-           - 如果兩者都有，精華放 desc，細節放 memo
+           - 「一眼重點、關鍵提醒」→ desc（讓用戶直接看到！）
+           - 「需要仔細閱讀的細節」→ memo
+           - 如果兩者都有，短的放 desc，長的放 memo
+           - 寧可放 desc 也不要遺漏重要提醒
         
-        3. **關鍵：連結優先 (Link Priority)**
-           - 如果 Markdown 中的地點有超連結 (例如 `[地點名](https://maps...)`)，請務必將該網址提取到 `link_url` 欄位
-           - 這是最高優先級的導航依據
+        3. **🔗 URL 智慧分類（新規則！）**
+           當一個地點有多個 URL 時：
+           
+           **link_url** (導航按鈕用)：
+           - 優先放 Google Maps 連結
+           - 格式：google.com/maps, goo.gl/maps, maps.app.goo.gl
+           - 只放一個最重要的導航用 URL
+           
+           **sub_items** (收集其他連結)：
+           - 官方網站、訂位網站 (tabelog, hotpepper, gurunavi)
+           - IG、部落格、其他參考連結
+           - 格式：{{ "name": "Tabelog", "desc": "評分 4.2", "link": "https://..." }}
+           
+           範例輸出：
+           {{
+               "link_url": "https://maps.google.com/...",
+               "sub_items": [
+                   {{"name": "官網", "link": "https://ichiran.com"}},
+                   {{"name": "Tabelog", "desc": "4.2分", "link": "https://tabelog.com/..."}}
+               ]
+           }}
         
-        4. **關鍵：地理資訊 (Location)**
-           - 即使有連結，還是請提供 `lat`, `lng` 作為地圖標記備用
+        4. **地理資訊 (Location)**
+           - 即使有 link_url，還是請提供 `lat`, `lng` 作為地圖標記備用
            - 如果是「飛機上」、「家中」，lat/lng 請給 null
            - `place_name` 請使用「Google Maps 上的正式店名」
         
-        5. **關鍵：附屬表格 (Sub Items)**
+        5. **附屬表格 (Sub Items)**
            - 請精準抓取行程下方的表格 (如超市排名)，解析為 `sub_items`
-           - `sub_items` 格式: {{ "name": "店名", "desc": "特色/說明", "link": "連結" }}
+           - sub_items 也用於收集多個連結
         
-        6. **🆕 關鍵：每日注意事項 (Day Notes)**
-           - 抓取「注意事項」表格，包含重點提醒如入境時間、交通轉乘、出站指引等
+        6. **每日注意事項 (Day Notes)**
+           - 抓取「注意事項」表格
            - 格式: `day_notes`: {{ "day_number": [ {{ "icon": "⚠️", "title": "標題", "content": "內容" }} ] }}
         
-        7. **🆕 關鍵：每日預估花費 (Day Costs)**
-           - 抓取「預估花費」表格的每個項目和金額
-           - 格式: `day_costs`: {{ "day_number": [ {{ "item": "交通", "amount": "¥1,200", "note": "備註" }} ] }}
+        7. **每日預估花費 (Day Costs)**
+           - 抓取「預估花費」表格
+           - 格式: `day_costs`: {{ "day_number": [ {{ "item": "交通", "amount": "¥1,200", "note": "" }} ] }}
         
-        8. **🆕 關鍵：交通票券 (Day Tickets)**
-           - 抓取「交通票券」區塊的票券資訊
-           - 格式: `day_tickets`: {{ "day_number": [ {{ "name": "京成 ACCESS特急", "price": "¥1,200", "note": "單程，刷 IC" }} ] }}
+        8. **交通票券 (Day Tickets)**
+           - 抓取「交通票券」區塊
+           - 格式: `day_tickets`: {{ "day_number": [ {{ "name": "ACCESS特急", "price": "¥1,200", "note": "刷 IC" }} ] }}
         
         9. 每日主要城市 (daily_locations): 判斷每一天的主要城市中心點
         
@@ -108,6 +132,13 @@ async def parse_markdown(
         13. **行程標題**
             - 從 Markdown 標題推斷行程名稱
 
+        14. **📋 輸出前自我檢查**
+            □ items 總數 ≥ Markdown 中可識別的活動數量
+            □ 重要提醒（必吃/預約/限定）→ desc 有內容
+            □ 詳細說明 → memo 有內容
+            □ 所有 URL 都已分類（地圖→link_url，其他→sub_items）
+            □ 沒有「其他」「等」「...」等省略用語
+
         回傳 JSON 格式範例:
         {{
             "title": "2026 東京×橫濱 15日遊",
@@ -117,18 +148,18 @@ async def parse_markdown(
                 {{ 
                     "day_number": 1, 
                     "time_slot": "10:00", 
-                    "place_name": "三谷ビル", 
-                    "category": "hotel",
-                    "desc": "民宿 Check-in",
-                    "memo": "從押上站 B3 出口出來右轉直走約 2 分鐘",
-                    "lat": 35.123, 
-                    "lng": 139.123,
-                    "original_name": "", 
-                    "tags": ["預約"], 
-                    "cost_amount": 0, 
-                    "reservation_code": "",
+                    "place_name": "一蘭拉麵 上野店", 
+                    "category": "food",
+                    "desc": "必吃！24H營業，深夜去避開排隊",
+                    "memo": "從上野站廣小路口出來左轉直走 3 分鐘",
+                    "lat": 35.71, 
+                    "lng": 139.77,
+                    "tags": ["必吃"], 
                     "link_url": "https://maps.google.com/...",
-                    "sub_items": []
+                    "sub_items": [
+                        {{"name": "官網", "link": "https://ichiran.com"}},
+                        {{"name": "Tabelog", "desc": "3.8分", "link": "https://tabelog.com/..."}}
+                    ]
                 }}
             ],
             "daily_locations": {{
@@ -136,14 +167,12 @@ async def parse_markdown(
             }},
             "day_notes": {{
                 "1": [
-                    {{ "icon": "✈️", "title": "機場入境", "content": "成田機場入境約需 1.5-2 小時" }},
-                    {{ "icon": "🚇", "title": "ACCESS特急", "content": "搭 ACCESS特急直達押上，車程 58 分" }}
+                    {{ "icon": "✈️", "title": "機場入境", "content": "成田機場入境約需 1.5-2 小時" }}
                 ]
             }},
             "day_costs": {{
                 "1": [
-                    {{ "item": "交通", "amount": "¥1,200", "note": "" }},
-                    {{ "item": "宵夜", "amount": "¥1,000-2,000", "note": "" }}
+                    {{ "item": "交通", "amount": "¥1,200", "note": "" }}
                 ]
             }},
             "day_tickets": {{
@@ -153,7 +182,7 @@ async def parse_markdown(
             }}
         }}
         
-        只回傳 JSON，不要 Markdown 標記。請確保所有表格資訊都被解析到！
+        只回傳 JSON，不要 Markdown 標記。請確保所有活動和表格資訊都被完整解析！
         """
         
         # 使用統一的 Model Manager
