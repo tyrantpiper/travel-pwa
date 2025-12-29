@@ -71,6 +71,7 @@ async def get_trips(
                 trip['day_costs'] = content.get('day_costs', {})
                 trip['day_tickets'] = content.get('day_tickets', {})
                 trip['day_checklists'] = content.get('day_checklists', {})
+                trip['ai_review'] = content.get('ai_review', "")
                 trip['credit_cards'] = content.get('credit_cards', [])
                 trips.append(trip)
         
@@ -138,6 +139,7 @@ async def get_trip_by_id(trip_id: str, supabase=Depends(get_supabase)):
             "day_costs": (trip.get("content") or {}).get("day_costs", {}),
             "day_tickets": (trip.get("content") or {}).get("day_tickets", {}),
             "day_checklists": (trip.get("content") or {}).get("day_checklists", {}),
+            "ai_review": (trip.get("content") or {}).get("ai_review", ""),
 
             "flight_info": trip.get("flight_info") or {},
             "hotel_info": trip.get("hotel_info") or {},
@@ -399,7 +401,9 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
                 "daily_locations": request.daily_locations,
                 "day_notes": request.day_notes,
                 "day_costs": request.day_costs,
-                "day_tickets": request.day_tickets
+                "day_tickets": request.day_tickets,
+                "day_checklists": request.day_checklists,
+                "ai_review": request.ai_review
             }
         }
         
@@ -523,7 +527,9 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
             # 🆕 以下使用深度追加合併，支援分批匯入
             "day_notes": deep_merge_day_arrays(existing_content.get("day_notes"), request.day_notes),
             "day_costs": deep_merge_day_arrays(existing_content.get("day_costs"), request.day_costs),
-            "day_tickets": deep_merge_day_arrays(existing_content.get("day_tickets"), request.day_tickets)
+            "day_tickets": deep_merge_day_arrays(existing_content.get("day_tickets"), request.day_tickets),
+            "day_checklists": deep_merge_day_arrays(existing_content.get("day_checklists"), request.day_checklists),
+            "ai_review": request.ai_review if request.ai_review else existing_content.get("ai_review")
         }
         
         # 3. 更新主行程 content

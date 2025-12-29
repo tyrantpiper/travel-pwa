@@ -86,6 +86,8 @@ class SaveItineraryRequest(BaseModel):
     day_notes: Optional[dict] = {}
     day_costs: Optional[dict] = {}
     day_tickets: Optional[dict] = {}
+    day_checklists: Optional[dict] = {}
+    ai_review: Optional[str] = None
 
 
 class JoinTripRequest(BaseModel):
@@ -140,6 +142,8 @@ class ImportToTripRequest(BaseModel):
     day_notes: Optional[dict] = {}
     day_costs: Optional[dict] = {}
     day_tickets: Optional[dict] = {}
+    day_checklists: Optional[dict] = {}
+    ai_review: Optional[str] = None
 
 
 # === Day 管理模型 ===

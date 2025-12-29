@@ -18,6 +18,33 @@ from models.base import (
 from utils.deps import get_gemini_key
 from utils.ai_config import PRIMARY_MODEL
 from services.geocode_service import geocode_place
+import uuid
+
+def process_checklists(checklists):
+    """將 AI 輸出的清單轉換為前端格式 (增加 ID)"""
+    if not checklists:
+        return {}
+    
+    processed = {}
+    for day, items in checklists.items():
+        new_items = []
+        for item in items:
+            # AI 可能輸出 { "item": "...", "status": ... }
+            # 前端需要 { "id": "...", "text": "...", "checked": ... }
+            text = item.get("item") or item.get("text", "")
+            checked = item.get("status") if "status" in item else item.get("checked", False)
+            note = item.get("note", "")
+            
+            if note:
+                text = f"{text} ({note})"
+            
+            new_items.append({
+                "id": str(uuid.uuid4()),
+                "text": text,
+                "checked": bool(checked)
+            })
+        processed[day] = new_items
+    return processed
 
 router = APIRouter(prefix="/api", tags=["ai"])
 
@@ -115,28 +142,39 @@ async def parse_markdown(
         
         9. 每日主要城市 (daily_locations): 判斷每一天的主要城市中心點
         
-        10. 分類 category 請用小寫英文:
+        10. **行前清單 (Pre-trip Checklist)**
+           - 抓取「行前準備」、「攜帶清單」等表格或列表
+           - 格式: `day_checklists`: {{ "0": [ {{ "item": "網卡", "status": false, "note": "買吃到飽" }} ] }}
+           - Key 使用 "0" 代表行前
+        
+        11. **深度行程審核 (Deep Review)**
+           - 發揮你的邏輯推理，審核行程順暢度、路線合理性、營業時間(週幾公休)隱憂
+           - 輸出一份「AI 深度審核報告」，給出具體建議
+           - 格式: `ai_review`: "這份行程的優點是... 但第三天移動距離過長..."
+        
+        12. 分類 category 請用小寫英文:
            - 'transport': 機場、車站、租車、搭車移動
            - 'food': 餐廳、咖啡廳、超商、小吃
            - 'hotel': 住宿、飯店、民宿
            - 'shopping': 購物中心、商店街、藥妝店
            - 'sightseeing': 景點、神社、公園
         
-        11. 如果有 "必吃"、"預約"、"推薦" 等關鍵字，放入 tags 陣列
+        13. 如果有 "必吃"、"預約"、"推薦" 等關鍵字，放入 tags 陣列
         
-        12. **日期解析**
+        14. **日期解析**
             - 從 Markdown 中找出開始日期和結束日期
             - 「Day 1 (2/2)」→ start_date: "2026-02-02"
             - 沒有年份則預設 2026 年
         
-        13. **行程標題**
+        15. **行程標題**
             - 從 Markdown 標題推斷行程名稱
 
-        14. **📋 輸出前自我檢查**
+        16. **📋 輸出前自我檢查**
             □ items 總數 ≥ Markdown 中可識別的活動數量
             □ 重要提醒（必吃/預約/限定）→ desc 有內容
             □ 詳細說明 → memo 有內容
             □ 所有 URL 都已分類（地圖→link_url，其他→sub_items）
+            □ 行前清單與深度審核都有輸出
             □ 沒有「其他」「等」「...」等省略用語
 
         回傳 JSON 格式範例:
@@ -179,7 +217,13 @@ async def parse_markdown(
                 "1": [
                     {{ "name": "京成 ACCESS特急", "price": "¥1,200", "note": "單程，刷 IC" }}
                 ]
-            }}
+            }},
+            "day_checklists": {{
+                "0": [
+                    {{ "item": "護照", "status": false, "note": "效期需大於6個月" }}
+                ]
+            }},
+            "ai_review": "整體行程安排非常順暢，特別是第二天的..."
         }}
         
         只回傳 JSON，不要 Markdown 標記。請確保所有活動和表格資訊都被完整解析！
@@ -218,7 +262,10 @@ async def parse_markdown(
             "daily_locations": parsed_data.get("daily_locations", {}),
             "day_notes": parsed_data.get("day_notes", {}),
             "day_costs": parsed_data.get("day_costs", {}),
-            "day_tickets": parsed_data.get("day_tickets", {})
+            "day_tickets": parsed_data.get("day_tickets", {}),
+            "day_tickets": parsed_data.get("day_tickets", {}),
+            "day_checklists": process_checklists(parsed_data.get("day_checklists", {})),
+            "ai_review": parsed_data.get("ai_review", "")
         }
         
     except Exception as e:

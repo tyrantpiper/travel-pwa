@@ -68,6 +68,8 @@ interface ParseResult {
     day_notes?: Record<string, Record<string, unknown>>
     day_costs?: Record<string, Record<string, unknown>>
     day_tickets?: Record<string, Record<string, unknown>>
+    day_checklists?: Record<string, Record<string, unknown>>
+    ai_review?: string
 }
 
 interface GenerateResult {
@@ -80,6 +82,8 @@ interface GenerateResult {
     day_notes?: Record<string, Record<string, unknown>>
     day_costs?: Record<string, Record<string, unknown>>
     day_tickets?: Record<string, Record<string, unknown>>
+    day_checklists?: Record<string, Record<string, unknown>>
+    ai_review?: string
 }
 
 // 🆕 v3.8: 信用卡回饋功能
@@ -539,7 +543,9 @@ export function ToolsView() {
                         daily_locations: result.daily_locations || {}, // 🆕 傳遞每日地點
                         day_notes: result.day_notes || {},
                         day_costs: result.day_costs || {},
-                        day_tickets: result.day_tickets || {}
+                        day_tickets: result.day_tickets || {},
+                        day_checklists: result.day_checklists || {},
+                        ai_review: result.ai_review
                     })
                 })
                 const data = await response.json()
@@ -564,7 +570,9 @@ export function ToolsView() {
                         daily_locations: result.daily_locations || {},
                         day_notes: result.day_notes || {},
                         day_costs: result.day_costs || {},
-                        day_tickets: result.day_tickets || {}
+                        day_tickets: result.day_tickets || {},
+                        day_checklists: result.day_checklists || {},
+                        ai_review: result.ai_review
                     })
                 })
                 const data = await response.json()

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Sparkles } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -100,6 +100,11 @@ export function ItineraryView() {
         // 🐛 FIX: Backend stores keys as strings ("1", "2"), but frontend uses numbers (1, 2)
         // Convert string keys to number keys to ensure dailyLocs[day] works correctly
         if (currentTrip) {
+            console.log("🔍 DEBUG: currentTrip Content Dump:", {
+                checklist: currentTrip.day_checklists,
+                review: currentTrip.ai_review
+            })
+
             const rawLocs = currentTrip.daily_locations || {}
             console.log("🔍 DEBUG: currentTrip.daily_locations =", JSON.stringify(rawLocs))
             const normalizedLocs: Record<number, DailyLocation> = {}
@@ -1120,6 +1125,18 @@ export function ItineraryView() {
                     </div>
                 </div >
 
+                {/* 🤖 AI Review (Only on Day 1) */}
+                {day === 1 && currentTrip?.ai_review && (
+                    <div className="mx-6 mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-xl shadow-sm">
+                        <h3 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-indigo-600" /> AI 深度審核報告
+                        </h3>
+                        <div className="text-sm text-indigo-800 whitespace-pre-wrap leading-relaxed">
+                            {currentTrip.ai_review}
+                        </div>
+                    </div>
+                )}
+
 
 
                 <EditableDailyTips
@@ -1152,13 +1169,24 @@ export function ItineraryView() {
                     key={`checklist-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
-                    items={currentTrip?.day_checklists?.[day] || []}
+                    items={day === 1 ? [...(currentTrip?.day_checklists?.[0] || []), ...(currentTrip?.day_checklists?.[1] || [])] : (currentTrip?.day_checklists?.[day] || [])}
                     onUpdate={async (items) => {
                         if (!activeTripId) return false
                         try {
+                            // 1. 儲存當前天數的清單
                             await tripsApi.updateDayData(activeTripId, day, {
                                 day_checklists: { [day]: items }
                             })
+
+                            // 2. ⚡ 殭屍清除邏輯：如果是在 Day 1 編輯，且 Day 0 有資料，須將 Day 0 清空
+                            const hasDay0Items = (currentTrip?.day_checklists?.[0]?.length || 0) > 0
+                            if (day === 1 && hasDay0Items) {
+                                console.log("🧹 Detecting Day 0 items after merge, clearing Day 0...")
+                                await tripsApi.updateDayData(activeTripId, 0, {
+                                    day_checklists: { "0": [] }
+                                })
+                            }
+
                             await reloadTripDetail()
                             return true
                         } catch (e) {

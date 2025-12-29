@@ -107,6 +107,7 @@ export interface Trip {
     day_costs?: Record<number, CostItem[]>
     day_tickets?: Record<number, TicketItem[]>
     day_checklists?: Record<number, { id: string; text: string; checked: boolean }[]>
+    ai_review?: string
 }
 
 export interface GeocodeResult {
