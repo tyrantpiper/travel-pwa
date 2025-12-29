@@ -88,10 +88,18 @@ export default function POIDetailDrawer({
         window.open(url, "_blank")
     }
 
-    // 深層連結：Google Image 搜尋
+    // 深層連結：Google Image 搜尋（包含位置資訊）
     const handleViewPhotos = () => {
         haptic.tap()
-        const query = encodeURIComponent(`${poi.name}`)
+        // 優先用地址，其次用坐標（給 Google 提示是日本的店）
+        let locationHint = ''
+        if (poi.address) {
+            locationHint = poi.address.split(',')[0]
+        } else if (poi.lat && poi.lng) {
+            // 無地址時，用日本地理提示讓 Google 搜尋日本結果
+            locationHint = '日本 Japan'
+        }
+        const query = encodeURIComponent(`${poi.name} ${locationHint}`.trim())
         const url = `https://www.google.com/search?tbm=isch&q=${query}`
         window.open(url, "_blank")
     }
@@ -376,7 +384,8 @@ export default function POIDetailDrawer({
                                     </Button>
                                     <Button
                                         onClick={() => {
-                                            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`
+                                            // 使用精確坐標開啟 Google Maps
+                                            const url = `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`
                                             window.open(url, "_blank")
                                         }}
                                         variant="ghost"
