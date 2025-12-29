@@ -691,107 +691,128 @@ export function ItineraryView() {
 
     if (viewMode === 'list') {
         return (
-            <div className="flex flex-col min-h-screen bg-stone-50 px-6 py-12 pb-32">
-                <header className="mb-8">
-                    <h1 className="text-3xl font-serif text-slate-900 mb-2">{t('my_trips')}</h1>
-                    <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
-                </header>
+            <div className="flex flex-col h-[100dvh] bg-stone-50 overflow-hidden">
+                <PullToRefresh
+                    className="flex-1 px-6 py-12 pb-32"
+                    onRefresh={async () => {
+                        try {
+                            await reloadTrips()
+                            haptic.success()
+                            toast.success(t('update_success') || "已更新")
+                        } catch (e) {
+                            haptic.error()
+                            toast.error("更新失敗")
+                        }
+                    }}
+                >
+                    <header className="mb-8">
+                        <h1 className="text-3xl font-serif text-slate-900 mb-2">{t('my_trips')}</h1>
+                        <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
+                    </header>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                    <CreateTripModal
-                        isOpen={isCreateOpen}
-                        onOpenChange={setIsCreateOpen}
-                        userId={userId || ""}
-                        onSuccess={() => {
-                            reloadTrips()
-                            // Double check to ensure consistency
-                            setTimeout(() => reloadTrips(), 500)
-                        }}
-                    />
-                    <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
-                </div>
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                        <CreateTripModal
+                            isOpen={isCreateOpen}
+                            onOpenChange={setIsCreateOpen}
+                            userId={userId || ""}
+                            onSuccess={() => {
+                                reloadTrips()
+                                setTimeout(() => reloadTrips(), 500)
+                            }}
+                        />
+                        <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
+                    </div>
 
-                <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="text-red-600 flex items-center gap-2">
-                                <AlertCircle className="w-5 h-5" />
-                                {t('confirm_delete')}
-                            </DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <p className="text-slate-600">
-                                確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: Trip) => t.id === deletingTripId)?.title}</span> 嗎？
-                            </p>
-                            <p className="text-sm text-slate-500 mt-2">此操作無法復原，所有相關資料將會遺失。</p>
-                        </div>
-                        <div className="flex justify-end gap-3">
-                            <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
-                            <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
-                                {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />刪除中...</> : t('delete')}
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-
-                <div className="space-y-4">
-                    {/* 載入中骨架屏 */}
-                    {isTripsLoading && (
-                        <>
-                            <TripCardSkeleton />
-                            <TripCardSkeleton />
-                            <TripCardSkeleton />
-                        </>
-                    )}
-
-                    {/* 實際 Trip 列表 */}
-                    {!isTripsLoading && trips.map((trip: Trip) => (
-                        <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
-                            <div className="absolute top-2 right-2 z-20">
-                                {/* 擁有者顯示刪除按鈕 */}
-                                {userId && trip.created_by === userId && (
-                                    <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}>
-                                        <Trash2 className="w-4 h-4 text-white" />
-                                    </Button>
-                                )}
+                    <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
+                        <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                                <DialogTitle className="text-red-600 flex items-center gap-2">
+                                    <AlertCircle className="w-5 h-5" />
+                                    {t('confirm_delete')}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <p className="text-slate-600">
+                                    確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: Trip) => t.id === deletingTripId)?.title}</span> 嗎？
+                                </p>
+                                <p className="text-sm text-slate-500 mt-2">此操作無法復原，所有相關資料將會遺失。</p>
                             </div>
-                            <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
-                                <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
-                                    {trip.cover_image ? (
-                                        <div className="relative w-full h-full">
-                                            <Image src={trip.cover_image} alt="cover" fill className="object-cover opacity-80" unoptimized />
-                                        </div>
-                                    ) : (
-                                        <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
-                                    )}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                    <div className="absolute bottom-4 left-4 text-white">
-                                        <h3 className="font-bold text-lg">{trip.title}</h3>
-                                        <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}</p>
-                                    </div>
-                                    <div className="absolute top-3 right-12 bg-white/20 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1"><Hash className="w-3 h-3" /> {trip.share_code}</div>
-                                </div>
-                                <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
-                                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
-                                    {/* 退出行程按鈕 (僅限非擁有者) */}
-                                    {userId && trip.created_by !== userId && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleLeaveTrip(trip.id)
-                                            }}
-                                        >
-                                            <LogOut className="w-3 h-3" /> 退出
+                            <div className="flex justify-end gap-3">
+                                <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
+                                <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
+                                    {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />刪除中...</> : t('delete')}
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                    <div className="space-y-4">
+                        {/* 載入中骨架屏 */}
+                        {isTripsLoading && (
+                            <>
+                                <TripCardSkeleton />
+                                <TripCardSkeleton />
+                                <TripCardSkeleton />
+                            </>
+                        )}
+
+                        {/* 實際 Trip 列表 */}
+                        {!isTripsLoading && trips.length === 0 && (
+                            <div className="text-center py-20 bg-white/50 rounded-xl border-2 border-dashed border-slate-200">
+                                <div className="text-slate-400 mb-2 text-lg">📭</div>
+                                <p className="text-slate-500">尚無行程</p>
+                                <p className="text-xs text-slate-400 mt-1">點擊上方按鈕建立新行程</p>
+                            </div>
+                        )}
+
+                        {!isTripsLoading && trips.map((trip: Trip) => (
+                            <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
+                                <div className="absolute top-2 right-2 z-20">
+                                    {/* 擁有者顯示刪除按鈕 */}
+                                    {userId && trip.created_by === userId && (
+                                        <Button variant="destructive" size="icon" className="w-8 h-8 rounded-full shadow-md bg-red-500 hover:bg-red-600 border border-white/20" onClick={(e) => { e.stopPropagation(); handleDeleteTrip(trip.id) }}>
+                                            <Trash2 className="w-4 h-4 text-white" />
                                         </Button>
                                     )}
                                 </div>
-                            </div>
-                        </Card>
-                    ))}
-                </div>
+                                <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
+                                    <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
+                                        {trip.cover_image ? (
+                                            <div className="relative w-full h-full">
+                                                <Image src={trip.cover_image} alt="cover" fill className="object-cover opacity-80" unoptimized />
+                                            </div>
+                                        ) : (
+                                            <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                        <div className="absolute bottom-4 left-4 text-white">
+                                            <h3 className="font-bold text-lg">{trip.title}</h3>
+                                            <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}</p>
+                                        </div>
+                                        <div className="absolute top-3 right-12 bg-white/20 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1"><Hash className="w-3 h-3" /> {trip.share_code}</div>
+                                    </div>
+                                    <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
+                                        <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
+                                        {/* 退出行程按鈕 (僅限非擁有者) */}
+                                        {userId && trip.created_by !== userId && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    handleLeaveTrip(trip.id)
+                                                }}
+                                            >
+                                                <LogOut className="w-3 h-3" /> 退出
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </PullToRefresh>
             </div>
         )
     }
