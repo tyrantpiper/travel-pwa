@@ -197,35 +197,54 @@ export default function FullscreenMapModal({
         setAiSearching(true)
         try {
             const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/poi/ai-enrich`,
+                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/ai/smart-search`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        name: query,
-                        type: "semantic_search",
+                        query,
                         lat: initialViewState.latitude,
                         lng: initialViewState.longitude,
-                        api_key: localStorage.getItem("user_gemini_key")
+                        region: tripTitle,
+                        trip_title: tripTitle,
+                        api_key: localStorage.getItem("user_gemini_key"),
+                        max_results: 5
                     })
                 }
             )
 
             if (response.ok) {
                 const data = await response.json()
-                if (data.summary) {
-                    flyTo({
-                        lat: initialViewState.latitude,
-                        lng: initialViewState.longitude,
-                        name: query,
-                        address: data.summary
-                    })
+                console.log("🧠 Smart Search Result:", data)
+
+                // 處理新格式響應（防胡謅版）
+                if (data.status === "success" && data.results && data.results.length > 0) {
+                    const first = data.results[0]
+                    if (first.lat && first.lng) {
+                        flyTo({
+                            lat: first.lat,
+                            lng: first.lng,
+                            name: first.name,
+                            address: first.address || ""
+                        })
+                    }
+
+                    // 只用真實 POI 資料
+                    setResults(data.results.map((r: { name: string; address?: string; lat?: number; lng?: number; distance?: number }) => ({
+                        name: r.name,
+                        address: r.address || (r.distance ? `距離 ${r.distance}m` : ""),
+                        lat: r.lat,
+                        lng: r.lng
+                    })))
+                } else if (data.status === "not_found") {
+                    console.log("⚠️ Not found:", data.message)
+                    setResults([])
                 }
             }
         } catch { /* silent */ } finally {
             setAiSearching(false)
         }
-    }, [query, initialViewState, flyTo])
+    }, [query, initialViewState, tripTitle, flyTo])
 
     // 地圖載入
     const handleMapLoad = useCallback(() => {
@@ -486,8 +505,8 @@ export default function FullscreenMapModal({
                                     </div>
                                 )}
 
-                                {/* AI 語意搜尋選項 */}
-                                {showAIOption && (
+                                {/* AI 語意搜尋選項 - 暫時隱藏，保留程式碼供未來開發 */}
+                                {/* {showAIOption && (
                                     <button
                                         onClick={handleAISearch}
                                         disabled={aiSearching}
@@ -508,7 +527,7 @@ export default function FullscreenMapModal({
                                             </>
                                         )}
                                     </button>
-                                )}
+                                )} */}
                             </div>
 
                             {/* 關閉按鈕 */}

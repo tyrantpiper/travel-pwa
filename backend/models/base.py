@@ -284,3 +284,35 @@ class POIRecommendRequest(BaseModel):
     user_query: str
     api_key: str
     user_preferences: Optional[dict] = None
+
+
+# === Smart Search 模型 ===
+
+class SmartSearchRequest(BaseModel):
+    """🧠 智能語意搜尋請求"""
+    query: str                          # 用戶自然語言輸入
+    lat: float                          # 當前位置
+    lng: float
+    region: Optional[str] = None        # 區域名（如 "新宿"）
+    trip_title: Optional[str] = None    # 行程標題（推斷國家）
+    api_key: str                        # BYOK
+    max_results: int = 3
+
+
+class SmartSearchRecommendation(BaseModel):
+    """單個推薦結果"""
+    name: str
+    reason: str
+    highlights: List[str] = []
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    rating: Optional[float] = None
+    distance: Optional[int] = None      # 公尺
+
+
+class SmartSearchResponse(BaseModel):
+    """智能搜尋回應"""
+    query_type: str                     # recommendation, nearby, specific
+    understood_intent: str              # AI 理解的意圖
+    recommendations: List[SmartSearchRecommendation]
+    source: str                         # gemma, poi_fallback, geocode_fallback

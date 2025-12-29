@@ -355,7 +355,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         setPoiDrawerOpen(true)
     }, [addToHistory])
 
-    // AI 語意搜尋
+    // AI 語意搜尋 - 防胡謅版：只用真實 POI 資料
     const handleAISearch = useCallback(async () => {
         if (!query) return
 
@@ -365,71 +365,59 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
         setAiSearching(true)
         try {
-            // 1. 先使用智能地理編碼 (含國家過濾 & 翻譯 & 位置權重)
-            const geocodeData = await geocodeApi.search({
-                query,
-                limit: 1,
-                tripTitle, // 傳入行程標題以啟用智能判斷
-                lat: lat, // 位置權重 (使用上方已定義的 center)
-                lng: lng  // 位置權重
-            })
-
-            let targetName = query
-            let targetLat = lat
-            let targetLng = lng
-            let found = false
-
-            // 2. 如果有搜尋結果，移動地圖並鎖定目標
-            if (geocodeData.results && geocodeData.results.length > 0) {
-                const best = geocodeData.results[0]
-                targetLat = best.lat
-                targetLng = best.lng
-                targetName = best.name
-                found = true
-
-                // 使用封裝好的 flyTo 函數 (會自動處理歷史記錄和狀態更新)
-                flyTo(best)
-            }
-
-            // 3. 呼叫 AI Enrich (使用正確的坐標與名稱)
             const response = await fetch(
-                `${API_BASE}/api/poi/ai-enrich`,
+                `${API_BASE}/api/ai/smart-search`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        name: targetName,
-                        type: "semantic_search",
-                        lat: targetLat,
-                        lng: targetLng,
-                        api_key: localStorage.getItem("user_gemini_key")
+                        query,
+                        lat,
+                        lng,
+                        region: tripTitle,
+                        trip_title: tripTitle,
+                        api_key: localStorage.getItem("user_gemini_key"),
+                        max_results: 5
                     })
                 }
             )
 
-            if (!response.ok) throw new Error("AI Enrich failed")
+            if (!response.ok) throw new Error("Smart search failed")
             const data = await response.json()
 
-            // 4. 開啟 Drawer 展示 AI 結果
-            if (data) {
-                if (!found) {
-                    // 如果沒找到地點，但 AI 有回應，可能是純查詢
-                    setSelectedPOI({
-                        name: query,
-                        type: "ai_result",
-                        lat: targetLat,
-                        lng: targetLng,
-                        address: "AI Search Result"
+            console.log("🧠 Smart Search Result:", data)
+
+            // 處理新格式響應
+            if (data.status === "success" && data.results && data.results.length > 0) {
+                // 飛到第一個結果
+                const first = data.results[0]
+                if (first.lat && first.lng) {
+                    flyTo({
+                        lat: first.lat,
+                        lng: first.lng,
+                        name: first.name,
+                        address: first.address || ""
                     })
                 }
-                setPoiDrawerOpen(true)
+
+                // 設置結果列表（只用真實 POI 資料，無 AI 生成描述）
+                setResults(data.results.map((r: { name: string; address?: string; lat?: number; lng?: number; distance?: number }) => ({
+                    name: r.name,
+                    address: r.address || (r.distance ? `距離 ${r.distance}m` : ""),
+                    lat: r.lat,
+                    lng: r.lng
+                })))
+            } else if (data.status === "not_found") {
+                // 明確的「找不到」，不胡謅
+                console.log("⚠️ Not found:", data.message)
+                setResults([])  // 清空結果
             }
         } catch (error) {
             console.error("AI Search Error:", error)
         } finally {
             setAiSearching(false)
         }
-    }, [query, flyTo])
+    }, [query, tripTitle, flyTo])
 
     // 過濾出有座標的地點
     const markers = activities
@@ -856,8 +844,8 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                                     </div>
                                                 )}
 
-                                                {/* AI 選項 - 與結果同時顯示 */}
-                                                {searchDone && (
+                                                {/* AI 選項 - 暫時隱藏，保留程式碼供未來開發 */}
+                                                {/* {searchDone && (
                                                     <button
                                                         onClick={handleAISearch}
                                                         disabled={aiSearching}
@@ -875,7 +863,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                                             </>
                                                         )}
                                                     </button>
-                                                )}
+                                                )} */}
                                             </>
                                         )
                                     })()}

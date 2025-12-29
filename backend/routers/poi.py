@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from google import genai
 from google.genai import types
 
-from models.base import POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest
+from models.base import POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest, SmartSearchRequest
 from utils.deps import get_gemini_key
 from utils.ai_config import LITE_MODEL
 from services.poi_service import (
@@ -26,6 +26,7 @@ from services.poi_service import (
     get_ai_prompt_for_recommendation,
     search_wikivoyage
 )
+from services.smart_search_service import smart_search
 
 router = APIRouter(prefix="/api", tags=["poi"])
 
@@ -270,3 +271,61 @@ async def wikivoyage_search(place: str, lang: str = "en"):
         "found": True,
         **result
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Smart AI Search (gemma-3-27b powered)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/ai/smart-search")
+async def ai_smart_search(request: SmartSearchRequest):
+    """
+    🧠 智能語意搜尋 - 使用 gemma-3-27b 理解用戶意圖
+    
+    支援查詢類型：
+    - 推薦類：「好吃的拉麵」「值得去的景點」
+    - 附近類：「附近有什麼」「周邊餐廳」
+    - 條件類：「便宜的壽司」「24小時營業」
+    
+    策略：gemma-3-27b 優先（14,400 RPD），零成本
+    
+    Returns:
+        {
+            "query_type": "recommendation|nearby|specific",
+            "understood_intent": "AI 理解的意圖描述",
+            "recommendations": [
+                {
+                    "name": "地點名稱",
+                    "reason": "推薦理由",
+                    "highlights": ["特色1", "特色2"],
+                    "lat": 35.6895,
+                    "lng": 139.6917,
+                    "rating": 4.5,
+                    "distance": 300
+                }
+            ],
+            "source": "gemma_poi|gemma_geocode|poi_fallback"
+        }
+    """
+    if not request.api_key:
+        raise HTTPException(status_code=400, detail="API key required")
+    
+    if not request.query or len(request.query) < 2:
+        raise HTTPException(status_code=400, detail="Query too short")
+    
+    try:
+        result = await smart_search(
+            api_key=request.api_key,
+            query=request.query,
+            lat=request.lat,
+            lng=request.lng,
+            region=request.region,
+            trip_title=request.trip_title,
+            max_results=request.max_results
+        )
+        
+        return result
+        
+    except Exception as e:
+        print(f"🔥 Smart Search Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Smart search failed: {str(e)}")
