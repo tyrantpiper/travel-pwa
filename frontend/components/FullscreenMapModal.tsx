@@ -84,7 +84,8 @@ export default function FullscreenMapModal({
     // 搜尋狀態
     const [query, setQuery] = useState("")
     const [results, setResults] = useState<SearchResult[]>([])
-    const [isSearching, setIsSearching] = useState(false)
+    const [isTyping, setIsTyping] = useState(false)     // 🆕 輸入中（debounce 期間）
+    const [isSearching, setIsSearching] = useState(false) // 搜尋中（API 調用中）
     const [showSearch, setShowSearch] = useState(false)
     const [aiSearching, setAiSearching] = useState(false)
     const { history, addToHistory } = useSearchHistory()
@@ -96,26 +97,47 @@ export default function FullscreenMapModal({
     // 標記點
     const markers = activities.filter(a => a.lat && a.lng) as (Activity & { lat: number; lng: number })[]
 
+    // 🆕 輸入變更處理（立即回饋）
+    const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value
+        setQuery(value)
+        if (value.length >= 2) {
+            setIsTyping(true)  // 立即顯示「準備中」
+        } else {
+            setIsTyping(false)
+            setResults([])
+        }
+    }
+
     // Debounced 搜尋
     useEffect(() => {
         if (query.length < 2) {
             setResults([])
+            setIsTyping(false)
             return
         }
 
+        const currentQuery = query  // 🆕 快照防止競態
+
         const timer = setTimeout(async () => {
-            setIsSearching(true)
+            setIsTyping(false)    // debounce 結束
+            setIsSearching(true)  // API 開始
             try {
                 const data = await geocodeApi.search({
-                    query,
+                    query: currentQuery,
                     limit: 5,
-                    tripTitle,  // 🆕 智能國家判斷
-                    lat: initialViewState.latitude,   // 🆕 位置權重
-                    lng: initialViewState.longitude   // 🆕 位置權重
+                    tripTitle,
+                    lat: initialViewState.latitude,
+                    lng: initialViewState.longitude
                 })
-                setResults(data.results || [])
+                // 🆕 只在 query 仍然匹配時更新（防止競態）
+                if (currentQuery === query) {
+                    setResults(data.results || [])
+                }
             } catch {
-                setResults([])
+                if (currentQuery === query) {
+                    setResults([])
+                }
             } finally {
                 setIsSearching(false)
             }
@@ -268,8 +290,11 @@ export default function FullscreenMapModal({
     if (!isOpen) return null
 
     const showHistory = query.length === 0 && history.length > 0
-    const showResults = query.length >= 2
-    const showAIOption = showResults && results.length === 0 && !isSearching
+    // 🆕 統一「搜尋完成」狀態：不在輸入、不在搜尋、query 長度足夠
+    const searchDone = query.length >= 2 && !isTyping && !isSearching
+    const showResults = searchDone && results.length > 0
+    const showNoResults = searchDone && results.length === 0
+    const showAIOption = searchDone  // AI 選項和結果同時顯示
 
     return (
         <AnimatePresence>
@@ -383,13 +408,17 @@ export default function FullscreenMapModal({
                                     <Input
                                         ref={inputRef}
                                         value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
+                                        onChange={handleQueryChange}
                                         placeholder="搜尋地點，或問 AI..."
                                         className="h-12 pl-12 pr-10 rounded-xl border-slate-200 text-base"
                                     />
                                     {query && (
                                         <button
-                                            onClick={() => setQuery("")}
+                                            onClick={() => {
+                                                setQuery("")
+                                                setIsTyping(false)
+                                                setResults([])
+                                            }}
                                             className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
                                         >
                                             <X className="w-5 h-5" />
@@ -417,16 +446,24 @@ export default function FullscreenMapModal({
                                     </>
                                 )}
 
-                                {/* 搜尋中 */}
+                                {/* 🆕 輸入中（debounce 期間）- 淡色提示 */}
+                                {isTyping && !isSearching && (
+                                    <div className="px-4 py-4 flex items-center gap-2 text-slate-400 transition-opacity duration-200">
+                                        <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-pulse" />
+                                        <span className="text-sm">等待輸入完成...</span>
+                                    </div>
+                                )}
+
+                                {/* 搜尋中（API 調用中）- 明顯 Loading */}
                                 {isSearching && (
-                                    <div className="px-4 py-6 flex items-center justify-center gap-2 text-slate-500">
+                                    <div className="px-4 py-6 flex items-center justify-center gap-2 text-indigo-500 transition-opacity duration-200">
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                         <span>搜尋中...</span>
                                     </div>
                                 )}
 
                                 {/* 搜尋結果 */}
-                                {showResults && !isSearching && results.map((r, i) => (
+                                {showResults && results.map((r, i) => (
                                     <button
                                         key={i}
                                         onClick={() => flyTo(r)}
@@ -441,6 +478,13 @@ export default function FullscreenMapModal({
                                         </div>
                                     </button>
                                 ))}
+
+                                {/* 🆕 無結果提示 */}
+                                {showNoResults && (
+                                    <div className="px-4 py-4 text-center text-slate-500 text-sm">
+                                        找不到「{query}」的結果
+                                    </div>
+                                )}
 
                                 {/* AI 語意搜尋選項 */}
                                 {showAIOption && (

@@ -209,10 +209,23 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     const [isSearchMinimized, setIsSearchMinimized] = useState(false)  // 🆕 最小化狀態
     const [query, setQuery] = useState("")
     const [results, setResults] = useState<SearchResult[]>([])
+    const [isTyping, setIsTyping] = useState(false)     // 🆕 輸入中（debounce 期間）
     const [isSearching, setIsSearching] = useState(false)
     const [aiSearching, setAiSearching] = useState(false)
     const { history, addToHistory, clearHistory } = useSearchHistory()
     const inputRef = useRef<HTMLInputElement>(null)
+
+    // 🆕 輸入變更處理（立即回饋）
+    const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value
+        setQuery(value)
+        if (value.length >= 2) {
+            setIsTyping(true)
+        } else {
+            setIsTyping(false)
+            setResults([])
+        }
+    }
 
     // 📍 自定義定位功能 (取代有 bug 的 GeolocateControl)
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
@@ -255,29 +268,38 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         )
     }
 
+
     // Debounced 搜尋
     useEffect(() => {
         if (!isSearchOpen || query.length < 2) {
             setResults([])
+            setIsTyping(false)
             return
         }
 
+        const currentQuery = query  // 🆕 快照防止競態
+
         const timer = setTimeout(async () => {
+            setIsTyping(false)    // debounce 結束
             setIsSearching(true)
-            setResults([])  // 🆕 Anti-flicker: clear old results before new search
+            setResults([])  // Anti-flicker: clear old results before new search
             try {
-                // 執行搜尋 (帶位置權重)
                 const center = mapRef.current?.getCenter()
                 const data = await geocodeApi.search({
-                    query,
+                    query: currentQuery,
                     limit: 5,
-                    tripTitle,  // 🆕 傳遞行程標題用於智能搜尋
-                    lat: center?.lat, // 🆕 位置權重
-                    lng: center?.lng  // 🆕 位置權重
+                    tripTitle,
+                    lat: center?.lat,
+                    lng: center?.lng
                 })
-                setResults(data.results || [])
+                // 🆕 只在 query 仍然匹配時更新
+                if (currentQuery === query) {
+                    setResults(data.results || [])
+                }
             } catch {
-                setResults([])
+                if (currentQuery === query) {
+                    setResults([])
+                }
             } finally {
                 setIsSearching(false)
             }
@@ -727,14 +749,18 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     <Input
                                         ref={inputRef}
                                         value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
+                                        onChange={handleQueryChange}
                                         placeholder="搜尋地點..."
                                         className="h-9 pl-9 pr-8 text-base shadow-none border-slate-200 focus-visible:ring-1"
                                         onFocus={() => setIsSearchMinimized(false)}
                                     />
                                     {query && (
                                         <button
-                                            onClick={() => setQuery("")}
+                                            onClick={() => {
+                                                setQuery("")
+                                                setIsTyping(false)
+                                                setResults([])
+                                            }}
                                             className="absolute right-2 top-2.5 text-slate-400"
                                         >
                                             <X className="w-4 h-4" />
@@ -784,41 +810,75 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                         </>
                                     )}
 
-                                    {/* 結果 */}
-                                    {results.map((r, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => flyTo(r)}
-                                            className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-start gap-3 border-b border-slate-50"
-                                        >
-                                            <MapPin className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" />
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-medium truncate">{r.name}</div>
-                                                {r.address && <div className="text-xs text-slate-500 truncate">{r.address}</div>}
-                                            </div>
-                                        </button>
-                                    ))}
-
-                                    {/* AI 選項 - 始終顯示 (只要 query >= 2) */}
-                                    {query.length >= 2 && !isSearching && (
-                                        <button
-                                            onClick={handleAISearch}
-                                            disabled={aiSearching}
-                                            className="w-full px-4 py-4 text-left hover:bg-purple-50 flex items-center gap-3 text-sm border-t border-slate-100"
-                                        >
-                                            {aiSearching ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
-                                                    <span className="text-purple-600">正在詢問 AI...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Sparkles className="w-4 h-4 text-purple-500" />
-                                                    <span className="text-purple-600 font-medium">✨ 使用 AI 搜尋「{query}」</span>
-                                                </>
-                                            )}
-                                        </button>
+                                    {/* 🆕 輸入中（debounce 期間）- 淡色提示 */}
+                                    {isTyping && !isSearching && (
+                                        <div className="px-4 py-4 flex items-center gap-2 text-slate-400">
+                                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-pulse" />
+                                            <span className="text-sm">等待輸入完成...</span>
+                                        </div>
                                     )}
+
+                                    {/* 搜尋中（API 調用中）- Loading */}
+                                    {isSearching && (
+                                        <div className="px-4 py-6 flex items-center justify-center gap-2 text-indigo-500">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <span className="text-sm">搜尋中...</span>
+                                        </div>
+                                    )}
+
+                                    {/* 🆕 統一搜尋完成狀態 */}
+                                    {(() => {
+                                        const searchDone = query.length >= 2 && !isTyping && !isSearching
+                                        const hasResults = results.length > 0
+                                        const noResults = results.length === 0
+
+                                        return (
+                                            <>
+                                                {/* 結果 */}
+                                                {searchDone && hasResults && results.map((r, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => flyTo(r)}
+                                                        className="w-full px-4 py-3 text-left hover:bg-slate-50 flex items-start gap-3 border-b border-slate-50"
+                                                    >
+                                                        <MapPin className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-medium truncate">{r.name}</div>
+                                                            {r.address && <div className="text-xs text-slate-500 truncate">{r.address}</div>}
+                                                        </div>
+                                                    </button>
+                                                ))}
+
+                                                {/* 無結果提示 */}
+                                                {searchDone && noResults && (
+                                                    <div className="px-4 py-4 text-center text-slate-500 text-sm">
+                                                        找不到「{query}」的結果
+                                                    </div>
+                                                )}
+
+                                                {/* AI 選項 - 與結果同時顯示 */}
+                                                {searchDone && (
+                                                    <button
+                                                        onClick={handleAISearch}
+                                                        disabled={aiSearching}
+                                                        className="w-full px-4 py-4 text-left hover:bg-purple-50 flex items-center gap-3 text-sm border-t border-slate-100"
+                                                    >
+                                                        {aiSearching ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
+                                                                <span className="text-purple-600">正在詢問 AI...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Sparkles className="w-4 h-4 text-purple-500" />
+                                                                <span className="text-purple-600 font-medium">✨ 使用 AI 搜尋「{query}」</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </>
+                                        )
+                                    })()}
                                 </div>
                             )}
                         </motion.div>
