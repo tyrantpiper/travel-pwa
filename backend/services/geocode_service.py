@@ -1,6 +1,11 @@
 """
 Geocode Service - 地理編碼服務
 Extracted from main.py for modularization
+
+🆕 v2.1: 日本區域優化
+- 模糊搜尋 (rapidfuzz)
+- 連鎖店品牌庫 (brands.json)
+- 增強的 AI 翻譯（多語言變體）
 """
 
 import os
@@ -8,12 +13,57 @@ import json
 import httpx
 from google import genai
 from google.genai import types
+from pathlib import Path
+
+# 🆕 模糊搜尋
+from rapidfuzz import fuzz, process
 
 # Import AI model config
 from utils.ai_config import WORKHORSE_MODEL
 
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+
+# 🆕 載入連鎖店品牌庫
+BRANDS_PATH = Path(__file__).parent.parent / "data" / "brands.json"
+BRANDS_DB = {}
+if BRANDS_PATH.exists():
+    with open(BRANDS_PATH, "r", encoding="utf-8") as f:
+        BRANDS_DB = json.load(f)
+    print(f"[OK] Loaded brands.json: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
+
+
+# 🆕 繁簡日漢字對照表（用於模糊搜尋標準化）
+# 🔧 修正：統一轉換方向為「標準化形式」（多數轉向日文/簡體）
+CHAR_EQUIVALENTS = {
+    # 繁體中文 → 日文新字體/簡體（標準化方向）
+    "澀": "渋", "齋": "斎", "顏": "顔", "廣": "広", 
+    "國": "国", "學": "学", "體": "体", "車": "車",
+    "關": "関", "龍": "竜", "鋪": "舗",
+    "橋": "橋", "邊": "辺", "寫": "写", "聲": "声",
+    "藝": "芸", "實": "実", "總": "総", "萬": "万",
+    "號": "号", "樓": "楼", "劍": "剣", "點": "点",
+    # 🔧 修正：駅/站 統一向「駅」（日文資料庫較多用「駅」）
+    "站": "駅",
+    # 簡體中文 → 相同標準化形式
+    "涩": "渋", "国": "国", "学": "学",
+}
+
+
+def normalize_for_fuzzy(text: str) -> str:
+    """標準化文字用於模糊比較"""
+    if not text:
+        return ""
+    text = text.lower().strip()
+    # 移除常見字尾
+    for suffix in ["店", "站", "駅", "市場", "神社", "寺", "城"]:
+        if text.endswith(suffix) and len(text) > len(suffix):
+            text = text[:-len(suffix)]
+    # 字元標準化
+    for char, equiv in CHAR_EQUIVALENTS.items():
+        text = text.replace(char, equiv)
+    return text
+
 
 # 🌍 地理編碼雙引擎系統 (ArcGIS + Nominatim)
 
@@ -558,13 +608,29 @@ except Exception as e:
 # 預先計算排序後的鍵（最長優先匹配）
 LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)
 
+# 🆕 預先建立模糊搜尋索引（效能優化，避免每次調用都重建）
+FUZZY_SEARCH_INDEX = {}
+for _k, _v in LANDMARKS_DB.items():
+    _normalized = normalize_for_fuzzy(_k)
+    if _normalized:
+        FUZZY_SEARCH_INDEX[_normalized] = (_k, _v)
+    for _alias in _v.get("aliases", []):
+        _normalized_alias = normalize_for_fuzzy(_alias)
+        if _normalized_alias:
+            FUZZY_SEARCH_INDEX[_normalized_alias] = (_k, _v)
+print(f"[OK] Built fuzzy search index: {len(FUZZY_SEARCH_INDEX)} entries")
+
+
 def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
     """🏰 確定性翻譯著名景點（無需 AI）
+    
+    🆕 v2.1: 支援模糊搜尋和連鎖店品牌匹配
     
     Returns: (search_terms: list, display_name: str, landmark_data: dict|None) 或 ([query], None, None)
     """
     query_lower = query.lower().strip()
     
+    # === 1. 精確匹配（最快） ===
     # 使用最長優先匹配（關鍵字必須在查詢中，防止誤匹配）
     for landmark_key in LANDMARKS_KEYS_SORTED:
         landmark = LANDMARKS_DB[landmark_key]
@@ -580,7 +646,46 @@ def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
                 print(f"🏰 Alias Match: '{alias}' → '{landmark['display']}'")
                 return ([landmark["search"], query], landmark["display"], landmark)
     
-    # 特殊處理：如果包含「迪士尼」和日本相關詞彙
+    # === 2. 🆕 連鎖店品牌匹配 ===
+    for category, brands in BRANDS_DB.items():
+        if category.startswith("_"):  # 跳過 __comment
+            continue
+        if not isinstance(brands, dict):
+            continue
+        for brand_name, brand_data in brands.items():
+            if not isinstance(brand_data, dict):
+                continue
+            # 檢查品牌名稱
+            if brand_name.lower() in query_lower:
+                search_term = brand_data.get("search_term", brand_name)
+                print(f"🏪 Brand Match: '{query}' → '{search_term}'")
+                return ([search_term, query], brand_name, None)
+            # 檢查別名
+            for alias in brand_data.get("aliases", []):
+                if alias.lower() in query_lower:
+                    search_term = brand_data.get("search_term", brand_name)
+                    print(f"🏪 Brand Alias Match: '{alias}' → '{search_term}'")
+                    return ([search_term, query], brand_name, None)
+    
+    # === 3. 🆕 模糊搜尋（容錯：typo、繁簡差異） ===
+    normalized_query = normalize_for_fuzzy(query)
+    if len(normalized_query) >= 2:  # 至少 2 字才進行模糊匹配
+        # 🆕 使用預先建立的索引（效能優化）
+        match_result = process.extractOne(
+            normalized_query, 
+            FUZZY_SEARCH_INDEX.keys(),
+            scorer=fuzz.ratio,
+            score_cutoff=88  # 🆕 提高閾值至 88% 減少誤匹配
+        )
+        
+        if match_result:
+            matched_key, score, _ = match_result
+            landmark_key, landmark = FUZZY_SEARCH_INDEX[matched_key]
+            print(f"[FUZZY] '{query}' -> '{landmark['display']}' (score: {score})")
+            return ([landmark["search"], query], landmark["display"], landmark)
+
+    
+    # === 4. 特殊處理：迪士尼 ===
     if "迪士尼" in query or "disney" in query_lower:
         if country_code == "JP" or any(jp in query.lower() for jp in ["東京", "tokyo", "日本", "japan"]):
             disney = LANDMARKS_DB.get("東京迪士尼樂園")
@@ -589,6 +694,7 @@ def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
             return (["Hong Kong Disneyland", query], "香港迪士尼樂園", None)
     
     return ([query], None, None)
+
 
 async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -> str:
     """🧠 使用 Gemini 從行程標題判斷目的地國家
@@ -633,6 +739,8 @@ TRANSLATION_CACHE = {}  # {(query, country_code): [translations]}
 async def translate_place_name(query: str, country_code: str, api_key: str = None) -> list:
     """🔤 使用 Gemini 將地名翻譯成目標國家語言
     
+    🆕 v2.1: 針對日本輸出多語言變體（漢字、假名、羅馬拼音）
+    
     Returns: 搜尋變體列表 [翻譯後, 英文, 原文]
     """
     if not country_code or not api_key:
@@ -652,7 +760,22 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
         client = genai.Client(api_key=api_key)
         country_name = country_info["name"]
         
-        prompt = f"""你是地名翻譯專家。用戶正在搜尋{country_name}的地點。
+        # 🆕 針對日本的特殊 prompt
+        if country_code == "JP":
+            prompt = f"""你是日本地名翻譯專家。用戶正在搜尋日本的地點。
+
+用戶輸入：「{query}」
+
+請翻譯成以下三種格式（每行一個，不要編號）：
+1. 日文漢字寫法（如：浅草寺）
+2. 日文假名（如：せんそうじ 或 センソウジ）
+3. 英文羅馬拼音（如：Senso-ji）
+
+如果是餐廳/商店名稱，請使用官方日文名稱。
+如果輸入已經是日文，直接輸出原文 + 羅馬拼音。
+只輸出翻譯結果，每行一個，最多3行。"""
+        else:
+            prompt = f"""你是地名翻譯專家。用戶正在搜尋{country_name}的地點。
 
 用戶輸入：「{query}」
 
@@ -680,7 +803,7 @@ Senso-ji
             # 確保原始查詢也在列表中
             if query not in lines:
                 lines.append(query)
-            result = lines[:3]  # 最多3個變體
+            result = lines[:4]  # 🆕 最多4個變體（增加容錯）
             # 🆕 存入緩存
             TRANSLATION_CACHE[cache_key] = result
             print(f"🔤 Translated '{query}' → {result} (cached)")
@@ -689,6 +812,7 @@ Senso-ji
     except Exception as e:
         print(f"🔤 Translation error: {e}")
         return [query]
+
 
 
 def filter_results_by_country(results: list, country_code: str, strict: bool = True) -> list:
