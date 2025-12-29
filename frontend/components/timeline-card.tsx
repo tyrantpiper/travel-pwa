@@ -143,17 +143,17 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
 
             {/* 附屬表格 */}
             {activity.sub_items && activity.sub_items.length > 0 && (
-                <div className="mt-3 mb-2 overflow-hidden rounded-lg border border-slate-200 shadow-sm bg-slate-50/50">
-                    <Table>
+                <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-slate-50/50">
+                    <Table className="w-full table-fixed min-w-[280px]">
                         <TableBody>
                             {activity.sub_items.map((item: SubItem, i: number) => (
                                 <TableRow key={i} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
-                                    <TableCell className="py-2.5 px-3 align-top break-words">
+                                    <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
                                         <div className="text-xs font-bold text-slate-700 mb-0.5 break-words">{item.name}</div>
-                                        {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words">{item.desc}</div>}
+                                        {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words whitespace-normal">{item.desc}</div>}
                                     </TableCell>
                                     {item.link ? (
-                                        <TableCell className="py-2 px-2 text-right align-middle w-10">
+                                        <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
                                             <button
                                                 className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                                                 onClick={(e) => { e.stopPropagation(); window.open(item.link, '_blank'); }}
