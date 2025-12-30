@@ -108,6 +108,7 @@ export interface Trip {
     day_tickets?: Record<number, TicketItem[]>
     day_checklists?: Record<number, { id: string; text: string; checked: boolean }[]>
     ai_review?: string
+    day_ai_reviews?: Record<number, string>  // 🆕 每日 AI 審核
 }
 
 export interface GeocodeResult {

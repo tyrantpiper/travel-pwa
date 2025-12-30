@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Sparkles } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -21,6 +21,7 @@ import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDial
 const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loading: () => <div className="h-64 w-full bg-slate-100 animate-pulse rounded-xl" /> })
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
 import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
+import EditableDailyAIReview from "@/components/itinerary/EditableDailyAIReview"
 import { tripsApi, itemsApi, geocodeApi } from "@/lib/api"
 import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
@@ -35,6 +36,16 @@ import { COUNTRY_REGIONS } from "@/lib/constants"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+/**
+ * 🔧 Helper to access day data with number/string key fallback
+ * JSON parses keys as strings, but TypeScript types use numbers
+ */
+function getDayData<T>(data: Record<number | string, T> | undefined, day: number): T | undefined {
+    if (!data) return undefined
+    // Try number key first, then string key
+    return data[day] ?? data[String(day)]
+}
 
 export function ItineraryView() {
     const { t } = useLanguage()
@@ -151,7 +162,7 @@ export function ItineraryView() {
         const fetchWeather = async () => {
             let lat = 35.6895  // Default: Tokyo
             let lng = 139.6917
-            let locationName = "Tokyo (Default)"
+            // locationName removed - was unused
 
             // 常見城市座標對照表（含時區）
             const CITY_COORDS: { [key: string]: { lat: number, lng: number, name: string, timezone: string } } = {
@@ -178,7 +189,6 @@ export function ItineraryView() {
             if (dailyLocs && dailyLocs[day]) {
                 lat = dailyLocs[day].lat
                 lng = dailyLocs[day].lng
-                locationName = dailyLocs[day].name || "Current Location"
                 // 根據地點名稱推測時區
                 for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
                     if (dailyLocs[day].name?.includes(cityName)) {
@@ -697,7 +707,7 @@ export function ItineraryView() {
                             await reloadTrips()
                             haptic.success()
                             toast.success(t('update_success') || "已更新")
-                        } catch (_e) {
+                        } catch {
                             haptic.error()
                             toast.error("更新失敗")
                         }
@@ -1144,27 +1154,24 @@ export function ItineraryView() {
                     </div>
                 </div >
 
-                {/* 🤖 AI Review (Only on Day 1) */}
-                {day === 1 && currentTrip?.ai_review && (
-                    <div className="mx-6 mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-xl shadow-sm">
-                        <h3 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-indigo-600" /> AI 深度審核報告
-                        </h3>
-                        <div className="text-sm text-indigo-800 whitespace-pre-wrap leading-relaxed">
-                            {currentTrip.ai_review}
-                        </div>
-                    </div>
-                )}
-
-
+                {/* 🕵️ AI 深度審核 - 每日都有 */}
+                <EditableDailyAIReview
+                    key={`ai-review-${day}`}
+                    tripId={activeTripId || ""}
+                    day={day}
+                    review={getDayData(currentTrip?.day_ai_reviews, day) || (day === 1 ? currentTrip?.ai_review : undefined)}
+                    onUpdate={async () => {
+                        await reloadTripDetail()
+                    }}
+                />
 
                 <EditableDailyTips
                     key={`tips-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
-                    notes={currentTrip?.day_notes?.[day] || []}
-                    costs={currentTrip?.day_costs?.[day] || []}
-                    tickets={currentTrip?.day_tickets?.[day] || []}
+                    notes={getDayData(currentTrip?.day_notes, day) || []}
+                    costs={getDayData(currentTrip?.day_costs, day) || []}
+                    tickets={getDayData(currentTrip?.day_tickets, day) || []}
                     userId={userId || undefined}
                     onUpdate={async (type, data) => {
                         if (!activeTripId) return false

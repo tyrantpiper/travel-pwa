@@ -147,10 +147,15 @@ async def parse_markdown(
            - 格式: `day_checklists`: {{ "0": [ {{ "item": "網卡", "status": false, "note": "買吃到飽" }} ] }}
            - Key 使用 "0" 代表行前
         
-        11. **深度行程審核 (Deep Review)**
-           - 發揮你的邏輯推理，審核行程順暢度、路線合理性、營業時間(週幾公休)隱憂
-           - 輸出一份「AI 深度審核報告」，給出具體建議
-           - 格式: `ai_review`: "這份行程的優點是... 但第三天移動距離過長..."
+        11. **每日深度審核 (Per-Day AI Review)** 🆕
+           - 發揮你的邏輯推理，針對「每一天」分別審核
+           - 審核內容：行程順暢度、路線合理性、營業時間、時間風險
+           - 格式: `day_ai_reviews`: {{ 
+                "1": "🎯 Day 1 行程審核報告\n\n✅ **優點**\n• 🚶 行程節奏適中\n• 🍜 用餐安排合理\n\n⚠️ **注意事項**\n• ⏰ 14:00 可能太趕\n\n💡 **建議**\n• 📌 預留30分鐘緩衝",
+                "2": "🎯 Day 2 行程審核報告\n\n✅ **優點**\n• 🗺️ 路線由東向西\n\n⚠️ **注意事項**\n• 🚇 轉車較多"
+           }}
+           - 必須使用 emoji 圖標（✅⚠️💡🎯🚶🍜🗺️⏰🚇📌）
+           - 每天至少 3 個重點（優點、注意事項、建議各 1-2 點）
         
         12. 分類 category 請用小寫英文:
            - 'transport': 機場、車站、租車、搭車移動
@@ -223,7 +228,10 @@ async def parse_markdown(
                     {{ "item": "護照", "status": false, "note": "效期需大於6個月" }}
                 ]
             }},
-            "ai_review": "整體行程安排非常順暢，特別是第二天的..."
+            "day_ai_reviews": {{
+                "1": "🎯 Day 1 行程審核報告\\n\\n✅ **優點**\\n• 🚶 行程節奏適中...",
+                "2": "🎯 Day 2 行程審核報告\\n\\n⚠️ **注意事項**\\n• ⏰ 下午較趕..."
+            }}
         }}
         
         只回傳 JSON，不要 Markdown 標記。請確保所有活動和表格資訊都被完整解析！
@@ -263,9 +271,8 @@ async def parse_markdown(
             "day_notes": parsed_data.get("day_notes", {}),
             "day_costs": parsed_data.get("day_costs", {}),
             "day_tickets": parsed_data.get("day_tickets", {}),
-            "day_tickets": parsed_data.get("day_tickets", {}),
             "day_checklists": process_checklists(parsed_data.get("day_checklists", {})),
-            "ai_review": parsed_data.get("ai_review", "")
+            "day_ai_reviews": parsed_data.get("day_ai_reviews", {})  # 🆕 每日 AI 審核
         }
         
     except Exception as e:
@@ -398,3 +405,109 @@ async def ai_generate(
     except Exception as e:
         print(f"🔥 AI Gen Error: {e}")
         raise HTTPException(status_code=400, detail=f"生成失敗: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🕵️ AI Day Review - 每日深度審核
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from utils.deps import get_supabase
+from services.model_manager import call_extraction
+
+
+@router.post("/trips/{trip_id}/days/{day}/ai-review")
+async def generate_day_review(
+    trip_id: str,
+    day: int,
+    api_key: str = Depends(get_gemini_key),
+    supabase=Depends(get_supabase)
+):
+    """🕵️ 生成每日 AI 深度審核報告
+    
+    針對指定天數的行程進行 AI 分析，生成優點、注意事項、建議。
+    使用 3 層 AI fallback 確保穩定性。
+    """
+    print(f"🕵️ 生成 Day {day} AI 審核報告 for Trip {trip_id}...")
+    
+    try:
+        # 1. 獲取行程資料
+        trip_res = supabase.table("itineraries").select("*").eq("id", trip_id).execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到行程")
+        
+        trip = trip_res.data[0]
+        
+        # 2. 獲取該天的活動
+        items_res = supabase.table("itinerary_items") \
+            .select("*") \
+            .eq("itinerary_id", trip_id) \
+            .eq("day_number", day) \
+            .order("time_slot") \
+            .execute()
+        
+        if not items_res.data or len(items_res.data) == 0:
+            raise HTTPException(status_code=400, detail=f"Day {day} 沒有任何行程項目")
+        
+        # 3. 格式化活動列表
+        activities_text = ""
+        for item in items_res.data:
+            time = item.get("time_slot", "")[:5] if item.get("time_slot") else "??:??"
+            place = item.get("place_name", "未知地點")
+            category = item.get("category", "")
+            desc = item.get("notes", "")
+            activities_text += f"• {time} {place} ({category})"
+            if desc:
+                activities_text += f" - {desc}"
+            activities_text += "\n"
+        
+        # 4. 生成 AI 審核 Prompt
+        prompt = f"""你是專業日本旅遊顧問。請審核以下 Day {day} 的行程，提供深度分析。
+
+行程標題: {trip.get('title', '未命名行程')}
+Day {day} 行程:
+{activities_text}
+
+請使用以下格式輸出（必須使用圖標和表情符號）:
+
+🎯 Day {day} 行程審核報告
+
+✅ **優點**
+• 🚶 [行程節奏分析（例如：節奏適中/緊湊/輕鬆）]
+• 🍜 [用餐時間分析]
+• 🗺️ [路線規劃分析]
+
+⚠️ **注意事項**
+• ⏰ [時間風險提醒]
+• 🚇 [交通提醒]
+• 📍 [地點相關提醒]
+
+💡 **建議**
+• 📌 [具體改進建議]
+• 🎫 [票券/預約建議]
+
+請用繁體中文回答，保持簡潔但專業。每個分類至少 2-3 點。"""
+
+        # 5. 使用 call_extraction (已有 3 層 AI fallback)
+        review_text = await call_extraction(api_key, prompt, intent_type="DIAGNOSIS")
+        
+        # 6. 儲存到 content.day_ai_reviews
+        content = trip.get("content") or {}
+        day_ai_reviews = content.get("day_ai_reviews") or {}
+        day_ai_reviews[str(day)] = review_text
+        content["day_ai_reviews"] = day_ai_reviews
+        
+        supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+        
+        print(f"✅ Day {day} AI 審核報告生成成功!")
+        
+        return {
+            "status": "success",
+            "day": day,
+            "review": review_text
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 AI Review Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI 審核失敗: {str(e)}")

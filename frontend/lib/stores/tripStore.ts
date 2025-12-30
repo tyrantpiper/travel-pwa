@@ -18,12 +18,36 @@ interface TripState {
     initializeFromStorage: () => void
 }
 
+/**
+ * 🔧 FIX: Sync initialize userId from localStorage to fix race condition
+ * This ensures userId is available immediately on first render
+ * 🆕 Auto-generates UUID if not exists
+ */
+const getInitialUserId = (): string | null => {
+    if (typeof window !== 'undefined') {
+        let uuid = localStorage.getItem('user_uuid')
+        if (!uuid) {
+            // 🆕 Auto-generate UUID for new users
+            uuid = crypto.randomUUID?.() ||
+                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                    const r = Math.random() * 16 | 0
+                    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+                    return v.toString(16)
+                })
+            localStorage.setItem('user_uuid', uuid)
+            console.log('🆕 Auto-generated user_uuid:', uuid)
+        }
+        return uuid
+    }
+    return null
+}
+
 export const useTripStore = create<TripState>()(
     persist(
         (set) => ({
-            // Initial state
+            // Initial state - 🔧 userId now sync initialized
             activeTripId: null,
-            userId: null,
+            userId: getInitialUserId(),
             activeTripTitle: null,
 
             // Actions
@@ -52,8 +76,18 @@ export const useTripStore = create<TripState>()(
                 // Only persist these fields
                 activeTripId: state.activeTripId,
                 activeTripTitle: state.activeTripTitle,
-                // Note: userId is managed separately by user auth flow
+                userId: state.userId  // 🔧 FIX: Now also persist userId
             }),
+            // 🔧 FIX: Custom merge to prevent sync-initialized userId from being overwritten
+            merge: (persistedState, currentState) => {
+                const persisted = persistedState as Partial<TripState>
+                return {
+                    ...currentState,
+                    ...persisted,
+                    // If persisted userId is empty, use sync-initialized value
+                    userId: persisted?.userId || currentState.userId
+                }
+            }
         }
     )
 )

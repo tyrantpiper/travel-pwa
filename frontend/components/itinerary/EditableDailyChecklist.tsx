@@ -27,8 +27,8 @@ interface EditableDailyChecklistProps {
 }
 
 export default function EditableDailyChecklist({
-    tripId: _tripId,
-    day: _day,
+    tripId: _tripId,  // eslint-disable-line @typescript-eslint/no-unused-vars
+    day: _day,        // eslint-disable-line @typescript-eslint/no-unused-vars
     items,
     onUpdate,
     readOnly = false,
@@ -75,7 +75,7 @@ export default function EditableDailyChecklist({
                     setLocalItems(localItems)
                     toast.error("更新失敗")
                 }
-            } catch (_e) {
+            } catch {
                 setLocalItems(localItems)
                 toast.error("更新失敗")
             } finally {
@@ -109,7 +109,7 @@ export default function EditableDailyChecklist({
             } else {
                 toast.success("已新增項目")
             }
-        } catch (_e) {
+        } catch {
             setLocalItems(localItems)
             toast.error("新增失敗")
         } finally {
@@ -134,7 +134,7 @@ export default function EditableDailyChecklist({
                 setLocalItems(localItems)
                 toast.error("刪除失敗")
             }
-        } catch (_e) {
+        } catch {
             setLocalItems(localItems)
             toast.error("刪除失敗")
         } finally {
@@ -173,7 +173,7 @@ export default function EditableDailyChecklist({
                 const item = newItems.find(i => i.id === id)
                 toast.success(item?.is_private ? "已設為私人" : "已設為公開")
             }
-        } catch (_e) {
+        } catch {
             setLocalItems(localItems)
             toast.error("更新失敗")
         } finally {
@@ -296,8 +296,8 @@ export default function EditableDailyChecklist({
                                             e.stopPropagation()
                                             handleTogglePrivacy(item.id)
                                         }}
-                                        className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
-                                                item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
+                                        className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
+                                            item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
                                             }`}
                                         disabled={processingItems.has(item.id) || isUpdating}
                                         title={item.is_private ? "設為公開" : "設為私人"}
@@ -315,7 +315,7 @@ export default function EditableDailyChecklist({
                                             e.stopPropagation()
                                             removeItem(item.id)
                                         }}
-                                        className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                        className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
                                             }`}
                                         disabled={processingItems.has(item.id) || isUpdating}
                                     >

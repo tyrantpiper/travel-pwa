@@ -7,8 +7,10 @@ import { useTripStore } from "./stores/tripStore"
 interface TripContextType {
     activeTripId: string | null
     setActiveTripId: (id: string | null) => void
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     trips: any[]
     isLoading: boolean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     activeTrip: any | null
     mutate: () => void
     userId: string | null
@@ -40,6 +42,14 @@ export function TripProvider({ children }: { children: ReactNode }) {
     }, [activeTripId, userId, setActiveTripId, setUserId])
 
     const { trips, isLoading, mutate } = useTrips(userId)
+
+    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，強制刷新 trips
+    // 這解決了首次載入時資料不顯示的問題
+    useEffect(() => {
+        if (userId && mutate) {
+            mutate()
+        }
+    }, [userId, mutate])
 
     // 當 trips 載入完成，驗證 activeTripId 是否有效
     useEffect(() => {

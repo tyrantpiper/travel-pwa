@@ -50,8 +50,8 @@ const CURRENCIES = ["JPY", "TWD", "USD", "EUR", "KRW", "HKD"]
 const DEFAULT_CURRENCY = "JPY"
 
 export default function EditableDailyTips({
-    tripId: _tripId,
-    day: _day,
+    tripId: _tripId,  // eslint-disable-line @typescript-eslint/no-unused-vars
+    day: _day,        // eslint-disable-line @typescript-eslint/no-unused-vars
     notes,
     costs,
     tickets,
@@ -66,6 +66,11 @@ export default function EditableDailyTips({
     const [localNotes, setLocalNotes] = useState<NoteItem[]>(notes || [])
     const [localCosts, setLocalCosts] = useState<CostItem[]>(costs || [])
     const [localTickets, setLocalTickets] = useState<TicketItem[]>(tickets || [])
+
+    // 🔧 FIX: Sync local state when props update (async data loading)
+    useEffect(() => { setLocalNotes(notes || []) }, [notes])
+    useEffect(() => { setLocalCosts(costs || []) }, [costs])
+    useEffect(() => { setLocalTickets(tickets || []) }, [tickets])
 
     // Adding state
     const [addingNote, setAddingNote] = useState(false)

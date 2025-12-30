@@ -155,6 +155,7 @@ class UpdateDayDataRequest(BaseModel):
     day_costs: Optional[dict] = None
     day_tickets: Optional[dict] = None
     day_checklists: Optional[dict] = None  # 🆕 行前清單
+    day_ai_reviews: Optional[dict] = None  # 🆕 AI 深度審核報告
 
 
 class AddDayRequest(BaseModel):

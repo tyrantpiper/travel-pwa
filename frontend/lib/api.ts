@@ -188,6 +188,41 @@ export const tripsApi = {
         if (!res.ok) throw new Error("Failed to update day data")
         return res.json()
     },
+
+    /** 🕵️ Generate AI day review */
+    generateAIReview: async (tripId: string, day: number): Promise<{ status: string; day: number; review: string }> => {
+        const apiKey = typeof window !== 'undefined'
+            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
+            : ""
+
+        if (!apiKey) {
+            throw new Error("請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)")
+        }
+
+        const res = await fetch(`${API.TRIPS}/${tripId}/days/${day}/ai-review`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Gemini-API-Key": apiKey
+            }
+        })
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: "AI 審核失敗" }))
+            throw new Error(error.detail || "AI 審核失敗")
+        }
+        return res.json()
+    },
+
+    /** 🗑️ Clear AI day review */
+    clearAIReview: async (tripId: string, day: number) => {
+        const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ day, day_ai_reviews: { [day]: "" } })
+        })
+        if (!res.ok) throw new Error("Failed to clear AI review")
+        return res.json()
+    },
 }
 
 /**

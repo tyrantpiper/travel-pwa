@@ -180,6 +180,7 @@ async def get_trip_by_id(
             "day_tickets": day_tickets,
             "day_checklists": day_checklists,
             "ai_review": content.get("ai_review", ""),
+            "day_ai_reviews": content.get("day_ai_reviews", {}),  # 🆕 每日 AI 審核報告
             "flight_info": trip.get("flight_info") or {},
             "hotel_info": trip.get("hotel_info") or {},
             "credit_cards": content.get("credit_cards", []),
@@ -382,6 +383,8 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
             "day_notes": (trip.get("content") or {}).get("day_notes", {}),
             "day_costs": (trip.get("content") or {}).get("day_costs", {}),
             "day_tickets": (trip.get("content") or {}).get("day_tickets", {}),
+            "ai_review": (trip.get("content") or {}).get("ai_review", ""),  # 🆕 AI 審核
+            "day_ai_reviews": (trip.get("content") or {}).get("day_ai_reviews", {}),  # 🆕 每日 AI 審核
             
             "flight_info": trip.get("flight_info") or {},  # 👈 新增航班資訊
             "hotel_info": trip.get("hotel_info") or {},    # 👈 新增住宿資訊
@@ -648,6 +651,19 @@ async def update_day_data(trip_id: str, request: UpdateDayDataRequest, supabase=
             new_data = request.day_checklists.get(day_key) or request.day_checklists.get(request.day) or []
             existing_checklists[day_key] = new_data
             content["day_checklists"] = existing_checklists
+        
+        # 🆕 AI 深度審核報告
+        if request.day_ai_reviews is not None:
+            existing_reviews = content.get("day_ai_reviews", {})
+            # 允許傳入空字串或 None 來清除審核
+            new_data = request.day_ai_reviews.get(day_key) or request.day_ai_reviews.get(request.day)
+            if new_data == "" or new_data is None:
+                # 清除審核：如果存在則刪除
+                if day_key in existing_reviews:
+                    del existing_reviews[day_key]
+            else:
+                existing_reviews[day_key] = new_data
+            content["day_ai_reviews"] = existing_reviews
         
         # 3. 寫回資料庫
         update_res = supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()

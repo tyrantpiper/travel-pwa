@@ -25,9 +25,10 @@ export function useTrips(userId: string | null) {
 export function useTripDetail(tripId: string | null, userId?: string | null) {
     // 🔧 FIX: Include userId in cache key to ensure refetch when userId changes
     // And only make the request when we have a valid userId to prevent unauthenticated fetches
+    const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
+
     const { data, error, mutate } = useSWR(
-        // Only fetch when both tripId and userId are available
-        (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null,
+        swrKey,
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
                 headers: { "X-User-ID": uid }
@@ -37,6 +38,15 @@ export function useTripDetail(tripId: string | null, userId?: string | null) {
             revalidateOnMount: true
         }
     )
+
+    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，強制刷新
+    // 這解決了首次載入時資料不顯示的問題
+    useEffect(() => {
+        if (userId && tripId && mutate) {
+            mutate()
+        }
+    }, [userId, tripId, mutate])
+
     return {
         trip: data,
         isLoading: !error && !data,
