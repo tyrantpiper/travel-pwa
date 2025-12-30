@@ -133,9 +133,8 @@ body {
 }
 
 /* 🚀 滾動性能優化 */
-html {
-  scroll-behavior: smooth;
-}
+/* 移除全局 smooth scroll，避免與手機原生慣性滾動衝突導致阻滯感 */
+/* html { scroll-behavior: smooth; } */
 
 /* iOS 滾動優化 */
 body,

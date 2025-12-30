@@ -26,7 +26,8 @@ export function AppShell() {
         <>
             <OfflineBanner />
             <div className="min-h-screen bg-background flex flex-col">
-                <main className="flex-1 pb-20 overflow-y-auto">
+                {/* 🔧 Mobile Optimization: overscroll-none (prevents browser pull-to-refresh), touch-pan-y (optimizes vertical scroll) */}
+                <main className="flex-1 pb-20 overflow-y-auto overscroll-none touch-pan-y" data-scroll="true">
                     <div className={activeView === "itinerary" ? "block" : "hidden"}><ItineraryView /></div>
                     <div className={activeView === "info" ? "block" : "hidden"}><InfoView /></div>
                     <div className={activeView === "tools" ? "block" : "hidden"}><ToolsView /></div>
