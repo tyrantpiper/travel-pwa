@@ -1196,7 +1196,7 @@ export function ItineraryView() {
                     key={`checklist-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
-                    items={day === 1 ? [...(currentTrip?.day_checklists?.[0] || []), ...(currentTrip?.day_checklists?.[1] || [])] : (currentTrip?.day_checklists?.[day] || [])}
+                    items={day === 1 ? [...(getDayData(currentTrip?.day_checklists, 0) || []), ...(getDayData(currentTrip?.day_checklists, 1) || [])] : (getDayData(currentTrip?.day_checklists, day) || [])}
                     userId={userId || undefined}
                     onUpdate={async (items) => {
                         if (!activeTripId) return false

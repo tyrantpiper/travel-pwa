@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useMemo } from "react"
+import { useState, useCallback, useRef, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { CheckSquare, Square, Plus, X, Check, ListChecks, Eye, EyeOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -36,6 +36,12 @@ export default function EditableDailyChecklist({
 }: EditableDailyChecklistProps) {
     const haptic = useHaptic()
     const [localItems, setLocalItems] = useState<ChecklistItem[]>(items || [])
+
+    // 🔧 FIX: Sync local items when props update (async data loading)
+    useEffect(() => {
+        setLocalItems(items || [])
+    }, [items])
+
     const [isAdding, setIsAdding] = useState(false)
     const [newItemText, setNewItemText] = useState("")
     const [isUpdating, setIsUpdating] = useState(false)
