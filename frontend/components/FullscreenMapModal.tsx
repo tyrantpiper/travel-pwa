@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Sparkles, Loader2, MapPin, Clock } from "lucide-react"
+import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { Input } from "@/components/ui/input"
 import { MAP_STYLES } from "@/lib/constants"
@@ -87,7 +87,6 @@ export default function FullscreenMapModal({
     const [isTyping, setIsTyping] = useState(false)     // 🆕 輸入中（debounce 期間）
     const [isSearching, setIsSearching] = useState(false) // 搜尋中（API 調用中）
     const [showSearch, setShowSearch] = useState(false)
-    const [aiSearching, setAiSearching] = useState(false)
     const { history, addToHistory } = useSearchHistory()
 
     // POI Drawer 狀態
@@ -190,62 +189,6 @@ export default function FullscreenMapModal({
         setPoiDrawerOpen(true)
     }, [addToHistory])
 
-    // AI 語意搜尋
-    const handleAISearch = useCallback(async () => {
-        if (!query) return
-
-        setAiSearching(true)
-        try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/ai/smart-search`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        query,
-                        lat: initialViewState.latitude,
-                        lng: initialViewState.longitude,
-                        region: tripTitle,
-                        trip_title: tripTitle,
-                        api_key: localStorage.getItem("user_gemini_key"),
-                        max_results: 5
-                    })
-                }
-            )
-
-            if (response.ok) {
-                const data = await response.json()
-                console.log("🧠 Smart Search Result:", data)
-
-                // 處理新格式響應（防胡謅版）
-                if (data.status === "success" && data.results && data.results.length > 0) {
-                    const first = data.results[0]
-                    if (first.lat && first.lng) {
-                        flyTo({
-                            lat: first.lat,
-                            lng: first.lng,
-                            name: first.name,
-                            address: first.address || ""
-                        })
-                    }
-
-                    // 只用真實 POI 資料
-                    setResults(data.results.map((r: { name: string; address?: string; lat?: number; lng?: number; distance?: number }) => ({
-                        name: r.name,
-                        address: r.address || (r.distance ? `距離 ${r.distance}m` : ""),
-                        lat: r.lat,
-                        lng: r.lng
-                    })))
-                } else if (data.status === "not_found") {
-                    console.log("⚠️ Not found:", data.message)
-                    setResults([])
-                }
-            }
-        } catch { /* silent */ } finally {
-            setAiSearching(false)
-        }
-    }, [query, initialViewState, tripTitle, flyTo])
-
     // 地圖載入
     const handleMapLoad = useCallback(() => {
         setMapLoaded(true)
@@ -313,7 +256,6 @@ export default function FullscreenMapModal({
     const searchDone = query.length >= 2 && !isTyping && !isSearching
     const showResults = searchDone && results.length > 0
     const showNoResults = searchDone && results.length === 0
-    const showAIOption = searchDone  // AI 選項和結果同時顯示
 
     return (
         <AnimatePresence>

@@ -1,10 +1,9 @@
 "use client"
 
 import { forwardRef } from "react"
-import { Button, type buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { useTheme } from "@/lib/ThemeContext"
 import { cn } from "@/lib/utils"
-import type { VariantProps } from "class-variance-authority"
 
 interface ThemedButtonProps extends React.ComponentProps<typeof Button> {
     useThemeColor?: boolean // 是否使用主題色，預設 true

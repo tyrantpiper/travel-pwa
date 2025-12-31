@@ -28,7 +28,6 @@ import { ImageUpload } from "@/components/ui/image-upload"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
-import { SwipeableItem } from "@/components/ui/swipeable-item"
 import { useHaptic } from "@/lib/hooks"
 
 // Type definitions
@@ -728,7 +727,7 @@ export function ToolsView() {
             }
             toast.success("卡片已刪除")
             haptic.success()
-        } catch (_e) {
+        } catch {
             // Rollback on error
             setSharedCards(oldShared)
             setLocalCards(oldLocal)
@@ -941,9 +940,7 @@ export function ToolsView() {
                         {/* Expense List */}
                         <div className="space-y-2">
                             {filteredExpenses.map((item: Expense) => (
-                                <SwipeableItem key={item.id} onDelete={() => handleDeleteExpense(item.id)}>
-                                    <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
-                                </SwipeableItem>
+                                <ExpenseItem key={item.id} item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
                             ))}
                             {filteredExpenses.length === 0 && (
                                 <div className="text-center py-8 text-slate-400 text-sm">暫無記錄</div>

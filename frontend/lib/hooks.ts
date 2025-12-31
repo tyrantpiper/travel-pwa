@@ -3,7 +3,6 @@ import { useState, useEffect } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const fetcherWithUserId = ([url, uid]: [string, string]) =>
     fetch(API_BASE + url, { headers: { "X-User-ID": uid } }).then(r => r.json())
@@ -27,7 +26,7 @@ export function useTripDetail(tripId: string | null, userId?: string | null) {
     // And only make the request when we have a valid userId to prevent unauthenticated fetches
     const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
 
-    const { data, error, mutate } = useSWR(
+    const { data, error, mutate, isValidating } = useSWR(
         swrKey,
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
@@ -50,6 +49,7 @@ export function useTripDetail(tripId: string | null, userId?: string | null) {
     return {
         trip: data,
         isLoading: !error && !data,
+        isValidating,  // 🆕 Indicates SWR is fetching fresh data (even with cache)
         isError: error,
         mutate
     }
@@ -101,10 +101,8 @@ export function useOnlineStatus() {
     const [isOnline, setIsOnline] = useState(true)
 
     useEffect(() => {
-        // Set initial state (only in browser)
-        if (typeof window !== 'undefined') {
-            setIsOnline(navigator.onLine)
-        }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Sync with browser state on mount
+        setIsOnline(navigator.onLine)
 
         const handleOnline = () => setIsOnline(true)
         const handleOffline = () => setIsOnline(false)

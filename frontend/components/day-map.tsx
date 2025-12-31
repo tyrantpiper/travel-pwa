@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
-import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, Sparkles, MapPin, Clock, Crosshair, Trash } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
 import { MAP_STYLES } from "@/lib/constants"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
@@ -178,6 +178,7 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
         }
 
         fetchRoute()
+        // Note: Only use markersKey (stable string) as dependency, NOT markers array (recreated every render)
     }, [markersKey, mode, optimize])
 
     return { route, routeInfo, loading }
@@ -211,7 +212,6 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     const [results, setResults] = useState<SearchResult[]>([])
     const [isTyping, setIsTyping] = useState(false)     // 🆕 輸入中（debounce 期間）
     const [isSearching, setIsSearching] = useState(false)
-    const [aiSearching, setAiSearching] = useState(false)
     const { history, addToHistory, clearHistory } = useSearchHistory()
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -355,70 +355,6 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         setPoiDrawerOpen(true)
     }, [addToHistory])
 
-    // AI 語意搜尋 - 防胡謅版：只用真實 POI 資料
-    const handleAISearch = useCallback(async () => {
-        if (!query) return
-
-        const center = mapRef.current?.getCenter()
-        const lat = center?.lat || 35.6895
-        const lng = center?.lng || 139.6917
-
-        setAiSearching(true)
-        try {
-            const response = await fetch(
-                `${API_BASE}/api/ai/smart-search`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        query,
-                        lat,
-                        lng,
-                        region: tripTitle,
-                        trip_title: tripTitle,
-                        api_key: localStorage.getItem("user_gemini_key"),
-                        max_results: 5
-                    })
-                }
-            )
-
-            if (!response.ok) throw new Error("Smart search failed")
-            const data = await response.json()
-
-            console.log("🧠 Smart Search Result:", data)
-
-            // 處理新格式響應
-            if (data.status === "success" && data.results && data.results.length > 0) {
-                // 飛到第一個結果
-                const first = data.results[0]
-                if (first.lat && first.lng) {
-                    flyTo({
-                        lat: first.lat,
-                        lng: first.lng,
-                        name: first.name,
-                        address: first.address || ""
-                    })
-                }
-
-                // 設置結果列表（只用真實 POI 資料，無 AI 生成描述）
-                setResults(data.results.map((r: { name: string; address?: string; lat?: number; lng?: number; distance?: number }) => ({
-                    name: r.name,
-                    address: r.address || (r.distance ? `距離 ${r.distance}m` : ""),
-                    lat: r.lat,
-                    lng: r.lng
-                })))
-            } else if (data.status === "not_found") {
-                // 明確的「找不到」，不胡謅
-                console.log("⚠️ Not found:", data.message)
-                setResults([])  // 清空結果
-            }
-        } catch (error) {
-            console.error("AI Search Error:", error)
-        } finally {
-            setAiSearching(false)
-        }
-    }, [query, tripTitle, flyTo])
-
     // 過濾出有座標的地點
     const markers = activities
         .filter((a): a is Activity & { lat: number; lng: number } =>
@@ -456,7 +392,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             'line-opacity',
                             isSatellite ? MAP_STYLES.ROAD_OPACITY_ON_SATELLITE : 1
                         )
-                    } catch (_e) {
+                    } catch {
                         // 某些圖層可能不支援此屬性
                     }
                 }

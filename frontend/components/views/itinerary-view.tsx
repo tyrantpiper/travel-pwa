@@ -53,7 +53,7 @@ export function ItineraryView() {
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
     // Use activeTripId from context, pass userId for privacy filtering
-    const { trip: currentTrip, mutate: reloadTripDetail } = useTripDetail(activeTripId, userId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void> }
+    const { trip: currentTrip, mutate: reloadTripDetail, isValidating } = useTripDetail(activeTripId, userId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void>, isValidating: boolean }
     const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -103,7 +103,13 @@ export function ItineraryView() {
     const [dailyLocSearchRegion, setDailyLocSearchRegion] = useState<string>("") // 每日地點搜尋區域
     const [currentTimezone, setCurrentTimezone] = useState<string>("Asia/Tokyo")  // 當前顯示地點的時區
 
-
+    // 🔧 FIX: Clear stale data immediately when switching trips (before SWR cache loads)
+    // This prevents "ghost date" flash from previous trip's cached data
+    useEffect(() => {
+        setDailyLocs({})  // Clear immediately
+        setDay(1)         // Reset to day 1
+        setWeatherData([]) // Clear weather
+    }, [activeTripId])
 
     useEffect(() => {
         // 🔄 State Sync Fix: Always sync state with props, defaulting to empty object if null
@@ -690,6 +696,13 @@ export function ItineraryView() {
     })()
     const dayNumbers = Array.from({ length: totalDays }, (_, i) => i + 1)
 
+    // 🔧 FIX: Prevent stale date display when switching trips OR on initial load
+    // SWR may return cached data from previous trip before fetching new one
+    const shouldShowDateSkeleton =
+        !currentTrip ||                              // No data yet (first load)
+        (currentTrip.id !== activeTripId) ||         // Trip ID mismatch (switching)
+        (isValidating && !currentTrip?.start_date)   // Validating with no valid date
+
     const getDateInfo = (dayNum: number) => {
         const start = currentTrip ? new Date(currentTrip.start_date || DEFAULT_START_DATE) : DEFAULT_START_DATE
         const d = new Date(start)
@@ -851,38 +864,46 @@ export function ItineraryView() {
                         +
                     </button>
 
-                    {dayNumbers.map((d) => {
-                        const { date, week } = getDateInfo(d)
-                        return (
-                            <div key={d} className="relative flex flex-col items-center">
-                                <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border", day === d ? "text-white" : "bg-white hover:bg-slate-50")}>
-                                    {/* Sliding Indicator */}
-                                    {day === d && (
-                                        <motion.div
-                                            layoutId="day-indicator"
-                                            className="absolute inset-0 bg-slate-900 rounded-lg -z-10"
-                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                        />
-                                    )}
-                                    <span className="text-[10px] opacity-70">{week}</span>
-                                    <span className="font-bold">{date}</span>
-                                </button>
-                                {/* 📱 手機友善刪除按鈕 - 長按當前選中的日期才顯示 */}
-                                {totalDays > 1 && day === d && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
-                                        className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
-                                                   text-red-400 bg-red-50/80 backdrop-blur-sm
-                                                   border border-red-200/60 rounded-full shadow-sm 
-                                                   active:scale-95 active:bg-red-100
-                                                   transition-transform duration-100"
-                                    >
-                                        移除此天
+                    {/* 🔧 FIX: Show skeleton when trip data is stale to prevent wrong dates */}
+                    {shouldShowDateSkeleton ? (
+                        // Skeleton: avoid showing wrong dates from cached trip
+                        [1, 2, 3].map(i => (
+                            <div key={i} className="w-14 h-14 bg-slate-200 rounded-lg animate-pulse flex-shrink-0" />
+                        ))
+                    ) : (
+                        dayNumbers.map((d) => {
+                            const { date, week } = getDateInfo(d)
+                            return (
+                                <div key={d} className="relative flex flex-col items-center">
+                                    <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border", day === d ? "text-white" : "bg-white hover:bg-slate-50")}>
+                                        {/* Sliding Indicator */}
+                                        {day === d && (
+                                            <motion.div
+                                                layoutId="day-indicator"
+                                                className="absolute inset-0 bg-slate-900 rounded-lg -z-10"
+                                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                            />
+                                        )}
+                                        <span className="text-[10px] opacity-70">{week}</span>
+                                        <span className="font-bold">{date}</span>
                                     </button>
-                                )}
-                            </div>
-                        )
-                    })}
+                                    {/* 📱 手機友善刪除按鈕 - 長按當前選中的日期才顯示 */}
+                                    {totalDays > 1 && day === d && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
+                                            className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
+                                                       text-red-400 bg-red-50/80 backdrop-blur-sm
+                                                       border border-red-200/60 rounded-full shadow-sm 
+                                                       active:scale-95 active:bg-red-100
+                                                       transition-transform duration-100"
+                                        >
+                                            移除此天
+                                        </button>
+                                    )}
+                                </div>
+                            )
+                        })
+                    )}
 
                     {/* 🆕 新增天數按鈕 (結尾) */}
                     <button

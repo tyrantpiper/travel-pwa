@@ -18,9 +18,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration: must set mounted after client render
         setMounted(true)
+
         const saved = localStorage.getItem('app_language') as Language
         if (saved && (saved === 'en' || saved === 'zh')) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialization from localStorage on mount is intentional
             setLangState(saved)
         }
     }, [])

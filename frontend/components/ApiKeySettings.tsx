@@ -22,17 +22,16 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
     const [open, setOpen] = useState(false)
     const [key, setKey] = useState("")
     const [isDev, setIsDev] = useState(false)
-
-    // 👇 新增：是否已掛載 (避免 SSR/Client hydration 不一致)
     const [isMounted, setIsMounted] = useState(false)
 
     useEffect(() => {
-        setIsMounted(true) // 代表現在是瀏覽器環境了
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration safety
+        setIsMounted(true)
 
         // 1. 優先檢查開發者後門
         const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
         if (devKey) {
-
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Init from env
             setKey(devKey)
             onKeySaved(devKey)
             setIsDev(true)
@@ -46,6 +45,7 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
             onKeySaved(storedKey)
         }
     }, [onKeySaved])
+
 
     const handleSave = () => {
         if (!key.trim()) return
@@ -139,7 +139,7 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
                                 <div className="flex gap-3">
                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">3</div>
                                     <div>
-                                        點擊 <b>Create API key</b> 按鈕，選擇第一個選項 <b>"Create API key in new project"</b>，複製那串 <code>AIza...</code> 開頭的代碼並貼在上方。
+                                        點擊 <b>Create API key</b> 按鈕，選擇第一個選項 <b>&quot;Create API key in new project&quot;</b>，複製那串 <code>AIza...</code> 開頭的代碼並貼在上方。
                                     </div>
                                 </div>
 

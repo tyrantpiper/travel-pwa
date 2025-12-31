@@ -703,7 +703,6 @@ async def update_trip_location(trip_id: str, request: UpdateLocationRequest, sup
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/trips/{trip_id}/info")
 
 @router.post("/trips/{trip_id}/leave")
 async def leave_trip(
@@ -736,6 +735,7 @@ async def leave_trip(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/trips/{trip_id}/info")
 async def update_trip_info(trip_id: str, request: UpdateInfoRequest, supabase=Depends(get_supabase)):
     """✈️ 更新行程資訊 (航班、住宿、信用卡)"""
     try:

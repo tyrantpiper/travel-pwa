@@ -12,7 +12,6 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useTripContext } from "@/lib/trip-context"
@@ -70,7 +69,7 @@ export function TripSwitcher({ className }: { className?: string }) {
             mutate()  // 刷新行程列表
             toast.success("標題已更新")
             setIsEditing(false)
-        } catch (e) {
+        } catch {
             toast.error("更新失敗")
         } finally {
             setIsSaving(false)

@@ -8,11 +8,12 @@ export function SplashScreen() {
     const [show, setShow] = useState(true)
     const [isStandalone, setIsStandalone] = useState(false)
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 這是必要的初始化邏輯，只在掛載時執行一次
+    // 檢查 PWA 模式和是否已顯示過閃屏
     useEffect(() => {
         // 檢查是否為 PWA 模式
         const standalone = window.matchMedia('(display-mode: standalone)').matches ||
             (window.navigator as unknown as { standalone?: boolean }).standalone === true
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- PWA detection requires init on mount
         setIsStandalone(standalone)
 
         // 檢查是否已經顯示過（同一 session）

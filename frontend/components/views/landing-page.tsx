@@ -13,25 +13,26 @@ function generateUUID() {
         return crypto.randomUUID();
     }
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
 }
 
 export function LandingPage() {
     const [mounted, setMounted] = useState(false)
-
     const [isLoggedIn, setIsLoggedIn] = useState(false)
     const [nickname, setNickname] = useState("")
     const [showRecover, setShowRecover] = useState(false)
     const [recoverCode, setRecoverCode] = useState("")
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration: must set mounted after client render
         setMounted(true)
 
         const storedName = localStorage.getItem("user_nickname")
         const storedId = localStorage.getItem("user_uuid")
         if (storedName && storedId) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialization from localStorage on mount is intentional
             setNickname(storedName)
             setIsLoggedIn(true)
         }
