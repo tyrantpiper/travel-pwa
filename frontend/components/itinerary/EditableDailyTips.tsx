@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff, Loader2 } from "lucide-react"
+import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
@@ -45,7 +45,25 @@ interface EditableDailyTipsProps {
 }
 
 // Constants
-const NOTE_ICONS = ["⚠️", "✈️", "🚇", "🏨", "🍽️", "🎫", "💡", "📍", "⏰", "🎒"]
+// 🎨 圖標庫 - 分類排列，方便用戶快速找到
+const NOTE_ICONS = [
+    // 🔔 警告 & 提示
+    "⚠️", "💡", "📢", "🔔",
+    // ✈️ 交通
+    "✈️", "🚇", "🚌", "🚗", "🚶",
+    // 🏨 住宿
+    "🏨", "🏠", "🔑",
+    // 🍽️ 餐飲
+    "🍽️", "☕", "🍜",
+    // 🛒 購物 & 實用
+    "🛒", "🛍️", "💳", "🏧", "📦",
+    // 🎫 票券 & 活動
+    "🎫", "🎭", "🎢",
+    // 📍 時間地點
+    "📍", "⏰", "📅",
+    // 🎒 其他實用
+    "🎒", "📸", "💊", "☂️", "🔋"
+]
 const CURRENCIES = ["JPY", "TWD", "USD", "EUR", "KRW", "HKD"]
 const DEFAULT_CURRENCY = "JPY"
 
@@ -87,6 +105,16 @@ export default function EditableDailyTips({
     // 🆕 Per-item processing state for anti-spam
     const [processingCosts, setProcessingCosts] = useState<Set<number>>(new Set())
     const [processingTickets, setProcessingTickets] = useState<Set<number>>(new Set())
+
+    // 🆕 編輯模式狀態
+    const [editingNotes, setEditingNotes] = useState(false)
+    const [editingCosts, setEditingCosts] = useState(false)
+    const [editingTickets, setEditingTickets] = useState(false)
+
+    // 🆕 編輯中的資料副本
+    const [editNotesData, setEditNotesData] = useState<NoteItem[]>([])
+    const [editCostsData, setEditCostsData] = useState<CostItem[]>([])
+    const [editTicketsData, setEditTicketsData] = useState<TicketItem[]>([])
 
     // 🆕 Exchange rates for conversion display
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({ JPY: 0.22 }) // Default JPY→TWD
@@ -173,7 +201,40 @@ export default function EditableDailyTips({
         }
     }
 
-    // Costs
+    // 🆕 Notes 編輯模式
+    const handleStartEditNotes = () => {
+        setEditNotesData([...localNotes])
+        setEditingNotes(true)
+        setAddingNote(false)
+        haptic.tap()
+    }
+
+    const handleSaveNotes = async () => {
+        setSaving(true)
+        haptic.tap()
+        if (await onUpdate("notes", editNotesData)) {
+            setLocalNotes(editNotesData)
+            setEditingNotes(false)
+            setEditNotesData([])
+            toast.success("已儲存修改")
+        } else {
+            toast.error("儲存失敗")
+        }
+        setSaving(false)
+    }
+
+    const handleCancelEditNotes = () => {
+        setEditingNotes(false)
+        setEditNotesData([])
+        haptic.tap()
+    }
+
+    const handleUpdateEditNote = (idx: number, field: keyof NoteItem, value: string) => {
+        setEditNotesData(prev => prev.map((note, i) =>
+            i === idx ? { ...note, [field]: value } : note
+        ))
+    }
+
     const handleAddCost = async () => {
         if (!newCost.item.trim() || !newCost.amount.trim()) { toast.error("請輸入項目和金額"); return }
         setSaving(true); haptic.tap()
@@ -236,6 +297,40 @@ export default function EditableDailyTips({
                 return next
             })
         }
+    }
+
+    // 🆕 Costs 編輯模式
+    const handleStartEditCosts = () => {
+        setEditCostsData([...localCosts])
+        setEditingCosts(true)
+        setAddingCost(false)
+        haptic.tap()
+    }
+
+    const handleSaveCosts = async () => {
+        setSaving(true)
+        haptic.tap()
+        if (await onUpdate("costs", editCostsData)) {
+            setLocalCosts(editCostsData)
+            setEditingCosts(false)
+            setEditCostsData([])
+            toast.success("已儲存修改")
+        } else {
+            toast.error("儲存失敗")
+        }
+        setSaving(false)
+    }
+
+    const handleCancelEditCosts = () => {
+        setEditingCosts(false)
+        setEditCostsData([])
+        haptic.tap()
+    }
+
+    const handleUpdateEditCost = (idx: number, field: keyof CostItem, value: string) => {
+        setEditCostsData(prev => prev.map((cost, i) =>
+            i === idx ? { ...cost, [field]: value } : cost
+        ))
     }
 
     // Tickets
@@ -303,6 +398,40 @@ export default function EditableDailyTips({
         }
     }
 
+    // 🆕 Tickets 編輯模式
+    const handleStartEditTickets = () => {
+        setEditTicketsData([...localTickets])
+        setEditingTickets(true)
+        setAddingTicket(false)
+        haptic.tap()
+    }
+
+    const handleSaveTickets = async () => {
+        setSaving(true)
+        haptic.tap()
+        if (await onUpdate("tickets", editTicketsData)) {
+            setLocalTickets(editTicketsData)
+            setEditingTickets(false)
+            setEditTicketsData([])
+            toast.success("已儲存修改")
+        } else {
+            toast.error("儲存失敗")
+        }
+        setSaving(false)
+    }
+
+    const handleCancelEditTickets = () => {
+        setEditingTickets(false)
+        setEditTicketsData([])
+        haptic.tap()
+    }
+
+    const handleUpdateEditTicket = (idx: number, field: keyof TicketItem, value: string) => {
+        setEditTicketsData(prev => prev.map((ticket, i) =>
+            i === idx ? { ...ticket, [field]: value } : ticket
+        ))
+    }
+
     return (
         <div className="mx-5 mb-6 space-y-4">
             {/* ⚠️ Notes Section */}
@@ -312,15 +441,60 @@ export default function EditableDailyTips({
                         <AlertCircle className="w-4 h-4" />
                         <h4 className="text-sm font-bold">每日重點提醒</h4>
                     </div>
-                    {!readOnly && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-100" onClick={() => setAddingNote(true)}>
-                            <Plus className="w-3 h-3 mr-1" /> 新增
-                        </Button>
+                    {!readOnly && !editingNotes && (
+                        <div className="flex gap-1">
+                            {localNotes.length > 0 && (
+                                <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-100" onClick={handleStartEditNotes}>
+                                    <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-100" onClick={() => setAddingNote(true)}>
+                                <Plus className="w-3 h-3 mr-1" /> 新增
+                            </Button>
+                        </div>
+                    )}
+                    {editingNotes && (
+                        <div className="flex gap-1">
+                            <Button size="sm" className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={handleSaveNotes} disabled={saving}>
+                                {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditNotes}>
+                                取消
+                            </Button>
+                        </div>
                     )}
                 </div>
 
                 <div className="space-y-3">
-                    {localNotes.map((note, idx) => (
+                    {/* 編輯模式：顯示所有條目的編輯表單 */}
+                    {editingNotes && editNotesData.map((note, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-amber-200 dark:border-amber-700 space-y-2">
+                            <div className="flex gap-2">
+                                <select
+                                    className="w-12 h-9 text-lg bg-transparent border border-slate-200 dark:border-slate-600 rounded"
+                                    value={note.icon || "⚠️"}
+                                    onChange={(e) => handleUpdateEditNote(idx, 'icon', e.target.value)}
+                                >
+                                    {NOTE_ICONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
+                                </select>
+                                <Input
+                                    placeholder="標題"
+                                    className="flex-1 h-9 text-sm"
+                                    value={note.title}
+                                    onChange={(e) => handleUpdateEditNote(idx, 'title', e.target.value)}
+                                />
+                            </div>
+                            <Input
+                                placeholder="內容..."
+                                className="h-9 text-sm"
+                                value={note.content}
+                                onChange={(e) => handleUpdateEditNote(idx, 'content', e.target.value)}
+                            />
+                        </div>
+                    ))}
+
+                    {/* 正常模式：顯示條目 */}
+                    {!editingNotes && localNotes.map((note, idx) => (
                         <div key={idx} className="flex gap-3 items-start group">
                             <div className="text-lg leading-none mt-0.5">{note.icon || '⚠️'}</div>
                             <div className="flex-1 min-w-0">
@@ -334,9 +508,13 @@ export default function EditableDailyTips({
                             )}
                         </div>
                     ))}
-                    {localNotes.length === 0 && !addingNote && (
+
+                    {/* 空狀態提示 */}
+                    {localNotes.length === 0 && !addingNote && !editingNotes && (
                         <p className="text-xs text-amber-600/60 dark:text-amber-400/60 italic text-center py-2">尚無提醒，點擊「新增」添加</p>
                     )}
+
+                    {/* 新增表單 */}
                     {addingNote && (
                         <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-amber-200 dark:border-amber-700 space-y-2 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex gap-2">
@@ -363,15 +541,69 @@ export default function EditableDailyTips({
                             <Wallet className="w-4 h-4" />
                             <h4 className="text-sm font-bold">預估花費</h4>
                         </div>
-                        {!readOnly && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => setAddingCost(true)}>
-                                <Plus className="w-3 h-3 mr-1" /> 新增
-                            </Button>
+                        {!readOnly && !editingCosts && (
+                            <div className="flex gap-1">
+                                {localCosts.length > 0 && (
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={handleStartEditCosts}>
+                                        <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => setAddingCost(true)}>
+                                    <Plus className="w-3 h-3 mr-1" /> 新增
+                                </Button>
+                            </div>
+                        )}
+                        {editingCosts && (
+                            <div className="flex gap-1">
+                                <Button size="sm" className="h-7 text-xs bg-slate-600 hover:bg-slate-700 text-white" onClick={handleSaveCosts} disabled={saving}>
+                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditCosts}>
+                                    取消
+                                </Button>
+                            </div>
                         )}
                     </div>
 
                     <div className="flex-1 space-y-2">
-                        {localCosts.map((cost, idx) => (
+                        {/* 編輯模式：顯示所有花費的編輯表單 */}
+                        {editingCosts && editCostsData.map((cost, idx) => (
+                            <div key={idx} className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-slate-200 dark:border-slate-600 space-y-2">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="項目"
+                                        className="flex-1 h-8 text-xs"
+                                        value={cost.item}
+                                        onChange={(e) => handleUpdateEditCost(idx, 'item', e.target.value)}
+                                    />
+                                    <div className="flex gap-1 w-32">
+                                        <select
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-[4.5rem]"
+                                            value={cost.currency || DEFAULT_CURRENCY}
+                                            onChange={(e) => handleUpdateEditCost(idx, 'currency', e.target.value)}
+                                        >
+                                            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <Input
+                                            placeholder="金額"
+                                            className="flex-1 h-8 text-xs"
+                                            type="number"
+                                            value={cost.amount}
+                                            onChange={(e) => handleUpdateEditCost(idx, 'amount', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <Input
+                                    placeholder="備註 (選填)"
+                                    className="h-8 text-xs"
+                                    value={cost.note || ""}
+                                    onChange={(e) => handleUpdateEditCost(idx, 'note', e.target.value)}
+                                />
+                            </div>
+                        ))}
+
+                        {/* 正常模式：顯示花費列表 */}
+                        {!editingCosts && localCosts.map((cost, idx) => (
                             <div
                                 key={idx}
                                 className={cn(
@@ -474,15 +706,69 @@ export default function EditableDailyTips({
                             <Ticket className="w-4 h-4" />
                             <h4 className="text-sm font-bold">交通票券</h4>
                         </div>
-                        {!readOnly && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={() => setAddingTicket(true)}>
-                                <Plus className="w-3 h-3 mr-1" /> 新增
-                            </Button>
+                        {!readOnly && !editingTickets && (
+                            <div className="flex gap-1">
+                                {localTickets.length > 0 && (
+                                    <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={handleStartEditTickets}>
+                                        <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={() => setAddingTicket(true)}>
+                                    <Plus className="w-3 h-3 mr-1" /> 新增
+                                </Button>
+                            </div>
+                        )}
+                        {editingTickets && (
+                            <div className="flex gap-1">
+                                <Button size="sm" className="h-7 text-xs bg-blue-500 hover:bg-blue-600 text-white" onClick={handleSaveTickets} disabled={saving}>
+                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditTickets}>
+                                    取消
+                                </Button>
+                            </div>
                         )}
                     </div>
 
                     <div className="flex-1 space-y-2">
-                        {localTickets.map((ticket, idx) => (
+                        {/* 編輯模式：顯示所有票券的編輯表單 */}
+                        {editingTickets && editTicketsData.map((ticket, idx) => (
+                            <div key={idx} className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-blue-200 dark:border-blue-600 space-y-2">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="票券名稱"
+                                        className="flex-1 h-8 text-xs"
+                                        value={ticket.name}
+                                        onChange={(e) => handleUpdateEditTicket(idx, 'name', e.target.value)}
+                                    />
+                                    <div className="flex gap-1 w-32">
+                                        <select
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-[4.5rem]"
+                                            value={ticket.currency || DEFAULT_CURRENCY}
+                                            onChange={(e) => handleUpdateEditTicket(idx, 'currency', e.target.value)}
+                                        >
+                                            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                        <Input
+                                            placeholder="價格"
+                                            className="flex-1 h-8 text-xs"
+                                            type="number"
+                                            value={ticket.price}
+                                            onChange={(e) => handleUpdateEditTicket(idx, 'price', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <Input
+                                    placeholder="備註 (選填)"
+                                    className="h-8 text-xs"
+                                    value={ticket.note || ""}
+                                    onChange={(e) => handleUpdateEditTicket(idx, 'note', e.target.value)}
+                                />
+                            </div>
+                        ))}
+
+                        {/* 正常模式：顯示票券列表 */}
+                        {!editingTickets && localTickets.map((ticket, idx) => (
                             <div
                                 key={idx}
                                 className={cn(

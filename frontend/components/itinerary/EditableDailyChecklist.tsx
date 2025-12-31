@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { CheckSquare, Square, Plus, X, Check, ListChecks, Eye, EyeOff, Loader2 } from "lucide-react"
+import { CheckSquare, Square, Plus, X, Check, ListChecks, Eye, EyeOff, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
@@ -48,6 +48,10 @@ export default function EditableDailyChecklist({
 
     // 🆕 Per-item processing state for anti-spam
     const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+
+    // 🆕 編輯模式狀態
+    const [isEditing, setIsEditing] = useState(false)
+    const [editData, setEditData] = useState<ChecklistItem[]>([])
 
     // Debounce ref for toggle updates
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -192,6 +196,42 @@ export default function EditableDailyChecklist({
         }
     }
 
+    // 🆕 編輯模式
+    const handleStartEdit = () => {
+        setEditData([...localItems])
+        setIsEditing(true)
+        setIsAdding(false)
+    }
+
+    const handleSaveEdit = async () => {
+        setIsUpdating(true)
+        try {
+            if (await onUpdate(editData)) {
+                setLocalItems(editData)
+                setIsEditing(false)
+                setEditData([])
+                toast.success("已儲存修改")
+            } else {
+                toast.error("儲存失敗")
+            }
+        } catch {
+            toast.error("儲存失敗")
+        } finally {
+            setIsUpdating(false)
+        }
+    }
+
+    const handleCancelEdit = () => {
+        setIsEditing(false)
+        setEditData([])
+    }
+
+    const handleUpdateEditItem = (id: string, text: string) => {
+        setEditData(prev => prev.map(item =>
+            item.id === id ? { ...item, text } : item
+        ))
+    }
+
     // 計算完成進度
     const completedCount = localItems.filter(item => item.checked).length
     const totalCount = localItems.length
@@ -222,15 +262,37 @@ export default function EditableDailyChecklist({
                         </span>
                     )}
                 </div>
-                {!readOnly && !isAdding && (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setIsAdding(true)}
-                        className="h-7 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
-                    >
-                        <Plus className="w-4 h-4" />
-                    </Button>
+                {!readOnly && !isAdding && !isEditing && (
+                    <div className="flex gap-1">
+                        {localItems.length > 0 && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleStartEdit}
+                                className="h-7 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                            >
+                                <Pencil className="w-3 h-3 mr-1" /> 編輯
+                            </Button>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setIsAdding(true)}
+                            className="h-7 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
+                        >
+                            <Plus className="w-4 h-4" />
+                        </Button>
+                    </div>
+                )}
+                {isEditing && (
+                    <div className="flex gap-1">
+                        <Button size="sm" className="h-7 text-xs bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleSaveEdit} disabled={isUpdating}>
+                            {isUpdating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEdit}>
+                            取消
+                        </Button>
+                    </div>
                 )}
             </div>
 
@@ -246,96 +308,111 @@ export default function EditableDailyChecklist({
 
             {/* 清單項目 */}
             <div className="space-y-1">
-                {localItems.length === 0 && !isAdding && (
+                {localItems.length === 0 && !isAdding && !isEditing && (
                     <div className="text-center py-4 text-indigo-400 dark:text-indigo-500 text-sm">
                         尚無清單項目
                     </div>
                 )}
 
-                <AnimatePresence mode="popLayout">
-                    {sortedItems.map(item => (
-                        <motion.div
-                            key={item.id}
-                            layout
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{
-                                layout: { type: "spring", stiffness: 500, damping: 35 },
-                                opacity: { duration: 0.15 }
-                            }}
-                            className={`group flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer
-                                ${item.checked
-                                    ? 'bg-indigo-100/50 dark:bg-indigo-900/30'
-                                    : 'hover:bg-white/50 dark:hover:bg-white/5'
-                                }
-                                ${item.is_private ? 'opacity-60 border border-dashed border-indigo-200 dark:border-indigo-700' : ''}`}
-                            onClick={() => toggleItem(item.id)}
-                        >
-                            {/* Checkbox */}
+                {/* 編輯模式：顯示所有項目的編輯表單 */}
+                {isEditing && editData.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                        <Square className="w-5 h-5 text-indigo-300" />
+                        <Input
+                            className="flex-1 h-8 text-sm border-0 focus-visible:ring-0 bg-transparent"
+                            value={item.text}
+                            onChange={(e) => handleUpdateEditItem(item.id, e.target.value)}
+                        />
+                    </div>
+                ))}
+
+                {/* 正常模式：顯示清單 */}
+                {!isEditing && (
+                    <AnimatePresence mode="popLayout">
+                        {sortedItems.map(item => (
                             <motion.div
-                                className="flex-shrink-0"
-                                animate={{ scale: item.checked ? 1.1 : 1 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                                key={item.id}
+                                layout
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{
+                                    layout: { type: "spring", stiffness: 500, damping: 35 },
+                                    opacity: { duration: 0.15 }
+                                }}
+                                className={`group flex items-center gap-2 p-2 rounded-lg transition-colors cursor-pointer
+                                ${item.checked
+                                        ? 'bg-indigo-100/50 dark:bg-indigo-900/30'
+                                        : 'hover:bg-white/50 dark:hover:bg-white/5'
+                                    }
+                                ${item.is_private ? 'opacity-60 border border-dashed border-indigo-200 dark:border-indigo-700' : ''}`}
+                                onClick={() => toggleItem(item.id)}
                             >
-                                {item.checked ? (
-                                    <CheckSquare className="w-5 h-5 text-indigo-500" />
-                                ) : (
-                                    <Square className="w-5 h-5 text-indigo-300 dark:text-indigo-600" />
+                                {/* Checkbox */}
+                                <motion.div
+                                    className="flex-shrink-0"
+                                    animate={{ scale: item.checked ? 1.1 : 1 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                                >
+                                    {item.checked ? (
+                                        <CheckSquare className="w-5 h-5 text-indigo-500" />
+                                    ) : (
+                                        <Square className="w-5 h-5 text-indigo-300 dark:text-indigo-600" />
+                                    )}
+                                </motion.div>
+
+                                {/* 文字 */}
+                                <span className={`flex-1 text-sm transition-all ${item.checked
+                                    ? 'line-through text-indigo-400 dark:text-indigo-500'
+                                    : 'text-indigo-700 dark:text-indigo-200'
+                                    }`}>
+                                    {item.is_private && <EyeOff className="w-3 h-3 inline mr-1 text-indigo-400" />}
+                                    {item.text}
+                                </span>
+
+                                {/* 隱私切換 + 刪除按鈕 */}
+                                {!readOnly && (
+                                    <>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleTogglePrivacy(item.id)
+                                            }}
+                                            className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
+                                                item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
+                                                }`}
+                                            disabled={processingItems.has(item.id) || isUpdating}
+                                            title={item.is_private ? "設為公開" : "設為私人"}
+                                        >
+                                            {processingItems.has(item.id) ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : item.is_private ? (
+                                                <EyeOff className="w-4 h-4" />
+                                            ) : (
+                                                <Eye className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                removeItem(item.id)
+                                            }}
+                                            className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                                }`}
+                                            disabled={processingItems.has(item.id) || isUpdating}
+                                        >
+                                            {processingItems.has(item.id) ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <X className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                    </>
                                 )}
                             </motion.div>
-
-                            {/* 文字 */}
-                            <span className={`flex-1 text-sm transition-all ${item.checked
-                                ? 'line-through text-indigo-400 dark:text-indigo-500'
-                                : 'text-indigo-700 dark:text-indigo-200'
-                                }`}>
-                                {item.is_private && <EyeOff className="w-3 h-3 inline mr-1 text-indigo-400" />}
-                                {item.text}
-                            </span>
-
-                            {/* 隱私切換 + 刪除按鈕 */}
-                            {!readOnly && (
-                                <>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleTogglePrivacy(item.id)
-                                        }}
-                                        className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
-                                            item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
-                                            }`}
-                                        disabled={processingItems.has(item.id) || isUpdating}
-                                        title={item.is_private ? "設為公開" : "設為私人"}
-                                    >
-                                        {processingItems.has(item.id) ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : item.is_private ? (
-                                            <EyeOff className="w-4 h-4" />
-                                        ) : (
-                                            <Eye className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            removeItem(item.id)
-                                        }}
-                                        className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
-                                            }`}
-                                        disabled={processingItems.has(item.id) || isUpdating}
-                                    >
-                                        {processingItems.has(item.id) ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <X className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </>
-                            )}
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
+                        ))}
+                    </AnimatePresence>
+                )}
 
                 {/* 新增輸入框 */}
                 {isAdding && (
