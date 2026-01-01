@@ -728,23 +728,23 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
 
             <div className="relative flex items-center justify-between px-4"><div className="w-4 h-4 bg-stone-50 rounded-full -ml-6"></div><div className="flex-1 border-t-2 border-dashed border-slate-200"></div><div className="w-4 h-4 bg-stone-50 rounded-full -mr-6"></div></div>
 
-            {/* PNR / Terminal / Seat - 置中對齊 */}
+            {/* PNR / Terminal / Seat - 垂直排列（手機友善）*/}
             <div className="p-5 bg-white">
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                        <Label className="text-[10px] text-slate-400 uppercase">PNR</Label>
-                        <div className="flex items-center gap-2">
-                            <Input disabled={!isEditing} value={data.pnr} onChange={e => onChange('pnr', e.target.value)} placeholder="Code" className={isEditing ? "h-8 text-xs font-mono" : "bg-transparent border-0 p-0 h-auto text-lg font-mono font-black text-slate-800 tracking-wider"} />
-                            {!isEditing && data.pnr && <button onClick={handleCopyPNR} className="text-slate-400 hover:text-green-600"><Copy className="w-4 h-4" /></button>}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                        <Label className="text-[10px] text-slate-400 uppercase w-20">PNR</Label>
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                            <Input disabled={!isEditing} value={data.pnr} onChange={e => onChange('pnr', e.target.value)} placeholder="Code" className={isEditing ? "h-8 text-xs font-mono w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-lg font-mono font-black text-slate-800 tracking-wider text-right"} />
+                            {!isEditing && data.pnr && <button onClick={handleCopyPNR} className="text-slate-400 hover:text-green-600 shrink-0"><Copy className="w-4 h-4" /></button>}
                         </div>
                     </div>
-                    <div className="space-y-1 text-center">
-                        <Label className="text-[10px] text-slate-400 uppercase">Terminal</Label>
-                        <Input disabled={!isEditing} value={data.terminal} onChange={e => onChange('terminal', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-center" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-center text-slate-800"} />
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                        <Label className="text-[10px] text-slate-400 uppercase w-20">Terminal</Label>
+                        <Input disabled={!isEditing} value={data.terminal} onChange={e => onChange('terminal', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-right w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-right text-slate-800"} />
                     </div>
-                    <div className="space-y-1 text-center">
-                        <Label className="text-[10px] text-slate-400 uppercase">Seat</Label>
-                        <Input disabled={!isEditing} value={data.seat} onChange={e => onChange('seat', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-center" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-center text-slate-800"} />
+                    <div className="flex items-center justify-between py-2">
+                        <Label className="text-[10px] text-slate-400 uppercase w-20">Seat</Label>
+                        <Input disabled={!isEditing} value={data.seat} onChange={e => onChange('seat', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-right w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-right text-slate-800"} />
                     </div>
                 </div>
             </div>
