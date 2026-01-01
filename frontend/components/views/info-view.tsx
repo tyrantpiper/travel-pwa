@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Plane, Bed, Save, Edit3, Clock, MapPin,
-    Copy, ExternalLink, Phone, Wifi, Link as LinkIcon, Plus, Trash2, Info, Navigation2, Search, Loader2
+    Copy, ExternalLink, Phone, Wifi, Link as LinkIcon, Plus, Trash2, Info, Navigation2, Search, Loader2, X
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,8 +26,8 @@ import { geocodeApi } from "@/lib/api"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const DEFAULT_FLIGHTS = {
-    outbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "TPE", arr_airport: "NRT", seat: "", terminal: "", pnr: "" },
-    inbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "NRT", arr_airport: "TPE", seat: "", terminal: "", pnr: "" }
+    outbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "TPE", arr_airport: "NRT", seat: "", terminal: "", pnr: "", seats: [] as string[], terminals: [] as string[], pnrs: [] as string[] },
+    inbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "NRT", arr_airport: "TPE", seat: "", terminal: "", pnr: "", seats: [] as string[], terminals: [] as string[], pnrs: [] as string[] }
 }
 
 const DEFAULT_HOTEL = {
@@ -61,10 +61,15 @@ interface FlightData {
     arr_time: string
     dep_airport: string
     arr_airport: string
+    // 舊格式（向後相容）
     seat: string
     terminal: string
     pnr: string
     date?: string  // Legacy fallback
+    // 新格式（多筆記錄）
+    seats?: string[]
+    terminals?: string[]
+    pnrs?: string[]
 }
 
 export function InfoView() {
@@ -313,7 +318,7 @@ export function InfoView() {
                                             <FlightCard
                                                 data={flights.outbound}
                                                 isEditing={isEditing}
-                                                onChange={(f: string, v: string) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
+                                                onChange={(f: string, v: string | string[]) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
                                                 onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
                                             />
                                         )}
@@ -321,7 +326,7 @@ export function InfoView() {
                                             <FlightCard
                                                 data={flights.inbound}
                                                 isEditing={isEditing}
-                                                onChange={(f: string, v: string) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
+                                                onChange={(f: string, v: string | string[]) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
                                                 onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
                                             />
                                         )}
@@ -658,8 +663,65 @@ export function InfoView() {
     )
 }
 
-function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, isEditing: boolean, onChange: (field: string, value: string) => void, onClear?: () => void }) {
-    const handleCopyPNR = () => { if (data.pnr) { navigator.clipboard.writeText(data.pnr) } }
+function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, isEditing: boolean, onChange: (field: string, value: string | string[]) => void, onClear?: () => void }) {
+    // 向後相容：讀取時自動轉換舊格式
+    const getPnrs = (): string[] => {
+        if (Array.isArray(data.pnrs) && data.pnrs.length > 0) return data.pnrs
+        return data.pnr ? [data.pnr] : []
+    }
+    const getTerminals = (): string[] => {
+        if (Array.isArray(data.terminals) && data.terminals.length > 0) return data.terminals
+        return data.terminal ? [data.terminal] : []
+    }
+    const getSeats = (): string[] => {
+        if (Array.isArray(data.seats) && data.seats.length > 0) return data.seats
+        return data.seat ? [data.seat] : []
+    }
+
+    const pnrs = getPnrs()
+    const terminals = getTerminals()
+    const seats = getSeats()
+
+    const handleCopy = (text: string) => { navigator.clipboard.writeText(text) }
+
+    // 新增項目
+    const handleAddPnr = () => { onChange('pnrs', [...pnrs, '']) }
+    const handleAddTerminal = () => { onChange('terminals', [...terminals, '']) }
+    const handleAddSeat = () => { onChange('seats', [...seats, '']) }
+
+    // 更新項目
+    const handleUpdatePnr = (idx: number, value: string) => {
+        const updated = [...pnrs]; updated[idx] = value
+        onChange('pnrs', updated)
+        onChange('pnr', updated[0] || '') // 雙寫：同步更新舊欄位
+    }
+    const handleUpdateTerminal = (idx: number, value: string) => {
+        const updated = [...terminals]; updated[idx] = value
+        onChange('terminals', updated)
+        onChange('terminal', updated[0] || '')
+    }
+    const handleUpdateSeat = (idx: number, value: string) => {
+        const updated = [...seats]; updated[idx] = value
+        onChange('seats', updated)
+        onChange('seat', updated[0] || '')
+    }
+
+    // 刪除項目
+    const handleRemovePnr = (idx: number) => {
+        const updated = pnrs.filter((_, i) => i !== idx)
+        onChange('pnrs', updated)
+        onChange('pnr', updated[0] || '')
+    }
+    const handleRemoveTerminal = (idx: number) => {
+        const updated = terminals.filter((_, i) => i !== idx)
+        onChange('terminals', updated)
+        onChange('terminal', updated[0] || '')
+    }
+    const handleRemoveSeat = (idx: number) => {
+        const updated = seats.filter((_, i) => i !== idx)
+        onChange('seats', updated)
+        onChange('seat', updated[0] || '')
+    }
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
@@ -728,26 +790,77 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
 
             <div className="relative flex items-center justify-between px-4"><div className="w-4 h-4 bg-stone-50 rounded-full -ml-6"></div><div className="flex-1 border-t-2 border-dashed border-slate-200"></div><div className="w-4 h-4 bg-stone-50 rounded-full -mr-6"></div></div>
 
-            {/* PNR / Terminal / Seat - 垂直排列（手機友善）*/}
+            {/* PNR / Terminal / Seat - 多筆列表 */}
             <div className="p-5 bg-white">
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                        <Label className="text-[10px] text-slate-400 uppercase w-20">PNR</Label>
-                        <div className="flex items-center gap-2 flex-1 justify-end">
-                            <Input disabled={!isEditing} value={data.pnr} onChange={e => onChange('pnr', e.target.value)} placeholder="Code" className={isEditing ? "h-8 text-xs font-mono w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-lg font-mono font-black text-slate-800 tracking-wider text-right"} />
-                            {!isEditing && data.pnr && <button onClick={handleCopyPNR} className="text-slate-400 hover:text-green-600 shrink-0"><Copy className="w-4 h-4" /></button>}
+                <div className="space-y-4">
+                    {/* PNR 列表 */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-[10px] text-slate-400 uppercase">PNR</Label>
+                            {isEditing && <button onClick={handleAddPnr} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"><Plus className="w-3 h-3" />新增</button>}
                         </div>
+                        {pnrs.length === 0 && !isEditing && <div className="text-slate-300 text-sm">-</div>}
+                        {pnrs.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                {isEditing ? (
+                                    <>
+                                        <Input value={item} onChange={e => handleUpdatePnr(idx, e.target.value)} placeholder="訂位代號(備註)" className="h-8 text-xs font-mono flex-1" />
+                                        <button onClick={() => handleRemovePnr(idx)} className="text-slate-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-lg font-mono font-black text-slate-800 tracking-wider">{item}</span>
+                                        <button onClick={() => handleCopy(item)} className="text-slate-400 hover:text-green-600"><Copy className="w-4 h-4" /></button>
+                                    </>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                        <Label className="text-[10px] text-slate-400 uppercase w-20">Terminal</Label>
-                        <Input disabled={!isEditing} value={data.terminal} onChange={e => onChange('terminal', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-right w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-right text-slate-800"} />
+
+                    {/* Terminal 列表 */}
+                    <div className="space-y-2 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-[10px] text-slate-400 uppercase">Terminal</Label>
+                            {isEditing && <button onClick={handleAddTerminal} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"><Plus className="w-3 h-3" />新增</button>}
+                        </div>
+                        {terminals.length === 0 && !isEditing && <div className="text-slate-300 text-sm">-</div>}
+                        {terminals.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                {isEditing ? (
+                                    <>
+                                        <Input value={item} onChange={e => handleUpdateTerminal(idx, e.target.value)} placeholder="航廈" className="h-8 text-xs flex-1" />
+                                        <button onClick={() => handleRemoveTerminal(idx)} className="text-slate-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+                                    </>
+                                ) : (
+                                    <span className="text-xl font-bold text-slate-800">{item}</span>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                    <div className="flex items-center justify-between py-2">
-                        <Label className="text-[10px] text-slate-400 uppercase w-20">Seat</Label>
-                        <Input disabled={!isEditing} value={data.seat} onChange={e => onChange('seat', e.target.value)} placeholder="-" className={isEditing ? "h-8 text-xs text-right w-full max-w-[180px]" : "bg-transparent border-0 p-0 h-auto text-xl font-bold text-right text-slate-800"} />
+
+                    {/* Seat 列表 */}
+                    <div className="space-y-2 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-[10px] text-slate-400 uppercase">Seat</Label>
+                            {isEditing && <button onClick={handleAddSeat} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"><Plus className="w-3 h-3" />新增</button>}
+                        </div>
+                        {seats.length === 0 && !isEditing && <div className="text-slate-300 text-sm">-</div>}
+                        {seats.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                {isEditing ? (
+                                    <>
+                                        <Input value={item} onChange={e => handleUpdateSeat(idx, e.target.value)} placeholder="座位(備註)" className="h-8 text-xs flex-1" />
+                                        <button onClick={() => handleRemoveSeat(idx)} className="text-slate-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+                                    </>
+                                ) : (
+                                    <span className="text-xl font-bold text-slate-800">{item}</span>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
         </div>
     )
 }
+
