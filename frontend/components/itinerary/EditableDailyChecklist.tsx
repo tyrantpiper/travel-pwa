@@ -38,9 +38,20 @@ export default function EditableDailyChecklist({
     const [localItems, setLocalItems] = useState<ChecklistItem[]>(items || [])
 
     // 🔧 FIX: Sync local items when props update (async data loading)
+    // 🆕 Skip sync when optimistic updates are pending to prevent flicker
     useEffect(() => {
+        if (pendingUpdatesCount.current > 0) return
         setLocalItems(items || [])
     }, [items])
+
+    // 🆕 Cleanup: cancel debounce on unmount to prevent memory leak
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current)
+            }
+        }
+    }, [])
 
     const [isAdding, setIsAdding] = useState(false)
     const [newItemText, setNewItemText] = useState("")
@@ -56,6 +67,10 @@ export default function EditableDailyChecklist({
     // Debounce ref for toggle updates
     const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
+    // 🆕 Track pending optimistic updates to prevent useEffect from overwriting
+    // Uses counter (not boolean) to handle multiple concurrent operations
+    const pendingUpdatesCount = useRef(0)
+
     // 生成 UUID
     const generateId = () => crypto.randomUUID()
 
@@ -64,6 +79,7 @@ export default function EditableDailyChecklist({
         if (readOnly || isUpdating) return
 
         haptic.tap()
+        pendingUpdatesCount.current++  // 🆕 Mark update pending
 
         // 樂觀更新本地狀態
         const newItems = localItems.map(item =>
@@ -90,6 +106,7 @@ export default function EditableDailyChecklist({
                 toast.error("更新失敗")
             } finally {
                 setIsUpdating(false)
+                pendingUpdatesCount.current--  // 🆕 Clear pending flag
             }
         }, 500)
     }, [localItems, onUpdate, readOnly, isUpdating, haptic])
@@ -99,6 +116,7 @@ export default function EditableDailyChecklist({
         if (!newItemText.trim()) return
 
         haptic.success()
+        pendingUpdatesCount.current++  // 🆕 Mark update pending
         const newItem: ChecklistItem = {
             id: generateId(),
             text: newItemText.trim(),
@@ -124,6 +142,7 @@ export default function EditableDailyChecklist({
             toast.error("新增失敗")
         } finally {
             setIsUpdating(false)
+            pendingUpdatesCount.current--  // 🆕 Clear pending flag
         }
     }
 
@@ -133,6 +152,7 @@ export default function EditableDailyChecklist({
         if (processingItems.has(id)) return
 
         haptic.tap()
+        pendingUpdatesCount.current++  // 🆕 Mark update pending
         setProcessingItems(prev => new Set(prev).add(id))
         const newItems = localItems.filter(item => item.id !== id)
         setLocalItems(newItems)
@@ -149,6 +169,7 @@ export default function EditableDailyChecklist({
             toast.error("刪除失敗")
         } finally {
             setIsUpdating(false)
+            pendingUpdatesCount.current--  // 🆕 Clear pending flag
             setProcessingItems(prev => {
                 const next = new Set(prev)
                 next.delete(id)
@@ -163,6 +184,7 @@ export default function EditableDailyChecklist({
         if (processingItems.has(id)) return
 
         haptic.tap()
+        pendingUpdatesCount.current++  // 🆕 Mark update pending
         setProcessingItems(prev => new Set(prev).add(id))
         const newItems = localItems.map(item =>
             item.id === id ? {
@@ -188,6 +210,7 @@ export default function EditableDailyChecklist({
             toast.error("更新失敗")
         } finally {
             setIsUpdating(false)
+            pendingUpdatesCount.current--  // 🆕 Clear pending flag
             setProcessingItems(prev => {
                 const next = new Set(prev)
                 next.delete(id)
