@@ -827,6 +827,7 @@ export function ItineraryView() {
                                                     try {
                                                         // 先取得完整行程資料
                                                         const res = await fetch(`${API_BASE}/api/trips/${trip.id}`)
+                                                        if (!res.ok) throw new Error("無法取得行程資料")
                                                         const fullTrip = await res.json()
 
                                                         // 轉換為 PDF 格式
