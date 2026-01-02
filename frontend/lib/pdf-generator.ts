@@ -1,7 +1,7 @@
 "use client"
 
 import jsPDF from "jspdf"
-import { toPng } from "html-to-image"
+import html2canvas from "html2canvas-pro"
 
 // 類型定義
 export interface TripPDFData {
@@ -53,20 +53,28 @@ const CATEGORY_ICONS: Record<string, string> = {
 }
 
 /**
+ * 防止 XSS 的 HTML 轉義
+ */
+function escapeHtml(text: string): string {
+    if (!text) return ''
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+}
+
+/**
  * 建立隱藏的 HTML 容器用於渲染 PDF 內容
- * 🆕 html-to-image 優化版
  */
 function createPDFContainer(data: TripPDFData): HTMLDivElement {
     const container = document.createElement("div")
     container.id = "pdf-render-container"
-    // 🆕 修復：使用 opacity:0 + fixed 定位（在 viewport 內但隱藏）
     container.style.cssText = `
-        position: fixed;
-        left: 0;
+        position: absolute;
+        left: -9999px;
         top: 0;
-        z-index: -9999;
-        opacity: 0;
-        pointer-events: none;
         width: 794px;
         background-color: #ffffff;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
@@ -141,25 +149,11 @@ function createPDFContainer(data: TripPDFData): HTMLDivElement {
 }
 
 /**
- * 防止 XSS 的 HTML 轉義
- */
-function escapeHtml(text: string): string {
-    if (!text) return ''
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;')
-}
-
-/**
- * 生成行程 PDF（使用 html-to-image，速度快 70 倍）
+ * 生成行程 PDF（使用 html2canvas-pro）
  * @param data 行程資料
  * @returns PDF blob URL
  */
 export async function generateTripPDF(data: TripPDFData): Promise<string> {
-
     // 空行程檢查
     if (!data.days || data.days.length === 0) {
         throw new Error("行程內容為空，無法生成 PDF。")
@@ -170,45 +164,36 @@ export async function generateTripPDF(data: TripPDFData): Promise<string> {
     container.setAttribute('aria-hidden', 'true')
     document.body.appendChild(container)
 
-    // 🆕 等待 DOM 穩定和圖片載入
-    await new Promise(resolve => setTimeout(resolve, 150))
-
     try {
-        // 🆕 使用 html-to-image (速度快 70 倍)
-        const dataUrl = await toPng(container, {
-            quality: 0.95,
-            pixelRatio: 2, // 高解析度
-            backgroundColor: '#ffffff', // 🆕 明確設定背景色，防止透明
-            skipFonts: true, // 🆕 跳過字體處理，避免 CORS 問題
-            cacheBust: true, // 🆕 防止快取問題
+        // 使用 html2canvas-pro（支援 lab() 等現代顏色）
+        const canvas = await html2canvas(container, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: "#ffffff",
+            logging: false
         })
 
         // 計算分頁
-        const img = new Image()
-        await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve()
-            img.onerror = reject
-            img.src = dataUrl
-        })
-
         const imgWidth = 210 // A4 寬度 mm
         const pageHeight = 297 // A4 高度 mm
-        const imgHeight = (img.height * imgWidth) / img.width
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
         let heightLeft = imgHeight
         let position = 0
 
         // 建立 PDF
         const pdf = new jsPDF("p", "mm", "a4")
+        const imgData = canvas.toDataURL("image/jpeg", 0.95)
 
         // 第一頁
-        pdf.addImage(dataUrl, "PNG", 0, position, imgWidth, imgHeight)
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
         heightLeft -= pageHeight
 
         // 多頁處理
         while (heightLeft > 0) {
             position -= pageHeight
             pdf.addPage()
-            pdf.addImage(dataUrl, "PNG", 0, position, imgWidth, imgHeight)
+            pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight)
             heightLeft -= pageHeight
         }
 
