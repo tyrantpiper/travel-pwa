@@ -10,6 +10,7 @@ import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
 import { geocodeApi } from "@/lib/api"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
+import { useCityBias } from "@/hooks/useCityBias"
 
 // ViewState 類型
 interface ViewState {
@@ -112,6 +113,9 @@ export default function FullscreenMapModal({
     // 🏕️ Local Geocode Hook (L1 本地秒回)
     const { search: localSearch, isLoaded: localDataLoaded } = useLocalGeocode()
 
+    // 🏙️ City Bias Hook (智能 Location Bias)
+    const { findNearestCity } = useCityBias()
+
     // Debounced 搜尋 (L1 本地 + L2 API)
     useEffect(() => {
         if (query.length < 2) {
@@ -150,12 +154,17 @@ export default function FullscreenMapModal({
             setIsTyping(false)
             setIsSearching(true)
             try {
+                // 🏙️ 智能 Location Bias: 根據地圖中心找最近城市
+                const nearestCity = findNearestCity(initialViewState.latitude, initialViewState.longitude)
+
                 const data = await geocodeApi.search({
                     query: currentQuery,
                     limit: 5,
                     tripTitle,
-                    lat: initialViewState.latitude,
-                    lng: initialViewState.longitude
+                    lat: nearestCity?.lat ?? initialViewState.latitude,
+                    lng: nearestCity?.lng ?? initialViewState.longitude,
+                    country: nearestCity?.country,
+                    region: nearestCity?.region
                 })
                 if (currentQuery === query) {
                     setResults(data.results || [])
@@ -170,6 +179,7 @@ export default function FullscreenMapModal({
         }, 300)
 
         return () => clearTimeout(timer)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, tripTitle, initialViewState.latitude, initialViewState.longitude, localDataLoaded, localSearch])
 
     // Esc 鍵退出

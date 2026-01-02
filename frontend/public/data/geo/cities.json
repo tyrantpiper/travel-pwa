@@ -1,0 +1,372 @@
+{
+    "__meta": {
+        "version": "1.0",
+        "lastUpdated": "2026-01-03",
+        "description": "亞洲主要旅遊城市座標，用於 Location Bias 搜尋優化",
+        "sources": [
+            "GeoNames",
+            "Natural Earth"
+        ]
+    },
+    "cities": [
+        {
+            "name": "東京",
+            "aliases": [
+                "tokyo",
+                "東京都",
+                "とうきょう"
+            ],
+            "country": "JP",
+            "region": "Kanto",
+            "lat": 35.6762,
+            "lng": 139.6503
+        },
+        {
+            "name": "大阪",
+            "aliases": [
+                "osaka",
+                "おおさか",
+                "大阪市"
+            ],
+            "country": "JP",
+            "region": "Kansai",
+            "lat": 34.6937,
+            "lng": 135.5023
+        },
+        {
+            "name": "京都",
+            "aliases": [
+                "kyoto",
+                "きょうと",
+                "京都市"
+            ],
+            "country": "JP",
+            "region": "Kansai",
+            "lat": 35.0116,
+            "lng": 135.7681
+        },
+        {
+            "name": "名古屋",
+            "aliases": [
+                "nagoya",
+                "なごや",
+                "名古屋市"
+            ],
+            "country": "JP",
+            "region": "Chubu",
+            "lat": 35.1815,
+            "lng": 136.9066
+        },
+        {
+            "name": "札幌",
+            "aliases": [
+                "sapporo",
+                "さっぽろ",
+                "札幌市"
+            ],
+            "country": "JP",
+            "region": "Hokkaido",
+            "lat": 43.0618,
+            "lng": 141.3545
+        },
+        {
+            "name": "福岡",
+            "aliases": [
+                "fukuoka",
+                "ふくおか",
+                "福岡市"
+            ],
+            "country": "JP",
+            "region": "Kyushu",
+            "lat": 33.5904,
+            "lng": 130.4017
+        },
+        {
+            "name": "沖繩",
+            "aliases": [
+                "okinawa",
+                "おきなわ",
+                "那霸",
+                "naha"
+            ],
+            "country": "JP",
+            "region": "Okinawa",
+            "lat": 26.2124,
+            "lng": 127.6809
+        },
+        {
+            "name": "橫濱",
+            "aliases": [
+                "yokohama",
+                "よこはま",
+                "横浜"
+            ],
+            "country": "JP",
+            "region": "Kanto",
+            "lat": 35.4437,
+            "lng": 139.6380
+        },
+        {
+            "name": "神戶",
+            "aliases": [
+                "kobe",
+                "こうべ",
+                "神戸"
+            ],
+            "country": "JP",
+            "region": "Kansai",
+            "lat": 34.6901,
+            "lng": 135.1956
+        },
+        {
+            "name": "奈良",
+            "aliases": [
+                "nara",
+                "なら",
+                "奈良市"
+            ],
+            "country": "JP",
+            "region": "Kansai",
+            "lat": 34.6851,
+            "lng": 135.8048
+        },
+        {
+            "name": "廣島",
+            "aliases": [
+                "hiroshima",
+                "ひろしま",
+                "広島"
+            ],
+            "country": "JP",
+            "region": "Chugoku",
+            "lat": 34.3853,
+            "lng": 132.4553
+        },
+        {
+            "name": "金澤",
+            "aliases": [
+                "kanazawa",
+                "かなざわ",
+                "金沢"
+            ],
+            "country": "JP",
+            "region": "Chubu",
+            "lat": 36.5944,
+            "lng": 136.6256
+        },
+        {
+            "name": "首爾",
+            "aliases": [
+                "seoul",
+                "서울",
+                "首尔"
+            ],
+            "country": "KR",
+            "region": "Seoul",
+            "lat": 37.5665,
+            "lng": 126.9780
+        },
+        {
+            "name": "釜山",
+            "aliases": [
+                "busan",
+                "부산",
+                "釜山市"
+            ],
+            "country": "KR",
+            "region": "Busan",
+            "lat": 35.1796,
+            "lng": 129.0756
+        },
+        {
+            "name": "濟州島",
+            "aliases": [
+                "jeju",
+                "제주",
+                "济州"
+            ],
+            "country": "KR",
+            "region": "Jeju",
+            "lat": 33.4996,
+            "lng": 126.5312
+        },
+        {
+            "name": "仁川",
+            "aliases": [
+                "incheon",
+                "인천",
+                "仁川市"
+            ],
+            "country": "KR",
+            "region": "Incheon",
+            "lat": 37.4563,
+            "lng": 126.7052
+        },
+        {
+            "name": "台北",
+            "aliases": [
+                "taipei",
+                "臺北",
+                "台北市"
+            ],
+            "country": "TW",
+            "region": "Taipei",
+            "lat": 25.0330,
+            "lng": 121.5654
+        },
+        {
+            "name": "高雄",
+            "aliases": [
+                "kaohsiung",
+                "高雄市"
+            ],
+            "country": "TW",
+            "region": "Kaohsiung",
+            "lat": 22.6273,
+            "lng": 120.3014
+        },
+        {
+            "name": "台中",
+            "aliases": [
+                "taichung",
+                "臺中",
+                "台中市"
+            ],
+            "country": "TW",
+            "region": "Taichung",
+            "lat": 24.1477,
+            "lng": 120.6736
+        },
+        {
+            "name": "台南",
+            "aliases": [
+                "tainan",
+                "臺南",
+                "台南市"
+            ],
+            "country": "TW",
+            "region": "Tainan",
+            "lat": 22.9998,
+            "lng": 120.2270
+        },
+        {
+            "name": "花蓮",
+            "aliases": [
+                "hualien",
+                "花蓮市"
+            ],
+            "country": "TW",
+            "region": "Hualien",
+            "lat": 23.9910,
+            "lng": 121.6113
+        },
+        {
+            "name": "曼谷",
+            "aliases": [
+                "bangkok",
+                "กรุงเทพ",
+                "曼谷市"
+            ],
+            "country": "TH",
+            "region": "Bangkok",
+            "lat": 13.7563,
+            "lng": 100.5018
+        },
+        {
+            "name": "清邁",
+            "aliases": [
+                "chiang mai",
+                "เชียงใหม่",
+                "清迈"
+            ],
+            "country": "TH",
+            "region": "Chiang Mai",
+            "lat": 18.7883,
+            "lng": 98.9853
+        },
+        {
+            "name": "普吉島",
+            "aliases": [
+                "phuket",
+                "ภูเก็ต",
+                "普吉"
+            ],
+            "country": "TH",
+            "region": "Phuket",
+            "lat": 7.8804,
+            "lng": 98.3923
+        },
+        {
+            "name": "河內",
+            "aliases": [
+                "hanoi",
+                "Hà Nội",
+                "河内"
+            ],
+            "country": "VN",
+            "region": "Hanoi",
+            "lat": 21.0278,
+            "lng": 105.8342
+        },
+        {
+            "name": "胡志明市",
+            "aliases": [
+                "ho chi minh",
+                "Hồ Chí Minh",
+                "西贡",
+                "saigon"
+            ],
+            "country": "VN",
+            "region": "HCMC",
+            "lat": 10.8231,
+            "lng": 106.6297
+        },
+        {
+            "name": "峴港",
+            "aliases": [
+                "da nang",
+                "Đà Nẵng",
+                "岘港"
+            ],
+            "country": "VN",
+            "region": "Da Nang",
+            "lat": 16.0544,
+            "lng": 108.2022
+        },
+        {
+            "name": "新加坡",
+            "aliases": [
+                "singapore",
+                "獅城"
+            ],
+            "country": "SG",
+            "region": "Singapore",
+            "lat": 1.3521,
+            "lng": 103.8198
+        },
+        {
+            "name": "香港",
+            "aliases": [
+                "hong kong",
+                "hongkong",
+                "HK"
+            ],
+            "country": "HK",
+            "region": "Hong Kong",
+            "lat": 22.3193,
+            "lng": 114.1694
+        },
+        {
+            "name": "澳門",
+            "aliases": [
+                "macau",
+                "macao",
+                "澳门"
+            ],
+            "country": "MO",
+            "region": "Macau",
+            "lat": 22.1987,
+            "lng": 113.5439
+        }
+    ]
+}

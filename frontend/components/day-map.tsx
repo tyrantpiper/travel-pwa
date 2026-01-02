@@ -11,6 +11,7 @@ import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
+import { useCityBias } from "@/hooks/useCityBias"
 
 // Activity 類型定義
 interface Activity {
@@ -273,6 +274,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     // 🏕️ Local Geocode Hook (L1 本地秒回)
     const { search: localSearch, isLoaded: localDataLoaded } = useLocalGeocode()
 
+    // 🏙️ City Bias Hook (智能 Location Bias)
+    const { findNearestCity } = useCityBias()
+
     // Debounced 搜尋 (L1 本地 + L2 API)
     useEffect(() => {
         if (!isSearchOpen || query.length < 2) {
@@ -313,12 +317,18 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             setResults([])  // Anti-flicker: clear old results before new search
             try {
                 const center = mapRef.current?.getCenter()
+
+                // 🏙️ 智能 Location Bias: 根據地圖中心找最近城市
+                const nearestCity = center ? findNearestCity(center.lat, center.lng) : null
+
                 const data = await geocodeApi.search({
                     query: currentQuery,
                     limit: 5,
                     tripTitle,
-                    lat: center?.lat,
-                    lng: center?.lng
+                    lat: nearestCity?.lat ?? center?.lat,
+                    lng: nearestCity?.lng ?? center?.lng,
+                    country: nearestCity?.country,
+                    region: nearestCity?.region
                 })
                 // 🆕 只在 query 仍然匹配時更新
                 if (currentQuery === query) {
@@ -334,6 +344,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         }, 300)
 
         return () => clearTimeout(timer)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, isSearchOpen, tripTitle, localDataLoaded, localSearch])
 
     // 自動 focus
