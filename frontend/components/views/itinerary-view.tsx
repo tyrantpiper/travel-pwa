@@ -823,7 +823,8 @@ export function ItineraryView() {
                                                 className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 gap-1 px-2 h-7"
                                                 onClick={async (e) => {
                                                     e.stopPropagation()
-                                                    toast.loading("生成 PDF 中...")
+                                                    // 🆕 修復：保存初始 toast ID 以便後續 dismiss
+                                                    let toastId: string | number = toast.loading("生成 PDF 中...")
                                                     try {
                                                         // 先取得完整行程資料
                                                         const res = await fetch(`${API_BASE}/api/trips/${trip.id}`)
@@ -856,13 +857,11 @@ export function ItineraryView() {
                                                             hotels: fullTrip.hotel_info || []
                                                         }
 
-                                                        // 🆕 添加進度回調
-                                                        let toastId: string | number | undefined
+                                                        // 🆕 進度回調：更新同一個 toast
                                                         const blobUrl = await generateTripPDF(pdfData, (current, total, stage) => {
-                                                            if (toastId) toast.dismiss(toastId)
-                                                            toastId = toast.loading(`${stage} (${current}/${total})`)
+                                                            toast.loading(`${stage} (${current}/${total})`, { id: toastId })
                                                         })
-                                                        if (toastId) toast.dismiss(toastId)
+                                                        toast.dismiss(toastId)
                                                         downloadPDF(blobUrl, `${trip.title || "trip"}.pdf`)
                                                         toast.success("PDF 下載成功！")
                                                     } catch (err) {
