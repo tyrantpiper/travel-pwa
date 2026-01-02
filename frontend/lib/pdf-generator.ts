@@ -195,6 +195,41 @@ async function renderToCanvas(element: HTMLDivElement): Promise<HTMLCanvasElemen
 }
 
 /**
+ * 🆕 將長圖分頁添加到 PDF（保持原始比例，超過一頁自動分頁）
+ */
+function addImageWithPaging(
+    pdf: jsPDF,
+    dataUrl: string,
+    imgWidth: number,
+    imgHeight: number,
+    pageHeight: number,
+    isFirstPage: boolean
+): boolean {
+    let position = 0
+    let heightLeft = imgHeight
+    let addedPage = false
+
+    // 第一次添加
+    if (!isFirstPage) {
+        pdf.addPage()
+        addedPage = true
+    }
+    pdf.addImage(dataUrl, "JPEG", 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    // 超過一頁的部分，繼續分頁
+    while (heightLeft > 0) {
+        position -= pageHeight
+        pdf.addPage()
+        pdf.addImage(dataUrl, "JPEG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+        addedPage = true
+    }
+
+    return addedPage
+}
+
+/**
  * 🆕 生成行程 PDF（每天獨立渲染，避免崩潰和切割）
  * @param data 行程資料
  * @param onProgress 進度回調
@@ -221,21 +256,19 @@ export async function generateTripPDF(
     const coverContainer = createCoverContainer(data)
     const coverCanvas = await renderToCanvas(coverContainer)
     const coverHeight = (coverCanvas.height * imgWidth) / coverCanvas.width
-    pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, coverHeight)
+    addImageWithPaging(pdf, coverCanvas.toDataURL("image/jpeg", 0.9), imgWidth, coverHeight, imgHeight, isFirstPage)
     isFirstPage = false
 
     // 2. 每天獨立一頁（🆕 核心優化）
     for (const dayData of data.days) {
         onProgress?.(++currentPage, totalPages, `生成 Day ${dayData.day}...`)
 
-        if (!isFirstPage) pdf.addPage()
-
         const dayContainer = createDayContainer(dayData)
         const dayCanvas = await renderToCanvas(dayContainer)
         const dayHeight = (dayCanvas.height * imgWidth) / dayCanvas.width
 
-        // 🆕 保持原始比例，不壓縮
-        pdf.addImage(dayCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, dayHeight)
+        // 🆕 保持原始比例，超過一頁自動分頁
+        addImageWithPaging(pdf, dayCanvas.toDataURL("image/jpeg", 0.9), imgWidth, dayHeight, imgHeight, isFirstPage)
         isFirstPage = false
     }
 
@@ -243,10 +276,9 @@ export async function generateTripPDF(
     const hotelsContainer = createHotelsContainer(data.hotels)
     if (hotelsContainer) {
         onProgress?.(++currentPage, totalPages, "生成住宿資訊...")
-        pdf.addPage()
         const hotelsCanvas = await renderToCanvas(hotelsContainer)
         const hotelsHeight = (hotelsCanvas.height * imgWidth) / hotelsCanvas.width
-        pdf.addImage(hotelsCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, hotelsHeight)
+        addImageWithPaging(pdf, hotelsCanvas.toDataURL("image/jpeg", 0.9), imgWidth, hotelsHeight, imgHeight, isFirstPage)
     }
 
     onProgress?.(totalPages, totalPages, "完成！")
