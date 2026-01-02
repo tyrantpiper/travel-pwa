@@ -60,3 +60,21 @@ export const MAP_STYLES = {
     // 衛星模式道路透明度
     ROAD_OPACITY_ON_SATELLITE: 0.7,
 }
+
+/**
+ * 地圖中文化配置
+ * 將所有標籤優先顯示繁體中文，並提供回退機制
+ */
+export const MAP_LOCALIZATION = {
+    // 中文標籤優先級表達式 (用於 MapLibre setLayoutProperty)
+    CHINESE_LABEL_EXPRESSION: [
+        'coalesce',
+        ['get', 'name:zh-Hant'],  // 1. 繁體中文
+        ['get', 'name:zh'],        // 2. 簡體中文
+        ['get', 'name:latin'],     // 3. 拉丁字母
+        ['get', 'name']            // 4. 當地語系 (最終回退)
+    ] as const,
+
+    // POI 名稱優先級順序
+    CHINESE_NAME_KEYS: ['name:zh-Hant', 'name:zh', 'name', 'name_en'] as const,
+}

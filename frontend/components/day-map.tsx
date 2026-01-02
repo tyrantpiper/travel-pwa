@@ -5,7 +5,7 @@ import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionContro
 import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
-import { MAP_STYLES } from "@/lib/constants"
+import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
@@ -518,6 +518,19 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             }, labelLayerId)
         }
 
+        // 🌍 全球中文化：所有標籤優先顯示繁體中文
+        const allLayers = map.getStyle()?.layers || []
+        let chineseLayerCount = 0
+        allLayers.forEach(layer => {
+            if (layer.type === 'symbol' && 'layout' in layer && layer.layout?.['text-field']) {
+                try {
+                    map.setLayoutProperty(layer.id, 'text-field', MAP_LOCALIZATION.CHINESE_LABEL_EXPRESSION)
+                    chineseLayerCount++
+                } catch { /* 部分圖層可能不支援 */ }
+            }
+        })
+        console.log(`🌍 已將 ${chineseLayerCount} 個標籤圖層中文化`)
+
         // 🆕 POI 點擊事件 (Progressive Intelligence Layer 1)
         map.on('click', (e) => {
             // 查詢點擊位置的 POI 圖層
@@ -535,8 +548,16 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     : [e.lngLat.lng, e.lngLat.lat]
 
                 // 構建 POI 基礎資料
+                // 🌍 中文名稱優先級
+                const getName = () => {
+                    for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
+                        if (props[key]) return props[key]
+                    }
+                    return '未知地點'
+                }
+
                 const poiData: POIBasicData = {
-                    name: props.name || props.name_en || '未知地點',
+                    name: getName(),
                     type: props.class || props.subclass || props.type || 'place',
                     lat: coords[1] as number,
                     lng: coords[0] as number,
