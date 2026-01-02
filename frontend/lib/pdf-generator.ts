@@ -221,7 +221,7 @@ export async function generateTripPDF(
     const coverContainer = createCoverContainer(data)
     const coverCanvas = await renderToCanvas(coverContainer)
     const coverHeight = (coverCanvas.height * imgWidth) / coverCanvas.width
-    pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, Math.min(coverHeight, imgHeight))
+    pdf.addImage(coverCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, coverHeight)
     isFirstPage = false
 
     // 2. 每天獨立一頁（🆕 核心優化）
@@ -234,8 +234,8 @@ export async function generateTripPDF(
         const dayCanvas = await renderToCanvas(dayContainer)
         const dayHeight = (dayCanvas.height * imgWidth) / dayCanvas.width
 
-        // 如果內容超過一頁，縮放填滿
-        pdf.addImage(dayCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, Math.min(dayHeight, imgHeight))
+        // 🆕 保持原始比例，不壓縮
+        pdf.addImage(dayCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, dayHeight)
         isFirstPage = false
     }
 
@@ -246,7 +246,7 @@ export async function generateTripPDF(
         pdf.addPage()
         const hotelsCanvas = await renderToCanvas(hotelsContainer)
         const hotelsHeight = (hotelsCanvas.height * imgWidth) / hotelsCanvas.width
-        pdf.addImage(hotelsCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, Math.min(hotelsHeight, imgHeight))
+        pdf.addImage(hotelsCanvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, imgWidth, hotelsHeight)
     }
 
     onProgress?.(totalPages, totalPages, "完成！")
