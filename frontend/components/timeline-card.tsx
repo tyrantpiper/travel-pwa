@@ -15,7 +15,8 @@ import {
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Textarea } from "@/components/ui/textarea"
+import { RichTextarea } from "@/components/ui/rich-textarea"
+import { RichDisplay } from "@/components/ui/rich-display"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -313,10 +314,13 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
 
                             {isEditing ? (
                                 <div className="space-y-4 bg-white p-3 rounded-xl border border-amber-200">
-                                    {/* Memo 編輯 */}
-                                    <Textarea
-                                        value={note} onChange={(e) => setNote(e.target.value)}
-                                        className="min-h-[80px] bg-yellow-50/30 text-sm" placeholder="輸入私人備忘..."
+                                    {/* Memo 編輯 - 使用 RichTextarea */}
+                                    <RichTextarea
+                                        value={note}
+                                        onChange={setNote}
+                                        placeholder="輸入私人備忘..."
+                                        className="bg-yellow-50/30"
+                                        minHeight="80px"
                                     />
 
                                     {/* 連結編輯 */}
@@ -343,12 +347,12 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                             ) : (
                                 // 唯讀顯示模式
                                 <div className="space-y-3">
-                                    {/* Memo 顯示 */}
+                                    {/* Memo 顯示 - 使用 RichDisplay */}
                                     <div
-                                        className="text-sm text-slate-600 leading-relaxed bg-yellow-50/50 p-4 rounded-xl border border-dashed border-amber-200 cursor-text hover:bg-yellow-50 transition-colors whitespace-pre-wrap"
+                                        className="text-sm text-slate-600 leading-relaxed bg-yellow-50/50 p-4 rounded-xl border border-dashed border-amber-200 cursor-text hover:bg-yellow-50 transition-colors"
                                         onClick={() => setIsEditing(true)}
                                     >
-                                        {note || <span className="text-slate-400 italic flex items-center gap-2"><Plus className="w-3 h-3" /> 新增備忘...</span>}
+                                        {note ? <RichDisplay text={note} /> : <span className="text-slate-400 italic flex items-center gap-2"><Plus className="w-3 h-3" /> 新增備忘...</span>}
                                     </div>
 
                                     {/* Links 顯示 (如果有) */}
