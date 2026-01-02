@@ -3,6 +3,11 @@ import withPWA from '@ducanh2912/next-pwa';
 
 const nextConfig = {
     reactStrictMode: true,
+    // 🚀 React 19 性能優化
+    experimental: {
+        reactCompiler: true,      // 自動 Memoization
+        viewTransition: true,     // 原生頁面過場動畫
+    },
     images: {
         remotePatterns: [
             { protocol: 'https', hostname: 'res.cloudinary.com' },
