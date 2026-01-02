@@ -142,19 +142,17 @@ async def get_trip_by_id(
                     "image_url": item.get("image_url")
                 })
         
-        # 🆕 隱私過濾輔助函數
+        # 🆕 隱私過濾輔助函數（修正版：使用 private_owner_id）
         def filter_private_items(items_dict: dict) -> dict:
-            """過濾非成員的私人項目"""
-            if is_member:
-                return items_dict  # 成員看到全部
-            
+            """過濾私人項目：只有設定者本人可見"""
             filtered = {}
             for day_key, items_list in items_dict.items():
                 if isinstance(items_list, list):
-                    # 過濾掉 is_private=True 的項目
+                    # 過濾掉私人項目（除非是自己設定的）
                     filtered[day_key] = [
                         item for item in items_list 
-                        if not item.get("is_private")
+                        if not item.get("is_private") or  # 公開項目
+                           item.get("private_owner_id") == user_id  # 或是自己的私人項目
                     ]
                 else:
                     filtered[day_key] = items_list
