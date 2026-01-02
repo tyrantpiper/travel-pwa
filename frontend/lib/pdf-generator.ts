@@ -151,29 +151,11 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * 🆕 檢測是否支援 foreignObject (舊瀏覽器相容性處理)
- */
-function isForeignObjectSupported(): boolean {
-    try {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-        const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject')
-        svg.appendChild(foreignObject)
-        return 'foreignObject' in foreignObject
-    } catch {
-        return false
-    }
-}
-
-/**
  * 生成行程 PDF（使用 html-to-image，速度快 70 倍）
  * @param data 行程資料
  * @returns PDF blob URL
  */
 export async function generateTripPDF(data: TripPDFData): Promise<string> {
-    // 🆕 舊瀏覽器相容性檢查
-    if (!isForeignObjectSupported()) {
-        throw new Error("您的瀏覽器版本過舊，不支援 PDF 生成。請使用 Chrome、Firefox 或 Safari 最新版。")
-    }
 
     // 空行程檢查
     if (!data.days || data.days.length === 0) {
