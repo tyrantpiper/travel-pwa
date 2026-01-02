@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
+import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 
 // Activity 類型定義
 interface Activity {
@@ -269,7 +270,10 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     }
 
 
-    // Debounced 搜尋
+    // 🏕️ Local Geocode Hook (L1 本地秒回)
+    const { search: localSearch, isLoaded: localDataLoaded } = useLocalGeocode()
+
+    // Debounced 搜尋 (L1 本地 + L2 API)
     useEffect(() => {
         if (!isSearchOpen || query.length < 2) {
             setResults([])
@@ -279,6 +283,30 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
         const currentQuery = query  // 🆕 快照防止競態
 
+        // 🏕️ L1: 本地即時搜尋 (毫秒級)
+        if (localDataLoaded) {
+            const localResults = localSearch(currentQuery, 5)
+            if (localResults.length > 0) {
+                const mapped = localResults
+                    .filter(r => r.lat && r.lng)  // 只取有座標的
+                    .map(r => ({
+                        name: r.display,
+                        lat: r.lat!,
+                        lng: r.lng!,
+                        address: r.country || '',
+                        type: r.type,
+                        source: 'local' as const
+                    }))
+                if (mapped.length > 0) {
+                    setResults(mapped)
+                    setIsTyping(false)
+                    console.log(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
+                    return  // 本地命中，不繼續 API
+                }
+            }
+        }
+
+        // 🌐 L2: API 搜尋 (300ms debounce)
         const timer = setTimeout(async () => {
             setIsTyping(false)    // debounce 結束
             setIsSearching(true)
@@ -306,7 +334,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         }, 300)
 
         return () => clearTimeout(timer)
-    }, [query, isSearchOpen, tripTitle])
+    }, [query, isSearchOpen, tripTitle, localDataLoaded, localSearch])
 
     // 自動 focus
     useEffect(() => {
