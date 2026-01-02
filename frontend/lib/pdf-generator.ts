@@ -1,7 +1,7 @@
 "use client"
 
 import jsPDF from "jspdf"
-import html2canvas from "html2canvas"
+import html2canvas from "html2canvas-pro"
 
 // 類型定義
 export interface TripPDFData {
