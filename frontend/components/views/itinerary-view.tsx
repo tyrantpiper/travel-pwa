@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
-import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Download } from "lucide-react"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -33,6 +33,7 @@ import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
 import { getNowInZone } from "@/lib/timezone"
 import { COUNTRY_REGIONS } from "@/lib/constants"
+import { generateTripPDF, downloadPDF, TripPDFData } from "@/lib/pdf-generator"
 
 const DEFAULT_START_DATE = new Date()
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -814,20 +815,74 @@ export function ItineraryView() {
                                     </div>
                                     <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
                                         <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
-                                        {/* 退出行程按鈕 (僅限非擁有者) */}
-                                        {userId && trip.created_by !== userId && (
+                                        <div className="flex items-center gap-2">
+                                            {/* PDF 下載按鈕 */}
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
-                                                onClick={(e) => {
+                                                className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 gap-1 px-2 h-7"
+                                                onClick={async (e) => {
                                                     e.stopPropagation()
-                                                    handleLeaveTrip(trip.id)
+                                                    toast.loading("生成 PDF 中...")
+                                                    try {
+                                                        // 先取得完整行程資料
+                                                        const res = await fetch(`${API_BASE}/api/trips/${trip.id}`)
+                                                        const fullTrip = await res.json()
+
+                                                        // 轉換為 PDF 格式
+                                                        const pdfData: TripPDFData = {
+                                                            title: fullTrip.title || trip.title,
+                                                            startDate: new Date(fullTrip.start_date || trip.start_date).toLocaleDateString(),
+                                                            endDate: new Date(fullTrip.end_date || trip.end_date || trip.start_date).toLocaleDateString(),
+                                                            coverImage: fullTrip.cover_image,
+                                                            days: (fullTrip.days || []).map((d: { day: number; activities?: Activity[] }) => ({
+                                                                day: d.day,
+                                                                date: (() => {
+                                                                    const start = new Date(fullTrip.start_date || trip.start_date)
+                                                                    start.setDate(start.getDate() + d.day - 1)
+                                                                    return start.toLocaleDateString()
+                                                                })(),
+                                                                location: fullTrip.daily_locations?.[d.day]?.name,
+                                                                activities: (d.activities || []).map((a: Activity) => ({
+                                                                    time: a.time || "00:00",
+                                                                    place: a.place || a.place_name || "",
+                                                                    desc: a.desc || a.notes || "",
+                                                                    category: a.category || "other",
+                                                                    memo: a.memo
+                                                                })),
+                                                                notes: fullTrip.day_notes?.[d.day] || []
+                                                            })),
+                                                            hotels: fullTrip.hotel_info || []
+                                                        }
+
+                                                        const blobUrl = await generateTripPDF(pdfData)
+                                                        downloadPDF(blobUrl, `${trip.title || "trip"}.pdf`)
+                                                        toast.dismiss()
+                                                        toast.success("PDF 下載成功！")
+                                                    } catch (err) {
+                                                        console.error(err)
+                                                        toast.dismiss()
+                                                        toast.error("PDF 生成失敗")
+                                                    }
                                                 }}
                                             >
-                                                <LogOut className="w-3 h-3" /> 退出
+                                                <Download className="w-3 h-3" /> PDF
                                             </Button>
-                                        )}
+                                            {/* 退出行程按鈕 (僅限非擁有者) */}
+                                            {userId && trip.created_by !== userId && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        handleLeaveTrip(trip.id)
+                                                    }}
+                                                >
+                                                    <LogOut className="w-3 h-3" /> 退出
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </Card>

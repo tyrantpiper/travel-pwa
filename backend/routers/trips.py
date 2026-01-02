@@ -233,6 +233,19 @@ async def create_manual_trip(
 ):
     """🔥 手動建立空白行程"""
     try:
+        # 🆕 Phase 2: 行程數量限制（最多 3 個自建行程）
+        count_res = supabase.table("itineraries")\
+            .select("id", count="exact")\
+            .eq("created_by", request.user_id)\
+            .execute()
+        
+        owned_count = count_res.count or 0
+        if owned_count >= 3:
+            raise HTTPException(
+                status_code=403, 
+                detail="行程數量已達上限 (最多 3 個)，請先下載 PDF 後刪除舊行程"
+            )
+        
         room_code = generate_room_code()
         
         trip_data = {
@@ -411,6 +424,19 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
     print(f"   項目數量: {len(request.items)}")
     
     try:
+        # 🆕 Phase 2: 行程數量限制（最多 3 個自建行程）
+        count_res = supabase.table("itineraries")\
+            .select("id", count="exact")\
+            .eq("created_by", request.user_id)\
+            .execute()
+        
+        owned_count = count_res.count or 0
+        if owned_count >= 3:
+            raise HTTPException(
+                status_code=403, 
+                detail="行程數量已達上限 (最多 3 個)，請先下載 PDF 後刪除舊行程"
+            )
+        
         # 1. 產生房間號
         room_code = generate_room_code()
         

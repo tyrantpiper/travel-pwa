@@ -89,7 +89,11 @@ export const tripsApi = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(params)
         })
-        if (!res.ok) throw new Error("Failed to create trip")
+        if (!res.ok) {
+            // 🆕 Phase 2: 處理行程數量上限錯誤
+            const error = await res.json().catch(() => ({ detail: "建立行程失敗" }))
+            throw new Error(error.detail || "建立行程失敗")
+        }
         return res.json()
     },
 

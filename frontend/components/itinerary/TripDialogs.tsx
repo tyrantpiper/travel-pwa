@@ -59,9 +59,11 @@ export function CreateTripModal({
             setCoverImage("")
             setTitle("")
             onSuccess(newTrip) // Pass the new trip back
-        } catch {
+        } catch (error) {
             haptic.error()
-            toast.error("Create failed")
+            // 🆕 Phase 2: 顯示後端返回的錯誤訊息（如行程上限）
+            const message = error instanceof Error ? error.message : "建立行程失敗"
+            toast.error(message)
         }
         finally { setIsCreating(false) }
     }
