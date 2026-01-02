@@ -856,9 +856,14 @@ export function ItineraryView() {
                                                             hotels: fullTrip.hotel_info || []
                                                         }
 
-                                                        const blobUrl = await generateTripPDF(pdfData)
+                                                        // 🆕 添加進度回調
+                                                        let toastId: string | number | undefined
+                                                        const blobUrl = await generateTripPDF(pdfData, (current, total, stage) => {
+                                                            if (toastId) toast.dismiss(toastId)
+                                                            toastId = toast.loading(`${stage} (${current}/${total})`)
+                                                        })
+                                                        if (toastId) toast.dismiss(toastId)
                                                         downloadPDF(blobUrl, `${trip.title || "trip"}.pdf`)
-                                                        toast.dismiss()
                                                         toast.success("PDF 下載成功！")
                                                     } catch (err) {
                                                         console.error(err)
