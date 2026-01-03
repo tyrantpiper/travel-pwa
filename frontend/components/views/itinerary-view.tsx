@@ -100,6 +100,8 @@ export function ItineraryView() {
 
     // 🆕 P7: 天氣快取 (避免重複請求)
     const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
+    // 🆕 P8: Active Flag (防止競態條件)
+    const activeReqRef = useRef<string>("")
 
     // 🆕 P7+: 定期清理過期快取 (防止記憶體累積)
     useEffect(() => {
@@ -280,6 +282,11 @@ export function ItineraryView() {
                 }
             }
 
+            // 🆕 P8: Active Flag (防止競態條件 - Race Condition Protection)
+            // 確保只有最後一次請求的結果會被寫入 State
+            const currentReqId = Math.random().toString(36).substring(7)
+            activeReqRef.current = currentReqId
+
             // 🆕 P7: 快取檢查 (避免重複請求)
             const cacheKey = `${lat.toFixed(2)}_${lng.toFixed(2)}_${targetDate || 'today'}`
             const cached = weatherCache.current.get(cacheKey)
@@ -290,8 +297,9 @@ export function ItineraryView() {
                 trend: 7 * 24 * 60 * 60 * 1000 // 7 天
             }
 
-            if (cached && (Date.now() - cached.timestamp) < cacheTTL[cached.mode]) {
+            if (cached && (Date.now() - cached.timestamp) < (cacheTTL[cached.mode] || 3600000)) {
                 console.log(`📦 Weather Cache HIT: ${cacheKey}`)
+                // 即時返回，不需要 active check 因為是同步的
                 setWeatherData(cached.data)
                 setWeatherMode(cached.mode)
                 return
@@ -301,9 +309,23 @@ export function ItineraryView() {
                 // 🆕 P6: 嘗試使用 SDK (FlatBuffers) - 節省 70% 流量
                 if (mode === 'forecast' || mode === 'live') {
                     const sdkResult = await fetchWeatherWithSDK(lat, lng, targetDate, daysFromNow)
+
+                    // 🛡️ P8: Race Check
+                    if (activeReqRef.current !== currentReqId) {
+                        console.log('🛡️ Race Condition Prevented (SDK): Stale response ignored')
+                        return
+                    }
+
                     if (sdkResult) {
                         setWeatherData(sdkResult.forecast)
                         setWeatherMode(sdkResult.mode)
+
+                        // 🆕 P8: Cache Limit (LRU-like)
+                        if (weatherCache.current.size > 50) {
+                            const firstKey = weatherCache.current.keys().next().value
+                            weatherCache.current.delete(firstKey) // 移除最舊的
+                        }
+
                         weatherCache.current.set(cacheKey, {
                             data: sdkResult.forecast,
                             mode: sdkResult.mode,
@@ -342,13 +364,19 @@ export function ItineraryView() {
                     apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 }
 
-                console.log(`🌡️ Weather API: ${mode} mode, date=${targetDate}, daysFromNow=${daysFromNow}`)
+                console.log(`🌡️ Weather API Request: ${mode} mode`)
 
                 const res = await fetch(apiUrl, {
                     signal: controller.signal,
                     headers
                 })
                 const data = await res.json()
+
+                // 🛡️ P8: Race Check (Post-fetch)
+                if (activeReqRef.current !== currentReqId) {
+                    console.log('🛡️ Race Condition Prevented (JSON): Stale response ignored')
+                    return
+                }
 
                 let temps: number[]
                 let codes: number[]

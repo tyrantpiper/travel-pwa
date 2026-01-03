@@ -187,10 +187,30 @@ export const fetchWeatherWithSDK = async (
         if (mode === 'forecast' || mode === 'live') {
             // 🆕 Phase 6: 並行請求海拔與天氣數據
             // P6-1: 請求 Elevation API (需手動 fetch 因為 SDK 只支援 weather)
-            const elevationPromise = fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
-                .then(res => res.json())
-                .then(data => data.elevation?.[0] as number | undefined)
-                .catch(() => undefined)
+            // 🆕 Phase 8: Elevation Cache - 永久快取避免 API 限制 (10k/day)
+            const elevCacheKey = `elev_${lat.toFixed(3)}_${lng.toFixed(3)}`
+            const cachedElev = typeof localStorage !== 'undefined' ? localStorage.getItem(elevCacheKey) : null
+
+            let elevationPromise: Promise<number | undefined>
+
+            if (cachedElev) {
+                // 快取命中：直接返回 Promise.resolve
+                console.log(`🏔️ Elevation Cache HIT: ${cachedElev}m for ${lat},${lng}`)
+                elevationPromise = Promise.resolve(parseFloat(cachedElev))
+            } else {
+                // 快取未命中：發起請求並寫入快取
+                elevationPromise = fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const val = data.elevation?.[0] as number | undefined
+                        if (val !== undefined && typeof localStorage !== 'undefined') {
+                            localStorage.setItem(elevCacheKey, val.toString())
+                            console.log(`🏔️ Elevation Cache STORE: ${val}m`)
+                        }
+                        return val
+                    })
+                    .catch(() => undefined)
+            }
 
             const params = {
                 latitude: lat,
