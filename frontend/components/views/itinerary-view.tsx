@@ -28,6 +28,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
+import { fetchWeatherWithSDK } from "@/lib/weather-api"  // 🆕 P6: FlatBuffers SDK
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
@@ -271,6 +272,23 @@ export function ItineraryView() {
             }
 
             try {
+                // 🆕 P6: 嘗試使用 SDK (FlatBuffers) - 節省 70% 流量
+                if (mode === 'forecast' || mode === 'live') {
+                    const sdkResult = await fetchWeatherWithSDK(lat, lng, targetDate, daysFromNow)
+                    if (sdkResult) {
+                        setWeatherData(sdkResult.forecast)
+                        setWeatherMode(sdkResult.mode)
+                        weatherCache.current.set(cacheKey, {
+                            data: sdkResult.forecast,
+                            mode: sdkResult.mode,
+                            timestamp: Date.now()
+                        })
+                        console.log(`💾 Weather Cache STORE (SDK): ${cacheKey}`)
+                        return  // SDK 成功，直接返回
+                    }
+                }
+
+                // JSON Fallback (SDK 失敗或不支援的模式)
                 // 🆕 P2: User-Agent Header (避免商業偵測)
                 const headers: HeadersInit = {
                     'User-Agent': 'RyanTravelApp/3.0 (Non-commercial travel planning tool)'
