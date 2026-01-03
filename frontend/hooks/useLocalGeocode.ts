@@ -1,6 +1,20 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import MiniSearch from 'minisearch'
+
+/**
+ * 🆕 Bigram 分詞器 (對中日韓文字有效)
+ * 將「東京」分成 ["東", "京", "東京"]
+ */
+function bigramTokenize(text: string): string[] {
+    const chars = text.split('')
+    const bigrams: string[] = []
+    for (let i = 0; i < text.length - 1; i++) {
+        bigrams.push(text.slice(i, i + 2))
+    }
+    return [...chars, ...bigrams]
+}
 
 /**
  * 景點資料結構 (對應 landmarks.json)
@@ -194,86 +208,91 @@ export function useLocalGeocode() {
         loadData()
     }, [])
 
-    // 建立搜尋索引 (優化效能)
-    const searchIndex = useMemo(() => {
-        const index: Array<{
-            key: string
-            aliases: string[]
-            data: LandmarkEntry | BrandEntry
+    // 🆕 MiniSearch 引擎 (替代舊的 array-based 索引)
+    const miniSearchEngine = useMemo(() => {
+        const engine = new MiniSearch<{
+            id: string
+            display: string
+            searchText: string
+            lat?: number
+            lng?: number
+            country?: string
+            type: 'landmark' | 'brand'
+        }>({
+            fields: ['display', 'searchText'],
+            storeFields: ['display', 'lat', 'lng', 'country', 'type'],
+            tokenize: (text) => bigramTokenize(normalizeForFuzzy(text)),
+            searchOptions: {
+                prefix: true,
+                fuzzy: 0.2,
+                boost: { display: 2 }
+            }
+        })
+
+        const documents: Array<{
+            id: string
+            display: string
+            searchText: string
+            lat?: number
+            lng?: number
+            country?: string
             type: 'landmark' | 'brand'
         }> = []
 
         // 索引景點
         for (const [key, entry] of Object.entries(landmarks)) {
-            index.push({
-                key,
-                aliases: [key, ...entry.aliases, entry.search, entry.display],
-                data: entry,
+            const allText = [key, entry.display, entry.search, ...entry.aliases].join(' ')
+            documents.push({
+                id: `landmark:${key}`,
+                display: entry.display,
+                searchText: allText,
+                lat: entry.lat,
+                lng: entry.lng,
+                country: entry.country,
                 type: 'landmark'
             })
         }
 
-        // 索引品牌 (nested object structure: category -> brand name -> brand entry)
+        // 索引品牌
         for (const [, categoryBrands] of Object.entries(brands)) {
             if (typeof categoryBrands !== 'object' || categoryBrands === null) continue
             for (const [brandName, brand] of Object.entries(categoryBrands)) {
                 if (typeof brand !== 'object' || !brand.search_term) continue
-                index.push({
-                    key: brand.search_term,
-                    aliases: [brandName, brand.search_term, ...(brand.aliases || [])],
-                    data: brand,
+                const allText = [brandName, brand.search_term, ...(brand.aliases || [])].join(' ')
+                documents.push({
+                    id: `brand:${brandName}`,
+                    display: brand.search_term,
+                    searchText: allText,
                     type: 'brand'
                 })
             }
         }
 
-        return index
+        if (documents.length > 0) {
+            engine.addAll(documents)
+            console.log(`🔍 MiniSearch 索引建立: ${documents.length} 條目`)
+        }
+
+        return engine
     }, [landmarks, brands])
 
-    // 搜尋函數
+    // 搜尋函數 (使用 MiniSearch)
     const search = useCallback((query: string, limit = 5): LocalSearchResult[] => {
         if (!query || query.length < 1 || !isLoaded) return []
 
-        const results: LocalSearchResult[] = []
+        const normalizedQuery = normalizeForFuzzy(query)
+        const results = miniSearchEngine.search(normalizedQuery)
 
-        for (const item of searchIndex) {
-            let bestScore = 0
-
-            // 檢查所有別名
-            for (const alias of item.aliases) {
-                const score = fuzzyScore(query, alias)
-                if (score > bestScore) bestScore = score
-            }
-
-            if (bestScore > 50) {
-                if (item.type === 'landmark') {
-                    const landmark = item.data as LandmarkEntry
-                    results.push({
-                        name: item.key,
-                        display: landmark.display,
-                        lat: landmark.lat,
-                        lng: landmark.lng,
-                        country: landmark.country,
-                        type: 'landmark',
-                        score: bestScore
-                    })
-                } else {
-                    const brand = item.data as BrandEntry
-                    results.push({
-                        name: brand.search_term,
-                        display: brand.search_term,
-                        type: 'brand',
-                        score: bestScore
-                    })
-                }
-            }
-        }
-
-        // 按分數排序，截取前 N 個
-        return results
-            .sort((a, b) => b.score - a.score)
-            .slice(0, limit)
-    }, [searchIndex, isLoaded])
+        return results.slice(0, limit).map(result => ({
+            name: result.id.split(':')[1],
+            display: result.display,
+            lat: result.lat,
+            lng: result.lng,
+            country: result.country,
+            type: result.type,
+            score: result.score
+        }))
+    }, [miniSearchEngine, isLoaded])
 
     return {
         search,
