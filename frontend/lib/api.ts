@@ -74,6 +74,7 @@ export interface GeocodeSearchParams {
     lng?: number        // 🆕 地圖中心經度
     country?: string    // 🆕 國家過濾 (如 "Japan", "Taiwan")
     region?: string     // 🆕 區域過濾 (如 "Tokyo 東京")
+    zoom?: number       // 🆕 P1: 地圖縮放層級 (用於動態 bias)
 }
 
 // === API Functions ===
