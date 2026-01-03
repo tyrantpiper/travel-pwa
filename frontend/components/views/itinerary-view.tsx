@@ -354,9 +354,20 @@ export function ItineraryView() {
                 let codes: number[]
 
                 if (mode === 'seasonal' && data.daily) {
-                    // Seasonal API 只有日最高/最低，轉為模擬小時制
-                    const avgTemp = (data.daily.temperature_2m_max[0] + data.daily.temperature_2m_min[0]) / 2
-                    temps = Array(24).fill(avgTemp)
+                    // Seasonal API 只有日最高/最低，使用溫度曲線模擬小時變化
+                    const tMin = data.daily.temperature_2m_min[0]
+                    const tMax = data.daily.temperature_2m_max[0]
+
+                    // 🆕 溫度曲線：最低溫約 6:00，最高溫約 14:00
+                    // 使用正弦函數模擬：T(h) = avg + amplitude * sin((h - 6) / 24 * 2π - π/2)
+                    const avg = (tMax + tMin) / 2
+                    const amplitude = (tMax - tMin) / 2
+
+                    temps = Array(24).fill(0).map((_, hour) => {
+                        // 調整相位使 6:00 最低，14:00 最高
+                        const phase = ((hour - 6) / 24) * 2 * Math.PI - Math.PI / 2
+                        return Math.round(avg + amplitude * Math.sin(phase))
+                    })
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
