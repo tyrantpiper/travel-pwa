@@ -80,6 +80,7 @@ export default function FullscreenMapModal({
 }: FullscreenMapModalProps) {
     const mapRef = useRef<MapRef>(null)
     const inputRef = useRef<HTMLInputElement>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)  // 🆕 P5: 取消前一個請求
     const [mapMode, setMapMode] = useState<'standard' | 'satellite'>('standard')
     const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -159,6 +160,11 @@ export default function FullscreenMapModal({
                 return
             }
 
+            // 🆕 P5: 取消前一個尚未完成的請求
+            abortControllerRef.current?.abort()
+            abortControllerRef.current = new AbortController()
+            const signal = abortControllerRef.current.signal
+
             setIsTyping(false)
             setIsSearching(true)
             try {
@@ -172,12 +178,18 @@ export default function FullscreenMapModal({
                     lat: nearestCity?.lat ?? initialViewState.latitude,
                     lng: nearestCity?.lng ?? initialViewState.longitude,
                     country: nearestCity?.country,
-                    region: nearestCity?.region
+                    region: nearestCity?.region,
+                    signal  // 🆕 P5: 傳遞 AbortSignal
                 })
-                if (currentQuery === query) {
+                if (currentQuery === query && !signal.aborted) {
                     setResults(data.results || [])
                 }
-            } catch {
+            } catch (e) {
+                // 🆕 P5: 忽略 AbortError (正常取消行為)
+                if (e instanceof Error && e.name === 'AbortError') {
+                    console.log(`🚫 L2 請求已取消: ${currentQuery}`)
+                    return
+                }
                 if (currentQuery === query) {
                     setResults([])
                 }
@@ -186,7 +198,10 @@ export default function FullscreenMapModal({
             }
         }, 300)
 
-        return () => clearTimeout(timer)
+        return () => {
+            clearTimeout(timer)
+            abortControllerRef.current?.abort()  // 🆕 cleanup 時也取消
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, tripTitle, initialViewState.latitude, initialViewState.longitude, localDataLoaded, localSearch])
 

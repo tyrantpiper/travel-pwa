@@ -134,23 +134,54 @@ async def geocode_with_nominatim(place_name: str):
     return None
 
 
-async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None):
+async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None, zoom: float = None):
     """Photon 地理編碼 (基於 OpenStreetMap + Elasticsearch，模糊搜尋強)
     
     Args:
         lat, lng: 若提供，將優先返回附近的結果 (Location Bias)
+        zoom: 縮放層級，用於 P2 動態 bias scale
     """
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
+            # 🆕 P0: 雙變體查詢 (原字串 + 簡體變體)
+            simplified = normalize_for_fuzzy(place_name)
+            if simplified != place_name.lower().strip():
+                query_text = f"{place_name} {simplified}"
+            else:
+                query_text = place_name
+                
+            # 🆕 P7: 意圖偵測 (自動 osm_tag)
+            osm_tag = None
+            if any(k in place_name for k in ["站", "駅", "線", "鐵"]):
+                osm_tag = "railway:station"
+            elif any(k in place_name for k in ["飯店", "酒店", "旅館", "ホテル"]):
+                osm_tag = "tourism:hotel"
+            elif any(k in place_name for k in ["餐廳", "餐", "食堂", "レストラン"]):
+                osm_tag = "amenity:restaurant"
+            
             params = {
-                "q": place_name,
+                "q": query_text,
                 "limit": limit,
                 "lang": "zh"  # 中文優先
             }
+            
+            # 🆕 P7: 添加 osm_tag 過濾
+            if osm_tag:
+                params["osm_tag"] = osm_tag
+                
             # 🆕 Location Bias
             if lat is not None and lng is not None:
                 params["lat"] = lat
                 params["lon"] = lng
+                
+            # 🆕 P2: 動態 bias scale (根據 zoom)
+            if zoom is not None:
+                if zoom > 14:
+                    params["location_bias_scale"] = 0.9
+                elif zoom > 10:
+                    params["location_bias_scale"] = 0.5
+                else:
+                    params["location_bias_scale"] = 0.2
 
             res = await client.get(
                 "https://photon.komoot.io/api/",

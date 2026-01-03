@@ -281,7 +281,9 @@ export const itemsApi = {
  */
 export const geocodeApi = {
     /** Search for locations with smart translation */
-    search: async (params: GeocodeSearchParams) => {
+    search: async (params: GeocodeSearchParams & { signal?: AbortSignal }) => {
+        const { signal, ...searchParams } = params  // 🆕 P5: 分離 signal
+
         const geminiKey = typeof window !== 'undefined'
             ? localStorage.getItem("user_gemini_key")
             : null
@@ -298,7 +300,8 @@ export const geocodeApi = {
         const res = await fetch(API.GEOCODE, {
             method: "POST",
             headers,
-            body: JSON.stringify(params)
+            body: JSON.stringify(searchParams),
+            signal  // 🆕 P5: 傳遞 AbortSignal
         })
         if (!res.ok) throw new Error("Search failed")
         return res.json()
