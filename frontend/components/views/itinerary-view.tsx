@@ -28,7 +28,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
-import { fetchWeatherWithSDK, generateHourlyCurve } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
+import { fetchWeatherWithSDK, generateHourlyCurve, HourlyForecast } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
@@ -390,7 +390,7 @@ export function ItineraryView() {
 
                 // P6 SDK 模式: 直接使用 SDK 回傳的完整資料
                 if (data.forecast) {
-                    forecast.push(...data.forecast.map(f => ({
+                    forecast.push(...data.forecast.map((f: HourlyForecast) => ({
                         time: f.time,
                         temp: f.temp,
                         code: f.code,
