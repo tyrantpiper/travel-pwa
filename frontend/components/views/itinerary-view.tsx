@@ -28,7 +28,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
-import { fetchWeatherWithSDK } from "@/lib/weather-api"  // 🆕 P6: FlatBuffers SDK
+import { fetchWeatherWithSDK, generateHourlyCurve } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
@@ -354,20 +354,13 @@ export function ItineraryView() {
                 let codes: number[]
 
                 if (mode === 'seasonal' && data.daily) {
-                    // Seasonal API 只有日最高/最低，使用溫度曲線模擬小時變化
+                    // 🆕 Phase 1: 使用 Linvill 非對稱三段式曲線
                     const tMin = data.daily.temperature_2m_min[0]
                     const tMax = data.daily.temperature_2m_max[0]
 
-                    // 🆕 溫度曲線：最低溫約 6:00，最高溫約 14:00
-                    // 使用正弦函數模擬：T(h) = avg + amplitude * sin((h - 6) / 24 * 2π - π/2)
-                    const avg = (tMax + tMin) / 2
-                    const amplitude = (tMax - tMin) / 2
-
-                    temps = Array(24).fill(0).map((_, hour) => {
-                        // 調整相位使 6:00 最低，14:00 最高
-                        const phase = ((hour - 6) / 24) * 2 * Math.PI - Math.PI / 2
-                        return Math.round(avg + amplitude * Math.sin(phase))
-                    })
+                    // 使用 Linvill 非對稱模型取代簡單正弦
+                    // 預設日出 6:00, 日落 18:00 (Phase 2 會改用 API 動態值)
+                    temps = generateHourlyCurve(tMin, tMax, 6, 18)
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
