@@ -14,6 +14,9 @@ export interface HourlyForecast {
     humidity?: number               // 🆕 濕度 (%)
     precipitation_probability?: number  // 🆕 降雨機率 (%)
     apparent_temperature?: number   // 🆕 體感溫度
+    uvIndex?: number                // 🆕 Phase 6: 紫外線指數
+    windSpeed?: number              // 🆕 Phase 6: 風速 (km/h)
+    visibility?: number             // 🆕 Phase 6: 能見度 (m)
 }
 
 export type WeatherMode = 'live' | 'forecast' | 'seasonal' | 'trend'
@@ -22,6 +25,7 @@ export interface WeatherResult {
     forecast: HourlyForecast[]
     mode: WeatherMode
     source: 'sdk' | 'fallback'
+    elevation?: number // 🆕 Phase 6: 海拔 (m)
 }
 
 /**
@@ -181,19 +185,30 @@ export const fetchWeatherWithSDK = async (
 
         // Forecast API (0-16 天) - live 和 forecast 都用這個
         if (mode === 'forecast' || mode === 'live') {
+            // 🆕 Phase 6: 並行請求海拔與天氣數據
+            // P6-1: 請求 Elevation API (需手動 fetch 因為 SDK 只支援 weather)
+            const elevationPromise = fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
+                .then(res => res.json())
+                .then(data => data.elevation?.[0] as number | undefined)
+                .catch(() => undefined)
+
             const params = {
                 latitude: lat,
                 longitude: lng,
-                hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature'],
+                // 🆕 Phase 6: 加入 UV, 風速, 能見度
+                hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature', 'uv_index_clear_sky', 'wind_speed_10m', 'visibility'],
                 models: 'ecmwf_ifs' as const,
                 timezone: 'auto',
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })
             }
 
-            const responses = await fetchWeatherApi(
-                'https://api.open-meteo.com/v1/forecast',
-                params
-            )
+            // P6-2: 並行執行
+            const [weatherResponses, elevation] = await Promise.all([
+                fetchWeatherApi('https://api.open-meteo.com/v1/forecast', params),
+                elevationPromise
+            ])
+
+            const responses = weatherResponses // 保持 SDK 結構兼容
 
             if (responses.length > 0) {
                 const response = responses[0]
@@ -203,21 +218,37 @@ export const fetchWeatherWithSDK = async (
                 const humidity = hourly.variables(2)?.valuesArray() || []
                 const precipProb = hourly.variables(3)?.valuesArray() || []
                 const apparent = hourly.variables(4)?.valuesArray() || []
+                // 🆕 Phase 6: 解析新參數 
+                const uvIndex = hourly.variables(5)?.valuesArray() || []
+                const windSpeed = hourly.variables(6)?.valuesArray() || []
+                const visibility = hourly.variables(7)?.valuesArray() || []
+
+                // 🆕 Phase 6: 輸出海拔資訊供地理修正確認
+                if (elevation) console.log(`🏔️ Phase 6 Geodata: Elevation=${elevation}m (from API), Lat=${lat}`)
 
                 const forecast: HourlyForecast[] = []
-                for (let i = 6; i <= 23 && i < temps.length; i++) {
+                // 🆕 Loop 調整: 0-23 小時完整收集，但這裡先維持舊邏輯或改為 0?
+                // 原有程式碼是 i=6 開始，但前面我們建議改為 0。
+                // 為了保持一致性，我們應該讓這裡收集所有數據，顯示層由 UI 決定。
+                // 但原代碼這裡只取了 i=6...23，這是一個潛在的數據缺失點。
+                // 讓我們把它改成從 0 開始以配合上一步的 itinerary-view 改動。
+                for (let i = 0; i < 24 && i < temps.length; i++) {
                     forecast.push({
                         time: `${i}:00`,
                         temp: Math.round(temps[i]),
                         code: codes[i] || 0,
                         humidity: humidity[i] ? Math.round(humidity[i]) : undefined,
                         precipitation_probability: precipProb[i] ? Math.round(precipProb[i]) : undefined,
-                        apparent_temperature: apparent[i] ? Math.round(apparent[i]) : undefined
+                        apparent_temperature: apparent[i] ? Math.round(apparent[i]) : undefined,
+                        // 🆕 Phase 6 Data
+                        uvIndex: uvIndex[i] ? Math.round(uvIndex[i]) : undefined,
+                        windSpeed: windSpeed[i] ? Math.round(windSpeed[i]) : undefined,
+                        visibility: visibility[i] ? Math.round(visibility[i]) : undefined
                     })
                 }
 
                 console.log(`🚀 P6 SDK (FlatBuffers): ${forecast.length} 小時預報`)
-                return { forecast, mode, source: 'sdk' }
+                return { forecast, mode, source: 'sdk', elevation }
             }
         }
 

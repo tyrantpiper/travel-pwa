@@ -377,9 +377,9 @@ export function ItineraryView() {
                     // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
                     const targetMonth = targetDate ? new Date(targetDate).getMonth() + 1 : new Date().getMonth() + 1
 
-                    // 🆕 Phase 4: 使用緯度進行地理修正
-                    // (海拔可透過 Open-Meteo Elevation API 獲取，暫用 undefined)
-                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth, undefined, lat)
+                    // 🆕 Phase 4 + 6: 使用緯度與真實海拔進行地理修正
+                    // (Phase 4 只用了 Lat, Phase 6 終於補上海拔數據!)
+                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth, data.elevation, lat)
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
@@ -1545,6 +1545,32 @@ export function ItineraryView() {
                                             if (diff < -3) return '涼爽'
                                             return '舒適'
                                         })()}
+                                    </div>
+                                </div>
+
+                                {/* 🆕 Phase 6: 紫外線 (UV) */}
+                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                    <span className="text-lg">☀️</span>
+                                    <div>
+                                        <div className="text-xs text-slate-500">UV 指數</div>
+                                        <div className="text-sm font-medium text-slate-700">
+                                            {(() => {
+                                                const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
+                                                if (maxUV === 0) return '無'
+                                                return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : '中'})`
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 🆕 Phase 6: 風速 */}
+                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                    <span className="text-lg">💨</span>
+                                    <div>
+                                        <div className="text-xs text-slate-500">最大風速</div>
+                                        <div className="text-sm font-medium text-slate-700">
+                                            {Math.max(...weatherData.map(w => w.windSpeed ?? 0))} km/h
+                                        </div>
                                     </div>
                                 </div>
                             </div>
