@@ -299,7 +299,7 @@ export function useLocalGeocode() {
                     const [name_zh, name_local, name_en, lat, lng, aliases = []] = ward as [string, string, string, number, number, string[]]
                     const allText = [name_zh, name_local, name_en, ...(aliases || [])].join(' ')
                     documents.push({
-                        id: `region:${country}:${name_zh}`,
+                        id: `region:${country}:${cityName}:${name_zh}`,  // 🆕 加入 cityName 避免重複
                         display: name_zh,
                         searchText: allText,
                         lat,
