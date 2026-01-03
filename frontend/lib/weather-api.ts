@@ -125,12 +125,14 @@ export const generateHourlyCurve = (
 
         if (hour >= sunriseHour && hour <= peakHour) {
             // ========== 段 1: 日出 → 最高溫 (正弦快速上升) ==========
-            const progress = (hour - sunriseHour) / (peakHour - sunriseHour)
+            const divisor1 = peakHour - sunriseHour
+            const progress = divisor1 > 0 ? (hour - sunriseHour) / divisor1 : 0
             temp = tMin + (tMax - tMin) * Math.sin(progress * Math.PI / 2)
         }
         else if (hour > peakHour && hour <= sunsetHour) {
             // ========== 段 2: 最高溫 → 日落 (正弦緩慢下降) ==========
-            const progress = (hour - peakHour) / (sunsetHour - peakHour)
+            const divisor2 = sunsetHour - peakHour
+            const progress = divisor2 > 0 ? (hour - peakHour) / divisor2 : 0
             temp = tMax - (tMax - avg) * Math.sin(progress * Math.PI / 2)
         }
         else {

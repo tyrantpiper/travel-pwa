@@ -366,9 +366,12 @@ export function ItineraryView() {
                         // API 回傳 ISO 格式如 "2026-05-18T05:30"
                         const sunriseTime = new Date(data.daily.sunrise[0])
                         const sunsetTime = new Date(data.daily.sunset[0])
-                        sunriseHour = sunriseTime.getHours() + sunriseTime.getMinutes() / 60
-                        sunsetHour = sunsetTime.getHours() + sunsetTime.getMinutes() / 60
-                        console.log(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
+                        // 🔒 安全性驗證：確保日期有效
+                        if (!isNaN(sunriseTime.getTime()) && !isNaN(sunsetTime.getTime())) {
+                            sunriseHour = sunriseTime.getHours() + sunriseTime.getMinutes() / 60
+                            sunsetHour = sunsetTime.getHours() + sunsetTime.getMinutes() / 60
+                            console.log(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
+                        }
                     }
 
                     // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
