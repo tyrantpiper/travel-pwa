@@ -354,7 +354,7 @@ export function ItineraryView() {
                 let codes: number[]
 
                 if (mode === 'seasonal' && data.daily) {
-                    // 🆕 Phase 1 + 2: Linvill 曲線 + 日出日落動態調整
+                    // 🆕 Phase 1 + 2 + 3: Linvill 曲線 + 日出日落 + 季節調節
                     const tMin = data.daily.temperature_2m_min[0]
                     const tMax = data.daily.temperature_2m_max[0]
 
@@ -371,7 +371,10 @@ export function ItineraryView() {
                         console.log(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
                     }
 
-                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour)
+                    // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
+                    const targetMonth = targetDate ? new Date(targetDate).getMonth() + 1 : new Date().getMonth() + 1
+
+                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth)
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []

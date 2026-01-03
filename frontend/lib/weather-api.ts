@@ -25,7 +25,48 @@ export interface WeatherResult {
 }
 
 /**
- * 🆕 Phase 1: 非對稱三段式溫度曲線生成 (Linvill 改進版)
+ * 🆕 Phase 3: 季節配置
+ */
+type Season = 'summer' | 'winter' | 'spring_autumn'
+
+const getSeasonConfig = (month: number, dayLength: number) => {
+    // 根據日照長度和月份判斷季節
+    // 夏季: 日長 > 13 小時 (5-8月)
+    // 冬季: 日長 < 11 小時 (11-2月)
+    // 春秋: 其他
+
+    let season: Season
+    if (dayLength > 13 || (month >= 5 && month <= 8)) {
+        season = 'summer'
+    } else if (dayLength < 11 || month >= 11 || month <= 2) {
+        season = 'winter'
+    } else {
+        season = 'spring_autumn'
+    }
+
+    const configs: Record<Season, { decayMod: number; peakDelay: number; label: string }> = {
+        summer: {
+            decayMod: 0.7,      // 夏季: 緩慢衰減 (濕度高)
+            peakDelay: 0.5,     // 最高溫延後 0.5 小時
+            label: '夏季模式'
+        },
+        winter: {
+            decayMod: 1.5,      // 冬季: 快速衰減 (輻射冷卻強)
+            peakDelay: -0.5,    // 最高溫提早 0.5 小時
+            label: '冬季模式'
+        },
+        spring_autumn: {
+            decayMod: 1.0,      // 春秋: 標準
+            peakDelay: 0,
+            label: '春秋模式'
+        }
+    }
+
+    return { season, ...configs[season] }
+}
+
+/**
+ * 🆕 Phase 1-3: 非對稱三段式溫度曲線生成 (Linvill 改進版 + 季節調節)
  * 
  * 三段式模型:
  * 1. 日出 → 最高溫: 正弦快速上升
@@ -36,28 +77,32 @@ export interface WeatherResult {
  * @param tMax 日最高溫
  * @param sunriseHour 日出時間 (小時, 如 5.5 = 05:30)
  * @param sunsetHour 日落時間 (小時, 如 18.5 = 18:30)
- * @param tempRange 日溫差 (用於判斷乾燥/潮濕)
+ * @param month 月份 (1-12) 用於季節判斷
  */
 export const generateHourlyCurve = (
     tMin: number,
     tMax: number,
     sunriseHour: number = 6,
     sunsetHour: number = 18,
-    tempRange?: number
+    month?: number
 ): number[] => {
     const dayLength = sunsetHour - sunriseHour
 
-    // 最高溫發生時間: 日落前 3-4 小時 (夏季日長則延後)
-    const peakHour = dayLength > 13
-        ? sunsetHour - 3   // 夏季: 日落前 3 小時
-        : sunsetHour - 4   // 冬季: 日落前 4 小時 (約 14:00)
+    // 🆕 Phase 3: 季節調節
+    const currentMonth = month ?? new Date().getMonth() + 1
+    const seasonConfig = getSeasonConfig(currentMonth, dayLength)
+
+    // 最高溫發生時間: 季節調整
+    const basePeakHour = dayLength > 13 ? sunsetHour - 3 : sunsetHour - 4
+    const peakHour = basePeakHour + seasonConfig.peakDelay
 
     // 平均溫度
     const avg = (tMax + tMin) / 2
 
-    // 夜間衰減係數: 日溫差大 = 乾燥 = 快速衰減
-    const range = tempRange ?? (tMax - tMin)
-    const decayRate = range > 15 ? 0.25 : range < 5 ? 0.08 : 0.15
+    // 夜間衰減係數: 日溫差 + 季節調整
+    const range = tMax - tMin
+    const baseDecay = range > 15 ? 0.25 : range < 5 ? 0.08 : 0.15
+    const decayRate = baseDecay * seasonConfig.decayMod
 
     const temps: number[] = []
 
@@ -96,7 +141,7 @@ export const generateHourlyCurve = (
         temps.push(Math.round(temp))
     }
 
-    console.log(`📈 Linvill 曲線: sunrise=${sunriseHour}, peak=${peakHour.toFixed(1)}, sunset=${sunsetHour}, decay=${decayRate}`)
+    console.log(`📈 Phase 3 Linvill: ${seasonConfig.label} | sunrise=${sunriseHour}, peak=${peakHour.toFixed(1)}, sunset=${sunsetHour}, decay=${decayRate.toFixed(2)}`)
     return temps
 }
 
