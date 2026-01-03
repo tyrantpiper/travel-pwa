@@ -387,7 +387,8 @@ export function ItineraryView() {
                 }
 
                 const forecast = []
-                for (let i = 6; i <= 23 && i < temps.length; i++) {
+                // 🆕 24 小時完整顯示 (0:00 - 23:00)
+                for (let i = 0; i <= 23 && i < temps.length; i++) {
                     forecast.push({
                         time: `${i}:00`,
                         temp: Math.round(temps[i]),
