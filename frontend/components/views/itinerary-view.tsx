@@ -386,14 +386,32 @@ export function ItineraryView() {
                     codes = data.hourly?.weather_code || []
                 }
 
-                const forecast = []
-                // 🆕 24 小時完整顯示 (0:00 - 23:00)
-                for (let i = 0; i <= 23 && i < temps.length; i++) {
-                    forecast.push({
-                        time: `${i}:00`,
-                        temp: Math.round(temps[i]),
-                        code: codes[i] || 0
-                    })
+                const forecast: DayWeather[] = []
+
+                // P6 SDK 模式: 直接使用 SDK 回傳的完整資料
+                if (data.forecast) {
+                    forecast.push(...data.forecast.map(f => ({
+                        time: f.time,
+                        temp: f.temp,
+                        code: f.code,
+                        humidity: f.humidity,
+                        precipitation_probability: f.precipitation_probability,
+                        apparent_temperature: f.apparent_temperature,
+                        uvIndex: f.uvIndex,
+                        windSpeed: f.windSpeed
+                    })))
+                }
+                // Fallback / Seasonal 模式 (手動構建)
+                else {
+                    // 🆕 24 小時完整顯示 (0:00 - 23:00)
+                    for (let i = 0; i <= 23 && i < temps.length; i++) {
+                        forecast.push({
+                            time: `${i}:00`,
+                            temp: Math.round(temps[i]),
+                            code: codes[i] || 0
+                            // 季節/JSON 模式目前沒有其他數據，保持 undefined
+                        })
+                    }
                 }
 
                 setWeatherData(forecast)

@@ -42,6 +42,8 @@ export interface DayWeather {
     humidity?: number               // 🆕 濕度 (%)
     precipitation_probability?: number  // 🆕 降雨機率 (%)
     apparent_temperature?: number   // 🆕 體感溫度
+    uvIndex?: number                // 🆕 Phase 6: UV 指數
+    windSpeed?: number              // 🆕 Phase 6: 風速
 }
 
 export interface SubItem {
