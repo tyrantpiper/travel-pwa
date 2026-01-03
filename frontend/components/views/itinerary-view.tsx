@@ -101,6 +101,32 @@ export function ItineraryView() {
     // 🆕 P7: 天氣快取 (避免重複請求)
     const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
 
+    // 🆕 P7+: 定期清理過期快取 (防止記憶體累積)
+    useEffect(() => {
+        const cleanExpiredCache = () => {
+            const now = Date.now()
+            const cacheTTL: Record<string, number> = {
+                live: 60 * 60 * 1000,
+                forecast: 60 * 60 * 1000,
+                seasonal: 24 * 60 * 60 * 1000,
+                trend: 7 * 24 * 60 * 60 * 1000
+            }
+            let cleaned = 0
+            weatherCache.current.forEach((value, key) => {
+                const ttl = cacheTTL[value.mode] || 60 * 60 * 1000
+                if (now - value.timestamp > ttl) {
+                    weatherCache.current.delete(key)
+                    cleaned++
+                }
+            })
+            if (cleaned > 0) console.log(`🧹 Weather cache cleaned: ${cleaned} expired entries`)
+        }
+
+        // 每 5 分鐘清理一次
+        const interval = setInterval(cleanExpiredCache, 5 * 60 * 1000)
+        return () => clearInterval(interval)
+    }, [])
+
     const [dailyLocs, setDailyLocs] = useState<Record<number, DailyLocation>>({})
     const [isLocEditOpen, setIsLocEditOpen] = useState(false)
     const [newLocName, setNewLocName] = useState("")
