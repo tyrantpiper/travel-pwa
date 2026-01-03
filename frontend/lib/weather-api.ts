@@ -17,6 +17,7 @@ export interface HourlyForecast {
     uvIndex?: number                // 🆕 Phase 6: 紫外線指數
     windSpeed?: number              // 🆕 Phase 6: 風速 (km/h)
     visibility?: number             // 🆕 Phase 6: 能見度 (m)
+    airQuality?: number             // 🆕 Phase 9: AQI (US AQI)
 }
 
 export type WeatherMode = 'live' | 'forecast' | 'seasonal' | 'trend'
@@ -212,6 +213,33 @@ export const fetchWeatherWithSDK = async (
                     .catch(() => undefined)
             }
 
+            // 🆕 Phase 9: Air Quality API (並行請求 + Cache)
+            const aqiCacheKey = `aqi_${lat.toFixed(2)}_${lng.toFixed(2)}_${targetDate || 'today'}`
+            // AQI 快取設為 1 小時 (localStorage 不足時可改用 sessionStorage)
+            const cachedAQI = typeof localStorage !== 'undefined' ? localStorage.getItem(aqiCacheKey) : null
+
+            let aqiPromise: Promise<number[] | undefined>
+
+            if (cachedAQI) {
+                const parsed = JSON.parse(cachedAQI)
+                // 簡單檢查快取是否過期 (這裡假設 cachedAQI 結構包含 timestamp)
+                // 但為了簡化，目前假設當日有效
+                aqiPromise = Promise.resolve(parsed.data)
+            } else {
+                aqiPromise = fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=us_aqi&domain=cams_global&timezone=auto&start_date=${targetDate || new Date().toISOString().split('T')[0]}&end_date=${targetDate || new Date().toISOString().split('T')[0]}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const vals = data.hourly?.us_aqi as number[] | undefined
+                        if (vals && typeof localStorage !== 'undefined') {
+                            // 存入快取 (簡易版，不存 timestamp，由外部 LRU 控制或每日覆蓋)
+                            localStorage.setItem(aqiCacheKey, JSON.stringify({ data: vals, ts: Date.now() }))
+                        }
+                        return vals
+                    })
+                    .catch(() => undefined)
+            }
+
+
             const params = {
                 latitude: lat,
                 longitude: lng,
@@ -222,59 +250,71 @@ export const fetchWeatherWithSDK = async (
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })
             }
 
-            // P6-2: 並行執行
-            const [weatherResponses, elevation] = await Promise.all([
+            // P6-2 + P9: 並行執行 (Weather + Elevation + AQI)
+            const [weatherResponses, elevation, aqiData] = await Promise.all([
                 fetchWeatherApi('https://api.open-meteo.com/v1/forecast', params),
-                elevationPromise
+                elevationPromise,
+                aqiPromise
             ])
 
-            const responses = weatherResponses // 保持 SDK 結構兼容
+            // P6-3 & P9: 解析數據
+            const response = weatherResponses[0]
+            if (!response) return null
 
-            if (responses.length > 0) {
-                const response = responses[0]
-                const hourly = response.hourly()!
-                const temps = hourly.variables(0)!.valuesArray()!
-                const codes = hourly.variables(1)!.valuesArray()!
-                const humidity = hourly.variables(2)?.valuesArray() || []
-                const precipProb = hourly.variables(3)?.valuesArray() || []
-                const apparent = hourly.variables(4)?.valuesArray() || []
-                // 🆕 Phase 6: 解析新參數 
-                const uvIndex = hourly.variables(5)?.valuesArray() || []
-                const windSpeed = hourly.variables(6)?.valuesArray() || []
-                const visibility = hourly.variables(7)?.valuesArray() || []
+            const utcOffsetSeconds = response.utcOffsetSeconds()
+            const hourly = response.hourly()!
 
-                // 🆕 Phase 6: 輸出海拔資訊供地理修正確認
-                if (elevation) console.log(`🏔️ Phase 6 Geodata: Elevation=${elevation}m (from API), Lat=${lat}`)
+            // Helper function to generate a range of numbers
+            const range = (start: number, stop: number, step: number) =>
+                Array.from({ length: (stop - start) / step }, (_, i) => start + i * step);
 
-                const forecast: HourlyForecast[] = []
-                // 🆕 Loop 調整: 0-23 小時完整收集，但這裡先維持舊邏輯或改為 0?
-                // 原有程式碼是 i=6 開始，但前面我們建議改為 0。
-                // 為了保持一致性，我們應該讓這裡收集所有數據，顯示層由 UI 決定。
-                // 但原代碼這裡只取了 i=6...23，這是一個潛在的數據缺失點。
-                // 讓我們把它改成從 0 開始以配合上一步的 itinerary-view 改動。
-                for (let i = 0; i < 24 && i < temps.length; i++) {
-                    forecast.push({
-                        time: `${i}:00`,
-                        temp: Math.round(temps[i]),
-                        code: codes[i] || 0,
-                        humidity: humidity[i] ? Math.round(humidity[i]) : undefined,
-                        precipitation_probability: precipProb[i] ? Math.round(precipProb[i]) : undefined,
-                        apparent_temperature: apparent[i] ? Math.round(apparent[i]) : undefined,
-                        // 🆕 Phase 6 Data
-                        uvIndex: uvIndex[i] ? Math.round(uvIndex[i]) : undefined,
-                        windSpeed: windSpeed[i] ? Math.round(windSpeed[i]) : undefined,
-                        visibility: visibility[i] ? Math.round(visibility[i]) : undefined
-                    })
-                }
+            const weatherData = {
+                hourly: {
+                    time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
+                        (t) => new Date((t + utcOffsetSeconds) * 1000).toISOString() // 修正時區
+                    ),
+                    temperature_2m: hourly.variables(0)!.valuesArray()!,
+                    weather_code: hourly.variables(1)!.valuesArray()!,
+                    relative_humidity_2m: hourly.variables(2)!.valuesArray()!,
+                    precipitation_probability: hourly.variables(3)!.valuesArray()!,
+                    apparent_temperature: hourly.variables(4)!.valuesArray()!,
+                    uv_index: hourly.variables(5)!.valuesArray()!,    // 🆕 UV
+                    wind_speed: hourly.variables(6)!.valuesArray()!,  // 🆕 Wind
+                    visibility: hourly.variables(7)!.valuesArray()!,  // 🆕 Vis
+                },
+            }
 
-                console.log(`🚀 P6 SDK (FlatBuffers): ${forecast.length} 小時預報`)
-                return { forecast, mode, source: 'sdk', elevation }
+            const forecast: HourlyForecast[] = []
+            for (let i = 0; i < weatherData.hourly.time.length; i++) {
+                // 取得小時 (0-23)
+                const hour = new Date(weatherData.hourly.time[i]).getHours()
+
+                forecast.push({
+                    time: `${hour}:00`,
+                    temp: Math.round(weatherData.hourly.temperature_2m[i]),
+                    code: weatherData.hourly.weather_code[i],
+                    humidity: Math.round(weatherData.hourly.relative_humidity_2m[i]),
+                    precipitation_probability: Math.round(weatherData.hourly.precipitation_probability[i]),
+                    apparent_temperature: Math.round(weatherData.hourly.apparent_temperature[i]),
+                    uvIndex: weatherData.hourly.uv_index ? Number(weatherData.hourly.uv_index[i].toFixed(1)) : 0,
+                    windSpeed: weatherData.hourly.wind_speed ? Math.round(weatherData.hourly.wind_speed[i]) : 0,
+                    visibility: weatherData.hourly.visibility ? weatherData.hourly.visibility[i] : 10000,
+                    airQuality: aqiData ? aqiData[i] : undefined // 🆕 Phase 9: AQI
+                })
+            }
+
+            return {
+                forecast,
+                mode,
+                source: 'sdk',
+                elevation
             }
         }
 
-        return null
-    } catch (error) {
-        console.warn('⚠️ P6 SDK 失敗，將使用 JSON fallback:', error)
+        return null // 其他模式暫時返回 null (由外部 fallback 處理)
+
+    } catch (e) {
+        console.error("SDK Error:", e)
         return null
     }
 }

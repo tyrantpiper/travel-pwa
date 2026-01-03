@@ -1619,6 +1619,28 @@ export function ItineraryView() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* 🆕 Phase 9: 空氣品質 (AQI) */}
+                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                    <span className="text-lg">🌱</span>
+                                    <div>
+                                        <div className="text-xs text-slate-500">AQI</div>
+                                        <div className="text-sm font-medium text-slate-700">
+                                            {(() => {
+                                                const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
+                                                if (maxAQI === 0) return '無'
+                                                let level = '良好'
+                                                if (maxAQI > 300) level = '危害';
+                                                else if (maxAQI > 200) level = '極差';
+                                                else if (maxAQI > 150) level = '不健康';
+                                                else if (maxAQI > 100) level = '敏感';
+                                                else if (maxAQI > 50) level = '普通';
+
+                                                return `${maxAQI} (${level})`
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
