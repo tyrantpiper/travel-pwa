@@ -1546,6 +1546,18 @@ export function ItineraryView() {
                             </div>
                         </div>
                     )}
+
+                    {/* 🆕 Phase 5: Open-Meteo 歸屬標註 (免費使用必要條件) */}
+                    <div className="flex justify-end pt-1">
+                        <a
+                            href="https://open-meteo.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-slate-400 hover:text-blue-500 transition-colors"
+                        >
+                            Weather data by Open-Meteo
+                        </a>
+                    </div>
                 </div >
 
                 {/* 🕵️ AI 深度審核 - 每日都有 */}
