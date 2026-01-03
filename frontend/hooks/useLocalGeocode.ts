@@ -46,7 +46,8 @@ export interface LocalSearchResult {
     lat?: number
     lng?: number
     country?: string
-    type: 'landmark' | 'brand'
+    parent?: string      // 🆕 行政區父層級 (用於 breadcrumb 顯示)
+    type: 'landmark' | 'brand' | 'region'  // 🆕 新增 region 類型
     score: number
 }
 
@@ -129,6 +130,9 @@ function fuzzyScore(query: string, target: string): number {
 export function useLocalGeocode() {
     const [landmarks, setLandmarks] = useState<Record<string, LandmarkEntry>>({})
     const [brands, setBrands] = useState<Record<string, Record<string, BrandEntry>>>({})
+    // 🆕 行政區資料: { JP: { 東京都: [[...], [...]] }, KR: { 首爾: [...] } }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [regions, setRegions] = useState<Record<string, Record<string, any[]>>>({})
     const [isLoading, setIsLoading] = useState(true)
     const [isLoaded, setIsLoaded] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -139,8 +143,8 @@ export function useLocalGeocode() {
             try {
                 setIsLoading(true)
 
-                // 載入主要資料 + 國家分離資料
-                const [landmarksRes, brandsRes, jpStationsRes, jpLandmarksRes, jpHotelsRes, jpRestaurantsRes, krStationsRes, krLandmarksRes] = await Promise.all([
+                // 載入主要資料 + 國家分離資料 + 行政區資料
+                const [landmarksRes, brandsRes, jpStationsRes, jpLandmarksRes, jpHotelsRes, jpRestaurantsRes, krStationsRes, krLandmarksRes, regionsRes] = await Promise.all([
                     fetch('/data/landmarks.json'),
                     fetch('/data/brands.json'),
                     fetch('/data/countries/jp/stations.json').catch(() => null),
@@ -148,7 +152,8 @@ export function useLocalGeocode() {
                     fetch('/data/countries/jp/hotels.json').catch(() => null),
                     fetch('/data/countries/jp/restaurants.json').catch(() => null),
                     fetch('/data/countries/kr/stations.json').catch(() => null),
-                    fetch('/data/countries/kr/landmarks.json').catch(() => null)
+                    fetch('/data/countries/kr/landmarks.json').catch(() => null),
+                    fetch('/data/regions-jp-kr.json').catch(() => null)  // 🆕 行政區資料
                 ])
 
                 if (!landmarksRes.ok || !brandsRes.ok) {
@@ -193,8 +198,21 @@ export function useLocalGeocode() {
                     }
                 }
 
+                // 🆕 處理行政區資料
+                const regionsData: Record<string, Record<string, unknown[]>> = {}
+                if (regionsRes && regionsRes.ok) {
+                    const rawRegions = await regionsRes.json()
+                    // 過濾掉 __meta 欄位
+                    for (const [country, cities] of Object.entries(rawRegions)) {
+                        if (country.startsWith('_')) continue
+                        regionsData[country] = cities as Record<string, unknown[]>
+                    }
+                    console.log(`🗺️ Regions loaded: JP ${Object.keys(regionsData.JP || {}).length} cities, KR ${Object.keys(regionsData.KR || {}).length} cities`)
+                }
+
                 setLandmarks(filteredLandmarks)
                 setBrands(filteredBrands)
+                setRegions(regionsData)
                 setIsLoaded(true)
                 console.log(`🏝️ Local geocode loaded: ${Object.keys(filteredLandmarks).length} landmarks (incl. ${countryEntriesCount} from countries/), ${Object.values(filteredBrands).reduce((acc, cat) => acc + Object.keys(cat).length, 0)} brands`)
             } catch (err) {
@@ -217,10 +235,11 @@ export function useLocalGeocode() {
             lat?: number
             lng?: number
             country?: string
-            type: 'landmark' | 'brand'
+            parent?: string  // 🆕 行政區父層級
+            type: 'landmark' | 'brand' | 'region'  // 🆕 新增 region
         }>({
             fields: ['display', 'searchText'],
-            storeFields: ['display', 'lat', 'lng', 'country', 'type'],
+            storeFields: ['display', 'lat', 'lng', 'country', 'parent', 'type'],
             tokenize: (text) => bigramTokenize(normalizeForFuzzy(text)),
             searchOptions: {
                 prefix: true,
@@ -236,7 +255,8 @@ export function useLocalGeocode() {
             lat?: number
             lng?: number
             country?: string
-            type: 'landmark' | 'brand'
+            parent?: string
+            type: 'landmark' | 'brand' | 'region'
         }> = []
 
         // 索引景點
@@ -268,13 +288,38 @@ export function useLocalGeocode() {
             }
         }
 
+        // 🆕 索引行政區 (格式: [name_zh, name_local, name_en, lat, lng, aliases[]])
+        let regionCount = 0
+        for (const [country, cities] of Object.entries(regions)) {
+            if (!cities || typeof cities !== 'object') continue
+            for (const [cityName, wards] of Object.entries(cities)) {
+                if (!Array.isArray(wards)) continue
+                for (const ward of wards) {
+                    if (!Array.isArray(ward) || ward.length < 5) continue
+                    const [name_zh, name_local, name_en, lat, lng, aliases = []] = ward as [string, string, string, number, number, string[]]
+                    const allText = [name_zh, name_local, name_en, ...(aliases || [])].join(' ')
+                    documents.push({
+                        id: `region:${country}:${name_zh}`,
+                        display: name_zh,
+                        searchText: allText,
+                        lat,
+                        lng,
+                        country,
+                        parent: cityName,  // 🆕 父層級用於 breadcrumb
+                        type: 'region'
+                    })
+                    regionCount++
+                }
+            }
+        }
+
         if (documents.length > 0) {
             engine.addAll(documents)
-            console.log(`🔍 MiniSearch 索引建立: ${documents.length} 條目`)
+            console.log(`🔍 MiniSearch 索引建立: ${documents.length} 條目 (含 ${regionCount} 行政區)`)
         }
 
         return engine
-    }, [landmarks, brands])
+    }, [landmarks, brands, regions])  // 🆕 加入 regions 依賴
 
     // 搜尋函數 (使用 MiniSearch)
     const search = useCallback((query: string, limit = 5): LocalSearchResult[] => {
@@ -283,15 +328,20 @@ export function useLocalGeocode() {
         const normalizedQuery = normalizeForFuzzy(query)
         const results = miniSearchEngine.search(normalizedQuery)
 
-        return results.slice(0, limit).map(result => ({
-            name: result.id.split(':')[1],
-            display: result.display,
-            lat: result.lat,
-            lng: result.lng,
-            country: result.country,
-            type: result.type,
-            score: result.score
-        }))
+        // 🆕 Region boost: 行政區優先顯示
+        return results
+            .map(result => ({
+                name: result.id.split(':').slice(1).join(':'),  // 處理 region:JP:新宿區 格式
+                display: result.display,
+                lat: result.lat,
+                lng: result.lng,
+                country: result.country,
+                parent: result.parent,  // 🆕 父層級 for breadcrumb
+                type: result.type,
+                score: result.score * (result.type === 'region' ? 1.5 : 1)  // 🆕 Region boost
+            }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, limit)
     }, [miniSearchEngine, isLoaded])
 
     return {
