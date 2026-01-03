@@ -1551,11 +1551,11 @@ export function ItineraryView() {
                         )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
                     </div>
 
-                    {/* 📊 今日指數 */}
+                    {/* 📊 今日指數 (Horizontal Scroll) */}
                     {weatherData.length > 0 && (
-                        <div className="grid grid-cols-2 gap-2 pt-2">
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar px-1 pt-2 pb-4 snap-x">
                             {/* 穿衣指數 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
                                 <span className="text-lg">👕</span>
                                 <div>
                                     <div className="text-xs text-slate-500">穿衣</div>
@@ -1574,7 +1574,7 @@ export function ItineraryView() {
                             </div>
 
                             {/* 降雨機率 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
                                 <span className="text-lg">☔</span>
                                 <div>
                                     <div className="text-xs text-slate-500">降雨</div>
@@ -1585,7 +1585,7 @@ export function ItineraryView() {
                             </div>
 
                             {/* 濕度 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
                                 <span className="text-lg">💧</span>
                                 <div>
                                     <div className="text-xs text-slate-500">濕度</div>
@@ -1596,7 +1596,7 @@ export function ItineraryView() {
                             </div>
 
                             {/* 體感 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
                                 <span className="text-lg">🌡️</span>
                                 <div>
                                     <div className="text-xs text-slate-500">體感</div>
@@ -1612,55 +1612,60 @@ export function ItineraryView() {
                                         })()}
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* 🆕 Phase 6: 紫外線 (UV) */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                                    <span className="text-lg">☀️</span>
-                                    <div>
-                                        <div className="text-xs text-slate-500">UV 指數</div>
-                                        <div className="text-sm font-medium text-slate-700">
-                                            {(() => {
-                                                const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
-                                                if (maxUV === 0) return '無'
-                                                return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : '中'})`
-                                            })()}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 🆕 Phase 6: 風速 */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                                    <span className="text-lg">💨</span>
-                                    <div>
-                                        <div className="text-xs text-slate-500">最大風速</div>
-                                        <div className="text-sm font-medium text-slate-700">
-                                            {Math.max(...weatherData.map(w => w.windSpeed ?? 0))} km/h
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 🆕 Phase 9: 空氣品質 (AQI) */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
-                                    <span className="text-lg">🌱</span>
-                                    <div>
-                                        <div className="text-xs text-slate-500">AQI</div>
-                                        <div className="text-sm font-medium text-slate-700">
-                                            {(() => {
-                                                const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
-                                                if (maxAQI === 0) return '無'
-                                                let level = '良好'
-                                                if (maxAQI > 300) level = '危害';
-                                                else if (maxAQI > 200) level = '極差';
-                                                else if (maxAQI > 150) level = '不健康';
-                                                else if (maxAQI > 100) level = '敏感';
-                                                else if (maxAQI > 50) level = '普通';
-
-                                                return `${maxAQI} (${level})`
-                                            })()}
-                                        </div>
+                            {/* 🆕 Phase 6: 紫外線 (UV) */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                                <span className="text-lg">☀️</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">UV 指數</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {(() => {
+                                            const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
+                                            if (maxUV === 0) return '無'
+                                            return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : '中'})`
+                                        })()}
                                     </div>
                                 </div>
                             </div>
+
+                            {/* 🆕 Phase 6: 風速 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                                <span className="text-lg">💨</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">最大風速</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {Math.max(...weatherData.map(w => w.windSpeed ?? 0))} km/h
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 🆕 Phase 9: 空氣品質 (AQI) - 僅在有數據時與 'live'/'forecast' 模式顯示 */}
+                            {(() => {
+                                const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
+                                if (maxAQI > 0) {
+                                    return (
+                                        <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                                            <span className="text-lg">🌱</span>
+                                            <div>
+                                                <div className="text-xs text-slate-500">AQI</div>
+                                                <div className="text-sm font-medium text-slate-700">
+                                                    {(() => {
+                                                        let level = '良好'
+                                                        if (maxAQI > 300) level = '危害';
+                                                        else if (maxAQI > 200) level = '極差';
+                                                        else if (maxAQI > 150) level = '不健康';
+                                                        else if (maxAQI > 100) level = '敏感';
+                                                        else if (maxAQI > 50) level = '普通';
+                                                        return `${maxAQI} (${level})`
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                }
+                                return null
+                            })()}
                         </div>
                     )}
 
