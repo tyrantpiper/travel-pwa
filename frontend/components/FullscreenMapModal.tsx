@@ -125,6 +125,7 @@ export default function FullscreenMapModal({
         }
 
         const currentQuery = query  // 🆕 快照防止競態
+        let l1Success = false       // 🆕 追蹤 L1 是否已成功
 
         // 🏕️ L1: 本地即時搜尋 (毫秒級)
         if (localDataLoaded) {
@@ -143,14 +144,21 @@ export default function FullscreenMapModal({
                 if (mapped.length > 0) {
                     setResults(mapped)
                     setIsTyping(false)
+                    l1Success = true  // 🆕 標記 L1 成功
                     console.log(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
-                    return
+                    // 🆕 不再 return，讓 L2 仍可補充結果
                 }
             }
         }
 
         // 🌐 L2: API 搜尋 (300ms debounce)
         const timer = setTimeout(async () => {
+            // 🆕 如果 L1 已找到結果，跳過 L2 避免覆蓋
+            if (l1Success) {
+                console.log(`🏕️ L1 已命中，跳過 L2 API`)
+                return
+            }
+
             setIsTyping(false)
             setIsSearching(true)
             try {
