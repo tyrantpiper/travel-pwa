@@ -11,6 +11,9 @@ export interface HourlyForecast {
     time: string
     temp: number
     code: number
+    humidity?: number               // 🆕 濕度 (%)
+    precipitation_probability?: number  // 🆕 降雨機率 (%)
+    apparent_temperature?: number   // 🆕 體感溫度
 }
 
 export type WeatherMode = 'live' | 'forecast' | 'seasonal' | 'trend'
@@ -44,7 +47,7 @@ export const fetchWeatherWithSDK = async (
             const params = {
                 latitude: lat,
                 longitude: lng,
-                hourly: ['temperature_2m', 'weather_code'],
+                hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature'],
                 models: 'ecmwf_ifs' as const,
                 timezone: 'auto',
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })
@@ -60,13 +63,19 @@ export const fetchWeatherWithSDK = async (
                 const hourly = response.hourly()!
                 const temps = hourly.variables(0)!.valuesArray()!
                 const codes = hourly.variables(1)!.valuesArray()!
+                const humidity = hourly.variables(2)?.valuesArray() || []
+                const precipProb = hourly.variables(3)?.valuesArray() || []
+                const apparent = hourly.variables(4)?.valuesArray() || []
 
                 const forecast: HourlyForecast[] = []
                 for (let i = 6; i <= 23 && i < temps.length; i++) {
                     forecast.push({
                         time: `${i}:00`,
                         temp: Math.round(temps[i]),
-                        code: codes[i] || 0
+                        code: codes[i] || 0,
+                        humidity: humidity[i] ? Math.round(humidity[i]) : undefined,
+                        precipitation_probability: precipProb[i] ? Math.round(precipProb[i]) : undefined,
+                        apparent_temperature: apparent[i] ? Math.round(apparent[i]) : undefined
                     })
                 }
 

@@ -1433,6 +1433,36 @@ export function ItineraryView() {
                         </span>
                     </div >
 
+                    {/* 🤖 AI 天氣建議 */}
+                    {weatherData.length > 0 && (
+                        <div className="bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl p-4 text-white shadow-lg">
+                            <div className="flex items-start gap-3">
+                                <span className="text-2xl">🤖</span>
+                                <div className="flex-1">
+                                    <p className="text-sm leading-relaxed">
+                                        {(() => {
+                                            const maxTemp = Math.max(...weatherData.map(w => w.temp))
+                                            const minTemp = Math.min(...weatherData.map(w => w.temp))
+                                            const avgHumidity = weatherData[0]?.humidity ?? 50
+                                            const maxPrecip = Math.max(...weatherData.map(w => w.precipitation_probability ?? 0))
+                                            const hasRain = weatherData.some(w => w.code > 3)
+
+                                            let advice = `今天氣溫 ${minTemp}°~${maxTemp}°`
+                                            if (avgHumidity > 80) advice += `，濕度偏高 (${avgHumidity}%)`
+                                            if (maxPrecip > 50) advice += `。下午有 ${maxPrecip}% 機率降雨，建議帶傘`
+                                            else if (hasRain) advice += `。可能有短暫降雨`
+                                            else advice += `，天氣良好`
+
+                                            if (maxTemp - minTemp > 10) advice += `。日夜溫差大，注意保暖`
+
+                                            return advice + '！'
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                         {weatherData.length > 0 ? weatherData.map((w, i) => (
                             <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
@@ -1442,6 +1472,71 @@ export function ItineraryView() {
                             </div>
                         )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
                     </div>
+
+                    {/* 📊 今日指數 */}
+                    {weatherData.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                            {/* 穿衣指數 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">👕</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">穿衣</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {(() => {
+                                            const avgTemp = (Math.max(...weatherData.map(w => w.temp)) + Math.min(...weatherData.map(w => w.temp))) / 2
+                                            if (avgTemp > 28) return '短袖短褲'
+                                            if (avgTemp > 22) return '短袖'
+                                            if (avgTemp > 15) return '長袖'
+                                            if (avgTemp > 10) return '薄外套'
+                                            if (avgTemp > 5) return '厚外套'
+                                            return '羽絨服'
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 降雨機率 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">☔</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">降雨</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {Math.max(...weatherData.map(w => w.precipitation_probability ?? 0))}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 濕度 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">💧</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">濕度</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {weatherData[Math.floor(weatherData.length / 2)]?.humidity ?? '--'}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 體感 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">🌡️</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">體感</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {(() => {
+                                            const avgApparent = weatherData[Math.floor(weatherData.length / 2)]?.apparent_temperature
+                                            const avgTemp = weatherData[Math.floor(weatherData.length / 2)]?.temp
+                                            if (!avgApparent) return '舒適'
+                                            const diff = avgApparent - avgTemp
+                                            if (diff > 3) return '悶熱'
+                                            if (diff < -3) return '涼爽'
+                                            return '舒適'
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div >
 
                 {/* 🕵️ AI 深度審核 - 每日都有 */}

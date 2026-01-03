@@ -39,6 +39,9 @@ export interface DayWeather {
     time: string
     temp: number
     code: number
+    humidity?: number               // 🆕 濕度 (%)
+    precipitation_probability?: number  // 🆕 降雨機率 (%)
+    apparent_temperature?: number   // 🆕 體感溫度
 }
 
 export interface SubItem {
