@@ -95,6 +95,7 @@ export function ItineraryView() {
 
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
+    const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')  // 🆕 P3: 天氣模式標籤
     const [dailyLocs, setDailyLocs] = useState<Record<number, DailyLocation>>({})
     const [isLocEditOpen, setIsLocEditOpen] = useState(false)
     const [newLocName, setNewLocName] = useState("")
@@ -224,24 +225,90 @@ export function ItineraryView() {
                 }
             }
 
-            try {
-                const res = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code&timezone=auto&forecast_days=1`,
-                    { signal: controller.signal }
-                )
-                const data = await res.json()
-                const temps = data.hourly.temperature_2m
-                const codes = data.hourly.weather_code
-                const forecast = []
+            // 🆕 P0: 計算行程對應的實際日期
+            let targetDate: string | null = null
+            let daysFromNow = 0
+            let mode: 'live' | 'forecast' | 'seasonal' | 'trend' = 'live'
 
-                for (let i = 6; i <= 23; i++) {
+            if (currentTrip?.start_date) {
+                const startDate = new Date(currentTrip.start_date)
+                const tripDate = new Date(startDate)
+                tripDate.setDate(startDate.getDate() + (day - 1))
+                targetDate = tripDate.toISOString().split('T')[0]
+                daysFromNow = Math.floor((tripDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+
+                // 決定天氣模式
+                if (daysFromNow < 0) {
+                    mode = 'trend'  // 過去日期用歷史參考
+                } else if (daysFromNow <= 16) {
+                    mode = 'forecast'  // 16 天內用精準預報
+                } else if (daysFromNow <= 46) {
+                    mode = 'seasonal'  // 16-46 天用季節預報
+                } else {
+                    mode = 'trend'  // 超過 46 天用趨勢參考
+                }
+            }
+
+            try {
+                // 🆕 P2: User-Agent Header (避免商業偵測)
+                const headers: HeadersInit = {
+                    'User-Agent': 'RyanTravelApp/3.0 (Non-commercial travel planning tool)'
+                }
+
+                let apiUrl: string
+
+                if (!targetDate || daysFromNow < -5 || daysFromNow > 46) {
+                    // 無日期或超出範圍：用今天天氣或去年同期
+                    if (targetDate && (daysFromNow < -5 || daysFromNow > 46)) {
+                        // 🆕 使用去年同期 (Archive API)
+                        const lastYear = new Date(targetDate)
+                        lastYear.setFullYear(lastYear.getFullYear() - 1)
+                        const archiveDate = lastYear.toISOString().split('T')[0]
+                        apiUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&start_date=${archiveDate}&end_date=${archiveDate}&timezone=auto`
+                    } else {
+                        // 即時天氣
+                        apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&timezone=auto&forecast_days=1`
+                    }
+                } else if (daysFromNow <= 16) {
+                    // 🆕 P1: 1-16 天內使用 Forecast API + ECMWF IFS 9km
+                    apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
+                } else {
+                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46)
+                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
+                }
+
+                console.log(`🌡️ Weather API: ${mode} mode, date=${targetDate}, daysFromNow=${daysFromNow}`)
+
+                const res = await fetch(apiUrl, {
+                    signal: controller.signal,
+                    headers
+                })
+                const data = await res.json()
+
+                let temps: number[]
+                let codes: number[]
+
+                if (mode === 'seasonal' && data.daily) {
+                    // Seasonal API 只有日最高/最低，轉為模擬小時制
+                    const avgTemp = (data.daily.temperature_2m_max[0] + data.daily.temperature_2m_min[0]) / 2
+                    temps = Array(24).fill(avgTemp)
+                    codes = Array(24).fill(0)  // 季節預報無天氣碼
+                } else {
+                    temps = data.hourly?.temperature_2m || []
+                    codes = data.hourly?.weather_code || []
+                }
+
+                const forecast = []
+                for (let i = 6; i <= 23 && i < temps.length; i++) {
                     forecast.push({
                         time: `${i}:00`,
                         temp: Math.round(temps[i]),
-                        code: codes[i]
+                        code: codes[i] || 0
                     })
                 }
+
                 setWeatherData(forecast)
+                setWeatherMode(mode)  // 🆕 P3: 更新天氣模式
             } catch (e) {
                 // 忽略 AbortError（正常的取消操作）
                 if ((e as Error).name !== 'AbortError') {
@@ -1221,7 +1288,22 @@ export function ItineraryView() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                        <span className="text-xs text-slate-400 flex items-center gap-1 ml-2 shrink-0"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />Live Weather</span>
+                        {/* 🆕 P3: 動態天氣模式標籤 */}
+                        <span className={`text-xs flex items-center gap-1 ml-2 shrink-0 ${weatherMode === 'live' ? 'text-green-500' :
+                                weatherMode === 'forecast' ? 'text-blue-500' :
+                                    weatherMode === 'seasonal' ? 'text-purple-500' :
+                                        'text-amber-500'
+                            }`}>
+                            <span className={`w-2 h-2 rounded-full ${weatherMode === 'live' ? 'bg-green-500 animate-pulse' :
+                                    weatherMode === 'forecast' ? 'bg-blue-500' :
+                                        weatherMode === 'seasonal' ? 'bg-purple-500' :
+                                            'bg-amber-500'
+                                }`} />
+                            {weatherMode === 'live' && '即時天氣'}
+                            {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
+                            {weatherMode === 'seasonal' && '季節預報'}
+                            {weatherMode === 'trend' && '歷史同期參考'}
+                        </span>
                     </div >
 
                     <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
