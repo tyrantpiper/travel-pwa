@@ -338,8 +338,8 @@ export function ItineraryView() {
                     // 🆕 P1: 1-16 天內使用 Forecast API + ECMWF IFS 9km
                     apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 } else {
-                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46)
-                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
+                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46) + 日出日落
+                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 }
 
                 console.log(`🌡️ Weather API: ${mode} mode, date=${targetDate}, daysFromNow=${daysFromNow}`)
@@ -354,13 +354,24 @@ export function ItineraryView() {
                 let codes: number[]
 
                 if (mode === 'seasonal' && data.daily) {
-                    // 🆕 Phase 1: 使用 Linvill 非對稱三段式曲線
+                    // 🆕 Phase 1 + 2: Linvill 曲線 + 日出日落動態調整
                     const tMin = data.daily.temperature_2m_min[0]
                     const tMax = data.daily.temperature_2m_max[0]
 
-                    // 使用 Linvill 非對稱模型取代簡單正弦
-                    // 預設日出 6:00, 日落 18:00 (Phase 2 會改用 API 動態值)
-                    temps = generateHourlyCurve(tMin, tMax, 6, 18)
+                    // 🆕 Phase 2: 從 API 獲取日出日落時間
+                    let sunriseHour = 6  // 預設
+                    let sunsetHour = 18  // 預設
+
+                    if (data.daily.sunrise?.[0] && data.daily.sunset?.[0]) {
+                        // API 回傳 ISO 格式如 "2026-05-18T05:30"
+                        const sunriseTime = new Date(data.daily.sunrise[0])
+                        const sunsetTime = new Date(data.daily.sunset[0])
+                        sunriseHour = sunriseTime.getHours() + sunriseTime.getMinutes() / 60
+                        sunsetHour = sunsetTime.getHours() + sunsetTime.getMinutes() / 60
+                        console.log(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
+                    }
+
+                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour)
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
