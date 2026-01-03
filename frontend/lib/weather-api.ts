@@ -93,13 +93,28 @@ export const generateHourlyCurve = (
     sunsetHour: number = 18,
     month?: number,
     elevation?: number,
-    latitude?: number
+    latitude?: number,
+    weatherCode?: number // 🆕 Phase 9: 天氣代碼微氣候修正
 ): number[] => {
     const dayLength = sunsetHour - sunriseHour
 
     // 🆕 Phase 3: 季節調節
     const currentMonth = month ?? new Date().getMonth() + 1
     const seasonConfig = getSeasonConfig(currentMonth, dayLength)
+
+    // 🆕 Phase 9: 微氣候聚類 (Physics-based Shape Tuning)
+    const weatherMod = { decayFactor: 1.0, peakShift: 0 }
+    if (weatherCode !== undefined) {
+        if (weatherCode <= 1) { // 晴天: 輻射冷卻強
+            weatherMod.decayFactor = 1.5
+        } else if (weatherCode >= 2 && weatherCode <= 3) { // 多雲: 雲層保溫
+            weatherMod.decayFactor = 0.8
+        } else if (weatherCode >= 50 && weatherCode <= 69) { // 雨天: 濕度高，溫差小
+            weatherMod.decayFactor = 0.5
+        } else if (weatherCode >= 95) { // 雷雨: 午後對流，提早降溫
+            weatherMod.peakShift = -1.5
+        }
+    }
 
     // 🆕 Phase 4: 地理修正係數
     const geoMod = {
@@ -111,17 +126,17 @@ export const generateHourlyCurve = (
         coastalDelay: (tMax - tMin) < 8 ? 0.5 : 0  // 溫差小可能沿海，延後最高溫
     }
 
-    // 最高溫發生時間: 季節 + 地理調整
+    // 最高溫發生時間: 季節 + 地理調整 + 天氣修正
     const basePeakHour = dayLength > 13 ? sunsetHour - 3 : sunsetHour - 4
-    const peakHour = basePeakHour + seasonConfig.peakDelay + geoMod.coastalDelay
+    const peakHour = basePeakHour + seasonConfig.peakDelay + geoMod.coastalDelay + weatherMod.peakShift
 
     // 平均溫度
     const avg = (tMax + tMin) / 2
 
-    // 夜間衰減係數: 日溫差 + 季節 + 地理調整
+    // 夜間衰減係數: 日溫差 + 季節 + 地理 + 天氣修正
     const range = tMax - tMin
     const baseDecay = range > 15 ? 0.25 : range < 5 ? 0.08 : 0.15
-    const decayRate = baseDecay * seasonConfig.decayMod * geoMod.elevationFactor * geoMod.latitudeFactor
+    const decayRate = baseDecay * seasonConfig.decayMod * geoMod.elevationFactor * geoMod.latitudeFactor * weatherMod.decayFactor
 
     const temps: number[] = []
 

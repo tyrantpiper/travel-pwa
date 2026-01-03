@@ -258,17 +258,18 @@ export function ItineraryView() {
                 }
             }
 
-            // 🆕 P0: 計算行程對應的實際日期
+            // 🆕 P0: 計算行程對應的實際日期 (Timezone Safe Fix)
             let targetDate: string | null = null
             let daysFromNow = 0
             let mode: 'live' | 'forecast' | 'seasonal' | 'trend' = 'live'
 
             if (currentTrip?.start_date) {
-                const startDate = new Date(currentTrip.start_date)
-                const tripDate = new Date(startDate)
-                tripDate.setDate(startDate.getDate() + (day - 1))
-                targetDate = tripDate.toISOString().split('T')[0]
-                daysFromNow = Math.floor((tripDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                // 🛡️ Fix Timezone Off-by-one: Parse YYYY-MM-DD manually and use UTC
+                const [y, m, d] = currentTrip.start_date.split('-').map(Number)
+                const tripDateUTC = new Date(Date.UTC(y, m - 1, d + (day - 1)))
+                targetDate = tripDateUTC.toISOString().split('T')[0]
+
+                daysFromNow = Math.floor((tripDateUTC.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
                 // 決定天氣模式
                 if (daysFromNow < 0) {
@@ -360,8 +361,8 @@ export function ItineraryView() {
                     // 🆕 P1: 1-16 天內使用 Forecast API + ECMWF IFS 9km
                     apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 } else {
-                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46) + 日出日落
-                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
+                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46) + 日出日落 + 降雨 (For Inference)
+                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 }
 
                 console.log(`🌡️ Weather API Request: ${mode} mode`)
@@ -385,6 +386,14 @@ export function ItineraryView() {
                     // 🆕 Phase 1 + 2 + 3: Linvill 曲線 + 日出日落 + 季節調節
                     const tMin = data.daily.temperature_2m_min[0]
                     const tMax = data.daily.temperature_2m_max[0]
+                    const precipSum = data.daily.precipitation_sum?.[0] ?? 0
+
+                    // 🆕 Phase 9: 根據降雨量推測天氣代碼 (Frontend Clustering)
+                    // >5mm: 雨天(63), >1mm: 小雨(51), <=1mm: 多雲(2)
+                    let inferredCode = 2 // Default: Cloudy
+                    if (precipSum > 5) inferredCode = 63 // Rain
+                    else if (precipSum > 1) inferredCode = 51 // Light Rain
+                    else if (precipSum <= 1) inferredCode = 1 // Clear/Cloudy
 
                     // 🆕 Phase 2: 從 API 獲取日出日落時間
                     let sunriseHour = 6  // 預設
@@ -405,10 +414,18 @@ export function ItineraryView() {
                     // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
                     const targetMonth = targetDate ? new Date(targetDate).getMonth() + 1 : new Date().getMonth() + 1
 
-                    // 🆕 Phase 4 + 6: 使用緯度與真實海拔進行地理修正
-                    // (Phase 4 只用了 Lat, Phase 6 終於補上海拔數據!)
-                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth, data.elevation, lat)
-                    codes = Array(24).fill(0)  // 季節預報無天氣碼
+                    // 🆕 Phase 4 + 6 + 9: 使用緯度、海拔、與天氣代碼進行聚類修正
+                    temps = generateHourlyCurve(
+                        Math.round(tMin),
+                        Math.round(tMax),
+                        sunriseHour,
+                        sunsetHour,
+                        targetMonth,
+                        data.elevation,
+                        lat,
+                        inferredCode // 🆕 Phase 9: Weather Code
+                    )
+                    codes = Array(24).fill(inferredCode)  // 季節預報使用推測代碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
                     codes = data.hourly?.weather_code || []
@@ -1462,7 +1479,9 @@ export function ItineraryView() {
                                                         setDailyLocs({ ...dailyLocs, [day]: { name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng } })
                                                         setIsLocEditOpen(false)
                                                     } else {
-                                                        toast.warning("請輸入有效的座標數字")
+                                                        // 顯示錯誤 Toast
+                                                        const toastId = Math.random().toString(36).substring(7)
+                                                        toast.warning("請輸入有效的座標數字", { id: toastId })
                                                     }
                                                 }}
                                             >
