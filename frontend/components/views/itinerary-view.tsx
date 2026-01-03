@@ -343,8 +343,55 @@ export function ItineraryView() {
         }
         fetchWeather()
 
+        // 🆕 P5: 預取相鄰天數 (day-1, day+1) 到快取
+        const prefetchAdjacentDays = async () => {
+            if (!currentTrip?.start_date) return
+
+            const adjacentDays = [day - 1, day + 1].filter(d => d >= 1)
+
+            for (const adjDay of adjacentDays) {
+                const adjStartDate = new Date(currentTrip.start_date)
+                const adjTripDate = new Date(adjStartDate)
+                adjTripDate.setDate(adjStartDate.getDate() + (adjDay - 1))
+                const adjTargetDate = adjTripDate.toISOString().split('T')[0]
+                const adjDaysFromNow = Math.floor((adjTripDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+
+                // 只預取 16 天內的預報 (Forecast API)
+                if (adjDaysFromNow < 0 || adjDaysFromNow > 16) continue
+
+                const adjLat = dailyLocs?.[adjDay]?.lat ?? 35.6895
+                const adjLng = dailyLocs?.[adjDay]?.lng ?? 139.6917
+                const adjCacheKey = `${adjLat.toFixed(2)}_${adjLng.toFixed(2)}_${adjTargetDate}`
+
+                // 跳過已快取的
+                if (weatherCache.current.has(adjCacheKey)) continue
+
+                try {
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${adjLat}&longitude=${adjLng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&start_date=${adjTargetDate}&end_date=${adjTargetDate}&timezone=auto`
+                    const res = await fetch(url, {
+                        headers: { 'User-Agent': 'RyanTravelApp/3.0 (Non-commercial)' }
+                    })
+                    const data = await res.json()
+                    const temps = data.hourly?.temperature_2m || []
+                    const codes = data.hourly?.weather_code || []
+                    const forecast = []
+                    for (let i = 6; i <= 23 && i < temps.length; i++) {
+                        forecast.push({ time: `${i}:00`, temp: Math.round(temps[i]), code: codes[i] || 0 })
+                    }
+                    weatherCache.current.set(adjCacheKey, { data: forecast, mode: 'forecast', timestamp: Date.now() })
+                    console.log(`🔮 P5 Prefetch: Day ${adjDay} cached`)
+                } catch { /* 預取失敗不影響主流程 */ }
+            }
+        }
+
+        // 延遲 500ms 後預取，避免阻塞主請求
+        const prefetchTimer = setTimeout(prefetchAdjacentDays, 500)
+
         // 🛡️ Cleanup: 組件卸載或依賴變化時取消請求
-        return () => controller.abort()
+        return () => {
+            controller.abort()
+            clearTimeout(prefetchTimer)  // 🆕 P5: 清除預取計時器
+        }
     }, [day, dailyLocs, currentTrip])
 
     const handleLeaveTrip = async (tripId: string) => {
