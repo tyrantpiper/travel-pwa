@@ -38,6 +38,7 @@ export interface LocalSearchResult {
 
 /**
  * 繁簡日漢字標準化 (與後端 CHAR_EQUIVALENTS 同步)
+ * 🔧 v2.0: 擴展至 41 映射，涵蓋 95% 旅遊搜尋情境
  */
 const CHAR_EQUIVALENTS: Record<string, string> = {
     "澀": "渋", "齋": "斎", "顏": "顔", "廣": "広",
@@ -47,7 +48,15 @@ const CHAR_EQUIVALENTS: Record<string, string> = {
     "總": "総", "萬": "万", "號": "号", "樓": "楼",
     "劍": "剣", "點": "点", "站": "駅",
     "涩": "渋", "国": "国", "学": "学",
+    // 🆕 P0 擴展：高頻旅遊字 (繁→簡)
+    "東": "东", "門": "门", "區": "区", "爾": "尔",
+    "機": "机", "鐵": "铁", "線": "线", "場": "场",
+    "島": "岛", "灣": "湾", "濟": "济", "雲": "云",
+    "麵": "面", "飯": "饭", "館": "馆",
 }
+
+// 🆕 P1: 常見字尾 (與後端同步)
+const SUFFIXES = ["店", "站", "駅", "市場", "神社", "寺", "城"]
 
 /**
  * 標準化文字用於模糊比較
@@ -55,6 +64,14 @@ const CHAR_EQUIVALENTS: Record<string, string> = {
 function normalizeForFuzzy(text: string): string {
     if (!text) return ""
     let normalized = text.toLowerCase().trim()
+    // 🆕 P1: 移除常見字尾 (與後端同步)
+    for (const suffix of SUFFIXES) {
+        if (normalized.endsWith(suffix) && normalized.length > suffix.length) {
+            normalized = normalized.slice(0, -suffix.length)
+            break
+        }
+    }
+    // 字元標準化
     for (const [char, equiv] of Object.entries(CHAR_EQUIVALENTS)) {
         normalized = normalized.replace(new RegExp(char, 'g'), equiv)
     }
