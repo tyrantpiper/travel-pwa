@@ -29,6 +29,37 @@ interface SearchResult {
     source?: string
 }
 
+// 🆕 P6: 二次排序 (Re-ranking)
+function rerankResults(
+    results: SearchResult[],
+    query: string,
+    centerLat: number,
+    centerLng: number
+): SearchResult[] {
+    // 簡易 Haversine 距離計算 (km)
+    const distance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+        const R = 6371
+        const dLat = (lat2 - lat1) * Math.PI / 180
+        const dLng = (lng2 - lng1) * Math.PI / 180
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    }
+
+    const queryLower = query.toLowerCase()
+
+    return results
+        .map(r => {
+            const dist = distance(centerLat, centerLng, r.lat, r.lng)
+            const nameMatch = r.name.toLowerCase().includes(queryLower) ? 50 : 0
+            const exactMatch = r.name.toLowerCase() === queryLower ? 100 : 0
+            // 分數 = 完全匹配 + 部分匹配 + 距離分 (越近分越高)
+            const reScore = exactMatch + nameMatch + Math.max(0, 100 - dist)
+            return { ...r, reScore }
+        })
+        .sort((a, b) => (b.reScore ?? 0) - (a.reScore ?? 0))
+        .map(({ reScore: _, ...r }) => r)  // 移除 reScore 欄位
+}
+
 // 活動類型
 interface Activity {
     id?: string
@@ -184,7 +215,15 @@ export default function FullscreenMapModal({
                     signal  // 🆕 P5: 傳遞 AbortSignal
                 })
                 if (currentQuery === query && !signal.aborted) {
-                    setResults(data.results || [])
+                    // 🆕 P6: 二次排序 (優先顯示精確匹配 + 距離近的結果)
+                    const reranked = rerankResults(
+                        data.results || [],
+                        currentQuery,
+                        initialViewState.latitude,
+                        initialViewState.longitude
+                    )
+                    setResults(reranked)
+                    console.log(`🔄 P6 Re-ranked ${reranked.length} results`)
                 }
             } catch (e) {
                 // 🆕 P5: 忽略 AbortError (正常取消行為)
