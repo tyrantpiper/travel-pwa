@@ -323,7 +323,7 @@ export function ItineraryView() {
                         // 🆕 P8: Cache Limit (LRU-like)
                         if (weatherCache.current.size > 50) {
                             const firstKey = weatherCache.current.keys().next().value
-                            weatherCache.current.delete(firstKey) // 移除最舊的
+                            if (firstKey) weatherCache.current.delete(firstKey) // 移除最舊的
                         }
 
                         weatherCache.current.set(cacheKey, {
