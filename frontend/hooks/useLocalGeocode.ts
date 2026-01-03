@@ -19,7 +19,7 @@ interface LandmarkEntry {
  */
 interface BrandEntry {
     aliases: string[]
-    search: string
+    search_term: string
     category: string
 }
 
@@ -97,7 +97,7 @@ function fuzzyScore(query: string, target: string): number {
  */
 export function useLocalGeocode() {
     const [landmarks, setLandmarks] = useState<Record<string, LandmarkEntry>>({})
-    const [brands, setBrands] = useState<Record<string, BrandEntry[]>>({})
+    const [brands, setBrands] = useState<Record<string, Record<string, BrandEntry>>>({})
     const [isLoading, setIsLoading] = useState(true)
     const [isLoaded, setIsLoaded] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -131,10 +131,10 @@ export function useLocalGeocode() {
                     }
                 }
 
-                const filteredBrands: Record<string, BrandEntry[]> = {}
+                const filteredBrands: Record<string, Record<string, BrandEntry>> = {}
                 for (const [key, value] of Object.entries(brandsData)) {
-                    if (!key.startsWith('_')) {
-                        filteredBrands[key] = value as BrandEntry[]
+                    if (!key.startsWith('_') && typeof value === 'object') {
+                        filteredBrands[key] = value as Record<string, BrandEntry>
                     }
                 }
 
@@ -164,7 +164,7 @@ export function useLocalGeocode() {
                 setLandmarks(filteredLandmarks)
                 setBrands(filteredBrands)
                 setIsLoaded(true)
-                console.log(`🏝️ Local geocode loaded: ${Object.keys(filteredLandmarks).length} landmarks (incl. ${countryEntriesCount} from countries/), ${Object.values(filteredBrands).flat().length} brands`)
+                console.log(`🏝️ Local geocode loaded: ${Object.keys(filteredLandmarks).length} landmarks (incl. ${countryEntriesCount} from countries/), ${Object.values(filteredBrands).reduce((acc, cat) => acc + Object.keys(cat).length, 0)} brands`)
             } catch (err) {
                 console.error('🏝️ Local geocode load error:', err)
                 setError(err instanceof Error ? err.message : 'Unknown error')
@@ -195,12 +195,14 @@ export function useLocalGeocode() {
             })
         }
 
-        // 索引品牌
-        for (const [, brandList] of Object.entries(brands)) {
-            for (const brand of brandList) {
+        // 索引品牌 (nested object structure: category -> brand name -> brand entry)
+        for (const [, categoryBrands] of Object.entries(brands)) {
+            if (typeof categoryBrands !== 'object' || categoryBrands === null) continue
+            for (const [brandName, brand] of Object.entries(categoryBrands)) {
+                if (typeof brand !== 'object' || !brand.search_term) continue
                 index.push({
-                    key: brand.search,
-                    aliases: [brand.search, ...brand.aliases],
+                    key: brand.search_term,
+                    aliases: [brandName, brand.search_term, ...(brand.aliases || [])],
                     data: brand,
                     type: 'brand'
                 })
@@ -240,8 +242,8 @@ export function useLocalGeocode() {
                 } else {
                     const brand = item.data as BrandEntry
                     results.push({
-                        name: brand.search,
-                        display: brand.search,
+                        name: brand.search_term,
+                        display: brand.search_term,
                         type: 'brand',
                         score: bestScore
                     })
