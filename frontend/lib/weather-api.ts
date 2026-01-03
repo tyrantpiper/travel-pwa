@@ -34,11 +34,12 @@ export const fetchWeatherWithSDK = async (
         // 決定模式
         let mode: WeatherMode = 'live'
         if (daysFromNow < 0) mode = 'trend'
+        else if (daysFromNow === 0) mode = 'live'  // 今天 = 即時
         else if (daysFromNow <= 16) mode = 'forecast'
         else if (daysFromNow <= 46) mode = 'seasonal'
         else mode = 'trend'
 
-        // Forecast API (0-16 天)
+        // Forecast API (0-16 天) - live 和 forecast 都用這個
         if (mode === 'forecast' || mode === 'live') {
             const params = {
                 latitude: lat,
