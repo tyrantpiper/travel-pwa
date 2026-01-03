@@ -31,7 +31,7 @@ async def geocode_search(
     
     🆕 支援結構化過濾參數 (country/region)
     """
-    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', country={request.country}, region={request.region}, bias={request.lat},{request.lng}")
+    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', country={request.country}, region={request.region}, zoom={request.zoom}, bias={request.lat},{request.lng}")
     return await smart_geocode_logic(
         request.query, 
         request.limit, 
@@ -40,7 +40,8 @@ async def geocode_search(
         request.lat, 
         request.lng,
         request.country,    # 🆕 傳遞國家過濾
-        request.region      # 🆕 傳遞區域過濾
+        request.region,     # 🆕 傳遞區域過濾
+        request.zoom        # 🆕 P1: 傳遞縮放層級
     )
 
 

@@ -47,6 +47,7 @@ class GeocodeSearchRequest(BaseModel):
     # 🆕 結構化過濾參數 (取代字串拼接)
     country: Optional[str] = None   # 國家名稱 (如 "Japan", "Taiwan")
     region: Optional[str] = None    # 區域名稱 (如 "Tokyo 東京")
+    zoom: Optional[float] = None    # 🆕 P1: 地圖縮放層級 (用於動態 bias)
 
 
 class GeocodeReverseRequest(BaseModel):

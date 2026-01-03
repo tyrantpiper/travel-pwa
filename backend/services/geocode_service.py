@@ -1004,10 +1004,11 @@ async def smart_geocode_logic(
     lat: float = None, 
     lng: float = None,
     country: str = None,    # 🆕 前端傳入的國家過濾
-    region: str = None      # 🆕 前端傳入的區域過濾
+    region: str = None,     # 🆕 前端傳入的區域過濾
+    zoom: float = None      # 🆕 P1: 地圖縮放層級 (用於動態 bias)
 ) -> dict:
     """共用的智能地理編碼邏輯"""
-    log_debug(f"🔍 [SmartGeo] Start search: '{query}' (Trip: {trip_title}, Country: {country}, Region: {region}, Bias: {lat},{lng})")
+    log_debug(f"🔍 [SmartGeo] Start search: '{query}' (Trip: {trip_title}, Country: {country}, Region: {region}, Zoom: {zoom}, Bias: {lat},{lng})")
     
     # 🧠 Step 0: 智能國家判斷和翻譯
     country_code = None
@@ -1092,8 +1093,8 @@ async def smart_geocode_logic(
         if len(all_results) >= limit:
             break
             
-        # Photon
-        photon = await geocode_with_photon(q, limit, lat, lng)
+        # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
+        photon = await geocode_with_photon(q, limit, lat, lng, zoom)
         if photon:
             for r in photon: r["source"] = "photon"
             all_results.extend(photon)

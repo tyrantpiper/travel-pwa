@@ -170,6 +170,7 @@ export default function FullscreenMapModal({
             try {
                 // 🏙️ 智能 Location Bias: 根據地圖中心找最近城市
                 const nearestCity = findNearestCity(initialViewState.latitude, initialViewState.longitude)
+                const currentZoom = mapRef.current?.getZoom() ?? initialViewState.zoom ?? 12  // 🆕 P1: 取得地圖縮放
 
                 const data = await geocodeApi.search({
                     query: currentQuery,
@@ -179,6 +180,7 @@ export default function FullscreenMapModal({
                     lng: nearestCity?.lng ?? initialViewState.longitude,
                     country: nearestCity?.country,
                     region: nearestCity?.region,
+                    zoom: currentZoom,  // 🆕 P1: 傳遞縮放層級
                     signal  // 🆕 P5: 傳遞 AbortSignal
                 })
                 if (currentQuery === query && !signal.aborted) {
