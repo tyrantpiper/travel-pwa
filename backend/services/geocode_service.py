@@ -605,6 +605,30 @@ try:
 except Exception as e:
     print(f"⚠️ Failed to load external landmarks: {e}")
 
+# 🆕 Load Country-Separated Data (Phase 5: Modular Architecture)
+try:
+    countries_dir = Path(__file__).parent.parent / "data" / "countries"
+    if countries_dir.exists():
+        total_country_entries = 0
+        for country_path in countries_dir.iterdir():
+            if country_path.is_dir():
+                country_code = country_path.name.upper()
+                for json_file in country_path.glob("*.json"):
+                    with open(json_file, "r", encoding="utf-8") as f:
+                        country_data = json.load(f)
+                        # Filter: Skip __meta and non-dict entries
+                        valid_entries = {
+                            k: v for k, v in country_data.items()
+                            if isinstance(v, dict) and not k.startswith("_")
+                        }
+                        LANDMARKS_DB.update(valid_entries)
+                        total_country_entries += len(valid_entries)
+                        print(f"  📂 {country_code}/{json_file.name}: {len(valid_entries)} entries")
+        print(f"📦 Loaded {total_country_entries} entries from countries/ directory")
+except Exception as e:
+    print(f"⚠️ Failed to load country data: {e}")
+
+
 # 預先計算排序後的鍵（最長優先匹配）
 LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)
 

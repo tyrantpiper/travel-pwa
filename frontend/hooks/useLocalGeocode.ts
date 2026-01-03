@@ -108,9 +108,12 @@ export function useLocalGeocode() {
             try {
                 setIsLoading(true)
 
-                const [landmarksRes, brandsRes] = await Promise.all([
+                // 載入主要資料 + 國家分離資料
+                const [landmarksRes, brandsRes, jpStationsRes, jpLandmarksRes] = await Promise.all([
                     fetch('/data/landmarks.json'),
-                    fetch('/data/brands.json')
+                    fetch('/data/brands.json'),
+                    fetch('/data/countries/jp/stations.json').catch(() => null),
+                    fetch('/data/countries/jp/landmarks.json').catch(() => null)
                 ])
 
                 if (!landmarksRes.ok || !brandsRes.ok) {
@@ -120,25 +123,48 @@ export function useLocalGeocode() {
                 const landmarksData = await landmarksRes.json()
                 const brandsData = await brandsRes.json()
 
-                // 過濾掉 __comment 欄位
+                // 過濾掉 __comment 和 __meta 欄位
                 const filteredLandmarks: Record<string, LandmarkEntry> = {}
                 for (const [key, value] of Object.entries(landmarksData)) {
-                    if (key !== '__comment') {
+                    if (!key.startsWith('_') && typeof value === 'object') {
                         filteredLandmarks[key] = value as LandmarkEntry
                     }
                 }
 
                 const filteredBrands: Record<string, BrandEntry[]> = {}
                 for (const [key, value] of Object.entries(brandsData)) {
-                    if (key !== '__comment') {
+                    if (!key.startsWith('_')) {
                         filteredBrands[key] = value as BrandEntry[]
+                    }
+                }
+
+                // 🆕 合併國家資料
+                let countryEntriesCount = 0
+
+                if (jpStationsRes?.ok) {
+                    const jpStations = await jpStationsRes.json()
+                    for (const [key, value] of Object.entries(jpStations)) {
+                        if (!key.startsWith('_') && typeof value === 'object') {
+                            filteredLandmarks[key] = value as LandmarkEntry
+                            countryEntriesCount++
+                        }
+                    }
+                }
+
+                if (jpLandmarksRes?.ok) {
+                    const jpLandmarks = await jpLandmarksRes.json()
+                    for (const [key, value] of Object.entries(jpLandmarks)) {
+                        if (!key.startsWith('_') && typeof value === 'object') {
+                            filteredLandmarks[key] = value as LandmarkEntry
+                            countryEntriesCount++
+                        }
                     }
                 }
 
                 setLandmarks(filteredLandmarks)
                 setBrands(filteredBrands)
                 setIsLoaded(true)
-                console.log(`🏝️ Local geocode loaded: ${Object.keys(filteredLandmarks).length} landmarks, ${Object.values(filteredBrands).flat().length} brands`)
+                console.log(`🏝️ Local geocode loaded: ${Object.keys(filteredLandmarks).length} landmarks (incl. ${countryEntriesCount} from countries/), ${Object.values(filteredBrands).flat().length} brands`)
             } catch (err) {
                 console.error('🏝️ Local geocode load error:', err)
                 setError(err instanceof Error ? err.message : 'Unknown error')
