@@ -96,6 +96,10 @@ export function ItineraryView() {
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')  // 🆕 P3: 天氣模式標籤
+
+    // 🆕 P7: 天氣快取 (避免重複請求)
+    const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
+
     const [dailyLocs, setDailyLocs] = useState<Record<number, DailyLocation>>({})
     const [isLocEditOpen, setIsLocEditOpen] = useState(false)
     const [newLocName, setNewLocName] = useState("")
@@ -249,6 +253,23 @@ export function ItineraryView() {
                 }
             }
 
+            // 🆕 P7: 快取檢查 (避免重複請求)
+            const cacheKey = `${lat.toFixed(2)}_${lng.toFixed(2)}_${targetDate || 'today'}`
+            const cached = weatherCache.current.get(cacheKey)
+            const cacheTTL = {
+                live: 60 * 60 * 1000,        // 1 小時
+                forecast: 60 * 60 * 1000,    // 1 小時
+                seasonal: 24 * 60 * 60 * 1000, // 24 小時
+                trend: 7 * 24 * 60 * 60 * 1000 // 7 天
+            }
+
+            if (cached && (Date.now() - cached.timestamp) < cacheTTL[cached.mode]) {
+                console.log(`📦 Weather Cache HIT: ${cacheKey}`)
+                setWeatherData(cached.data)
+                setWeatherMode(cached.mode)
+                return
+            }
+
             try {
                 // 🆕 P2: User-Agent Header (避免商業偵測)
                 const headers: HeadersInit = {
@@ -309,6 +330,10 @@ export function ItineraryView() {
 
                 setWeatherData(forecast)
                 setWeatherMode(mode)  // 🆕 P3: 更新天氣模式
+
+                // 🆕 P7: 儲存至快取
+                weatherCache.current.set(cacheKey, { data: forecast, mode, timestamp: Date.now() })
+                console.log(`💾 Weather Cache STORE: ${cacheKey}`)
             } catch (e) {
                 // 忽略 AbortError（正常的取消操作）
                 if ((e as Error).name !== 'AbortError') {
@@ -1290,14 +1315,14 @@ export function ItineraryView() {
                         </Dialog>
                         {/* 🆕 P3: 動態天氣模式標籤 */}
                         <span className={`text-xs flex items-center gap-1 ml-2 shrink-0 ${weatherMode === 'live' ? 'text-green-500' :
-                                weatherMode === 'forecast' ? 'text-blue-500' :
-                                    weatherMode === 'seasonal' ? 'text-purple-500' :
-                                        'text-amber-500'
+                            weatherMode === 'forecast' ? 'text-blue-500' :
+                                weatherMode === 'seasonal' ? 'text-purple-500' :
+                                    'text-amber-500'
                             }`}>
                             <span className={`w-2 h-2 rounded-full ${weatherMode === 'live' ? 'bg-green-500 animate-pulse' :
-                                    weatherMode === 'forecast' ? 'bg-blue-500' :
-                                        weatherMode === 'seasonal' ? 'bg-purple-500' :
-                                            'bg-amber-500'
+                                weatherMode === 'forecast' ? 'bg-blue-500' :
+                                    weatherMode === 'seasonal' ? 'bg-purple-500' :
+                                        'bg-amber-500'
                                 }`} />
                             {weatherMode === 'live' && '即時天氣'}
                             {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
