@@ -384,8 +384,8 @@ export function ItineraryView() {
 
                 if (mode === 'seasonal' && data.daily) {
                     // 🆕 Phase 1 + 2 + 3: Linvill 曲線 + 日出日落 + 季節調節
-                    const tMin = data.daily.temperature_2m_min[0]
-                    const tMax = data.daily.temperature_2m_max[0]
+                    const tMin = data.daily.temperature_2m_min?.[0] ?? 10
+                    const tMax = data.daily.temperature_2m_max?.[0] ?? 20
                     const precipSum = data.daily.precipitation_sum?.[0] ?? 0
 
                     // 🆕 Phase 9: 根據降雨量推測天氣代碼 (Frontend Clustering)
@@ -1546,9 +1546,18 @@ export function ItineraryView() {
                             <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
                                 <span className="text-xs text-slate-400 font-mono">{w.time}</span>
                                 {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
-                                <span className="text-sm font-bold text-slate-700">{w.temp}°</span>
+                                <span className="text-sm font-bold text-slate-700 tabular-nums">{w.temp}°</span>
                             </div>
-                        )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
+                        )) : (
+                            // 💀 Skeleton Loading: Prevent Layout Shift & "Distorted" feel
+                            Array.from({ length: 24 }).map((_, i) => (
+                                <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0 animate-pulse">
+                                    <div className="w-8 h-3 bg-slate-200 rounded"></div>
+                                    <div className="w-6 h-6 bg-slate-200 rounded-full"></div>
+                                    <div className="w-6 h-4 bg-slate-200 rounded"></div>
+                                </div>
+                            ))
+                        )}
                     </div>
 
                     {/* 📊 今日指數 (Horizontal Scroll) */}
