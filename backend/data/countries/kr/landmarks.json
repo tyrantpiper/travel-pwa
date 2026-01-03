@@ -1,0 +1,748 @@
+{
+    "__meta": {
+        "source": "Korea Landmarks Database",
+        "version": "1.0",
+        "lastUpdated": "2026-01-03",
+        "description": "韓國景點資料庫 - 首爾/釜山/濟州/大邱"
+    },
+    "景福宮": {
+        "aliases": [
+            "gyeongbokgung",
+            "경복궁",
+            "景福宮"
+        ],
+        "search": "Gyeongbokgung Palace",
+        "display": "景福宮",
+        "country": "KR",
+        "lat": 37.5796,
+        "lng": 126.9770
+    },
+    "昌德宮": {
+        "aliases": [
+            "changdeokgung",
+            "창덕궁",
+            "後苑"
+        ],
+        "search": "Changdeokgung Palace",
+        "display": "昌德宮",
+        "country": "KR",
+        "lat": 37.5794,
+        "lng": 126.9910
+    },
+    "德壽宮": {
+        "aliases": [
+            "deoksugung",
+            "덕수궁",
+            "德壽宮石牆路"
+        ],
+        "search": "Deoksugung Palace",
+        "display": "德壽宮",
+        "country": "KR",
+        "lat": 37.5659,
+        "lng": 126.9750
+    },
+    "昌慶宮": {
+        "aliases": [
+            "changgyeonggung",
+            "창경궁"
+        ],
+        "search": "Changgyeonggung Palace",
+        "display": "昌慶宮",
+        "country": "KR",
+        "lat": 37.5787,
+        "lng": 126.9957
+    },
+    "宗廟": {
+        "aliases": [
+            "jongmyo",
+            "종묘",
+            "宗廟祭禮"
+        ],
+        "search": "Jongmyo Shrine",
+        "display": "宗廟",
+        "country": "KR",
+        "lat": 37.5742,
+        "lng": 126.9943
+    },
+    "北村韓屋村": {
+        "aliases": [
+            "bukchon hanok village",
+            "북촌한옥마을",
+            "北村"
+        ],
+        "search": "Bukchon Hanok Village",
+        "display": "北村韓屋村",
+        "country": "KR",
+        "lat": 37.5826,
+        "lng": 126.9850
+    },
+    "三清洞": {
+        "aliases": [
+            "samcheong-dong",
+            "삼청동"
+        ],
+        "search": "Samcheong-dong",
+        "display": "三清洞",
+        "country": "KR",
+        "lat": 37.5816,
+        "lng": 126.9815
+    },
+    "仁寺洞": {
+        "aliases": [
+            "insadong",
+            "인사동",
+            "仁寺洞街"
+        ],
+        "search": "Insadong",
+        "display": "仁寺洞",
+        "country": "KR",
+        "lat": 37.5743,
+        "lng": 126.9867
+    },
+    "明洞": {
+        "aliases": [
+            "myeongdong",
+            "명동",
+            "明洞購物街"
+        ],
+        "search": "Myeongdong",
+        "display": "明洞",
+        "country": "KR",
+        "lat": 37.5636,
+        "lng": 126.9850
+    },
+    "南大門市場": {
+        "aliases": [
+            "namdaemun market",
+            "남대문시장",
+            "南大門"
+        ],
+        "search": "Namdaemun Market",
+        "display": "南大門市場",
+        "country": "KR",
+        "lat": 37.5593,
+        "lng": 126.9775
+    },
+    "東大門設計廣場": {
+        "aliases": [
+            "dongdaemun design plaza",
+            "ddp",
+            "동대문디자인플라자"
+        ],
+        "search": "Dongdaemun Design Plaza",
+        "display": "東大門設計廣場 (DDP)",
+        "country": "KR",
+        "lat": 37.5670,
+        "lng": 127.0095
+    },
+    "廣藏市場": {
+        "aliases": [
+            "gwangjang market",
+            "광장시장",
+            "綠豆煎餅"
+        ],
+        "search": "Gwangjang Market",
+        "display": "廣藏市場",
+        "country": "KR",
+        "lat": 37.5700,
+        "lng": 126.9997
+    },
+    "N首爾塔": {
+        "aliases": [
+            "n seoul tower",
+            "namsan tower",
+            "남산타워",
+            "南山塔"
+        ],
+        "search": "N Seoul Tower",
+        "display": "N首爾塔",
+        "country": "KR",
+        "lat": 37.5512,
+        "lng": 126.9882
+    },
+    "南山公園": {
+        "aliases": [
+            "namsan park",
+            "남산공원"
+        ],
+        "search": "Namsan Park",
+        "display": "南山公園",
+        "country": "KR",
+        "lat": 37.5511,
+        "lng": 126.9883
+    },
+    "梨花女子大學": {
+        "aliases": [
+            "ewha womans university",
+            "이화여자대학교",
+            "梨大"
+        ],
+        "search": "Ewha Womans University",
+        "display": "梨花女子大學",
+        "country": "KR",
+        "lat": 37.5615,
+        "lng": 126.9467
+    },
+    "弘大商圈": {
+        "aliases": [
+            "hongdae",
+            "홍대",
+            "弘大街頭"
+        ],
+        "search": "Hongdae",
+        "display": "弘大商圈",
+        "country": "KR",
+        "lat": 37.5566,
+        "lng": 126.9230
+    },
+    "延南洞公園": {
+        "aliases": [
+            "yeonnam-dong",
+            "연남동",
+            "延南洞"
+        ],
+        "search": "Yeonnam-dong",
+        "display": "延南洞",
+        "country": "KR",
+        "lat": 37.5668,
+        "lng": 126.9248
+    },
+    "望遠漢江公園": {
+        "aliases": [
+            "mangwon hangang park",
+            "망원한강공원"
+        ],
+        "search": "Mangwon Hangang Park",
+        "display": "望遠漢江公園",
+        "country": "KR",
+        "lat": 37.5550,
+        "lng": 126.8960
+    },
+    "汝矣島漢江公園": {
+        "aliases": [
+            "yeouido hangang park",
+            "여의도한강공원",
+            "漢江野餐"
+        ],
+        "search": "Yeouido Hangang Park",
+        "display": "汝矣島漢江公園",
+        "country": "KR",
+        "lat": 37.5282,
+        "lng": 126.9328
+    },
+    "IFC首爾": {
+        "aliases": [
+            "ifc seoul",
+            "ifc몰",
+            "IFC Mall"
+        ],
+        "search": "IFC Seoul",
+        "display": "IFC首爾",
+        "country": "KR",
+        "lat": 37.5253,
+        "lng": 126.9260
+    },
+    "63大廈": {
+        "aliases": [
+            "63 building",
+            "63빌딩",
+            "63 Square"
+        ],
+        "search": "63 Building Seoul",
+        "display": "63大廈",
+        "country": "KR",
+        "lat": 37.5198,
+        "lng": 126.9405
+    },
+    "樂天世界塔": {
+        "aliases": [
+            "lotte world tower",
+            "롯데월드타워",
+            "Seoul Sky"
+        ],
+        "search": "Lotte World Tower",
+        "display": "樂天世界塔",
+        "country": "KR",
+        "lat": 37.5124,
+        "lng": 127.1025
+    },
+    "樂天世界": {
+        "aliases": [
+            "lotte world",
+            "롯데월드",
+            "樂天樂園"
+        ],
+        "search": "Lotte World",
+        "display": "樂天世界",
+        "country": "KR",
+        "lat": 37.5111,
+        "lng": 127.0981
+    },
+    "COEX Mall": {
+        "aliases": [
+            "coex",
+            "코엑스",
+            "COEX水族館"
+        ],
+        "search": "COEX Mall",
+        "display": "COEX Mall",
+        "country": "KR",
+        "lat": 37.5114,
+        "lng": 127.0594
+    },
+    "星空圖書館": {
+        "aliases": [
+            "starfield library",
+            "별마당도서관"
+        ],
+        "search": "Starfield Library COEX",
+        "display": "星空圖書館",
+        "country": "KR",
+        "lat": 37.5098,
+        "lng": 127.0600
+    },
+    "奉恩寺": {
+        "aliases": [
+            "bongeunsa",
+            "봉은사"
+        ],
+        "search": "Bongeunsa Temple",
+        "display": "奉恩寺",
+        "country": "KR",
+        "lat": 37.5145,
+        "lng": 127.0575
+    },
+    "江南地下街": {
+        "aliases": [
+            "gangnam underground",
+            "강남지하상가"
+        ],
+        "search": "Gangnam Underground Shopping Center",
+        "display": "江南地下街",
+        "country": "KR",
+        "lat": 37.4986,
+        "lng": 127.0288
+    },
+    "新沙洞林蔭道": {
+        "aliases": [
+            "garosugil",
+            "가로수길",
+            "林蔭道"
+        ],
+        "search": "Garosu-gil",
+        "display": "新沙洞林蔭道",
+        "country": "KR",
+        "lat": 37.5196,
+        "lng": 127.0230
+    },
+    "清潭洞名品街": {
+        "aliases": [
+            "cheongdam-dong",
+            "청담동",
+            "名品街"
+        ],
+        "search": "Cheongdam-dong",
+        "display": "清潭洞名品街",
+        "country": "KR",
+        "lat": 37.5241,
+        "lng": 127.0473
+    },
+    "狎鷗亭羅德奧街": {
+        "aliases": [
+            "apgujeong rodeo street",
+            "압구정로데오",
+            "羅德奧"
+        ],
+        "search": "Apgujeong Rodeo Street",
+        "display": "狎鷗亭羅德奧街",
+        "country": "KR",
+        "lat": 37.5268,
+        "lng": 127.0395
+    },
+    "梨泰院": {
+        "aliases": [
+            "itaewon",
+            "이태원",
+            "經理團路"
+        ],
+        "search": "Itaewon",
+        "display": "梨泰院",
+        "country": "KR",
+        "lat": 37.5344,
+        "lng": 126.9940
+    },
+    "解放村": {
+        "aliases": [
+            "haebangchon",
+            "해방촌",
+            "HBC"
+        ],
+        "search": "Haebangchon",
+        "display": "解放村",
+        "country": "KR",
+        "lat": 37.5414,
+        "lng": 126.9873
+    },
+    "龍山電子商街": {
+        "aliases": [
+            "yongsan electronics market",
+            "용산전자상가"
+        ],
+        "search": "Yongsan Electronics Market",
+        "display": "龍山電子商街",
+        "country": "KR",
+        "lat": 37.5293,
+        "lng": 126.9653
+    },
+    "戰爭紀念館": {
+        "aliases": [
+            "war memorial of korea",
+            "전쟁기념관"
+        ],
+        "search": "War Memorial of Korea",
+        "display": "戰爭紀念館",
+        "country": "KR",
+        "lat": 37.5365,
+        "lng": 126.9773
+    },
+    "國立中央博物館": {
+        "aliases": [
+            "national museum of korea",
+            "국립중앙박물관"
+        ],
+        "search": "National Museum of Korea",
+        "display": "國立中央博物館",
+        "country": "KR",
+        "lat": 37.5239,
+        "lng": 126.9806
+    },
+    "愛寶樂園": {
+        "aliases": [
+            "everland",
+            "에버랜드"
+        ],
+        "search": "Everland",
+        "display": "愛寶樂園",
+        "country": "KR",
+        "lat": 37.2942,
+        "lng": 127.2025
+    },
+    "韓國民俗村": {
+        "aliases": [
+            "korean folk village",
+            "한국민속촌"
+        ],
+        "search": "Korean Folk Village",
+        "display": "韓國民俗村",
+        "country": "KR",
+        "lat": 37.2582,
+        "lng": 127.1178
+    },
+    "水原華城": {
+        "aliases": [
+            "hwaseong fortress",
+            "수원화성",
+            "水原"
+        ],
+        "search": "Hwaseong Fortress",
+        "display": "水原華城",
+        "country": "KR",
+        "lat": 37.2875,
+        "lng": 127.0145
+    },
+    "南怡島": {
+        "aliases": [
+            "nami island",
+            "남이섬",
+            "冬季戀歌"
+        ],
+        "search": "Nami Island",
+        "display": "南怡島",
+        "country": "KR",
+        "lat": 37.7902,
+        "lng": 127.5253
+    },
+    "晨靜樹木園": {
+        "aliases": [
+            "garden of morning calm",
+            "아침고요수목원"
+        ],
+        "search": "Garden of Morning Calm",
+        "display": "晨靜樹木園",
+        "country": "KR",
+        "lat": 37.7420,
+        "lng": 127.3524
+    },
+    "小法國村": {
+        "aliases": [
+            "petite france",
+            "쁘띠프랑스"
+        ],
+        "search": "Petite France",
+        "display": "小法國村",
+        "country": "KR",
+        "lat": 37.7649,
+        "lng": 127.4878
+    },
+    "義大利村": {
+        "aliases": [
+            "swiss village",
+            "에델바이스 스위스테마파크"
+        ],
+        "search": "Edelweiss Swiss Theme Park",
+        "display": "瑞士村",
+        "country": "KR",
+        "lat": 37.7605,
+        "lng": 127.5012
+    },
+    "甘川文化村": {
+        "aliases": [
+            "gamcheon culture village",
+            "감천문화마을",
+            "甘川洞"
+        ],
+        "search": "Gamcheon Culture Village",
+        "display": "甘川文化村",
+        "country": "KR",
+        "lat": 35.0973,
+        "lng": 129.0108
+    },
+    "海雲臺海水浴場": {
+        "aliases": [
+            "haeundae beach",
+            "해운대해수욕장",
+            "海雲台"
+        ],
+        "search": "Haeundae Beach",
+        "display": "海雲臺海水浴場",
+        "country": "KR",
+        "lat": 35.1587,
+        "lng": 129.1605
+    },
+    "廣安里海水浴場": {
+        "aliases": [
+            "gwangalli beach",
+            "광안리해수욕장",
+            "廣安大橋"
+        ],
+        "search": "Gwangalli Beach",
+        "display": "廣安里海水浴場",
+        "country": "KR",
+        "lat": 35.1534,
+        "lng": 129.1186
+    },
+    "The Bay 101": {
+        "aliases": [
+            "bay 101",
+            "더베이101"
+        ],
+        "search": "The Bay 101 Busan",
+        "display": "The Bay 101",
+        "country": "KR",
+        "lat": 35.1673,
+        "lng": 129.1380
+    },
+    "海東龍宮寺": {
+        "aliases": [
+            "haedong yonggungsa",
+            "해동용궁사",
+            "龍宮寺"
+        ],
+        "search": "Haedong Yonggungsa Temple",
+        "display": "海東龍宮寺",
+        "country": "KR",
+        "lat": 35.1879,
+        "lng": 129.2231
+    },
+    "太宗臺": {
+        "aliases": [
+            "taejongdae",
+            "태종대"
+        ],
+        "search": "Taejongdae",
+        "display": "太宗臺",
+        "country": "KR",
+        "lat": 35.0510,
+        "lng": 129.0850
+    },
+    "札嘎其市場": {
+        "aliases": [
+            "jagalchi fish market",
+            "자갈치시장"
+        ],
+        "search": "Jagalchi Fish Market",
+        "display": "札嘎其市場",
+        "country": "KR",
+        "lat": 35.0968,
+        "lng": 129.0306
+    },
+    "國際市場": {
+        "aliases": [
+            "gukje market",
+            "국제시장"
+        ],
+        "search": "Gukje Market",
+        "display": "國際市場",
+        "country": "KR",
+        "lat": 35.1001,
+        "lng": 129.0277
+    },
+    "BIFF廣場": {
+        "aliases": [
+            "biff square",
+            "biff광장",
+            "釜山電影節"
+        ],
+        "search": "BIFF Square",
+        "display": "BIFF廣場",
+        "country": "KR",
+        "lat": 35.0987,
+        "lng": 129.0273
+    },
+    "釜山塔": {
+        "aliases": [
+            "busan tower",
+            "부산타워"
+        ],
+        "search": "Busan Tower",
+        "display": "釜山塔",
+        "country": "KR",
+        "lat": 35.1013,
+        "lng": 129.0321
+    },
+    "龍頭山公園": {
+        "aliases": [
+            "yongdusan park",
+            "용두산공원"
+        ],
+        "search": "Yongdusan Park",
+        "display": "龍頭山公園",
+        "country": "KR",
+        "lat": 35.1012,
+        "lng": 129.0325
+    },
+    "西面地下街": {
+        "aliases": [
+            "seomyeon underground shopping",
+            "서면지하상가"
+        ],
+        "search": "Seomyeon Underground Shopping Center",
+        "display": "西面地下街",
+        "country": "KR",
+        "lat": 35.1575,
+        "lng": 129.0593
+    },
+    "新世界百貨 Centum City": {
+        "aliases": [
+            "shinsegae centum city",
+            "신세계백화점 센텀시티",
+            "世界最大百貨"
+        ],
+        "search": "Shinsegae Centum City",
+        "display": "新世界百貨 Centum City",
+        "country": "KR",
+        "lat": 35.1692,
+        "lng": 129.1318
+    },
+    "城山日出峰": {
+        "aliases": [
+            "seongsan ilchulbong",
+            "성산일출봉",
+            "日出峰"
+        ],
+        "search": "Seongsan Ilchulbong",
+        "display": "城山日出峰",
+        "country": "KR",
+        "lat": 33.4601,
+        "lng": 126.9417
+    },
+    "牛島": {
+        "aliases": [
+            "udo island",
+            "우도"
+        ],
+        "search": "Udo Island",
+        "display": "牛島",
+        "country": "KR",
+        "lat": 33.5000,
+        "lng": 126.9533
+    },
+    "涉地可支": {
+        "aliases": [
+            "sopjikoji",
+            "섭지코지"
+        ],
+        "search": "Sopjikoji",
+        "display": "涉地可支",
+        "country": "KR",
+        "lat": 33.4241,
+        "lng": 126.9280
+    },
+    "漢拿山": {
+        "aliases": [
+            "hallasan",
+            "한라산",
+            "漢拏山"
+        ],
+        "search": "Hallasan",
+        "display": "漢拿山",
+        "country": "KR",
+        "lat": 33.3617,
+        "lng": 126.5292
+    },
+    "濟州泰迪熊博物館": {
+        "aliases": [
+            "teddy bear museum jeju",
+            "테디베어뮤지엄"
+        ],
+        "search": "Teddy Bear Museum Jeju",
+        "display": "濟州泰迪熊博物館",
+        "country": "KR",
+        "lat": 33.2504,
+        "lng": 126.4129
+    },
+    "天地淵瀑布": {
+        "aliases": [
+            "cheonjeyeon falls",
+            "천지연폭포"
+        ],
+        "search": "Cheonjeyeon Falls",
+        "display": "天地淵瀑布",
+        "country": "KR",
+        "lat": 33.2472,
+        "lng": 126.5556
+    },
+    "月精理海邊": {
+        "aliases": [
+            "woljeongri beach",
+            "월정리해변"
+        ],
+        "search": "Woljeongri Beach",
+        "display": "月精理海邊",
+        "country": "KR",
+        "lat": 33.5555,
+        "lng": 126.7955
+    },
+    "涯月海岸道路": {
+        "aliases": [
+            "aewol coastal road",
+            "애월해안도로"
+        ],
+        "search": "Aewol Coastal Road",
+        "display": "涯月海岸道路",
+        "country": "KR",
+        "lat": 33.4701,
+        "lng": 126.3154
+    },
+    "東門市場": {
+        "aliases": [
+            "dongmun market jeju",
+            "동문시장"
+        ],
+        "search": "Dongmun Market Jeju",
+        "display": "東門市場 (濟州)",
+        "country": "KR",
+        "lat": 33.5128,
+        "lng": 126.5287
+    }
+}

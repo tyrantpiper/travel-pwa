@@ -1,0 +1,706 @@
+{
+    "__meta": {
+        "source": "Japan Restaurants Database",
+        "version": "1.0",
+        "lastUpdated": "2026-01-03",
+        "description": "日本連鎖餐廳資料庫"
+    },
+    "一蘭 新宿中央東口店": {
+        "aliases": [
+            "ichiran shinjuku chuo higashiguchi",
+            "一蘭 新宿"
+        ],
+        "search": "Ichiran Ramen Shinjuku Chuo Higashiguchi",
+        "display": "一蘭 新宿中央東口店",
+        "country": "JP",
+        "lat": 35.6908,
+        "lng": 139.7027
+    },
+    "一蘭 澀谷店": {
+        "aliases": [
+            "ichiran shibuya",
+            "一蘭 渋谷店"
+        ],
+        "search": "Ichiran Ramen Shibuya",
+        "display": "一蘭 澀谷店",
+        "country": "JP",
+        "lat": 35.6598,
+        "lng": 139.7013
+    },
+    "一蘭 上野店": {
+        "aliases": [
+            "ichiran ueno",
+            "一蘭 上野御徒町"
+        ],
+        "search": "Ichiran Ramen Ueno",
+        "display": "一蘭 上野店",
+        "country": "JP",
+        "lat": 35.7100,
+        "lng": 139.7750
+    },
+    "一蘭 池袋店": {
+        "aliases": [
+            "ichiran ikebukuro",
+            "一蘭 池袋"
+        ],
+        "search": "Ichiran Ramen Ikebukuro",
+        "display": "一蘭 池袋店",
+        "country": "JP",
+        "lat": 35.7290,
+        "lng": 139.7110
+    },
+    "一蘭 道頓堀店": {
+        "aliases": [
+            "ichiran dotonbori",
+            "一蘭 道頓堀"
+        ],
+        "search": "Ichiran Ramen Dotonbori",
+        "display": "一蘭 道頓堀店",
+        "country": "JP",
+        "lat": 34.6688,
+        "lng": 135.5013
+    },
+    "一蘭 本社總本店": {
+        "aliases": [
+            "ichiran honten fukuoka",
+            "一蘭 總本店",
+            "福岡"
+        ],
+        "search": "Ichiran Ramen Main Store Fukuoka",
+        "display": "一蘭 本社總本店 (福岡)",
+        "country": "JP",
+        "lat": 33.5855,
+        "lng": 130.4022
+    },
+    "一風堂 新宿店": {
+        "aliases": [
+            "ippudo shinjuku",
+            "一風堂 新宿"
+        ],
+        "search": "Ippudo Shinjuku",
+        "display": "一風堂 新宿店",
+        "country": "JP",
+        "lat": 35.6910,
+        "lng": 139.7030
+    },
+    "一風堂 澀谷店": {
+        "aliases": [
+            "ippudo shibuya",
+            "一風堂 渋谷"
+        ],
+        "search": "Ippudo Shibuya",
+        "display": "一風堂 澀谷店",
+        "country": "JP",
+        "lat": 35.6590,
+        "lng": 139.7020
+    },
+    "一風堂 六本木店": {
+        "aliases": [
+            "ippudo roppongi",
+            "一風堂 六本木"
+        ],
+        "search": "Ippudo Roppongi",
+        "display": "一風堂 六本木店",
+        "country": "JP",
+        "lat": 35.6640,
+        "lng": 139.7320
+    },
+    "一風堂 大丸梅田店": {
+        "aliases": [
+            "ippudo daimaru umeda",
+            "一風堂 梅田"
+        ],
+        "search": "Ippudo Daimaru Umeda",
+        "display": "一風堂 梅田店",
+        "country": "JP",
+        "lat": 34.7050,
+        "lng": 135.4980
+    },
+    "蒙古タンメン中本 池袋店": {
+        "aliases": [
+            "nakamoto ikebukuro",
+            "蒙古湯麵中本 池袋"
+        ],
+        "search": "Mouko Tanmen Nakamoto Ikebukuro",
+        "display": "蒙古湯麵中本 池袋店",
+        "country": "JP",
+        "lat": 35.7300,
+        "lng": 139.7120
+    },
+    "蒙古タンメン中本 新宿店": {
+        "aliases": [
+            "nakamoto shinjuku",
+            "蒙古湯麵中本 新宿"
+        ],
+        "search": "Mouko Tanmen Nakamoto Shinjuku",
+        "display": "蒙古湯麵中本 新宿店",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.7010
+    },
+    "麵屋武藏 新宿本店": {
+        "aliases": [
+            "menya musashi shinjuku",
+            "麺屋武蔵 新宿"
+        ],
+        "search": "Menya Musashi Shinjuku",
+        "display": "麵屋武藏 新宿本店",
+        "country": "JP",
+        "lat": 35.6891,
+        "lng": 139.6995
+    },
+    "AFURI 惠比壽本店": {
+        "aliases": [
+            "afuri ebisu",
+            "阿夫利 惠比壽",
+            "柚子鹽"
+        ],
+        "search": "AFURI Ebisu",
+        "display": "AFURI 惠比壽本店",
+        "country": "JP",
+        "lat": 35.6465,
+        "lng": 139.7105
+    },
+    "AFURI 六本木店": {
+        "aliases": [
+            "afuri roppongi",
+            "阿夫利 六本木"
+        ],
+        "search": "AFURI Roppongi",
+        "display": "AFURI 六本木店",
+        "country": "JP",
+        "lat": 35.6630,
+        "lng": 139.7300
+    },
+    "藏壽司 新宿店": {
+        "aliases": [
+            "kura sushi shinjuku",
+            "くら寿司 新宿"
+        ],
+        "search": "Kura Sushi Shinjuku",
+        "display": "藏壽司 新宿店",
+        "country": "JP",
+        "lat": 35.6890,
+        "lng": 139.7000
+    },
+    "藏壽司 澀谷店": {
+        "aliases": [
+            "kura sushi shibuya",
+            "くら寿司 渋谷"
+        ],
+        "search": "Kura Sushi Shibuya",
+        "display": "藏壽司 澀谷店",
+        "country": "JP",
+        "lat": 35.6580,
+        "lng": 139.7016
+    },
+    "藏壽司 池袋店": {
+        "aliases": [
+            "kura sushi ikebukuro",
+            "くら寿司 池袋"
+        ],
+        "search": "Kura Sushi Ikebukuro",
+        "display": "藏壽司 池袋店",
+        "country": "JP",
+        "lat": 35.7290,
+        "lng": 139.7100
+    },
+    "壽司郎 新宿西口店": {
+        "aliases": [
+            "sushiro shinjuku nishiguchi",
+            "スシロー 新宿"
+        ],
+        "search": "Sushiro Shinjuku Nishiguchi",
+        "display": "壽司郎 新宿西口店",
+        "country": "JP",
+        "lat": 35.6890,
+        "lng": 139.6960
+    },
+    "壽司郎 澀谷店": {
+        "aliases": [
+            "sushiro shibuya",
+            "スシロー 渋谷"
+        ],
+        "search": "Sushiro Shibuya",
+        "display": "壽司郎 澀谷店",
+        "country": "JP",
+        "lat": 35.6585,
+        "lng": 139.7005
+    },
+    "はま寿司 新宿店": {
+        "aliases": [
+            "hama sushi shinjuku",
+            "濱壽司 新宿"
+        ],
+        "search": "Hama Sushi Shinjuku",
+        "display": "はま寿司 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7015
+    },
+    "大戶屋 新宿東口店": {
+        "aliases": [
+            "ootoya shinjuku higashiguchi",
+            "大戸屋 新宿"
+        ],
+        "search": "Ootoya Shinjuku Higashiguchi",
+        "display": "大戶屋 新宿東口店",
+        "country": "JP",
+        "lat": 35.6905,
+        "lng": 139.7030
+    },
+    "大戶屋 澀谷店": {
+        "aliases": [
+            "ootoya shibuya",
+            "大戸屋 渋谷"
+        ],
+        "search": "Ootoya Shibuya",
+        "display": "大戶屋 澀谷店",
+        "country": "JP",
+        "lat": 35.6588,
+        "lng": 139.7010
+    },
+    "大戶屋 池袋店": {
+        "aliases": [
+            "ootoya ikebukuro",
+            "大戸屋 池袋"
+        ],
+        "search": "Ootoya Ikebukuro",
+        "display": "大戶屋 池袋店",
+        "country": "JP",
+        "lat": 35.7297,
+        "lng": 139.7105
+    },
+    "やよい軒 新宿店": {
+        "aliases": [
+            "yayoiken shinjuku",
+            "弥生軒 新宿"
+        ],
+        "search": "Yayoiken Shinjuku",
+        "display": "やよい軒 新宿店",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.7010
+    },
+    "やよい軒 秋葉原店": {
+        "aliases": [
+            "yayoiken akihabara",
+            "弥生軒 秋葉原"
+        ],
+        "search": "Yayoiken Akihabara",
+        "display": "やよい軒 秋葉原店",
+        "country": "JP",
+        "lat": 35.6990,
+        "lng": 139.7735
+    },
+    "松屋 新宿南口店": {
+        "aliases": [
+            "matsuya shinjuku minami",
+            "松屋 新宿"
+        ],
+        "search": "Matsuya Shinjuku Minamiguchi",
+        "display": "松屋 新宿南口店",
+        "country": "JP",
+        "lat": 35.6880,
+        "lng": 139.7000
+    },
+    "松屋 澀谷店": {
+        "aliases": [
+            "matsuya shibuya",
+            "松屋 渋谷"
+        ],
+        "search": "Matsuya Shibuya",
+        "display": "松屋 澀谷店",
+        "country": "JP",
+        "lat": 35.6585,
+        "lng": 139.7000
+    },
+    "吉野家 新宿店": {
+        "aliases": [
+            "yoshinoya shinjuku",
+            "吉野家 新宿"
+        ],
+        "search": "Yoshinoya Shinjuku",
+        "display": "吉野家 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7005
+    },
+    "すき家 新宿南口店": {
+        "aliases": [
+            "sukiya shinjuku minami",
+            "すきや 新宿"
+        ],
+        "search": "Sukiya Shinjuku Minamiguchi",
+        "display": "すき家 新宿南口店",
+        "country": "JP",
+        "lat": 35.6875,
+        "lng": 139.6995
+    },
+    "CoCo壱番屋 新宿店": {
+        "aliases": [
+            "cocoichi shinjuku",
+            "ココイチ 新宿"
+        ],
+        "search": "CoCo Ichibanya Shinjuku",
+        "display": "CoCo壱番屋 新宿店",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.7020
+    },
+    "CoCo壱番屋 秋葉原店": {
+        "aliases": [
+            "cocoichi akihabara",
+            "ココイチ 秋葉原"
+        ],
+        "search": "CoCo Ichibanya Akihabara",
+        "display": "CoCo壱番屋 秋葉原店",
+        "country": "JP",
+        "lat": 35.6985,
+        "lng": 139.7730
+    },
+    "丸亀製麵 新宿文化クイントビル店": {
+        "aliases": [
+            "marugame seimen shinjuku",
+            "丸亀 新宿"
+        ],
+        "search": "Marugame Seimen Shinjuku",
+        "display": "丸亀製麵 新宿店",
+        "country": "JP",
+        "lat": 35.6890,
+        "lng": 139.6980
+    },
+    "丸亀製麵 澀谷店": {
+        "aliases": [
+            "marugame seimen shibuya",
+            "丸亀 渋谷"
+        ],
+        "search": "Marugame Seimen Shibuya",
+        "display": "丸亀製麵 澀谷店",
+        "country": "JP",
+        "lat": 35.6582,
+        "lng": 139.7000
+    },
+    "敘敘苑 六本木本店": {
+        "aliases": [
+            "jojoen roppongi honten",
+            "叙々苑 六本木"
+        ],
+        "search": "Jojoen Roppongi Honten",
+        "display": "敘敘苑 六本木本店",
+        "country": "JP",
+        "lat": 35.6620,
+        "lng": 139.7310
+    },
+    "敘敘苑 東京歌劇城店": {
+        "aliases": [
+            "jojoen opera city",
+            "叙々苑 歌劇城",
+            "景觀餐廳"
+        ],
+        "search": "Jojoen Tokyo Opera City",
+        "display": "敘敘苑 東京歌劇城店",
+        "country": "JP",
+        "lat": 35.6882,
+        "lng": 139.6869
+    },
+    "敘敘苑 銀座コリドー店": {
+        "aliases": [
+            "jojoen ginza corridor",
+            "叙々苑 銀座"
+        ],
+        "search": "Jojoen Ginza Corridor",
+        "display": "敘敘苑 銀座店",
+        "country": "JP",
+        "lat": 35.6720,
+        "lng": 139.7620
+    },
+    "牛角 新宿東口店": {
+        "aliases": [
+            "gyukaku shinjuku higashiguchi",
+            "牛角 新宿"
+        ],
+        "search": "Gyukaku Shinjuku Higashiguchi",
+        "display": "牛角 新宿東口店",
+        "country": "JP",
+        "lat": 35.6905,
+        "lng": 139.7025
+    },
+    "牛角 澀谷店": {
+        "aliases": [
+            "gyukaku shibuya",
+            "牛角 渋谷"
+        ],
+        "search": "Gyukaku Shibuya",
+        "display": "牛角 澀谷店",
+        "country": "JP",
+        "lat": 35.6590,
+        "lng": 139.7000
+    },
+    "燒肉KINTAN 新宿店": {
+        "aliases": [
+            "yakiniku kintan shinjuku",
+            "焼肉KINTAN 新宿"
+        ],
+        "search": "Yakiniku Kintan Shinjuku",
+        "display": "燒肉KINTAN 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7005
+    },
+    "燒肉KINTAN 表參道店": {
+        "aliases": [
+            "yakiniku kintan omotesando",
+            "焼肉KINTAN 表参道"
+        ],
+        "search": "Yakiniku Kintan Omotesando",
+        "display": "燒肉KINTAN 表參道店",
+        "country": "JP",
+        "lat": 35.6650,
+        "lng": 139.7120
+    },
+    "炸牛排もと村 澀谷店": {
+        "aliases": [
+            "gyukatsu motomura shibuya",
+            "牛かつもと村 渋谷"
+        ],
+        "search": "Gyukatsu Motomura Shibuya",
+        "display": "炸牛排もと村 澀谷店",
+        "country": "JP",
+        "lat": 35.6587,
+        "lng": 139.7027
+    },
+    "炸牛排もと村 新宿店": {
+        "aliases": [
+            "gyukatsu motomura shinjuku",
+            "牛かつもと村 新宿"
+        ],
+        "search": "Gyukatsu Motomura Shinjuku",
+        "display": "炸牛排もと村 新宿店",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.7015
+    },
+    "とんかつ和幸 新宿店": {
+        "aliases": [
+            "tonkatsu wako shinjuku",
+            "和幸 新宿"
+        ],
+        "search": "Tonkatsu Wako Shinjuku",
+        "display": "とんかつ和幸 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7000
+    },
+    "とんかつ和幸 銀座店": {
+        "aliases": [
+            "tonkatsu wako ginza",
+            "和幸 銀座"
+        ],
+        "search": "Tonkatsu Wako Ginza",
+        "display": "とんかつ和幸 銀座店",
+        "country": "JP",
+        "lat": 35.6715,
+        "lng": 139.7640
+    },
+    "まい泉 表參道本店": {
+        "aliases": [
+            "maisen omotesando",
+            "まい泉 表参道",
+            "炸豬排三明治"
+        ],
+        "search": "Maisen Omotesando",
+        "display": "まい泉 表參道本店",
+        "country": "JP",
+        "lat": 35.6660,
+        "lng": 139.7100
+    },
+    "蟹道樂 道頓堀本店": {
+        "aliases": [
+            "kani doraku dotonbori honten",
+            "カニ道楽 道頓堀"
+        ],
+        "search": "Kani Doraku Dotonbori Honten",
+        "display": "蟹道樂 道頓堀本店",
+        "country": "JP",
+        "lat": 34.6688,
+        "lng": 135.5015
+    },
+    "蟹道樂 新宿店": {
+        "aliases": [
+            "kani doraku shinjuku",
+            "カニ道楽 新宿"
+        ],
+        "search": "Kani Doraku Shinjuku",
+        "display": "蟹道樂 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7010
+    },
+    "鳥貴族 新宿歌舞伎町店": {
+        "aliases": [
+            "torikizoku shinjuku kabukicho",
+            "鳥貴族 新宿"
+        ],
+        "search": "Torikizoku Shinjuku Kabukicho",
+        "display": "鳥貴族 新宿歌舞伎町店",
+        "country": "JP",
+        "lat": 35.6938,
+        "lng": 139.7020
+    },
+    "鳥貴族 澀谷店": {
+        "aliases": [
+            "torikizoku shibuya",
+            "鳥貴族 渋谷"
+        ],
+        "search": "Torikizoku Shibuya",
+        "display": "鳥貴族 澀谷店",
+        "country": "JP",
+        "lat": 35.6590,
+        "lng": 139.7000
+    },
+    "天一 京都四条本店": {
+        "aliases": [
+            "tenichi kyoto shijo honten",
+            "天一 京都 天麩羅"
+        ],
+        "search": "Tenichi Kyoto Shijo",
+        "display": "天一 京都四条本店",
+        "country": "JP",
+        "lat": 35.0020,
+        "lng": 135.7590
+    },
+    "つるとんたん 新宿店": {
+        "aliases": [
+            "tsurutontan shinjuku",
+            "つるとんたん 新宿 うどん"
+        ],
+        "search": "Tsurutontan Shinjuku",
+        "display": "つるとんたん 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.7000
+    },
+    "つるとんたん 六本木店": {
+        "aliases": [
+            "tsurutontan roppongi",
+            "つるとんたん 六本木"
+        ],
+        "search": "Tsurutontan Roppongi",
+        "display": "つるとんたん 六本木店",
+        "country": "JP",
+        "lat": 35.6630,
+        "lng": 139.7300
+    },
+    "すき焼き人形町今半 本店": {
+        "aliases": [
+            "imahan ningyocho honten",
+            "今半 壽喜燒"
+        ],
+        "search": "Imahan Ningyocho Honten",
+        "display": "人形町今半 本店",
+        "country": "JP",
+        "lat": 35.6850,
+        "lng": 139.7830
+    },
+    "木曾路 新宿店": {
+        "aliases": [
+            "kisoji shinjuku",
+            "木曽路 すき焼き"
+        ],
+        "search": "Kisoji Shinjuku",
+        "display": "木曾路 新宿店",
+        "country": "JP",
+        "lat": 35.6890,
+        "lng": 139.6980
+    },
+    "土古里 新宿店": {
+        "aliases": [
+            "toguri shinjuku",
+            "とぐり 韓國燒肉"
+        ],
+        "search": "Toguri Shinjuku",
+        "display": "土古里 新宿店",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.6990
+    },
+    "築地玉寿司 銀座店": {
+        "aliases": [
+            "tsukiji tamasushi ginza",
+            "玉寿司 銀座"
+        ],
+        "search": "Tsukiji Tamasushi Ginza",
+        "display": "築地玉壽司 銀座店",
+        "country": "JP",
+        "lat": 35.6715,
+        "lng": 139.7650
+    },
+    "うなぎ 色川 本店": {
+        "aliases": [
+            "unagi irokawa honten",
+            "色川 うなぎ 淺草"
+        ],
+        "search": "Irokawa Honten Asakusa",
+        "display": "色川 本店 (淺草鰻魚)",
+        "country": "JP",
+        "lat": 35.7110,
+        "lng": 139.7960
+    },
+    "Blue Bottle Coffee 青山店": {
+        "aliases": [
+            "blue bottle aoyama",
+            "藍瓶咖啡 青山"
+        ],
+        "search": "Blue Bottle Coffee Aoyama",
+        "display": "Blue Bottle Coffee 青山店",
+        "country": "JP",
+        "lat": 35.6644,
+        "lng": 139.7142
+    },
+    "Blue Bottle Coffee 清澄白河店": {
+        "aliases": [
+            "blue bottle kiyosumi",
+            "藍瓶咖啡 清澄白河",
+            "創始店"
+        ],
+        "search": "Blue Bottle Coffee Kiyosumi",
+        "display": "Blue Bottle Coffee 清澄白河店",
+        "country": "JP",
+        "lat": 35.6820,
+        "lng": 139.8030
+    },
+    "猿田彥珈琲 惠比壽本店": {
+        "aliases": [
+            "sarutahiko coffee ebisu",
+            "猿田彥 恵比寿"
+        ],
+        "search": "Sarutahiko Coffee Ebisu",
+        "display": "猿田彥珈琲 惠比壽本店",
+        "country": "JP",
+        "lat": 35.6465,
+        "lng": 139.7108
+    },
+    "% Arabica 嵐山": {
+        "aliases": [
+            "arabica arashiyama",
+            "arabica 嵐山 京都"
+        ],
+        "search": "% Arabica Arashiyama",
+        "display": "% Arabica 嵐山店",
+        "country": "JP",
+        "lat": 35.0145,
+        "lng": 135.6720
+    },
+    "% Arabica 東山": {
+        "aliases": [
+            "arabica higashiyama",
+            "arabica 東山 京都"
+        ],
+        "search": "% Arabica Higashiyama",
+        "display": "% Arabica 東山店",
+        "country": "JP",
+        "lat": 34.9980,
+        "lng": 135.7810
+    }
+}

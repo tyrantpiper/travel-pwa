@@ -1,0 +1,646 @@
+{
+    "__meta": {
+        "source": "Korea Metro Stations Database",
+        "version": "1.0",
+        "lastUpdated": "2026-01-03",
+        "description": "韓國地鐵站資料庫 - 首爾/釜山/仁川"
+    },
+    "首爾站": {
+        "aliases": [
+            "seoul station",
+            "서울역",
+            "ソウル駅"
+        ],
+        "search": "Seoul Station",
+        "display": "首爾站",
+        "country": "KR",
+        "lat": 37.5547,
+        "lng": 126.9707
+    },
+    "明洞站": {
+        "aliases": [
+            "myeongdong",
+            "명동역",
+            "明洞"
+        ],
+        "search": "Myeongdong Station",
+        "display": "明洞站",
+        "country": "KR",
+        "lat": 37.5609,
+        "lng": 126.9863
+    },
+    "弘大入口站": {
+        "aliases": [
+            "hongdae",
+            "hongik university",
+            "홍대입구역",
+            "弘大"
+        ],
+        "search": "Hongik University Station",
+        "display": "弘大入口站",
+        "country": "KR",
+        "lat": 37.5571,
+        "lng": 126.9246
+    },
+    "江南站": {
+        "aliases": [
+            "gangnam",
+            "강남역",
+            "江南"
+        ],
+        "search": "Gangnam Station",
+        "display": "江南站",
+        "country": "KR",
+        "lat": 37.4980,
+        "lng": 127.0276
+    },
+    "新沙站": {
+        "aliases": [
+            "sinsa",
+            "신사역",
+            "新沙洞",
+            "林蔭道"
+        ],
+        "search": "Sinsa Station",
+        "display": "新沙站",
+        "country": "KR",
+        "lat": 37.5165,
+        "lng": 127.0200
+    },
+    "狎鷗亭站": {
+        "aliases": [
+            "apgujeong",
+            "압구정역",
+            "狎鷗亭洞"
+        ],
+        "search": "Apgujeong Station",
+        "display": "狎鷗亭站",
+        "country": "KR",
+        "lat": 37.5272,
+        "lng": 127.0283
+    },
+    "三成站": {
+        "aliases": [
+            "samseong",
+            "삼성역",
+            "COEX"
+        ],
+        "search": "Samseong Station",
+        "display": "三成站 (COEX)",
+        "country": "KR",
+        "lat": 37.5088,
+        "lng": 127.0631
+    },
+    "蠶室站": {
+        "aliases": [
+            "jamsil",
+            "잠실역",
+            "蠶室",
+            "樂天世界"
+        ],
+        "search": "Jamsil Station",
+        "display": "蠶室站",
+        "country": "KR",
+        "lat": 37.5133,
+        "lng": 127.1001
+    },
+    "東大門站": {
+        "aliases": [
+            "dongdaemun",
+            "동대문역",
+            "東大門"
+        ],
+        "search": "Dongdaemun Station",
+        "display": "東大門站",
+        "country": "KR",
+        "lat": 37.5712,
+        "lng": 127.0095
+    },
+    "東大門歷史文化公園站": {
+        "aliases": [
+            "dongdaemun history and culture park",
+            "동대문역사문화공원역",
+            "DDP"
+        ],
+        "search": "Dongdaemun History and Culture Park Station",
+        "display": "東大門歷史文化公園站",
+        "country": "KR",
+        "lat": 37.5653,
+        "lng": 127.0085
+    },
+    "惠化站": {
+        "aliases": [
+            "hyehwa",
+            "혜화역",
+            "大學路"
+        ],
+        "search": "Hyehwa Station",
+        "display": "惠化站",
+        "country": "KR",
+        "lat": 37.5824,
+        "lng": 127.0018
+    },
+    "鍾路3街站": {
+        "aliases": [
+            "jongno 3-ga",
+            "종로3가역",
+            "鍾路三街"
+        ],
+        "search": "Jongno 3-ga Station",
+        "display": "鍾路3街站",
+        "country": "KR",
+        "lat": 37.5714,
+        "lng": 126.9920
+    },
+    "光化門站": {
+        "aliases": [
+            "gwanghwamun",
+            "광화문역",
+            "景福宮"
+        ],
+        "search": "Gwanghwamun Station",
+        "display": "光化門站",
+        "country": "KR",
+        "lat": 37.5711,
+        "lng": 126.9768
+    },
+    "市廳站": {
+        "aliases": [
+            "city hall",
+            "시청역",
+            "市廳"
+        ],
+        "search": "City Hall Station Seoul",
+        "display": "市廳站",
+        "country": "KR",
+        "lat": 37.5659,
+        "lng": 126.9773
+    },
+    "乙支路入口站": {
+        "aliases": [
+            "euljiro 1-ga",
+            "을지로입구역",
+            "乙支路"
+        ],
+        "search": "Euljiro 1-ga Station",
+        "display": "乙支路入口站",
+        "country": "KR",
+        "lat": 37.5660,
+        "lng": 126.9823
+    },
+    "忠武路站": {
+        "aliases": [
+            "chungmuro",
+            "충무로역"
+        ],
+        "search": "Chungmuro Station",
+        "display": "忠武路站",
+        "country": "KR",
+        "lat": 37.5612,
+        "lng": 126.9946
+    },
+    "梨泰院站": {
+        "aliases": [
+            "itaewon",
+            "이태원역",
+            "梨泰院"
+        ],
+        "search": "Itaewon Station",
+        "display": "梨泰院站",
+        "country": "KR",
+        "lat": 37.5346,
+        "lng": 126.9946
+    },
+    "汝矣島站": {
+        "aliases": [
+            "yeouido",
+            "여의도역",
+            "汝矣島"
+        ],
+        "search": "Yeouido Station",
+        "display": "汝矣島站",
+        "country": "KR",
+        "lat": 37.5218,
+        "lng": 126.9243
+    },
+    "龍山站": {
+        "aliases": [
+            "yongsan",
+            "용산역"
+        ],
+        "search": "Yongsan Station",
+        "display": "龍山站",
+        "country": "KR",
+        "lat": 37.5299,
+        "lng": 126.9645
+    },
+    "新村站": {
+        "aliases": [
+            "sinchon",
+            "신촌역"
+        ],
+        "search": "Sinchon Station",
+        "display": "新村站",
+        "country": "KR",
+        "lat": 37.5550,
+        "lng": 126.9368
+    },
+    "梨大站": {
+        "aliases": [
+            "ewha womans university",
+            "이대역",
+            "梨花女大"
+        ],
+        "search": "Ewha Womans University Station",
+        "display": "梨大站",
+        "country": "KR",
+        "lat": 37.5569,
+        "lng": 126.9467
+    },
+    "建大入口站": {
+        "aliases": [
+            "konkuk university",
+            "건대입구역",
+            "建大"
+        ],
+        "search": "Konkuk University Station",
+        "display": "建大入口站",
+        "country": "KR",
+        "lat": 37.5403,
+        "lng": 127.0701
+    },
+    "聖水站": {
+        "aliases": [
+            "seongsu",
+            "성수역",
+            "聖水洞"
+        ],
+        "search": "Seongsu Station",
+        "display": "聖水站",
+        "country": "KR",
+        "lat": 37.5446,
+        "lng": 127.0555
+    },
+    "合井站": {
+        "aliases": [
+            "hapjeong",
+            "합정역"
+        ],
+        "search": "Hapjeong Station",
+        "display": "合井站",
+        "country": "KR",
+        "lat": 37.5495,
+        "lng": 126.9138
+    },
+    "望遠站": {
+        "aliases": [
+            "mangwon",
+            "망원역",
+            "望遠洞"
+        ],
+        "search": "Mangwon Station",
+        "display": "望遠站",
+        "country": "KR",
+        "lat": 37.5560,
+        "lng": 126.9105
+    },
+    "延南洞": {
+        "aliases": [
+            "yeonnamdong",
+            "연남동"
+        ],
+        "search": "Yeonnam-dong",
+        "display": "延南洞",
+        "country": "KR",
+        "lat": 37.5660,
+        "lng": 126.9256
+    },
+    "益善洞": {
+        "aliases": [
+            "ikseon-dong",
+            "익선동"
+        ],
+        "search": "Ikseon-dong",
+        "display": "益善洞",
+        "country": "KR",
+        "lat": 37.5740,
+        "lng": 126.9880
+    },
+    "北村站": {
+        "aliases": [
+            "anguk",
+            "안국역",
+            "北村韓屋村"
+        ],
+        "search": "Anguk Station",
+        "display": "安國站 (北村)",
+        "country": "KR",
+        "lat": 37.5764,
+        "lng": 126.9851
+    },
+    "鐘閣站": {
+        "aliases": [
+            "jonggak",
+            "종각역"
+        ],
+        "search": "Jonggak Station",
+        "display": "鐘閣站",
+        "country": "KR",
+        "lat": 37.5700,
+        "lng": 126.9833
+    },
+    "教大站": {
+        "aliases": [
+            "seoul national university of education",
+            "교대역"
+        ],
+        "search": "Seoul National University of Education Station",
+        "display": "教大站",
+        "country": "KR",
+        "lat": 37.4936,
+        "lng": 127.0145
+    },
+    "高速巴士客運站": {
+        "aliases": [
+            "express bus terminal",
+            "고속터미널역",
+            "高速巴士站"
+        ],
+        "search": "Express Bus Terminal Station",
+        "display": "高速巴士客運站",
+        "country": "KR",
+        "lat": 37.5044,
+        "lng": 127.0048
+    },
+    "新論峴站": {
+        "aliases": [
+            "sinnonhyeon",
+            "신논현역"
+        ],
+        "search": "Sinnonhyeon Station",
+        "display": "新論峴站",
+        "country": "KR",
+        "lat": 37.5046,
+        "lng": 127.0249
+    },
+    "論峴站": {
+        "aliases": [
+            "nonhyeon",
+            "논현역"
+        ],
+        "search": "Nonhyeon Station",
+        "display": "論峴站",
+        "country": "KR",
+        "lat": 37.5115,
+        "lng": 127.0212
+    },
+    "驛三站": {
+        "aliases": [
+            "yeoksam",
+            "역삼역"
+        ],
+        "search": "Yeoksam Station",
+        "display": "驛三站",
+        "country": "KR",
+        "lat": 37.5008,
+        "lng": 127.0366
+    },
+    "宣陵站": {
+        "aliases": [
+            "seolleung",
+            "선릉역",
+            "宣靖陵"
+        ],
+        "search": "Seolleung Station",
+        "display": "宣陵站",
+        "country": "KR",
+        "lat": 37.5045,
+        "lng": 127.0489
+    },
+    "清潭站": {
+        "aliases": [
+            "cheongdam",
+            "청담역",
+            "清潭洞"
+        ],
+        "search": "Cheongdam Station",
+        "display": "清潭站",
+        "country": "KR",
+        "lat": 37.5179,
+        "lng": 127.0530
+    },
+    "江南區廳站": {
+        "aliases": [
+            "gangnam-gu office",
+            "강남구청역"
+        ],
+        "search": "Gangnam-gu Office Station",
+        "display": "江南區廳站",
+        "country": "KR",
+        "lat": 37.5173,
+        "lng": 127.0410
+    },
+    "狎鷗亭羅德奧站": {
+        "aliases": [
+            "apgujeong rodeo",
+            "압구정로데오역",
+            "羅德奧街"
+        ],
+        "search": "Apgujeong Rodeo Station",
+        "display": "狎鷗亭羅德奧站",
+        "country": "KR",
+        "lat": 37.5272,
+        "lng": 127.0399
+    },
+    "仁川國際機場站": {
+        "aliases": [
+            "incheon airport",
+            "인천공항역",
+            "ICN"
+        ],
+        "search": "Incheon International Airport Station",
+        "display": "仁川國際機場站",
+        "country": "KR",
+        "lat": 37.4411,
+        "lng": 126.4526
+    },
+    "仁川機場第2航廈站": {
+        "aliases": [
+            "incheon airport terminal 2",
+            "인천공항2터미널역"
+        ],
+        "search": "Incheon Airport Terminal 2 Station",
+        "display": "仁川機場第2航廈站",
+        "country": "KR",
+        "lat": 37.4600,
+        "lng": 126.4384
+    },
+    "金浦機場站": {
+        "aliases": [
+            "gimpo airport",
+            "김포공항역",
+            "GMP"
+        ],
+        "search": "Gimpo Airport Station",
+        "display": "金浦機場站",
+        "country": "KR",
+        "lat": 37.5621,
+        "lng": 126.8014
+    },
+    "弘大入口站(機場鐵路)": {
+        "aliases": [
+            "hongdae arex",
+            "홍대입구역 공항철도"
+        ],
+        "search": "Hongdae Station AREX",
+        "display": "弘大入口站 (機場鐵路)",
+        "country": "KR",
+        "lat": 37.5571,
+        "lng": 126.9246
+    },
+    "釜山站": {
+        "aliases": [
+            "busan station",
+            "부산역",
+            "プサン駅"
+        ],
+        "search": "Busan Station",
+        "display": "釜山站",
+        "country": "KR",
+        "lat": 35.1152,
+        "lng": 129.0410
+    },
+    "西面站": {
+        "aliases": [
+            "seomyeon",
+            "서면역",
+            "西面"
+        ],
+        "search": "Seomyeon Station",
+        "display": "西面站",
+        "country": "KR",
+        "lat": 35.1579,
+        "lng": 129.0599
+    },
+    "海雲臺站": {
+        "aliases": [
+            "haeundae",
+            "해운대역",
+            "海雲台"
+        ],
+        "search": "Haeundae Station",
+        "display": "海雲臺站",
+        "country": "KR",
+        "lat": 35.1630,
+        "lng": 129.1639
+    },
+    "南浦站": {
+        "aliases": [
+            "nampo",
+            "남포역",
+            "南浦洞",
+            "BIFF廣場"
+        ],
+        "search": "Nampo Station",
+        "display": "南浦站",
+        "country": "KR",
+        "lat": 35.0975,
+        "lng": 129.0289
+    },
+    "札嘎其站": {
+        "aliases": [
+            "jagalchi",
+            "자갈치역",
+            "札嘎其市場"
+        ],
+        "search": "Jagalchi Station",
+        "display": "札嘎其站",
+        "country": "KR",
+        "lat": 35.0966,
+        "lng": 129.0307
+    },
+    "廣安站": {
+        "aliases": [
+            "gwangan",
+            "광안역",
+            "廣安里",
+            "廣安大橋"
+        ],
+        "search": "Gwangan Station",
+        "display": "廣安站",
+        "country": "KR",
+        "lat": 35.1531,
+        "lng": 129.1188
+    },
+    "冬柏站": {
+        "aliases": [
+            "dongbaek",
+            "동백역",
+            "The Bay 101"
+        ],
+        "search": "Dongbaek Station",
+        "display": "冬柏站",
+        "country": "KR",
+        "lat": 35.1693,
+        "lng": 129.1406
+    },
+    "中洞站": {
+        "aliases": [
+            "jungdong",
+            "중동역",
+            "新世界百貨"
+        ],
+        "search": "Jungdong Station",
+        "display": "中洞站",
+        "country": "KR",
+        "lat": 35.1655,
+        "lng": 129.1284
+    },
+    "草梁站": {
+        "aliases": [
+            "choryang",
+            "초량역",
+            "草梁洞"
+        ],
+        "search": "Choryang Station",
+        "display": "草梁站",
+        "country": "KR",
+        "lat": 35.1174,
+        "lng": 129.0432
+    },
+    "大邱站": {
+        "aliases": [
+            "daegu station",
+            "대구역"
+        ],
+        "search": "Daegu Station",
+        "display": "大邱站",
+        "country": "KR",
+        "lat": 35.8796,
+        "lng": 128.6262
+    },
+    "東城路站": {
+        "aliases": [
+            "dongseongno",
+            "동성로",
+            "東城路商圈"
+        ],
+        "search": "Dongseongno",
+        "display": "東城路站",
+        "country": "KR",
+        "lat": 35.8686,
+        "lng": 128.5951
+    },
+    "濟州國際機場": {
+        "aliases": [
+            "jeju airport",
+            "제주공항",
+            "CJU"
+        ],
+        "search": "Jeju International Airport",
+        "display": "濟州國際機場",
+        "country": "KR",
+        "lat": 33.5071,
+        "lng": 126.4928
+    }
+}

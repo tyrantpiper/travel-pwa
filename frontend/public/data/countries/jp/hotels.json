@@ -1,0 +1,734 @@
+{
+    "__meta": {
+        "source": "Japan Hotels Database",
+        "version": "1.0",
+        "lastUpdated": "2026-01-03",
+        "description": "日本連鎖飯店資料庫"
+    },
+    "東橫INN 新宿歌舞伎町": {
+        "aliases": [
+            "toyoko inn shinjuku kabukicho",
+            "東横インン 新宿歌舞伎町"
+        ],
+        "search": "Toyoko Inn Shinjuku Kabukicho",
+        "display": "東橫INN 新宿歌舞伎町",
+        "country": "JP",
+        "lat": 35.6947,
+        "lng": 139.7022
+    },
+    "東橫INN 澀谷道玄坂": {
+        "aliases": [
+            "toyoko inn shibuya dogenzaka",
+            "東横イン渋谷道玄坂"
+        ],
+        "search": "Toyoko Inn Shibuya Dogenzaka",
+        "display": "東橫INN 澀谷道玄坂",
+        "country": "JP",
+        "lat": 35.6580,
+        "lng": 139.6970
+    },
+    "東橫INN 池袋西口": {
+        "aliases": [
+            "toyoko inn ikebukuro nishiguchi",
+            "東横イン池袋西口"
+        ],
+        "search": "Toyoko Inn Ikebukuro Nishiguchi",
+        "display": "東橫INN 池袋西口",
+        "country": "JP",
+        "lat": 35.7295,
+        "lng": 139.7070
+    },
+    "東橫INN 東京駅新大橋前": {
+        "aliases": [
+            "toyoko inn tokyo station",
+            "東横イン東京駅"
+        ],
+        "search": "Toyoko Inn Tokyo Station Shin-Ohashi-mae",
+        "display": "東橫INN 東京駅新大橋前",
+        "country": "JP",
+        "lat": 35.6780,
+        "lng": 139.7850
+    },
+    "東橫INN 上野田原町站前": {
+        "aliases": [
+            "toyoko inn ueno tawaramachi",
+            "東横イン上野田原町駅前"
+        ],
+        "search": "Toyoko Inn Ueno Tawaramachi-ekimae",
+        "display": "東橫INN 上野田原町站前",
+        "country": "JP",
+        "lat": 35.7110,
+        "lng": 139.7900
+    },
+    "東橫INN 品川站港南口": {
+        "aliases": [
+            "toyoko inn shinagawa konan",
+            "東横イン品川駅港南口"
+        ],
+        "search": "Toyoko Inn Shinagawa Konan-guchi",
+        "display": "東橫INN 品川站港南口",
+        "country": "JP",
+        "lat": 35.6270,
+        "lng": 139.7420
+    },
+    "東橫INN 羽田機場": {
+        "aliases": [
+            "toyoko inn haneda",
+            "東横イン羽田空港"
+        ],
+        "search": "Toyoko Inn Haneda Airport",
+        "display": "東橫INN 羽田機場",
+        "country": "JP",
+        "lat": 35.5520,
+        "lng": 139.7710
+    },
+    "東橫INN 成田機場": {
+        "aliases": [
+            "toyoko inn narita",
+            "東横イン成田空港"
+        ],
+        "search": "Toyoko Inn Narita Airport",
+        "display": "東橫INN 成田機場",
+        "country": "JP",
+        "lat": 35.7730,
+        "lng": 140.3850
+    },
+    "東橫INN 大阪難波": {
+        "aliases": [
+            "toyoko inn osaka namba",
+            "東横イン大阪なんば"
+        ],
+        "search": "Toyoko Inn Osaka Namba",
+        "display": "東橫INN 大阪難波",
+        "country": "JP",
+        "lat": 34.6650,
+        "lng": 135.5020
+    },
+    "東橫INN 京都四条烏丸": {
+        "aliases": [
+            "toyoko inn kyoto shijo karasuma",
+            "東横イン京都四条烏丸"
+        ],
+        "search": "Toyoko Inn Kyoto Shijo Karasuma",
+        "display": "東橫INN 京都四条烏丸",
+        "country": "JP",
+        "lat": 35.0030,
+        "lng": 135.7590
+    },
+    "APA Hotel 新宿歌舞伎町": {
+        "aliases": [
+            "apa hotel shinjuku kabukicho",
+            "アパホテル新宿歌舞伎町"
+        ],
+        "search": "APA Hotel Shinjuku Kabukicho",
+        "display": "APA Hotel 新宿歌舞伎町",
+        "country": "JP",
+        "lat": 35.6938,
+        "lng": 139.7026
+    },
+    "APA Hotel 澀谷道玄坂": {
+        "aliases": [
+            "apa hotel shibuya dogenzaka",
+            "アパホテル渋谷道玄坂"
+        ],
+        "search": "APA Hotel Shibuya Dogenzaka",
+        "display": "APA Hotel 澀谷道玄坂",
+        "country": "JP",
+        "lat": 35.6568,
+        "lng": 139.6965
+    },
+    "APA Hotel 銀座中央": {
+        "aliases": [
+            "apa hotel ginza chuo",
+            "アパホテル銀座中央"
+        ],
+        "search": "APA Hotel Ginza Chuo",
+        "display": "APA Hotel 銀座中央",
+        "country": "JP",
+        "lat": 35.6720,
+        "lng": 139.7680
+    },
+    "APA Hotel 上野站前": {
+        "aliases": [
+            "apa hotel ueno ekimae",
+            "アパホテル上野駅前"
+        ],
+        "search": "APA Hotel Ueno Ekimae",
+        "display": "APA Hotel 上野站前",
+        "country": "JP",
+        "lat": 35.7130,
+        "lng": 139.7770
+    },
+    "APA Hotel 秋葉原站前": {
+        "aliases": [
+            "apa hotel akihabara ekimae",
+            "アパホテル秋葉原駅前"
+        ],
+        "search": "APA Hotel Akihabara Ekimae",
+        "display": "APA Hotel 秋葉原站前",
+        "country": "JP",
+        "lat": 35.6990,
+        "lng": 139.7740
+    },
+    "APA Hotel 淺草雷門": {
+        "aliases": [
+            "apa hotel asakusa kaminarimon",
+            "アパホテル浅草雷門"
+        ],
+        "search": "APA Hotel Asakusa Kaminarimon",
+        "display": "APA Hotel 淺草雷門",
+        "country": "JP",
+        "lat": 35.7110,
+        "lng": 139.7950
+    },
+    "APA Hotel 六本木站前": {
+        "aliases": [
+            "apa hotel roppongi ekimae",
+            "アパホテル六本木駅前"
+        ],
+        "search": "APA Hotel Roppongi Ekimae",
+        "display": "APA Hotel 六本木站前",
+        "country": "JP",
+        "lat": 35.6640,
+        "lng": 139.7310
+    },
+    "APA Hotel 大阪心斎橋": {
+        "aliases": [
+            "apa hotel osaka shinsaibashi",
+            "アパホテル大阪心斎橋"
+        ],
+        "search": "APA Hotel Osaka Shinsaibashi",
+        "display": "APA Hotel 大阪心齋橋",
+        "country": "JP",
+        "lat": 34.6740,
+        "lng": 135.5010
+    },
+    "APA Hotel 大阪難波": {
+        "aliases": [
+            "apa hotel osaka namba",
+            "アパホテル大阪なんば"
+        ],
+        "search": "APA Hotel Osaka Namba",
+        "display": "APA Hotel 大阪難波",
+        "country": "JP",
+        "lat": 34.6660,
+        "lng": 135.5020
+    },
+    "APA Hotel 京都站堀川通": {
+        "aliases": [
+            "apa hotel kyoto station horikawa",
+            "アパホテル京都駅堀川通"
+        ],
+        "search": "APA Hotel Kyoto Station Horikawa-dori",
+        "display": "APA Hotel 京都站堀川通",
+        "country": "JP",
+        "lat": 34.9840,
+        "lng": 135.7530
+    },
+    "Dormy Inn 新宿": {
+        "aliases": [
+            "dormy inn shinjuku",
+            "ドーミーイン新宿",
+            "天然温泉"
+        ],
+        "search": "Dormy Inn Shinjuku",
+        "display": "Dormy Inn 新宿",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.7040
+    },
+    "Dormy Inn 上野御徒町": {
+        "aliases": [
+            "dormy inn ueno okachimachi",
+            "ドーミーイン上野·御徒町"
+        ],
+        "search": "Dormy Inn Ueno Okachimachi",
+        "display": "Dormy Inn 上野御徒町",
+        "country": "JP",
+        "lat": 35.7080,
+        "lng": 139.7740
+    },
+    "Dormy Inn 淺草": {
+        "aliases": [
+            "dormy inn asakusa",
+            "ドーミーイン浅草"
+        ],
+        "search": "Dormy Inn Asakusa",
+        "display": "Dormy Inn 淺草",
+        "country": "JP",
+        "lat": 35.7120,
+        "lng": 139.7920
+    },
+    "Dormy Inn 大阪心斎橋": {
+        "aliases": [
+            "dormy inn osaka shinsaibashi",
+            "ドーミーイン大阪心斎橋"
+        ],
+        "search": "Dormy Inn Osaka Shinsaibashi",
+        "display": "Dormy Inn 大阪心齋橋",
+        "country": "JP",
+        "lat": 34.6730,
+        "lng": 135.5000
+    },
+    "Dormy Inn 京都站前": {
+        "aliases": [
+            "dormy inn kyoto ekimae",
+            "ドーミーイン京都駅前"
+        ],
+        "search": "Dormy Inn Kyoto Ekimae",
+        "display": "Dormy Inn 京都站前",
+        "country": "JP",
+        "lat": 34.9850,
+        "lng": 135.7580
+    },
+    "超級酒店 新宿歌舞伎町": {
+        "aliases": [
+            "super hotel shinjuku kabukicho",
+            "スーパーホテル新宿歌舞伎町"
+        ],
+        "search": "Super Hotel Shinjuku Kabukicho",
+        "display": "超級酒店 新宿歌舞伎町",
+        "country": "JP",
+        "lat": 35.6945,
+        "lng": 139.7018
+    },
+    "超級酒店 池袋西口": {
+        "aliases": [
+            "super hotel ikebukuro nishiguchi",
+            "スーパーホテル池袋西口"
+        ],
+        "search": "Super Hotel Ikebukuro Nishiguchi",
+        "display": "超級酒店 池袋西口",
+        "country": "JP",
+        "lat": 35.7290,
+        "lng": 139.7080
+    },
+    "超級酒店 大阪難波": {
+        "aliases": [
+            "super hotel osaka namba",
+            "スーパーホテル大阪なんば"
+        ],
+        "search": "Super Hotel Osaka Namba",
+        "display": "超級酒店 大阪難波",
+        "country": "JP",
+        "lat": 34.6655,
+        "lng": 135.5015
+    },
+    "相鐵FRESA INN 新宿東新宿": {
+        "aliases": [
+            "sotetsu fresa inn higashi shinjuku",
+            "相鉄フレッサイン東新宿"
+        ],
+        "search": "Sotetsu Fresa Inn Higashi-Shinjuku",
+        "display": "相鐵FRESA INN 東新宿",
+        "country": "JP",
+        "lat": 35.6982,
+        "lng": 139.7057
+    },
+    "相鐵FRESA INN 銀座": {
+        "aliases": [
+            "sotetsu fresa inn ginza",
+            "相鉄フレッサイン銀座"
+        ],
+        "search": "Sotetsu Fresa Inn Ginza",
+        "display": "相鐵FRESA INN 銀座",
+        "country": "JP",
+        "lat": 35.6710,
+        "lng": 139.7650
+    },
+    "相鐵FRESA INN 京都站八条口": {
+        "aliases": [
+            "sotetsu fresa inn kyoto hachijoguchi",
+            "相鉄フレッサイン京都駅八条口"
+        ],
+        "search": "Sotetsu Fresa Inn Kyoto Hachijoguchi",
+        "display": "相鐵FRESA INN 京都站八条口",
+        "country": "JP",
+        "lat": 34.9840,
+        "lng": 135.7600
+    },
+    "Vessel Inn 心斎橋": {
+        "aliases": [
+            "vessel inn shinsaibashi",
+            "ベッセルイン心斎橋"
+        ],
+        "search": "Vessel Inn Shinsaibashi",
+        "display": "Vessel Inn 心齋橋",
+        "country": "JP",
+        "lat": 34.6740,
+        "lng": 135.5020
+    },
+    "Vessel Inn 高輪": {
+        "aliases": [
+            "vessel inn takanawa",
+            "ベッセルイン高輪"
+        ],
+        "search": "Vessel Inn Takanawa",
+        "display": "Vessel Inn 高輪",
+        "country": "JP",
+        "lat": 35.6330,
+        "lng": 139.7400
+    },
+    "新阪急酒店 大阪": {
+        "aliases": [
+            "hotel new hankyu osaka",
+            "ホテル新阪急大阪",
+            "新阪急"
+        ],
+        "search": "Hotel New Hankyu Osaka",
+        "display": "新阪急酒店 大阪",
+        "country": "JP",
+        "lat": 34.7040,
+        "lng": 135.4980
+    },
+    "日航酒店 東京": {
+        "aliases": [
+            "hotel nikko tokyo",
+            "ホテル日航東京",
+            "台場日航"
+        ],
+        "search": "Hotel Nikko Tokyo",
+        "display": "日航酒店 東京台場",
+        "country": "JP",
+        "lat": 35.6290,
+        "lng": 139.7750
+    },
+    "日航酒店 大阪": {
+        "aliases": [
+            "hotel nikko osaka",
+            "ホテル日航大阪"
+        ],
+        "search": "Hotel Nikko Osaka",
+        "display": "日航酒店 大阪",
+        "country": "JP",
+        "lat": 34.6740,
+        "lng": 135.5010
+    },
+    "京王飯店 新宿": {
+        "aliases": [
+            "keio plaza hotel shinjuku",
+            "京王プラザホテル",
+            "京王"
+        ],
+        "search": "Keio Plaza Hotel Tokyo",
+        "display": "京王飯店 新宿",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.6930
+    },
+    "世紀南悅酒店 大阪": {
+        "aliases": [
+            "century hyatt osaka",
+            "センチュリーハイアット大阪"
+        ],
+        "search": "Hyatt Regency Osaka",
+        "display": "大阪凱悅酒店",
+        "country": "JP",
+        "lat": 34.7050,
+        "lng": 135.4970
+    },
+    "Mystays 新宿": {
+        "aliases": [
+            "hotel mystays shinjuku",
+            "ホテルマイステイズ新宿"
+        ],
+        "search": "Hotel Mystays Shinjuku",
+        "display": "Mystays 新宿",
+        "country": "JP",
+        "lat": 35.6890,
+        "lng": 139.6990
+    },
+    "Mystays 上野稻荷町": {
+        "aliases": [
+            "hotel mystays ueno inaricho",
+            "ホテルマイステイズ上野稲荷町"
+        ],
+        "search": "Hotel Mystays Ueno Inaricho",
+        "display": "Mystays 上野稻荷町",
+        "country": "JP",
+        "lat": 35.7130,
+        "lng": 139.7820
+    },
+    "Mystays 淺草": {
+        "aliases": [
+            "hotel mystays asakusa",
+            "ホテルマイステイズ浅草"
+        ],
+        "search": "Hotel Mystays Asakusa",
+        "display": "Mystays 淺草",
+        "country": "JP",
+        "lat": 35.7120,
+        "lng": 139.7960
+    },
+    "Mystays 京都四条": {
+        "aliases": [
+            "hotel mystays kyoto shijo",
+            "ホテルマイステイズ京都四条"
+        ],
+        "search": "Hotel Mystays Kyoto Shijo",
+        "display": "Mystays 京都四条",
+        "country": "JP",
+        "lat": 35.0020,
+        "lng": 135.7580
+    },
+    "Prince Hotel 東京": {
+        "aliases": [
+            "tokyo prince hotel",
+            "東京プリンスホテル",
+            "王子飯店"
+        ],
+        "search": "Tokyo Prince Hotel",
+        "display": "東京王子飯店",
+        "country": "JP",
+        "lat": 35.6550,
+        "lng": 139.7460
+    },
+    "新大谷飯店 東京": {
+        "aliases": [
+            "hotel new otani tokyo",
+            "ホテルニューオータニ",
+            "大谷"
+        ],
+        "search": "Hotel New Otani Tokyo",
+        "display": "新大谷飯店 東京",
+        "country": "JP",
+        "lat": 35.6790,
+        "lng": 139.7340
+    },
+    "帝國飯店 東京": {
+        "aliases": [
+            "imperial hotel tokyo",
+            "帝国ホテル",
+            "帝國"
+        ],
+        "search": "Imperial Hotel Tokyo",
+        "display": "帝國飯店 東京",
+        "country": "JP",
+        "lat": 35.6730,
+        "lng": 139.7600
+    },
+    "東京希爾頓": {
+        "aliases": [
+            "hilton tokyo",
+            "ヒルトン東京"
+        ],
+        "search": "Hilton Tokyo",
+        "display": "東京希爾頓",
+        "country": "JP",
+        "lat": 35.6900,
+        "lng": 139.6920
+    },
+    "新宿Park Hyatt": {
+        "aliases": [
+            "park hyatt tokyo",
+            "パークハイアット東京",
+            "迷失東京"
+        ],
+        "search": "Park Hyatt Tokyo",
+        "display": "Park Hyatt 東京",
+        "country": "JP",
+        "lat": 35.6860,
+        "lng": 139.6900
+    },
+    "東京半島酒店": {
+        "aliases": [
+            "the peninsula tokyo",
+            "ペニンシュラ東京"
+        ],
+        "search": "The Peninsula Tokyo",
+        "display": "東京半島酒店",
+        "country": "JP",
+        "lat": 35.6750,
+        "lng": 139.7620
+    },
+    "安達仕東京": {
+        "aliases": [
+            "andaz tokyo",
+            "アンダーズ東京",
+            "虎ノ門"
+        ],
+        "search": "Andaz Tokyo",
+        "display": "安達仕東京",
+        "country": "JP",
+        "lat": 35.6690,
+        "lng": 139.7500
+    },
+    "東京文華東方": {
+        "aliases": [
+            "mandarin oriental tokyo",
+            "マンダリンオリエンタル東京"
+        ],
+        "search": "Mandarin Oriental Tokyo",
+        "display": "東京文華東方",
+        "country": "JP",
+        "lat": 35.6860,
+        "lng": 139.7720
+    },
+    "東京麗思卡爾頓": {
+        "aliases": [
+            "the ritz carlton tokyo",
+            "ザ・リッツ・カールトン東京"
+        ],
+        "search": "The Ritz-Carlton Tokyo",
+        "display": "東京麗思卡爾頓",
+        "country": "JP",
+        "lat": 35.6660,
+        "lng": 139.7290
+    },
+    "艾美東京": {
+        "aliases": [
+            "le meridien tokyo",
+            "ウェスティン東京"
+        ],
+        "search": "The Westin Tokyo",
+        "display": "東京威斯汀",
+        "country": "JP",
+        "lat": 35.6480,
+        "lng": 139.7110
+    },
+    "東京喜來登都酒店": {
+        "aliases": [
+            "sheraton miyako hotel tokyo",
+            "シェラトン都ホテル東京"
+        ],
+        "search": "Sheraton Miyako Hotel Tokyo",
+        "display": "東京喜來登都酒店",
+        "country": "JP",
+        "lat": 35.6330,
+        "lng": 139.7250
+    },
+    "東京汐留皇家公園酒店": {
+        "aliases": [
+            "royal park hotel shiodome",
+            "ロイヤルパークホテル汐留"
+        ],
+        "search": "Royal Park Hotel The Shiodome",
+        "display": "皇家公園酒店 汐留",
+        "country": "JP",
+        "lat": 35.6610,
+        "lng": 139.7600
+    },
+    "大阪W酒店": {
+        "aliases": [
+            "w osaka",
+            "Wオオサカ"
+        ],
+        "search": "W Osaka",
+        "display": "大阪W酒店",
+        "country": "JP",
+        "lat": 34.6720,
+        "lng": 135.5020
+    },
+    "大阪康萊德": {
+        "aliases": [
+            "conrad osaka",
+            "コンラッド大阪"
+        ],
+        "search": "Conrad Osaka",
+        "display": "大阪康萊德",
+        "country": "JP",
+        "lat": 34.6950,
+        "lng": 135.4940
+    },
+    "大阪瑞吉酒店": {
+        "aliases": [
+            "st regis osaka",
+            "セントレジス大阪"
+        ],
+        "search": "The St. Regis Osaka",
+        "display": "大阪瑞吉酒店",
+        "country": "JP",
+        "lat": 34.6960,
+        "lng": 135.4960
+    },
+    "京都麗思卡爾頓": {
+        "aliases": [
+            "the ritz carlton kyoto",
+            "ザ・リッツ・カールトン京都"
+        ],
+        "search": "The Ritz-Carlton Kyoto",
+        "display": "京都麗思卡爾頓",
+        "country": "JP",
+        "lat": 35.0130,
+        "lng": 135.7720
+    },
+    "京都四季酒店": {
+        "aliases": [
+            "four seasons kyoto",
+            "フォーシーズンズ京都"
+        ],
+        "search": "Four Seasons Hotel Kyoto",
+        "display": "京都四季酒店",
+        "country": "JP",
+        "lat": 34.9930,
+        "lng": 135.7780
+    },
+    "OMO5 京都祇園": {
+        "aliases": [
+            "omo5 kyoto gion",
+            "OMO5京都祇園"
+        ],
+        "search": "OMO5 Kyoto Gion",
+        "display": "OMO5 京都祇園",
+        "country": "JP",
+        "lat": 35.0040,
+        "lng": 135.7760
+    },
+    "星野 虹夕諾雅 京都": {
+        "aliases": [
+            "hoshinoya kyoto",
+            "星のや京都",
+            "嵐山"
+        ],
+        "search": "Hoshinoya Kyoto",
+        "display": "星野 虹夕諾雅 京都",
+        "country": "JP",
+        "lat": 35.0120,
+        "lng": 135.6670
+    },
+    "星野 虹夕諾雅 東京": {
+        "aliases": [
+            "hoshinoya tokyo",
+            "星のや東京",
+            "大手町"
+        ],
+        "search": "Hoshinoya Tokyo",
+        "display": "星野 虹夕諾雅 東京",
+        "country": "JP",
+        "lat": 35.6860,
+        "lng": 139.7660
+    },
+    "札幌JR Tower日航酒店": {
+        "aliases": [
+            "jr tower hotel nikko sapporo",
+            "JRタワーホテル日航札幌"
+        ],
+        "search": "JR Tower Hotel Nikko Sapporo",
+        "display": "札幌JR Tower日航酒店",
+        "country": "JP",
+        "lat": 43.0680,
+        "lng": 141.3510
+    },
+    "福岡凱悅酒店": {
+        "aliases": [
+            "grand hyatt fukuoka",
+            "グランドハイアット福岡"
+        ],
+        "search": "Grand Hyatt Fukuoka",
+        "display": "福岡凱悅酒店",
+        "country": "JP",
+        "lat": 33.5890,
+        "lng": 130.4020
+    },
+    "沖繩希爾頓": {
+        "aliases": [
+            "hilton okinawa chatan",
+            "ヒルトン沖縄北谷"
+        ],
+        "search": "Hilton Okinawa Chatan Resort",
+        "display": "沖繩希爾頓",
+        "country": "JP",
+        "lat": 26.3160,
+        "lng": 127.7580
+    }
+}

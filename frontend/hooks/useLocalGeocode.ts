@@ -109,11 +109,15 @@ export function useLocalGeocode() {
                 setIsLoading(true)
 
                 // 載入主要資料 + 國家分離資料
-                const [landmarksRes, brandsRes, jpStationsRes, jpLandmarksRes] = await Promise.all([
+                const [landmarksRes, brandsRes, jpStationsRes, jpLandmarksRes, jpHotelsRes, jpRestaurantsRes, krStationsRes, krLandmarksRes] = await Promise.all([
                     fetch('/data/landmarks.json'),
                     fetch('/data/brands.json'),
                     fetch('/data/countries/jp/stations.json').catch(() => null),
-                    fetch('/data/countries/jp/landmarks.json').catch(() => null)
+                    fetch('/data/countries/jp/landmarks.json').catch(() => null),
+                    fetch('/data/countries/jp/hotels.json').catch(() => null),
+                    fetch('/data/countries/jp/restaurants.json').catch(() => null),
+                    fetch('/data/countries/kr/stations.json').catch(() => null),
+                    fetch('/data/countries/kr/landmarks.json').catch(() => null)
                 ])
 
                 if (!landmarksRes.ok || !brandsRes.ok) {
@@ -138,25 +142,22 @@ export function useLocalGeocode() {
                     }
                 }
 
-                // 🆕 合併國家資料
+                // 🆕 合併國家資料 (JP + KR)
                 let countryEntriesCount = 0
 
-                if (jpStationsRes?.ok) {
-                    const jpStations = await jpStationsRes.json()
-                    for (const [key, value] of Object.entries(jpStations)) {
-                        if (!key.startsWith('_') && typeof value === 'object') {
-                            filteredLandmarks[key] = value as LandmarkEntry
-                            countryEntriesCount++
-                        }
-                    }
-                }
+                const countryDataSources = [
+                    jpStationsRes, jpLandmarksRes, jpHotelsRes, jpRestaurantsRes,
+                    krStationsRes, krLandmarksRes
+                ]
 
-                if (jpLandmarksRes?.ok) {
-                    const jpLandmarks = await jpLandmarksRes.json()
-                    for (const [key, value] of Object.entries(jpLandmarks)) {
-                        if (!key.startsWith('_') && typeof value === 'object') {
-                            filteredLandmarks[key] = value as LandmarkEntry
-                            countryEntriesCount++
+                for (const res of countryDataSources) {
+                    if (res?.ok) {
+                        const data = await res.json()
+                        for (const [key, value] of Object.entries(data)) {
+                            if (!key.startsWith('_') && typeof value === 'object') {
+                                filteredLandmarks[key] = value as LandmarkEntry
+                                countryEntriesCount++
+                            }
                         }
                     }
                 }
