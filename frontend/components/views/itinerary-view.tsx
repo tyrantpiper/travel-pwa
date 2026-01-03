@@ -1438,7 +1438,7 @@ export function ItineraryView() {
                             <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
                                 <span className="text-xs text-slate-400 font-mono">{w.time}</span>
                                 {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
-                                <span className="text-sm font-bold text-slate-700">{w.temp}C</span>
+                                <span className="text-sm font-bold text-slate-700">{w.temp}°</span>
                             </div>
                         )) : <div className="text-xs text-slate-400 p-2">Loading weather...</div>}
                     </div>
