@@ -78,13 +78,17 @@ const getSeasonConfig = (month: number, dayLength: number) => {
  * @param sunriseHour 日出時間 (小時, 如 5.5 = 05:30)
  * @param sunsetHour 日落時間 (小時, 如 18.5 = 18:30)
  * @param month 月份 (1-12) 用於季節判斷
+ * @param elevation 海拔高度 (公尺) 用於地理修正
+ * @param latitude 緯度 用於地理修正
  */
 export const generateHourlyCurve = (
     tMin: number,
     tMax: number,
     sunriseHour: number = 6,
     sunsetHour: number = 18,
-    month?: number
+    month?: number,
+    elevation?: number,
+    latitude?: number
 ): number[] => {
     const dayLength = sunsetHour - sunriseHour
 
@@ -92,17 +96,27 @@ export const generateHourlyCurve = (
     const currentMonth = month ?? new Date().getMonth() + 1
     const seasonConfig = getSeasonConfig(currentMonth, dayLength)
 
-    // 最高溫發生時間: 季節調整
+    // 🆕 Phase 4: 地理修正係數
+    const geoMod = {
+        // 高海拔 (>1000m): 夜間衰減更快
+        elevationFactor: elevation && elevation > 1000 ? 1.3 : 1.0,
+        // 高緯度夏季 (>45°): 曲線扁平化
+        latitudeFactor: latitude && Math.abs(latitude) > 45 && (currentMonth >= 5 && currentMonth <= 8) ? 0.7 : 1.0,
+        // 沿海判斷需要更多數據，暫用溫差小判斷
+        coastalDelay: (tMax - tMin) < 8 ? 0.5 : 0  // 溫差小可能沿海，延後最高溫
+    }
+
+    // 最高溫發生時間: 季節 + 地理調整
     const basePeakHour = dayLength > 13 ? sunsetHour - 3 : sunsetHour - 4
-    const peakHour = basePeakHour + seasonConfig.peakDelay
+    const peakHour = basePeakHour + seasonConfig.peakDelay + geoMod.coastalDelay
 
     // 平均溫度
     const avg = (tMax + tMin) / 2
 
-    // 夜間衰減係數: 日溫差 + 季節調整
+    // 夜間衰減係數: 日溫差 + 季節 + 地理調整
     const range = tMax - tMin
     const baseDecay = range > 15 ? 0.25 : range < 5 ? 0.08 : 0.15
-    const decayRate = baseDecay * seasonConfig.decayMod
+    const decayRate = baseDecay * seasonConfig.decayMod * geoMod.elevationFactor * geoMod.latitudeFactor
 
     const temps: number[] = []
 
@@ -141,7 +155,7 @@ export const generateHourlyCurve = (
         temps.push(Math.round(temp))
     }
 
-    console.log(`📈 Phase 3 Linvill: ${seasonConfig.label} | sunrise=${sunriseHour}, peak=${peakHour.toFixed(1)}, sunset=${sunsetHour}, decay=${decayRate.toFixed(2)}`)
+    console.log(`📈 Phase 4 Linvill: ${seasonConfig.label} | peak=${peakHour.toFixed(1)}, decay=${decayRate.toFixed(2)}, elev=${elevation ?? 0}m, lat=${latitude?.toFixed(1) ?? 'N/A'}`)
     return temps
 }
 

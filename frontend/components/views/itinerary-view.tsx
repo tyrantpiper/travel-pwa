@@ -374,7 +374,9 @@ export function ItineraryView() {
                     // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
                     const targetMonth = targetDate ? new Date(targetDate).getMonth() + 1 : new Date().getMonth() + 1
 
-                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth)
+                    // 🆕 Phase 4: 使用緯度進行地理修正
+                    // (海拔可透過 Open-Meteo Elevation API 獲取，暫用 undefined)
+                    temps = generateHourlyCurve(tMin, tMax, sunriseHour, sunsetHour, targetMonth, undefined, lat)
                     codes = Array(24).fill(0)  // 季節預報無天氣碼
                 } else {
                     temps = data.hourly?.temperature_2m || []
