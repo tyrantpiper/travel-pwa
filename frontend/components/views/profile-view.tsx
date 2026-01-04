@@ -476,9 +476,38 @@ export function ProfileView() {
                                         height={180}
                                         className="mx-auto rounded-lg"
                                     />
-                                    <p className="text-xs text-slate-500 mt-2">
+                                    <p className="text-xs text-slate-500 mt-2 mb-3">
                                         使用 台灣Pay / 街口 / LINE Pay 掃描
                                     </p>
+
+                                    {/* 手機收款資訊 */}
+                                    <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
+                                        <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                            <Smartphone className="w-3.5 h-3.5 text-slate-500" />
+                                            手機收款 <span className="text-slate-400 font-normal">(代碼 812)</span>
+                                        </h4>
+                                        <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+                                            銀行代碼「812」+ 手機號碼即可轉帳。
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <code className="bg-white border border-slate-200 px-2 py-1.5 rounded text-xs font-mono text-slate-700 flex-1 text-center tracking-wider font-bold">
+                                                0908879076
+                                            </code>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-7 w-7 p-0 shrink-0 bg-white hover:bg-slate-50"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText("0908879076")
+                                                    toast.success("手機號碼已複製！")
+                                                }}
+                                                title="複製號碼"
+                                            >
+                                                <Copy className="w-3 h-3 text-slate-500" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
                                     <p className="text-[10px] text-slate-400 mt-1">
                                         本處方由藥學系學生 Ryan 調劑 🧪
                                     </p>
