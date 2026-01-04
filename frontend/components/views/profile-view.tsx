@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2, X,
-    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle
+    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
+    ChevronDown, ChevronUp  // 🆕 捐贈功能圖示
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,11 @@ export function ProfileView() {
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
     const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
+
+    // 🆕 捐贈功能 state（獨立區塊，不影響現有邏輯）
+    const [donationProgress, setDonationProgress] = useState({ current: 0, goal: 2000 })
+    const [showDonation, setShowDonation] = useState(true)
+    const [donationExpanded, setDonationExpanded] = useState(false)
 
     // 🆕 POI 推薦偏好設定
     const [poiPreferences, setPoiPreferences] = useState({
@@ -84,6 +90,47 @@ export function ProfileView() {
                 setPoiPreferences(JSON.parse(savedPoiPrefs))
             } catch { /* ignore */ }
         }
+    }, [])
+
+    // 🆕 捐贈進度讀取（獨立 useEffect，不影響現有邏輯）
+    useEffect(() => {
+        // 檢查是否被用戶關閉（當月不再顯示）
+        const dismissedMonth = localStorage.getItem('donation_dismissed')
+        const currentMonth = new Date().toISOString().slice(0, 7)
+        if (dismissedMonth === currentMonth) {
+            setShowDonation(false)
+        }
+
+        // 從 Supabase 讀取進度（使用獨立連線，不干擾 app.state）
+        const fetchDonationProgress = async () => {
+            try {
+                const { createClient } = await import('@supabase/supabase-js')
+                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+                const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                if (!supabaseUrl || !supabaseKey) return
+
+                const supabase = createClient(supabaseUrl, supabaseKey)
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('value')
+                    .eq('key', 'donation_progress')
+                    .single()
+
+                if (data?.value) {
+                    // 自動月份重置：如果是新的月份，current 顯示為 0
+                    const storedMonth = data.value.month
+                    const nowMonth = new Date().toISOString().slice(0, 7)
+                    if (storedMonth && storedMonth !== nowMonth) {
+                        setDonationProgress({ current: 0, goal: data.value.goal || 2000 })
+                    } else {
+                        setDonationProgress(data.value)
+                    }
+                }
+            } catch (err) {
+                console.log('[Donation] Failed to fetch progress:', err)
+            }
+        }
+        fetchDonationProgress()
     }, [])
 
     const handleSaveProfile = () => {
@@ -263,6 +310,183 @@ export function ProfileView() {
                         )}
                     </div>
                 </div>
+
+                {/* 🆕 捐贈區塊 - 藥學系治療窗口版 */}
+                {showDonation && (() => {
+                    const percentage = Math.min((donationProgress.current / donationProgress.goal) * 100, 120)
+
+                    // 治療窗口狀態判斷
+                    const getTherapeuticStatus = () => {
+                        if (percentage < 30) return {
+                            zone: 'ineffective',
+                            label: '🪫 能量不足',
+                            labelBg: 'bg-amber-900/80',  // 深褐色背景
+                            color: 'from-[#FF9966] to-[#FF5E62]',  // 活力橘漸層
+                            message: '適應症：開發者因修 Bug 導致咖啡因枯竭，急需您的贊助輸血 ☕',
+                            emoji: '😵'
+                        }
+                        if (percentage < 80) return {
+                            zone: 'therapeutic',
+                            label: '✅ 治療區',
+                            labelBg: 'bg-emerald-900/80',
+                            color: 'from-emerald-500 to-teal-500',
+                            message: '藥效穩定發揮中！App 正常運轉，Bug 逐漸消失 💊',
+                            emoji: '😊'
+                        }
+                        return {
+                            zone: 'toxic',
+                            label: '⚡ 亢奮區',
+                            labelBg: 'bg-purple-900/80',
+                            color: 'from-purple-500 to-pink-500',
+                            message: '警告！開發者過度興奮，可能承諾開發過多新功能！🚀',
+                            emoji: '🤩'
+                        }
+                    }
+
+                    const status = getTherapeuticStatus()
+
+                    // 里程碑節點
+                    const milestones = [
+                        { percent: 30, label: '伺服器存活', desc: '至少這個月不會 404' },
+                        { percent: 70, label: '開發者獲得雞腿', desc: 'Bug 少一半' },
+                        { percent: 100, label: '新功能解鎖', desc: '彩蛋模式啟動' }
+                    ]
+
+                    return (
+                        <div
+                            className={cn(
+                                "mt-6 rounded-xl p-5 shadow-lg relative overflow-hidden transition-all duration-500",
+                                `bg-gradient-to-br ${status.color}`
+                            )}
+                        >
+                            {/* 裝飾圖示 */}
+                            <div className="absolute top-0 right-0 p-3 opacity-20">
+                                <span className="text-6xl">{status.emoji}</span>
+                            </div>
+
+                            {/* 標題 + 狀態標籤 */}
+                            <div className="flex items-center justify-between mb-2">
+                                <h3
+                                    className="text-sm font-bold text-white flex items-center gap-2"
+                                    style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}
+                                >
+                                    💊 開發者血藥濃度監測
+                                </h3>
+                                <span className={cn(
+                                    "text-[10px] px-2.5 py-1 rounded-full font-bold text-white",
+                                    status.labelBg
+                                )}>
+                                    {status.label}
+                                </span>
+                            </div>
+
+                            {/* 動態狀態文字（純白+陰影） */}
+                            <p
+                                className="text-xs text-white mb-4 leading-relaxed"
+                                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+                            >
+                                {status.message}
+                            </p>
+
+                            {/* 治療窗口進度條 */}
+                            <div className="mb-4">
+                                {/* 進度條背景 + 分區 */}
+                                <div className="relative h-6 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
+                                    {/* 分區標示（更淡，不遮擋進度條） */}
+                                    <div className="absolute inset-0 flex">
+                                        <div className="w-[30%] border-r border-white/20" />
+                                        <div className="w-[50%] border-r border-white/20" />
+                                        <div className="flex-1" />
+                                    </div>
+
+                                    {/* 進度條填充（亮黃色 + 發光效果，像皮卡丘的電！） */}
+                                    <div
+                                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
+                                        style={{
+                                            width: `${Math.min(percentage, 100)}%`,
+                                            background: 'linear-gradient(90deg, #FFEB3B 0%, #FFC107 100%)',
+                                            boxShadow: '0 0 12px rgba(255, 235, 59, 0.7), 0 0 4px rgba(255, 193, 7, 0.5)'
+                                        }}
+                                    />
+
+                                    {/* 里程碑節點 */}
+                                    {milestones.map((m) => (
+                                        <div
+                                            key={m.percent}
+                                            className={cn(
+                                                "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white transition-all",
+                                                percentage >= m.percent ? "bg-white" : "bg-transparent"
+                                            )}
+                                            style={{ left: `${m.percent}%`, transform: 'translate(-50%, -50%)' }}
+                                            title={m.label}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* 里程碑標籤 */}
+                                <div className="flex justify-between mt-1 text-[9px] text-white/60">
+                                    <span>0%</span>
+                                    <span className={percentage >= 30 ? "text-white" : ""}>30%</span>
+                                    <span className={percentage >= 70 ? "text-white" : ""}>70%</span>
+                                    <span className={percentage >= 100 ? "text-white" : ""}>100%</span>
+                                </div>
+                            </div>
+
+                            {/* 數據顯示 */}
+                            <div className="flex justify-between items-end text-xs text-white/90 mb-3">
+                                <span className="mb-1">本月處方籤累積</span>
+                                <div className="text-right">
+                                    <span className="text-lg font-bold text-white mr-1 drop-shadow-md">
+                                        NT${donationProgress.current.toLocaleString()}
+                                    </span>
+                                    <span className="text-white/70">
+                                        / ${donationProgress.goal.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* 里程碑達成提示 */}
+                            {percentage >= 30 && (
+                                <div className="text-[10px] text-white/70 mb-3 space-y-1">
+                                    {percentage >= 30 && <div>✅ 30% - 伺服器存活確認</div>}
+                                    {percentage >= 70 && <div>✅ 70% - 開發者獲得雞腿</div>}
+                                    {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
+                                </div>
+                            )}
+
+                            {/* 展開/收合 QR Code */}
+                            <button
+                                onClick={() => setDonationExpanded(!donationExpanded)}
+                                className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg p-2.5 flex items-center justify-center gap-2 text-sm font-medium text-white shadow-sm transition-all border border-white/10"
+                            >
+                                {donationExpanded ? (
+                                    <>收起處方籤 <ChevronUp className="w-4 h-4" /></>
+                                ) : (
+                                    <>💉 立即注入咖啡因 <ChevronDown className="w-4 h-4" /></>
+                                )}
+                            </button>
+
+                            {/* QR Code 區塊（可展開） */}
+                            {donationExpanded && (
+                                <div className="bg-white rounded-lg p-4 text-center mt-3">
+                                    <Image
+                                        src="/donation-qr.png"
+                                        alt="Donation QR Code"
+                                        width={180}
+                                        height={180}
+                                        className="mx-auto rounded-lg"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        使用 台灣Pay / 街口 / LINE Pay 掃描
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        本處方由藥學系學生 Ryan 調劑 🧪
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )
+                })()}
 
                 <div className="mt-8 bg-slate-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-3 opacity-20">
