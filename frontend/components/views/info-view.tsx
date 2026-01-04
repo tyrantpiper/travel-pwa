@@ -318,7 +318,7 @@ export function InfoView() {
                                             <FlightCard
                                                 data={flights.outbound}
                                                 isEditing={isEditing}
-                                                onChange={(f: string, v: string | string[]) => setFlights({ ...flights, outbound: { ...flights.outbound, [f]: v } })}
+                                                onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, outbound: { ...prev.outbound, [f]: v } }))}
                                                 onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
                                             />
                                         )}
@@ -326,7 +326,7 @@ export function InfoView() {
                                             <FlightCard
                                                 data={flights.inbound}
                                                 isEditing={isEditing}
-                                                onChange={(f: string, v: string | string[]) => setFlights({ ...flights, inbound: { ...flights.inbound, [f]: v } })}
+                                                onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, inbound: { ...prev.inbound, [f]: v } }))}
                                                 onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
                                             />
                                         )}
@@ -689,38 +689,32 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
     const handleAddTerminal = () => { onChange('terminals', [...terminals, '']) }
     const handleAddSeat = () => { onChange('seats', [...seats, '']) }
 
-    // 更新項目
+    // 更新項目（使用單次更新避免 race condition）
     const handleUpdatePnr = (idx: number, value: string) => {
         const updated = [...pnrs]; updated[idx] = value
         onChange('pnrs', updated)
-        onChange('pnr', updated[0] || '') // 雙寫：同步更新舊欄位
     }
     const handleUpdateTerminal = (idx: number, value: string) => {
         const updated = [...terminals]; updated[idx] = value
         onChange('terminals', updated)
-        onChange('terminal', updated[0] || '')
     }
     const handleUpdateSeat = (idx: number, value: string) => {
         const updated = [...seats]; updated[idx] = value
         onChange('seats', updated)
-        onChange('seat', updated[0] || '')
     }
 
-    // 刪除項目
+    // 刪除項目（使用單次更新避免 race condition）
     const handleRemovePnr = (idx: number) => {
         const updated = pnrs.filter((_, i) => i !== idx)
         onChange('pnrs', updated)
-        onChange('pnr', updated[0] || '')
     }
     const handleRemoveTerminal = (idx: number) => {
         const updated = terminals.filter((_, i) => i !== idx)
         onChange('terminals', updated)
-        onChange('terminal', updated[0] || '')
     }
     const handleRemoveSeat = (idx: number) => {
         const updated = seats.filter((_, i) => i !== idx)
         onChange('seats', updated)
-        onChange('seat', updated[0] || '')
     }
 
     return (
