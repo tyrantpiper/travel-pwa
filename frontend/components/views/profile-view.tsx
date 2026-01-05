@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { TaskCard } from "@/components/onboarding/TaskCard"
+import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 
 
 
@@ -570,6 +572,14 @@ export function ProfileView() {
                         </div>
                     )
                 })()}
+
+                {/* 🆕 新手任務卡片 */}
+                {!useOnboardingStore.getState().isCompleted && (
+                    <TaskCard
+                        onNavigateToApiKey={() => setApiKeyDialogOpen(true)}
+                        className="mt-6"
+                    />
+                )}
 
                 <div className="mt-8 bg-slate-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-3 opacity-20">

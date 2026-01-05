@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { AnimatePresence } from "framer-motion"
 import { Compass, Sparkles, ArrowRight, ShieldCheck, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AppShell } from "@/components/views/app-shell"
+import { WelcomeWizard } from "@/components/onboarding/WelcomeWizard"
+import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 
 import { toast } from "sonner"
 
@@ -24,6 +27,10 @@ export function LandingPage() {
     const [nickname, setNickname] = useState("")
     const [showRecover, setShowRecover] = useState(false)
     const [recoverCode, setRecoverCode] = useState("")
+    const [showWizard, setShowWizard] = useState(false)
+
+    // 🆕 Onboarding state
+    const { isCompleted: isOnboardingComplete } = useOnboardingStore()
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration: must set mounted after client render
@@ -46,7 +53,13 @@ export function LandingPage() {
             localStorage.setItem("user_uuid", uuid)
         }
         localStorage.setItem("user_nickname", nickname)
-        setIsLoggedIn(true)
+
+        // 🆕 Show welcome wizard for first-time users
+        if (!isOnboardingComplete) {
+            setShowWizard(true)
+        } else {
+            setIsLoggedIn(true)
+        }
     }
 
     const handleRecover = async () => {
@@ -89,6 +102,18 @@ export function LandingPage() {
     }
 
     if (!mounted) return null;
+
+    // 🆕 Show welcome wizard overlay
+    if (showWizard) {
+        return (
+            <AnimatePresence>
+                <WelcomeWizard onComplete={() => {
+                    setShowWizard(false)
+                    setIsLoggedIn(true)
+                }} />
+            </AnimatePresence>
+        )
+    }
 
     if (isLoggedIn) return <AppShell />
 
