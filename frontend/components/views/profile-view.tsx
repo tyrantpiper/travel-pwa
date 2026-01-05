@@ -393,47 +393,72 @@ export function ProfileView() {
 
                             {/* 治療窗口進度條 */}
                             <div className="mb-4">
-                                {/* 進度條背景 + 分區 */}
-                                <div className="relative h-6 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
-                                    {/* 分區標示（更淡，不遮擋進度條） */}
-                                    <div className="absolute inset-0 flex">
-                                        <div className="w-[25%] border-r border-white/20" />
-                                        <div className="w-[25%] border-r border-white/20" />
-                                        <div className="w-[25%] border-r border-white/20" />
-                                        <div className="flex-1" />
+                                <div className="relative h-6">
+                                    {/* 進度條背景 + 分區 (overflow-hidden) */}
+                                    <div className="absolute inset-0 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
+                                        {/* 分區標示 */}
+                                        <div className="absolute inset-0 flex">
+                                            <div className="w-[25%] border-r border-white/20" />
+                                            <div className="w-[25%] border-r border-white/20" />
+                                            <div className="w-[25%] border-r border-white/20" />
+                                            <div className="flex-1" />
+                                        </div>
+
+                                        {/* 進度條填充 */}
+                                        <div
+                                            className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
+                                            style={{
+                                                width: `${Math.min(percentage, 100)}%`,
+                                                background: 'linear-gradient(90deg, #FFEB3B 0%, #FFC107 100%)',
+                                                boxShadow: '0 0 12px rgba(255, 235, 59, 0.7), 0 0 4px rgba(255, 193, 7, 0.5)'
+                                            }}
+                                        />
                                     </div>
 
-                                    {/* 進度條填充（亮黃色 + 發光效果，像皮卡丘的電！） */}
-                                    <div
-                                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
-                                        style={{
-                                            width: `${Math.min(percentage, 100)}%`,
-                                            background: 'linear-gradient(90deg, #FFEB3B 0%, #FFC107 100%)',
-                                            boxShadow: '0 0 12px rgba(255, 235, 59, 0.7), 0 0 4px rgba(255, 193, 7, 0.5)'
-                                        }}
-                                    />
+                                    {/* 里程碑節點 (移出 overflow-hidden) */}
+                                    {milestones.map((m) => {
+                                        const isAchieved = percentage >= m.percent
+                                        let bgStyle = {}
 
-                                    {/* 里程碑節點（使用 Popover 支援手機點擊） */}
-                                    {milestones.map((m) => (
-                                        <Popover key={m.percent}>
-                                            <PopoverTrigger asChild>
-                                                <div
-                                                    className={cn(
-                                                        "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white transition-all cursor-pointer z-10",
-                                                        percentage >= m.percent ? "bg-white shadow-lg" : "bg-transparent"
-                                                    )}
-                                                    style={{ left: `${m.percent}%`, transform: 'translate(-50%, -50%)' }}
-                                                />
-                                            </PopoverTrigger>
-                                            <PopoverContent side="top" className="w-auto p-2 text-xs">
-                                                <div className="font-medium">{m.label}</div>
-                                                <div className="text-muted-foreground text-[10px]">{m.desc}</div>
-                                            </PopoverContent>
-                                        </Popover>
-                                    ))}
+                                        if (isAchieved) {
+                                            if (m.percent === 0) bgStyle = { background: 'transparent' }
+                                            else if (m.percent === 25) bgStyle = { background: 'conic-gradient(white 90deg, transparent 0)' }
+                                            else if (m.percent === 50) bgStyle = { background: 'conic-gradient(white 180deg, transparent 0)' }
+                                            else if (m.percent === 75) bgStyle = { background: 'conic-gradient(white 270deg, transparent 0)' }
+                                            else bgStyle = { background: 'white' }
+                                        } else {
+                                            bgStyle = { background: 'transparent' }
+                                        }
+
+                                        let leftPos = `${m.percent}%`
+                                        if (m.percent === 0) leftPos = '6px'
+                                        else if (m.percent === 100) leftPos = 'calc(100% - 6px)'
+
+                                        return (
+                                            <Popover key={m.percent}>
+                                                <PopoverTrigger asChild>
+                                                    <div
+                                                        className={cn(
+                                                            "absolute top-[60%] -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white transition-all cursor-pointer z-10",
+                                                            isAchieved && m.percent !== 0 ? "shadow-lg" : ""
+                                                        )}
+                                                        style={{
+                                                            left: leftPos,
+                                                            transform: 'translate(-50%, -50%)',
+                                                            ...bgStyle
+                                                        }}
+                                                    />
+                                                </PopoverTrigger>
+                                                <PopoverContent side="top" className="w-auto p-2 text-xs">
+                                                    <div className="font-medium">{m.label}</div>
+                                                    <div className="text-muted-foreground text-[10px]">{m.desc}</div>
+                                                </PopoverContent>
+                                            </Popover>
+                                        )
+                                    })}
                                 </div>
 
-                                {/* 里程碑標籤（與圓點對齊） */}
+                                {/* 里程碑標籤 */}
                                 <div className="relative mt-1 text-[9px] text-white/60 h-4">
                                     <span className="absolute left-0">0%</span>
                                     <span className={cn("absolute", percentage >= 25 ? "text-white" : "")} style={{ left: '25%', transform: 'translateX(-50%)' }}>25%</span>
@@ -478,52 +503,54 @@ export function ProfileView() {
                             </button>
 
                             {/* QR Code 區塊（可展開） */}
-                            {donationExpanded && (
-                                <div className="bg-white rounded-lg p-4 text-center mt-3">
-                                    <Image
-                                        src="/donation-qr.png"
-                                        alt="Donation QR Code"
-                                        width={180}
-                                        height={180}
-                                        className="mx-auto rounded-lg"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-2 mb-3">
-                                        使用 台灣Pay / 街口 / LINE Pay 掃描
-                                    </p>
-
-                                    {/* 手機收款資訊 */}
-                                    <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
-                                        <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                                            <Smartphone className="w-3.5 h-3.5 text-slate-500" />
-                                            手機收款 <span className="text-slate-400 font-normal">(代碼 812)</span>
-                                        </h4>
-                                        <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-                                            銀行代碼「812」+ 手機號碼即可轉帳。
+                            {
+                                donationExpanded && (
+                                    <div className="bg-white rounded-lg p-4 text-center mt-3">
+                                        <Image
+                                            src="/donation-qr.png"
+                                            alt="Donation QR Code"
+                                            width={180}
+                                            height={180}
+                                            className="mx-auto rounded-lg"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2 mb-3">
+                                            使用 台灣Pay / 街口 / LINE Pay 掃描
                                         </p>
-                                        <div className="flex items-center gap-2">
-                                            <code className="bg-white border border-slate-200 px-2 py-1.5 rounded text-xs font-mono text-slate-700 flex-1 text-center tracking-wider font-bold">
-                                                0908879076
-                                            </code>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-7 w-7 p-0 shrink-0 bg-white hover:bg-slate-50"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText("0908879076")
-                                                    toast.success("手機號碼已複製！")
-                                                }}
-                                                title="複製號碼"
-                                            >
-                                                <Copy className="w-3 h-3 text-slate-500" />
-                                            </Button>
-                                        </div>
-                                    </div>
 
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                        本處方由藥學系學生 Ryan 調劑 🧪
-                                    </p>
-                                </div>
-                            )}
+                                        {/* 手機收款資訊 */}
+                                        <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
+                                            <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                                                <Smartphone className="w-3.5 h-3.5 text-slate-500" />
+                                                手機收款 <span className="text-slate-400 font-normal">(代碼 812)</span>
+                                            </h4>
+                                            <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+                                                銀行代碼「812」+ 手機號碼即可轉帳。
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <code className="bg-white border border-slate-200 px-2 py-1.5 rounded text-xs font-mono text-slate-700 flex-1 text-center tracking-wider font-bold">
+                                                    0908879076
+                                                </code>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-7 w-7 p-0 shrink-0 bg-white hover:bg-slate-50"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText("0908879076")
+                                                        toast.success("手機號碼已複製！")
+                                                    }}
+                                                    title="複製號碼"
+                                                >
+                                                    <Copy className="w-3 h-3 text-slate-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-[10px] text-slate-400 mt-1">
+                                            本處方由藥學系學生 Ryan 調劑 🧪
+                                        </p>
+                                    </div>
+                                )
+                            }
                         </div>
                     )
                 })()}
@@ -800,7 +827,7 @@ export function ProfileView() {
                 </div>
 
             </div>
-        </div>
+        </div >
     )
 }
 
