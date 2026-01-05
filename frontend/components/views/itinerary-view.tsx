@@ -1674,10 +1674,15 @@ export function ItineraryView() {
                                     <div className="text-sm font-medium text-slate-700">
                                         {(() => {
                                             const avgApparent = weatherData[Math.floor(weatherData.length / 2)]?.apparent_temperature
-                                            const avgTemp = weatherData[Math.floor(weatherData.length / 2)]?.temp
                                             if (avgApparent === undefined) return '-- °C'
-                                            const diff = avgApparent - avgTemp
-                                            const feeling = diff > 3 ? '悶熱' : (diff < -3 ? '涼爽' : '舒適')
+                                            // 🔧 修復：基於絕對體感溫度判斷，而非溫差
+                                            let feeling = '舒適'
+                                            if (avgApparent >= 35) feeling = '酷熱 🥵'
+                                            else if (avgApparent >= 28) feeling = '悶熱'
+                                            else if (avgApparent >= 20) feeling = '舒適'
+                                            else if (avgApparent >= 10) feeling = '涼爽'
+                                            else if (avgApparent >= 0) feeling = '寒冷 🥶'
+                                            else feeling = '極寒 ❄️'
                                             return `${avgApparent}°C (${feeling})`
                                         })()}
                                     </div>
