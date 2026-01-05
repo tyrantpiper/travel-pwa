@@ -61,6 +61,25 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 }
 
 export default function ChatWidget() {
+    // 🔒 登錄狀態檢查 - 未登錄時不顯示聊天氣泡
+    const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+    useEffect(() => {
+        // 初始檢查
+        const checkLogin = () => {
+            const userId = localStorage.getItem("user_uuid")
+            const userName = localStorage.getItem("user_nickname")
+            setIsLoggedIn(!!(userId && userName))
+        }
+        checkLogin()
+
+        // 監聽 storage 變化 (跨 tab 同步)
+        window.addEventListener('storage', checkLogin)
+        return () => window.removeEventListener('storage', checkLogin)
+    }, [])
+
+    // 🔒 登錄狀態 - 在 JSX 中使用此變數決定是否渲染
+
     // ✅ 直接使用 TripContext（現在 ChatWidget 在 TripProvider 內）
     const { activeTrip, activeTripId } = useTripContext()
 
@@ -458,6 +477,9 @@ export default function ChatWidget() {
             reader.readAsDataURL(file)
         }
     }
+
+    // 🔒 未登錄時不渲染任何內容
+    if (!isLoggedIn) return null
 
     return (
         <>

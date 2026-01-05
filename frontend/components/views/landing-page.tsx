@@ -5,7 +5,7 @@ import { Compass, Sparkles, ArrowRight, ShieldCheck, History } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { AppShell } from "@/components/views/app-shell"
-import { ApiKeySettings } from "@/components/ApiKeySettings"
+
 import { toast } from "sonner"
 
 function generateUUID() {
@@ -99,7 +99,7 @@ export function LandingPage() {
                 <div className="absolute top-40 -right-20 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
             </div>
 
-            <ApiKeySettings onKeySaved={() => { }} />
+
 
             <main className="flex-1 flex flex-col items-center justify-center px-8 py-12 z-10">
                 <div className="mb-10 relative animate-bounce-slow">
