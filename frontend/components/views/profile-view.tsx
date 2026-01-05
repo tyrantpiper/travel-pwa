@@ -349,6 +349,7 @@ export function ProfileView() {
                     // 里程碑節點
                     const milestones = [
                         { percent: 25, label: '伺服器存活', desc: '至少這個月不會 404' },
+                        { percent: 50, label: '升級大杯拿鐵', desc: '寫 Code 比較不會手抖' },
                         { percent: 75, label: '開發者獲得雞腿', desc: 'Bug 少一半' },
                         { percent: 100, label: '新功能解鎖', desc: '彩蛋模式啟動' }
                     ]
@@ -395,8 +396,9 @@ export function ProfileView() {
                                 <div className="relative h-6 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}>
                                     {/* 分區標示（更淡，不遮擋進度條） */}
                                     <div className="absolute inset-0 flex">
-                                        <div className="w-[30%] border-r border-white/20" />
-                                        <div className="w-[50%] border-r border-white/20" />
+                                        <div className="w-[25%] border-r border-white/20" />
+                                        <div className="w-[25%] border-r border-white/20" />
+                                        <div className="w-[25%] border-r border-white/20" />
                                         <div className="flex-1" />
                                     </div>
 
@@ -434,6 +436,7 @@ export function ProfileView() {
                                 <div className="relative mt-1 text-[9px] text-white/60 h-4">
                                     <span className="absolute left-0">0%</span>
                                     <span className={cn("absolute", percentage >= 25 ? "text-white" : "")} style={{ left: '25%', transform: 'translateX(-50%)' }}>25%</span>
+                                    <span className={cn("absolute", percentage >= 50 ? "text-white" : "")} style={{ left: '50%', transform: 'translateX(-50%)' }}>50%</span>
                                     <span className={cn("absolute", percentage >= 75 ? "text-white" : "")} style={{ left: '75%', transform: 'translateX(-50%)' }}>75%</span>
                                     <span className={cn("absolute right-0", percentage >= 100 ? "text-white" : "")}>100%</span>
                                 </div>
@@ -456,6 +459,7 @@ export function ProfileView() {
                             {percentage >= 25 && (
                                 <div className="text-[10px] text-white/70 mb-3 space-y-1">
                                     {percentage >= 25 && <div>✅ 25% - 伺服器存活確認</div>}
+                                    {percentage >= 50 && <div>✅ 50% - 升級大杯拿鐵</div>}
                                     {percentage >= 75 && <div>✅ 75% - 開發者獲得雞腿</div>}
                                     {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
                                 </div>
