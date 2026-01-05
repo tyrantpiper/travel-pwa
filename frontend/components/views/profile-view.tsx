@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
 import { useLanguage } from "@/lib/LanguageContext"
@@ -410,23 +410,23 @@ export function ProfileView() {
                                         }}
                                     />
 
-                                    {/* 里程碑節點（點擊/觸摸顯示 Tooltip） */}
+                                    {/* 里程碑節點（使用 Popover 支援手機點擊） */}
                                     {milestones.map((m) => (
-                                        <Tooltip key={m.percent}>
-                                            <TooltipTrigger asChild>
+                                        <Popover key={m.percent}>
+                                            <PopoverTrigger asChild>
                                                 <div
                                                     className={cn(
-                                                        "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white transition-all cursor-pointer",
+                                                        "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white transition-all cursor-pointer z-10",
                                                         percentage >= m.percent ? "bg-white shadow-lg" : "bg-transparent"
                                                     )}
                                                     style={{ left: `${m.percent}%`, transform: 'translate(-50%, -50%)' }}
                                                 />
-                                            </TooltipTrigger>
-                                            <TooltipContent side="top" className="text-xs">
+                                            </PopoverTrigger>
+                                            <PopoverContent side="top" className="w-auto p-2 text-xs">
                                                 <div className="font-medium">{m.label}</div>
-                                                <div className="text-muted-foreground">{m.desc}</div>
-                                            </TooltipContent>
-                                        </Tooltip>
+                                                <div className="text-muted-foreground text-[10px]">{m.desc}</div>
+                                            </PopoverContent>
+                                        </Popover>
                                     ))}
                                 </div>
 
