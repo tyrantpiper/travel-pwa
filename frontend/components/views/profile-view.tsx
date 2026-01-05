@@ -483,10 +483,26 @@ export function ProfileView() {
 
                             {/* 里程碑達成提示 */}
                             <div className="text-[10px] text-white/70 mb-3 space-y-1">
-                                {percentage >= 0 && <div>✅ 0% - 開發者處於飢餓狀態</div>}
-                                {percentage >= 25 && <div>✅ 25% - 伺服器存活確認</div>}
-                                {percentage >= 50 && <div>✅ 50% - 升級大杯拿鐵</div>}
-                                {percentage >= 75 && <div>✅ 75% - 開發者獲得雞腿</div>}
+                                {percentage >= 0 && (
+                                    <div>
+                                        ✅ {percentage < 25 ? (percentage < 1 && percentage > 0 ? percentage.toFixed(1) : Math.floor(percentage)) : 0}% - 開發者處於飢餓狀態
+                                    </div>
+                                )}
+                                {percentage >= 25 && (
+                                    <div>
+                                        ✅ {percentage < 50 ? Math.floor(percentage) : 25}% - 伺服器存活確認
+                                    </div>
+                                )}
+                                {percentage >= 50 && (
+                                    <div>
+                                        ✅ {percentage < 75 ? Math.floor(percentage) : 50}% - 升級大杯拿鐵
+                                    </div>
+                                )}
+                                {percentage >= 75 && (
+                                    <div>
+                                        ✅ {percentage < 100 ? Math.floor(percentage) : 75}% - 開發者獲得雞腿
+                                    </div>
+                                )}
                                 {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
                             </div>
 
