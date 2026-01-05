@@ -44,7 +44,10 @@ export interface DayWeather {
     apparent_temperature?: number   // 🆕 體感溫度
     uvIndex?: number                // 🆕 Phase 6: UV 指數
     windSpeed?: number              // 🆕 Phase 6: 風速
+    visibility?: number             // 🆕 Phase 10: 能見度 (m)
     airQuality?: number             // 🆕 Phase 9: AQI (US AQI)
+    precipTrend?: 'wet' | 'unstable' | 'dry'  // 🆕 Phase 11: Seasonal 降雨趨勢
+    isSeasonalEstimate?: boolean    // 🆕 Phase 11: 標記為季節性推估（非精確預報）
 }
 
 export interface SubItem {

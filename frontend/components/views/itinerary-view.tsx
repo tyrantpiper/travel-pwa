@@ -28,7 +28,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
-import { fetchWeatherWithSDK, generateHourlyCurve, HourlyForecast } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
+import { fetchWeatherWithSDK, generateHourlyCurve } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
 import { useHaptic } from "@/lib/hooks"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
@@ -97,6 +97,7 @@ export function ItineraryView() {
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')  // 🆕 P3: 天氣模式標籤
+    const [elevation, setElevation] = useState<number | null>(null)  // 🆕 Phase 10: 海拔 (m)
 
     // 🆕 P7: 天氣快取 (避免重複請求)
     const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
@@ -320,6 +321,7 @@ export function ItineraryView() {
                     if (sdkResult) {
                         setWeatherData(sdkResult.forecast)
                         setWeatherMode(sdkResult.mode)
+                        if (sdkResult.elevation !== undefined) setElevation(sdkResult.elevation)  // 🆕 Phase 10: 儲存海拔
 
                         // 🆕 P8: Cache Limit (LRU-like)
                         if (weatherCache.current.size > 50) {
@@ -361,8 +363,9 @@ export function ItineraryView() {
                     // 🆕 P1: 1-16 天內使用 Forecast API + ECMWF IFS 9km
                     apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,weather_code&models=ecmwf_ifs&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 } else {
-                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46) + 日出日落 + 降雨 (For Inference)
-                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
+                    // 🆕 16-46 天使用 Seasonal Forecast API (EC46) + 日出日落 + 降雨 + 風速 (For Inference)
+                    // P12.1: 加入 wind_speed_10m_max 用於體感校正
+                    apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,wind_speed_10m_max&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 }
 
                 console.log(`🌡️ Weather API Request: ${mode} mode`)
@@ -381,12 +384,34 @@ export function ItineraryView() {
 
                 let temps: number[]
                 let codes: number[]
+                const forecast: DayWeather[] = []  // 🆕 Phase 10: 提前宣告
 
                 if (mode === 'seasonal' && data.daily) {
                     // 🆕 Phase 1 + 2 + 3: Linvill 曲線 + 日出日落 + 季節調節
                     const tMin = data.daily.temperature_2m_min?.[0] ?? 10
                     const tMax = data.daily.temperature_2m_max?.[0] ?? 20
                     const precipSum = data.daily.precipitation_sum?.[0] ?? 0
+
+                    // 🆕 Phase 11: Seasonal 模式優化
+                    // 注意：Seasonal 預報無法精準預測「哪一天」下雨，只能推估「當日累積降雨趨勢」
+                    // 因此使用「季節趨勢」描述而非誤導性的百分比
+                    // 
+                    // 邏輯說明：
+                    // - 強降雨 (>5mm)：明顯降水，影響戶外行程 → 顯示「濕潤」
+                    // - 小雨/陣雨 (1-5mm)：有降雨可能 → 顯示「不穩定」
+                    // - 微量/無雨 (<1mm)：含午後局部陣雨 → 顯示「乾燥」
+                    //
+                    // 注意：這裡的 precipSum 是「當日預測累積降雨量」，非「降雨機率」
+                    // 轉換為「旅遊建議指數」更合適
+                    let inferredPrecipProb = 20  // 用於內部計算，UI 會顯示趨勢文字
+                    let precipTrend: 'wet' | 'unstable' | 'dry' = 'dry'
+                    if (precipSum > 5) {
+                        inferredPrecipProb = 80
+                        precipTrend = 'wet'
+                    } else if (precipSum > 1) {
+                        inferredPrecipProb = 50
+                        precipTrend = 'unstable'
+                    }
 
                     // 🆕 Phase 9: 根據降雨量推測天氣代碼 (Frontend Clustering)
                     // >5mm: 雨天(63), >1mm: 小雨(51), <=1mm: 多雲(2)
@@ -414,6 +439,9 @@ export function ItineraryView() {
                     // 🆕 Phase 3: 從目標日期獲取月份用於季節調節
                     const targetMonth = targetDate ? new Date(targetDate).getMonth() + 1 : new Date().getMonth() + 1
 
+                    // 🆕 Phase 10: 儲存海拔
+                    if (data.elevation !== undefined) setElevation(data.elevation)
+
                     // 🆕 Phase 4 + 6 + 9: 使用緯度、海拔、與天氣代碼進行聚類修正
                     temps = generateHourlyCurve(
                         Math.round(tMin),
@@ -426,38 +454,60 @@ export function ItineraryView() {
                         inferredCode // 🆕 Phase 9: Weather Code
                     )
                     codes = Array(24).fill(inferredCode)  // 季節預報使用推測代碼
+
+                    // 🆕 P12.1: 讀取最大風速 (用於體感校正)
+                    const windSpeedMax = data.daily?.wind_speed_10m_max?.[0] ?? 0
+                    console.log(`💨 P12.1: wind_speed_10m_max=${windSpeedMax} km/h`)
+
+                    // 🆕 P12.2: 濕度動態區間 (下雨 85-95%, 多雲 65-75%, 晴天 40-60%)
+                    const getDynamicHumidity = () => {
+                        if (precipSum > 5) return 85 + Math.floor(Math.random() * 10)  // 85-95%
+                        if (precipSum > 1) return 65 + Math.floor(Math.random() * 10)  // 65-75%
+                        return 40 + Math.floor(Math.random() * 20)  // 40-60%
+                    }
+
+                    // 🆕 P12.3: 體感溫度校正 (含風速)
+                    const getApparentMod = () => {
+                        let mod = 0
+                        if (precipSum > 1) mod -= 2      // 下雨冷
+                        if (inferredCode <= 1) mod += 2  // 晴天熱
+                        // P12.3: 風速校正
+                        if (windSpeedMax > 20) mod -= 2  // 強風 (>20 km/h)
+                        else if (windSpeedMax > 10) mod -= 1  // 中風 (>10 km/h)
+                        return mod
+                    }
+
+                    // 🆕 Phase 11 + P12: 為 Seasonal 模式構建完整 forecast
+                    for (let i = 0; i <= 23 && i < temps.length; i++) {
+                        forecast.push({
+                            time: `${i}:00`,
+                            temp: Math.round(temps[i]),
+                            code: codes[i] || 0,
+                            precipitation_probability: inferredPrecipProb,
+                            apparent_temperature: Math.round(temps[i]) + getApparentMod(),
+                            humidity: getDynamicHumidity(),
+                            windSpeed: Math.round(windSpeedMax),  // 🆕 P12.1: 儲存風速供 UI 顯示
+                            precipTrend,
+                            isSeasonalEstimate: true
+                        })
+                    }
                 } else {
                     temps = data.hourly?.temperature_2m || []
                     codes = data.hourly?.weather_code || []
-                }
 
-                const forecast: DayWeather[] = []
-
-                // P6 SDK 模式: 直接使用 SDK 回傳的完整資料
-                if (data.forecast) {
-                    forecast.push(...data.forecast.map((f: HourlyForecast) => ({
-                        time: f.time,
-                        temp: f.temp,
-                        code: f.code,
-                        humidity: f.humidity,
-                        precipitation_probability: f.precipitation_probability,
-                        apparent_temperature: f.apparent_temperature,
-                        uvIndex: f.uvIndex,
-                        windSpeed: f.windSpeed
-                    })))
-                }
-                // Fallback / Seasonal 模式 (手動構建)
-                else {
-                    // 🆕 24 小時完整顯示 (0:00 - 23:00)
+                    // Fallback JSON 模式 (手動構建)
                     for (let i = 0; i <= 23 && i < temps.length; i++) {
                         forecast.push({
                             time: `${i}:00`,
                             temp: Math.round(temps[i]),
                             code: codes[i] || 0
-                            // 季節/JSON 模式目前沒有其他數據，保持 undefined
+                            // JSON 模式沒有其他數據
                         })
                     }
                 }
+
+                // P6 SDK 模式: 直接使用 SDK 回傳的完整資料 (已在上方處理)
+                // 此處的 forecast 已由上方填充
 
                 setWeatherData(forecast)
                 setWeatherMode(mode)  // 🆕 P3: 更新天氣模式
@@ -1094,7 +1144,7 @@ export function ItineraryView() {
                                                 onClick={async (e) => {
                                                     e.stopPropagation()
                                                     // 🆕 修復：保存初始 toast ID 以便後續 dismiss
-                                                    let toastId: string | number = toast.loading("生成 PDF 中...")
+                                                    const toastId: string | number = toast.loading("生成 PDF 中...")
                                                     try {
                                                         // 先取得完整行程資料
                                                         const res = await fetch(`${API_BASE}/api/trips/${trip.id}`)
@@ -1560,11 +1610,11 @@ export function ItineraryView() {
                         )}
                     </div>
 
-                    {/* 📊 今日指數 (Horizontal Scroll) */}
+                    {/* 📊 今日指數 (2x4 Grid 布局) */}
                     {weatherData.length > 0 && (
-                        <div className="flex gap-3 overflow-x-auto no-scrollbar px-1 pt-2 pb-4 snap-x">
-                            {/* 穿衣指數 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                        <div className="grid grid-cols-2 gap-2 pt-2 pb-4">
+                            {/* Row 1: 穿衣 | 降雨 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
                                 <span className="text-lg">👕</span>
                                 <div>
                                     <div className="text-xs text-slate-500">穿衣</div>
@@ -1581,20 +1631,34 @@ export function ItineraryView() {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* 降雨機率 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
                                 <span className="text-lg">☔</span>
                                 <div>
-                                    <div className="text-xs text-slate-500">降雨</div>
-                                    <div className="text-sm font-medium text-slate-700">
-                                        {Math.max(...weatherData.map(w => w.precipitation_probability ?? 0))}%
+                                    <div className="text-xs text-slate-500">
+                                        {weatherData[0]?.isSeasonalEstimate ? '降雨趨勢' : '降雨機率'}
                                     </div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {weatherData[0]?.isSeasonalEstimate ? (
+                                            // 🆕 Phase 11: Seasonal 模式顯示趨勢描述
+                                            (() => {
+                                                const trend = weatherData[0]?.precipTrend
+                                                if (trend === 'wet') return <span className="text-blue-600">濕潤 💦</span>
+                                                if (trend === 'unstable') return <span className="text-amber-600">不穩定 🌦️</span>
+                                                return <span className="text-green-600">乾燥 ☀️</span>
+                                            })()
+                                        ) : (
+                                            // Forecast 模式顯示精確百分比
+                                            <>{Math.max(...weatherData.map(w => w.precipitation_probability ?? 0))}%</>
+                                        )}
+                                    </div>
+                                    {weatherData[0]?.isSeasonalEstimate && (
+                                        <div className="text-[9px] text-slate-400 mt-0.5">季節預測・僅供參考</div>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* 濕度 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                            {/* Row 2: 濕度 | 體感 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
                                 <span className="text-lg">💧</span>
                                 <div>
                                     <div className="text-xs text-slate-500">濕度</div>
@@ -1603,70 +1667,96 @@ export function ItineraryView() {
                                     </div>
                                 </div>
                             </div>
-
-                            {/* 體感 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
                                 <span className="text-lg">🌡️</span>
                                 <div>
-                                    <div className="text-xs text-slate-500">體感</div>
+                                    <div className="text-xs text-slate-500">體感溫度</div>
                                     <div className="text-sm font-medium text-slate-700">
                                         {(() => {
                                             const avgApparent = weatherData[Math.floor(weatherData.length / 2)]?.apparent_temperature
                                             const avgTemp = weatherData[Math.floor(weatherData.length / 2)]?.temp
-                                            if (!avgApparent) return '舒適'
+                                            if (avgApparent === undefined) return '-- °C'
                                             const diff = avgApparent - avgTemp
-                                            if (diff > 3) return '悶熱'
-                                            if (diff < -3) return '涼爽'
-                                            return '舒適'
+                                            const feeling = diff > 3 ? '悶熱' : (diff < -3 ? '涼爽' : '舒適')
+                                            return `${avgApparent}°C (${feeling})`
                                         })()}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 🆕 Phase 6: 紫外線 (UV) */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                            {/* Row 3: UV 指數 | 最大風速 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
                                 <span className="text-lg">☀️</span>
                                 <div>
                                     <div className="text-xs text-slate-500">UV 指數</div>
                                     <div className="text-sm font-medium text-slate-700">
                                         {(() => {
                                             const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
-                                            if (maxUV === 0) return '無'
-                                            return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : '中'})`
+                                            if (maxUV === 0) return '無資料'
+                                            return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : maxUV > 2 ? '中' : '低'})`
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">💨</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">最大風速</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {(() => {
+                                            const maxWind = Math.max(...weatherData.map(w => w.windSpeed ?? 0))
+                                            if (maxWind === 0) return '無資料'
+                                            return `${maxWind} km/h`
                                         })()}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 🆕 Phase 6: 風速 */}
-                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
-                                <span className="text-lg">💨</span>
+                            {/* Row 4: 能見度 | 海拔 */}
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">👁️</span>
                                 <div>
-                                    <div className="text-xs text-slate-500">最大風速</div>
+                                    <div className="text-xs text-slate-500">能見度</div>
                                     <div className="text-sm font-medium text-slate-700">
-                                        {Math.max(...weatherData.map(w => w.windSpeed ?? 0))} km/h
+                                        {(() => {
+                                            const avgVis = weatherData[Math.floor(weatherData.length / 2)]?.visibility
+                                            if (!avgVis) return '無資料'
+                                            if (avgVis >= 10000) return `${(avgVis / 1000).toFixed(0)} km (良好)`
+                                            if (avgVis >= 5000) return `${(avgVis / 1000).toFixed(1)} km (普通)`
+                                            return `${(avgVis / 1000).toFixed(1)} km (差)`
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <span className="text-lg">🏔️</span>
+                                <div>
+                                    <div className="text-xs text-slate-500">海拔</div>
+                                    <div className="text-sm font-medium text-slate-700">
+                                        {elevation !== null ? `${Math.round(elevation)} m` : '無資料'}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 🆕 Phase 9: 空氣品質 (AQI) - 僅在有數據時與 'live'/'forecast' 模式顯示 */}
+                            {/* Row 5 (Optional): AQI - 僅在有數據時顯示 */}
                             {(() => {
                                 const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
                                 if (maxAQI > 0) {
                                     return (
-                                        <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 min-w-[150px] snap-start shrink-0">
+                                        <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 col-span-2">
                                             <span className="text-lg">🌱</span>
-                                            <div>
-                                                <div className="text-xs text-slate-500">AQI</div>
+                                            <div className="flex-1">
+                                                <div className="text-xs text-slate-500">空氣品質 (AQI)</div>
                                                 <div className="text-sm font-medium text-slate-700">
                                                     {(() => {
                                                         let level = '良好'
-                                                        if (maxAQI > 300) level = '危害';
-                                                        else if (maxAQI > 200) level = '極差';
-                                                        else if (maxAQI > 150) level = '不健康';
-                                                        else if (maxAQI > 100) level = '敏感';
-                                                        else if (maxAQI > 50) level = '普通';
-                                                        return `${maxAQI} (${level})`
+                                                        let color = 'text-green-600'
+                                                        if (maxAQI > 300) { level = '危害'; color = 'text-red-600' }
+                                                        else if (maxAQI > 200) { level = '極差'; color = 'text-red-500' }
+                                                        else if (maxAQI > 150) { level = '不健康'; color = 'text-orange-500' }
+                                                        else if (maxAQI > 100) { level = '敏感族群'; color = 'text-yellow-600' }
+                                                        else if (maxAQI > 50) { level = '普通'; color = 'text-yellow-500' }
+                                                        return <span className={color}>{maxAQI} ({level})</span>
                                                     })()}
                                                 </div>
                                             </div>
