@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Download } from "lucide-react"
+import { Virtuoso } from "react-virtuoso"
 import { TimelineCard } from "@/components/timeline-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -1857,50 +1858,60 @@ export function ItineraryView() {
                     }}
                 />
 
-                <div className="px-5 py-6 space-y-1">
+                <div className="px-5 py-6">
+                    {/* 🚀 Phase 2: Virtuoso 虛擬化列表 (自動高度偵測) */}
                     {(() => {
-                        let realIndex = 0;
-                        return currentDayData.map((item: Activity, idx: number) => {
+                        // 預先計算每個項目的 realIndex
+                        const realIndices: number[] = [];
+                        let counter = 0;
+                        currentDayData.forEach((item: Activity) => {
                             const isHeader = item.category === 'header' || item.time === '00:00';
-                            if (!isHeader) realIndex++;
-                            return (
-                                <TimelineCard
-                                    key={item.id}
-                                    activity={item}
-                                    index={realIndex}
-                                    isLast={idx === currentDayData.length - 1}
-                                    onEdit={(item: Activity) => {
-                                        if (!isOnline) {
-                                            toast.error("✈️ 離線模式下無法編輯")
-                                            return
-                                        }
-                                        setIsAddMode(false)
-                                        // Map Activity to ItineraryItemState
-                                        setEditItem({
-                                            id: item.id,
-                                            time: item.time || item.time_slot || "00:00",
-                                            place: item.place || item.place_name || "",
-                                            category: item.category || "sightseeing",
-                                            desc: item.desc || item.notes || "",
-                                            lat: item.lat,
-                                            lng: item.lng,
-                                            image_url: item.image_url,
-                                            tags: item.tags || []
-                                        })
-                                        setIsEditOpen(true)
-                                    }}
-                                    onDelete={(id) => {
-                                        if (!isOnline) {
-                                            toast.error("✈️ 離線模式下無法刪除")
-                                            return
-                                        }
-                                        handleDeleteItem(id)
-                                    }}
-                                    onUpdateMemo={handleUpdateMemo}
-                                    onUpdateSubItems={handleUpdateSubItems}
-                                />
-                            )
-                        })
+                            if (!isHeader) counter++;
+                            realIndices.push(counter);
+                        });
+
+                        return currentDayData.length > 0 ? (
+                            <Virtuoso
+                                useWindowScroll
+                                data={currentDayData}
+                                itemContent={(idx, item) => (
+                                    <TimelineCard
+                                        key={item.id}
+                                        activity={item}
+                                        index={realIndices[idx]}
+                                        isLast={idx === currentDayData.length - 1}
+                                        onEdit={(item: Activity) => {
+                                            if (!isOnline) {
+                                                toast.error("✈️ 離線模式下無法編輯")
+                                                return
+                                            }
+                                            setIsAddMode(false)
+                                            setEditItem({
+                                                id: item.id,
+                                                time: item.time || item.time_slot || "00:00",
+                                                place: item.place || item.place_name || "",
+                                                category: item.category || "sightseeing",
+                                                desc: item.desc || item.notes || "",
+                                                lat: item.lat,
+                                                lng: item.lng,
+                                                image_url: item.image_url,
+                                                tags: item.tags || []
+                                            })
+                                            setIsEditOpen(true)
+                                        }}
+                                        onDelete={(id) => {
+                                            if (!isOnline) {
+                                                toast.error("✈️ 離線模式下無法刪除")
+                                                return
+                                            }
+                                            handleDeleteItem(id)
+                                        }}
+                                        onUpdateMemo={handleUpdateMemo}
+                                        onUpdateSubItems={handleUpdateSubItems}
+                                    />
+                                )}
+                            />
+                        ) : null;
                     })()}
 
                     <div className="py-4 text-center">
