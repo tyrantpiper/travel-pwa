@@ -430,12 +430,12 @@ export function ProfileView() {
                                     ))}
                                 </div>
 
-                                {/* 里程碑標籤 */}
-                                <div className="flex justify-between mt-1 text-[9px] text-white/60">
-                                    <span>0%</span>
-                                    <span className={percentage >= 25 ? "text-white" : ""}>25%</span>
-                                    <span className={percentage >= 75 ? "text-white" : ""}>75%</span>
-                                    <span className={percentage >= 100 ? "text-white" : ""}>100%</span>
+                                {/* 里程碑標籤（與圓點對齊） */}
+                                <div className="relative mt-1 text-[9px] text-white/60 h-4">
+                                    <span className="absolute left-0">0%</span>
+                                    <span className={cn("absolute", percentage >= 25 ? "text-white" : "")} style={{ left: '25%', transform: 'translateX(-50%)' }}>25%</span>
+                                    <span className={cn("absolute", percentage >= 75 ? "text-white" : "")} style={{ left: '75%', transform: 'translateX(-50%)' }}>75%</span>
+                                    <span className={cn("absolute right-0", percentage >= 100 ? "text-white" : "")}>100%</span>
                                 </div>
                             </div>
 
