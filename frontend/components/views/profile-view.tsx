@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 import { useLanguage } from "@/lib/LanguageContext"
@@ -347,8 +348,8 @@ export function ProfileView() {
 
                     // 里程碑節點
                     const milestones = [
-                        { percent: 30, label: '伺服器存活', desc: '至少這個月不會 404' },
-                        { percent: 70, label: '開發者獲得雞腿', desc: 'Bug 少一半' },
+                        { percent: 25, label: '伺服器存活', desc: '至少這個月不會 404' },
+                        { percent: 75, label: '開發者獲得雞腿', desc: 'Bug 少一半' },
                         { percent: 100, label: '新功能解鎖', desc: '彩蛋模式啟動' }
                     ]
 
@@ -409,25 +410,31 @@ export function ProfileView() {
                                         }}
                                     />
 
-                                    {/* 里程碑節點 */}
+                                    {/* 里程碑節點（點擊/觸摸顯示 Tooltip） */}
                                     {milestones.map((m) => (
-                                        <div
-                                            key={m.percent}
-                                            className={cn(
-                                                "absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white transition-all",
-                                                percentage >= m.percent ? "bg-white" : "bg-transparent"
-                                            )}
-                                            style={{ left: `${m.percent}%`, transform: 'translate(-50%, -50%)' }}
-                                            title={m.label}
-                                        />
+                                        <Tooltip key={m.percent}>
+                                            <TooltipTrigger asChild>
+                                                <div
+                                                    className={cn(
+                                                        "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-white transition-all cursor-pointer",
+                                                        percentage >= m.percent ? "bg-white shadow-lg" : "bg-transparent"
+                                                    )}
+                                                    style={{ left: `${m.percent}%`, transform: 'translate(-50%, -50%)' }}
+                                                />
+                                            </TooltipTrigger>
+                                            <TooltipContent side="top" className="text-xs">
+                                                <div className="font-medium">{m.label}</div>
+                                                <div className="text-muted-foreground">{m.desc}</div>
+                                            </TooltipContent>
+                                        </Tooltip>
                                     ))}
                                 </div>
 
                                 {/* 里程碑標籤 */}
                                 <div className="flex justify-between mt-1 text-[9px] text-white/60">
                                     <span>0%</span>
-                                    <span className={percentage >= 30 ? "text-white" : ""}>30%</span>
-                                    <span className={percentage >= 70 ? "text-white" : ""}>70%</span>
+                                    <span className={percentage >= 25 ? "text-white" : ""}>25%</span>
+                                    <span className={percentage >= 75 ? "text-white" : ""}>75%</span>
                                     <span className={percentage >= 100 ? "text-white" : ""}>100%</span>
                                 </div>
                             </div>
@@ -446,10 +453,10 @@ export function ProfileView() {
                             </div>
 
                             {/* 里程碑達成提示 */}
-                            {percentage >= 30 && (
+                            {percentage >= 25 && (
                                 <div className="text-[10px] text-white/70 mb-3 space-y-1">
-                                    {percentage >= 30 && <div>✅ 30% - 伺服器存活確認</div>}
-                                    {percentage >= 70 && <div>✅ 70% - 開發者獲得雞腿</div>}
+                                    {percentage >= 25 && <div>✅ 25% - 伺服器存活確認</div>}
+                                    {percentage >= 75 && <div>✅ 75% - 開發者獲得雞腿</div>}
                                     {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
                                 </div>
                             )}
