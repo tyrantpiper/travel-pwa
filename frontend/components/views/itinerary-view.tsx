@@ -1132,7 +1132,7 @@ export function ItineraryView() {
                                             <h3 className="font-bold text-lg">{trip.title}</h3>
                                             <p className="text-xs opacity-80 flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}</p>
                                         </div>
-                                        <div className="absolute top-3 right-12 bg-white/20 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1 will-change-transform"><Hash className="w-3 h-3" /> {trip.share_code}</div>
+                                        <div className="absolute top-3 right-12 bg-slate-800/90 px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1"><Hash className="w-3 h-3" /> {trip.share_code}</div>
                                     </div>
                                     <div className="p-4 bg-white flex justify-between items-center rounded-b-lg">
                                         <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">By {trip.creator_name || 'Guest'}</span>
