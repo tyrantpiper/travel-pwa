@@ -348,6 +348,7 @@ export function ProfileView() {
 
                     // 里程碑節點
                     const milestones = [
+                        { percent: 0, label: '開發者處於飢餓狀態', desc: '急需咖啡因注入 ☕' },
                         { percent: 25, label: '伺服器存活', desc: '至少這個月不會 404' },
                         { percent: 50, label: '升級大杯拿鐵', desc: '寫 Code 比較不會手抖' },
                         { percent: 75, label: '開發者獲得雞腿', desc: 'Bug 少一半' },
@@ -456,14 +457,13 @@ export function ProfileView() {
                             </div>
 
                             {/* 里程碑達成提示 */}
-                            {percentage >= 25 && (
-                                <div className="text-[10px] text-white/70 mb-3 space-y-1">
-                                    {percentage >= 25 && <div>✅ 25% - 伺服器存活確認</div>}
-                                    {percentage >= 50 && <div>✅ 50% - 升級大杯拿鐵</div>}
-                                    {percentage >= 75 && <div>✅ 75% - 開發者獲得雞腿</div>}
-                                    {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
-                                </div>
-                            )}
+                            <div className="text-[10px] text-white/70 mb-3 space-y-1">
+                                {percentage >= 0 && <div>✅ 0% - 開發者處於飢餓狀態</div>}
+                                {percentage >= 25 && <div>✅ 25% - 伺服器存活確認</div>}
+                                {percentage >= 50 && <div>✅ 50% - 升級大杯拿鐵</div>}
+                                {percentage >= 75 && <div>✅ 75% - 開發者獲得雞腿</div>}
+                                {percentage >= 100 && <div>🔓 100% - 新功能開發中...</div>}
+                            </div>
 
                             {/* 展開/收合 QR Code */}
                             <button
