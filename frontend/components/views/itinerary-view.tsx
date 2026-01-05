@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
@@ -781,7 +781,7 @@ export function ItineraryView() {
         }
     }
 
-    const handleUpdateMemo = async (id: string, newMemo: string) => {
+    const handleUpdateMemo = useCallback(async (id: string, newMemo: string) => {
         try {
             const res = await fetch(`${API_BASE}/api/items/${id}`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -794,9 +794,9 @@ export function ItineraryView() {
             toast.error("儲存備忘錄失敗")
             return false
         }
-    }
+    }, [reloadTripDetail])
 
-    const handleUpdateSubItems = async (id: string, newItems: SubItem[]) => {
+    const handleUpdateSubItems = useCallback(async (id: string, newItems: SubItem[]) => {
         try {
             const res = await fetch(`${API_BASE}/api/items/${id}`, {
                 method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -809,9 +809,9 @@ export function ItineraryView() {
             toast.error("儲存連結失敗")
             return false
         }
-    }
+    }, [reloadTripDetail])
 
-    const handleDeleteItem = async (id: string) => {
+    const handleDeleteItem = useCallback(async (id: string) => {
         if (!confirm(t('confirm_delete'))) return
 
         // Optimistic update: immediately remove from UI
@@ -829,7 +829,7 @@ export function ItineraryView() {
         // Background API call
         fetch(`${API_BASE}/api/items/${id}`, { method: "DELETE" })
             .catch(() => reloadTripDetail()) // Revert on error
-    }
+    }, [t, currentTrip, reloadTripDetail])
 
     const handleDeleteDay = async (dayNum: number) => {
         if (!currentTrip) return

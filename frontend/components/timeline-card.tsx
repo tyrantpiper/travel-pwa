@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, memo } from "react"
 import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
@@ -36,7 +36,7 @@ interface TimelineCardProps {
     onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean> // 新增：更新連結列表
 }
 
-export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: TimelineCardProps) {
+export const TimelineCard = memo(function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: TimelineCardProps) {
     const [showDetail, setShowDetail] = useState(false)
 
     // 判斷是否為 Header 卡片
@@ -223,7 +223,7 @@ export function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpda
             />
         </div>
     )
-}
+})
 
 // --- 升級版彈窗 (可編輯備忘錄) ---
 interface DetailDialogProps {
