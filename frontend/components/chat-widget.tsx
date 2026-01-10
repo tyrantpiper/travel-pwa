@@ -75,7 +75,12 @@ export default function ChatWidget() {
 
         // 監聽 storage 變化 (跨 tab 同步)
         window.addEventListener('storage', checkLogin)
-        return () => window.removeEventListener('storage', checkLogin)
+        // 🆕 監聯同 tab 登入狀態變化
+        window.addEventListener('user-login-state-changed', checkLogin)
+        return () => {
+            window.removeEventListener('storage', checkLogin)
+            window.removeEventListener('user-login-state-changed', checkLogin)
+        }
     }, [])
 
     // 🔒 登錄狀態 - 在 JSX 中使用此變數決定是否渲染

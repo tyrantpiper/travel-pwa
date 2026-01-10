@@ -54,6 +54,9 @@ export function LandingPage() {
         }
         localStorage.setItem("user_nickname", nickname)
 
+        // 🆕 通知 ChatWidget 用戶已登入
+        window.dispatchEvent(new CustomEvent('user-login-state-changed'))
+
         // 🆕 Show welcome wizard for first-time users
         if (!isOnboardingComplete) {
             setShowWizard(true)
@@ -108,6 +111,8 @@ export function LandingPage() {
         return (
             <AnimatePresence>
                 <WelcomeWizard onComplete={() => {
+                    // 🆕 通知 ChatWidget 用戶已完成登入
+                    window.dispatchEvent(new CustomEvent('user-login-state-changed'))
                     setShowWizard(false)
                     setIsLoggedIn(true)
                 }} />
