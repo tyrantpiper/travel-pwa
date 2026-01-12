@@ -13,6 +13,7 @@ import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import Image from "next/image"
+import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { RichTextarea } from "@/components/ui/rich-textarea"
@@ -227,7 +228,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 onUpdateSubItems={onUpdateSubItems}
             />
 
-            {/* 🆕 全螢幕圖片預覽 */}
+            {/* 🆕 全螢幕圖片預覽 (可縮放) */}
             <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
@@ -235,13 +236,10 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                     </DialogHeader>
                     {activity.image_url && (
                         <div className="relative w-full h-[80vh]">
-                            <Image
+                            <ZoomableImage
                                 src={activity.image_url}
                                 alt={activity.place || "Preview"}
-                                fill
-                                className="object-contain cursor-pointer"
-                                onClick={() => setShowPhotoPreview(false)}
-                                unoptimized
+                                onClose={() => setShowPhotoPreview(false)}
                             />
                         </div>
                     )}

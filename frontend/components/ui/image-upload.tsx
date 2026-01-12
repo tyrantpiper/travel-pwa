@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react"
 import Image from "next/image"
+import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { Camera, Loader2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -172,7 +173,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                 />
             </div>
 
-            {/* 全螢幕預覽 Dialog */}
+            {/* 全螢幕預覽 Dialog (可縮放) */}
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <VisuallyHidden>
@@ -180,13 +181,10 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                     </VisuallyHidden>
                     {value && (
                         <div className="relative w-full h-[80vh]">
-                            <Image
+                            <ZoomableImage
                                 src={value}
                                 alt="Preview"
-                                fill
-                                className="object-contain cursor-pointer"
-                                onClick={() => setPreviewOpen(false)}
-                                unoptimized
+                                onClose={() => setPreviewOpen(false)}
                             />
                         </div>
                     )}
