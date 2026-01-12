@@ -129,6 +129,12 @@ export function MultiImageUpload({
 
     const canAddMore = values.length < maxImages
 
+    // 🆕 Cloudinary 縮圖轉換 (200x200, 裁切填滿)
+    const getThumbnailUrl = (url: string) => {
+        if (!url.includes('cloudinary.com')) return url
+        return url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto/')
+    }
+
     return (
         <>
             <div className={cn("space-y-3", className)}>
@@ -142,7 +148,7 @@ export function MultiImageUpload({
                             onClick={() => setPreviewIndex(index)}
                         >
                             <Image
-                                src={url}
+                                src={getThumbnailUrl(url)}
                                 alt={`圖片 ${index + 1}`}
                                 fill
                                 className="object-cover"
