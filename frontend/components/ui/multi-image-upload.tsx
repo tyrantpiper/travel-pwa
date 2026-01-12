@@ -9,15 +9,33 @@
  * - 👆 點擊預覽放大
  * - 📊 上傳進度顯示
  * - 🔄 自動同步到 image_urls 陣列
+ * - 🆕 拖曳排序 (長按啟動，觸控友好)
  */
 
-import { useState, useRef } from "react"
+import { useState, useRef, useCallback } from "react"
 import Image from "next/image"
-import { Loader2, Plus, X } from "lucide-react"
+import { Loader2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
+
+// 🆕 DND-Kit imports
+import {
+    DndContext,
+    closestCenter,
+    TouchSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from "@dnd-kit/core"
+import {
+    arrayMove,
+    SortableContext,
+    rectSortingStrategy
+} from "@dnd-kit/sortable"
+import { SortablePhoto } from "./sortable-photo"
 
 interface MultiImageUploadProps {
     values: string[]
@@ -38,6 +56,33 @@ export function MultiImageUpload({
     const [progress, setProgress] = useState(0)
     const [previewIndex, setPreviewIndex] = useState<number | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // 🆕 DND Sensors - 長按 250ms 才啟動拖曳，避免與捲動衝突
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8  // 滑鼠需拖曳 8px 才啟動
+            }
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 250,     // 長按 250ms 才啟動
+                tolerance: 5    // 容許 5px 抖動
+            }
+        })
+    )
+
+    // 🆕 拖曳結束處理
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event
+        if (over && active.id !== over.id) {
+            const oldIndex = values.indexOf(active.id as string)
+            const newIndex = values.indexOf(over.id as string)
+            const newOrder = arrayMove(values, oldIndex, newIndex)
+            onChange(newOrder)
+            toast.success("排序已更新")
+        }
+    }, [values, onChange])
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -122,83 +167,73 @@ export function MultiImageUpload({
         }
     }
 
-    const handleRemove = (index: number) => {
+    const handleRemove = useCallback((index: number) => {
         const newValues = values.filter((_, i) => i !== index)
         onChange(newValues)
-    }
+    }, [values, onChange])
 
     const canAddMore = values.length < maxImages
 
     // 🆕 Cloudinary 縮圖轉換 (200x200, 裁切填滿)
-    const getThumbnailUrl = (url: string) => {
+    const getThumbnailUrl = useCallback((url: string) => {
         if (!url.includes('cloudinary.com')) return url
         return url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto/')
-    }
+    }, [])
 
     return (
         <>
             <div className={cn("space-y-3", className)}>
-                {/* 圖片網格 */}
-                <div className="flex flex-wrap gap-2">
-                    {/* 已上傳的圖片 */}
-                    {values.map((url, index) => (
-                        <div
-                            key={`${url}-${index}`}
-                            className="relative group w-16 h-16 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
-                            onClick={() => setPreviewIndex(index)}
-                        >
-                            <Image
-                                src={getThumbnailUrl(url)}
-                                alt={`圖片 ${index + 1}`}
-                                fill
-                                className="object-cover"
-                                unoptimized
-                            />
-                            {/* 刪除按鈕 */}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleRemove(index)
-                                }}
-                                className="absolute top-0.5 right-0.5 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
-                            {/* 序號 */}
-                            <div className="absolute bottom-0.5 left-0.5 px-1.5 py-0.5 bg-black/60 text-white text-xs rounded">
-                                {index + 1}
-                            </div>
-                        </div>
-                    ))}
+                {/* 圖片網格 - 支援拖曳排序 */}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={values} strategy={rectSortingStrategy}>
+                        <div className="flex flex-wrap gap-2">
+                            {/* 已上傳的圖片 - 可拖曳 */}
+                            {values.map((url, index) => (
+                                <SortablePhoto
+                                    key={url}
+                                    id={url}
+                                    url={url}
+                                    index={index}
+                                    onRemove={() => handleRemove(index)}
+                                    onPreview={() => setPreviewIndex(index)}
+                                    getThumbnailUrl={getThumbnailUrl}
+                                />
+                            ))}
 
-                    {/* 新增按鈕 */}
-                    {canAddMore && (
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={loading}
-                            className={cn(
-                                "w-16 h-16 rounded-lg border-2 border-dashed border-slate-300",
-                                "flex flex-col items-center justify-center gap-1",
-                                "text-slate-400 hover:text-blue-500 hover:border-blue-500",
-                                "transition-colors cursor-pointer",
-                                loading && "opacity-50 cursor-not-allowed"
+                            {/* 新增按鈕 */}
+                            {canAddMore && (
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={loading}
+                                    className={cn(
+                                        "w-16 h-16 rounded-lg border-2 border-dashed border-slate-300",
+                                        "flex flex-col items-center justify-center gap-1",
+                                        "text-slate-400 hover:text-blue-500 hover:border-blue-500",
+                                        "transition-colors cursor-pointer",
+                                        loading && "opacity-50 cursor-not-allowed"
+                                    )}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            <span className="text-[10px]">{progress}%</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus className="w-5 h-5" />
+                                            <span className="text-[10px]">{values.length}/{maxImages}</span>
+                                        </>
+                                    )}
+                                </button>
                             )}
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span className="text-[10px]">{progress}%</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Plus className="w-5 h-5" />
-                                    <span className="text-[10px]">{values.length}/{maxImages}</span>
-                                </>
-                            )}
-                        </button>
-                    )}
-                </div>
+                        </div>
+                    </SortableContext>
+                </DndContext>
 
                 {/* 隱藏的 file input */}
                 <input
