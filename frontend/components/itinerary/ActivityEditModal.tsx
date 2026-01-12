@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { ImageUpload } from "@/components/ui/image-upload"
+import { MultiImageUpload } from "@/components/ui/multi-image-upload"
 import { POISearch } from "@/components/poi-search"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { ItineraryItemState, LocationInfo, DailyLocation, GeocodeResult } from "@/lib/itinerary-types"
@@ -118,12 +118,12 @@ export function ActivityEditModal({
                     <DialogTitle>{isAddMode ? "Add Activity" : "Edit Activity"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                    {/* Spot Photo Upload */}
+                    {/* Spot Photo Upload - 多圖片 */}
                     <div className="flex justify-center mb-2">
-                        <ImageUpload
-                            value={editItem.image_url}
-                            onChange={(url) => setEditItem({ ...editItem, image_url: url })}
-                            onRemove={() => setEditItem({ ...editItem, image_url: "" })}
+                        <MultiImageUpload
+                            values={editItem.image_urls || (editItem.image_url ? [editItem.image_url] : [])}
+                            onChange={(urls) => setEditItem({ ...editItem, image_urls: urls, image_url: urls[0] || "" })}
+                            maxImages={5}
                             folder="ryan_travel/spots"
                         />
                     </div>

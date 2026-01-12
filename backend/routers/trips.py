@@ -139,7 +139,8 @@ async def get_trip_by_id(
                     "tags": item.get("tags", []),
                     "link_url": item.get("link_url"), 
                     "sub_items": item.get("sub_items") or [],
-                    "image_url": item.get("image_url")
+                    "image_url": item.get("image_url"),
+                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else [])  # 🆕 多圖片
                 })
         
         # 🆕 隱私過濾輔助函數（修正版：使用 private_owner_id）
@@ -371,7 +372,8 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
                     # 👇👇👇 補上這兩行！沒有這兩行，前端就是瞎子！
                     "link_url": item.get("link_url"), 
                     "sub_items": item.get("sub_items") or [],
-                    "image_url": item.get("image_url")  # 🆕 圖片 URL
+                    "image_url": item.get("image_url"),  # 🆕 圖片 URL
+                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else [])  # 🆕 多圖片
                 })
             
         # 轉成陣列
@@ -817,8 +819,9 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
             "notes": request.notes,
             "location_lat": request.lat,
             "location_lng": request.lng,
-            "image_url": request.image_url,  # 🆕 圖片 URL
-            "tags": request.tags              # 🆕 標籤
+            "image_url": request.image_url,      # 向後相容
+            "image_urls": request.image_urls or ([request.image_url] if request.image_url else []),  # 🆕 多圖片
+            "tags": request.tags
         }
         
         res = supabase.table("itinerary_items").insert(data).execute()
@@ -854,8 +857,10 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         # 👇 新增：處理分類與標籤
         if request.category is not None: data["category"] = request.category
         if request.tags is not None: data["tags"] = request.tags
-        # 👇 新增：處理圖片 URL
+        # 👇 新增：處理圖片 URL (向後相容)
         if request.image_url is not None: data["image_url"] = request.image_url
+        # 🆕 新增：處理多圖片 URLs
+        if request.image_urls is not None: data["image_urls"] = request.image_urls
         
         if not data:
             print("⚠️ 沒有資料需要更新")

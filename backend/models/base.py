@@ -118,7 +118,8 @@ class UpdateItemRequest(BaseModel):
     lng: Optional[float] = None
     memo: Optional[str] = None
     sub_items: Optional[List[dict]] = None
-    image_url: Optional[str] = None
+    image_url: Optional[str] = None      # 向後相容
+    image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
     category: Optional[str] = None
     tags: Optional[List[str]] = None
 
@@ -133,8 +134,9 @@ class CreateItemRequest(BaseModel):
     notes: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
-    image_url: Optional[str] = None  # 🆕 圖片 URL
-    tags: Optional[List[str]] = None  # 🆕 標籤
+    image_url: Optional[str] = None       # 向後相容
+    image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
+    tags: Optional[List[str]] = None
 
 
 

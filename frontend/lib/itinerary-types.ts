@@ -25,6 +25,7 @@ export interface ItineraryItemState {
     lat?: number | string | null
     lng?: number | string | null
     image_url?: string
+    image_urls?: string[]  // 🆕 多圖片 URLs
     sub_items?: SubItem[]
     memo?: string
 }
@@ -70,6 +71,7 @@ export interface Activity {
     lat?: number
     lng?: number
     image_url?: string
+    image_urls?: string[]  // 🆕 多圖片 URLs
     tags?: string[]
     memo?: string // User's private memo
     sub_items?: SubItem[]

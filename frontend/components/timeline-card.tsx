@@ -84,113 +84,126 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         return <Camera className="w-3.5 h-3.5" />
     }
 
-    const renderContent = () => (
-        <>
-            {/* Spot Photo - 可點擊預覽 */}
-            {activity.image_url && (
-                <div
-                    className="mb-3 rounded-lg overflow-hidden h-40 w-full relative cursor-pointer hover:opacity-90 transition-opacity bg-slate-100"
-                    onClick={() => setShowPhotoPreview(true)}
-                >
-                    <Image
-                        src={activity.image_url}
-                        alt={activity.place || "Activity"}
-                        fill
-                        className="object-contain"  // 🔧 改用 contain 顯示完整圖片
-                        unoptimized
-                        onError={(e) => { e.currentTarget.style.display = 'none' }}
-                    />
-                </div>
-            )}
+    const renderContent = () => {
+        // 🆕 支援多圖片：優先使用 image_urls，fallback 到 image_url
+        const images = activity.image_urls?.length
+            ? activity.image_urls
+            : (activity.image_url ? [activity.image_url] : [])
 
-            <div className="flex justify-between items-start mb-1 pr-6">
-                <h3 className={cn("font-bold text-slate-900 leading-tight", isHeader ? "text-xl" : "text-lg")}>
-                    {activity.place || "Unknown Place"}
-                </h3>
-            </div>
-
-            {/* 編輯選單 - Mobile Friendly */}
-            <div className="absolute top-3 right-2 z-20" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full touch-manipulation"
-                        >
-                            <MoreHorizontal className="w-5 h-5" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="min-w-[140px]">
-                        <DropdownMenuItem onClick={() => onEdit(activity)} className="py-3">
-                            <Edit className="w-4 h-4 mr-2" /> 編輯全部
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 py-3" onClick={() => onDelete(activity.id || '')}>
-                            <Trash2 className="w-4 h-4 mr-2" /> 刪除
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border flex items-center gap-1",
-                    isHeader ? "bg-amber-100 text-amber-600 border-amber-200 font-bold" :
-                        (activity.category === 'transport' ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-white text-slate-500 border-slate-200")
-                )}>
-                    {getIcon()} {isHeader ? "INFO" : activity.category}
-                </span>
-                {activity.tags?.map((tag: string) => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">#{tag}</span>
-                ))}
-            </div>
-
-            <p className="text-sm text-slate-600 mb-3 leading-relaxed font-light whitespace-pre-wrap line-clamp-3">
-                {activity.desc || "點擊新增備忘錄..."}
-            </p>
-
-            {/* 附屬表格 */}
-            {activity.sub_items && activity.sub_items.length > 0 && (
-                <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-slate-50/50">
-                    <Table className="w-full table-fixed min-w-[280px]">
-                        <TableBody>
-                            {activity.sub_items.map((item: SubItem, i: number) => (
-                                <TableRow key={i} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
-                                    <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
-                                        <div className="text-xs font-bold text-slate-700 mb-0.5 break-words">{item.name}</div>
-                                        {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words whitespace-normal">{item.desc}</div>}
-                                    </TableCell>
-                                    {item.link ? (
-                                        <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
-                                            <button
-                                                className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                                onClick={(e) => { e.stopPropagation(); window.open(item.link, '_blank'); }}
-                                            >
-                                                <ExternalLink className="w-3 h-3" />
-                                            </button>
-                                        </TableCell>
-                                    ) : <TableCell className="w-0 p-0" />}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
-
-            {/* 按鈕區 */}
-            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                {!hideMapBtn && (
-                    <Button variant="outline" size="sm" className="h-8 text-xs bg-white hover:bg-slate-50 border-slate-200 text-slate-600" onClick={openGoogleMap}>
-                        <MapPin className="w-3 h-3 mr-1" /> 導航
-                    </Button>
+        return (
+            <>
+                {/* Spot Photo - 可點擊預覽 */}
+                {images.length > 0 && (
+                    <div
+                        className="mb-3 rounded-lg overflow-hidden h-40 w-full relative cursor-pointer hover:opacity-90 transition-opacity bg-slate-100"
+                        onClick={() => setShowPhotoPreview(true)}
+                    >
+                        <Image
+                            src={images[0]}
+                            alt={activity.place || "Activity"}
+                            fill
+                            className="object-contain"
+                            unoptimized
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                        {/* 🆕 多圖片指示器 */}
+                        {images.length > 1 && (
+                            <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                                +{images.length - 1}
+                            </span>
+                        )}
+                    </div>
                 )}
 
-                {/* 👇 改成此地備忘錄 */}
-                <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
-                    <StickyNote className="w-3 h-3 mr-1" /> 此地備忘錄
-                </Button>
-            </div>
-        </>
-    )
+                <div className="flex justify-between items-start mb-1 pr-6">
+                    <h3 className={cn("font-bold text-slate-900 leading-tight", isHeader ? "text-xl" : "text-lg")}>
+                        {activity.place || "Unknown Place"}
+                    </h3>
+                </div>
+
+                {/* 編輯選單 - Mobile Friendly */}
+                <div className="absolute top-3 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full touch-manipulation"
+                            >
+                                <MoreHorizontal className="w-5 h-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-[140px]">
+                            <DropdownMenuItem onClick={() => onEdit(activity)} className="py-3">
+                                <Edit className="w-4 h-4 mr-2" /> 編輯全部
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600 py-3" onClick={() => onDelete(activity.id || '')}>
+                                <Trash2 className="w-4 h-4 mr-2" /> 刪除
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border flex items-center gap-1",
+                        isHeader ? "bg-amber-100 text-amber-600 border-amber-200 font-bold" :
+                            (activity.category === 'transport' ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-white text-slate-500 border-slate-200")
+                    )}>
+                        {getIcon()} {isHeader ? "INFO" : activity.category}
+                    </span>
+                    {activity.tags?.map((tag: string) => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">#{tag}</span>
+                    ))}
+                </div>
+
+                <p className="text-sm text-slate-600 mb-3 leading-relaxed font-light whitespace-pre-wrap line-clamp-3">
+                    {activity.desc || "點擊新增備忘錄..."}
+                </p>
+
+                {/* 附屬表格 */}
+                {activity.sub_items && activity.sub_items.length > 0 && (
+                    <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-slate-50/50">
+                        <Table className="w-full table-fixed min-w-[280px]">
+                            <TableBody>
+                                {activity.sub_items.map((item: SubItem, i: number) => (
+                                    <TableRow key={i} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
+                                        <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
+                                            <div className="text-xs font-bold text-slate-700 mb-0.5 break-words">{item.name}</div>
+                                            {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words whitespace-normal">{item.desc}</div>}
+                                        </TableCell>
+                                        {item.link ? (
+                                            <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
+                                                <button
+                                                    className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                                    onClick={(e) => { e.stopPropagation(); window.open(item.link, '_blank'); }}
+                                                >
+                                                    <ExternalLink className="w-3 h-3" />
+                                                </button>
+                                            </TableCell>
+                                        ) : <TableCell className="w-0 p-0" />}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+
+                {/* 按鈕區 */}
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    {!hideMapBtn && (
+                        <Button variant="outline" size="sm" className="h-8 text-xs bg-white hover:bg-slate-50 border-slate-200 text-slate-600" onClick={openGoogleMap}>
+                            <MapPin className="w-3 h-3 mr-1" /> 導航
+                        </Button>
+                    )}
+
+                    {/* 👇 改成此地備忘錄 */}
+                    <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
+                        <StickyNote className="w-3 h-3 mr-1" /> 此地備忘錄
+                    </Button>
+                </div>
+            </>
+        )
+    }
 
     return (
         <div className="flex gap-3 relative group">
@@ -228,21 +241,33 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 onUpdateSubItems={onUpdateSubItems}
             />
 
-            {/* 🆕 全螢幕圖片預覽 (可縮放) */}
+            {/* 🆕 全螢幕圖片預覽 (支援多圖片) */}
             <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
                         <DialogTitle>圖片預覽</DialogTitle>
                     </DialogHeader>
-                    {activity.image_url && (
-                        <div className="relative w-full h-[80vh]">
-                            <ZoomableImage
-                                src={activity.image_url}
-                                alt={activity.place || "Preview"}
-                                onClose={() => setShowPhotoPreview(false)}
-                            />
-                        </div>
-                    )}
+                    {(() => {
+                        const images = activity.image_urls?.length
+                            ? activity.image_urls
+                            : (activity.image_url ? [activity.image_url] : [])
+                        return images.length > 0 ? (
+                            <div className="relative w-full h-[80vh]">
+                                <ZoomableImage
+                                    src={images[0]}
+                                    alt={activity.place || "Preview"}
+                                    onClose={() => setShowPhotoPreview(false)}
+                                />
+                                {images.length > 1 && (
+                                    <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+                                        {images.map((_, i) => (
+                                            <span key={i} className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'}`} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ) : null
+                    })()}
                 </DialogContent>
             </Dialog>
         </div>

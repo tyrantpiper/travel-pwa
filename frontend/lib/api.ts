@@ -51,6 +51,7 @@ export interface CreateItemParams {
     lng?: number | string | null
     tags?: string[]
     image_url?: string
+    image_urls?: string[]  // 🆕 多圖片
 }
 
 export interface UpdateItemParams {
@@ -62,6 +63,7 @@ export interface UpdateItemParams {
     lng?: number | string | null
     tags?: string[]
     image_url?: string
+    image_urls?: string[]  // 🆕 多圖片
     memo?: string
     sub_items?: { name: string; checked: boolean }[]
 }

@@ -751,8 +751,9 @@ export function ItineraryView() {
                         notes: editItem.desc,
                         lat: finalLat ? Number(finalLat) : null,
                         lng: finalLng ? Number(finalLng) : null,
-                        image_url: editItem.image_url,  // 🆕 新增圖片 URL
-                        tags: editItem.tags             // 🆕 修復：標籤陣列
+                        image_url: editItem.image_url,
+                        image_urls: editItem.image_urls,  // 🆕 多圖片
+                        tags: editItem.tags
                     })
                 })
             } else {
@@ -767,7 +768,8 @@ export function ItineraryView() {
                         notes: editItem.desc,
                         lat: finalLat ? Number(finalLat) : null,
                         lng: finalLng ? Number(finalLng) : null,
-                        image_url: editItem.image_url
+                        image_url: editItem.image_url,
+                        image_urls: editItem.image_urls  // 🆕 多圖片
                     })
                 })
             }
