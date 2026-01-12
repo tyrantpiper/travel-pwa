@@ -92,6 +92,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                         alt={activity.place || "Activity"}
                         fill
                         className="object-cover"
+                        unoptimized  // 🔧 FIX: 繞過 Next.js 優化，避免 400 錯誤
                         onError={(e) => { e.currentTarget.style.display = 'none' }}
                     />
                 </div>
