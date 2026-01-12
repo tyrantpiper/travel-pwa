@@ -370,7 +370,8 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
                     "tags": item.get("tags", []),
                     # 👇👇👇 補上這兩行！沒有這兩行，前端就是瞎子！
                     "link_url": item.get("link_url"), 
-                    "sub_items": item.get("sub_items") or []
+                    "sub_items": item.get("sub_items") or [],
+                    "image_url": item.get("image_url")  # 🆕 圖片 URL
                 })
             
         # 轉成陣列
