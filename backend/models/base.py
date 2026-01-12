@@ -133,6 +133,9 @@ class CreateItemRequest(BaseModel):
     notes: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
+    image_url: Optional[str] = None  # 🆕 圖片 URL
+    tags: Optional[List[str]] = None  # 🆕 標籤
+
 
 
 class ImportToTripRequest(BaseModel):

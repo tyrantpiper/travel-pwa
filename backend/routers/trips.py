@@ -815,7 +815,9 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
             "category": request.category,
             "notes": request.notes,
             "location_lat": request.lat,
-            "location_lng": request.lng
+            "location_lng": request.lng,
+            "image_url": request.image_url,  # 🆕 圖片 URL
+            "tags": request.tags              # 🆕 標籤
         }
         
         res = supabase.table("itinerary_items").insert(data).execute()
@@ -851,6 +853,8 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         # 👇 新增：處理分類與標籤
         if request.category is not None: data["category"] = request.category
         if request.tags is not None: data["tags"] = request.tags
+        # 👇 新增：處理圖片 URL
+        if request.image_url is not None: data["image_url"] = request.image_url
         
         if not data:
             print("⚠️ 沒有資料需要更新")
