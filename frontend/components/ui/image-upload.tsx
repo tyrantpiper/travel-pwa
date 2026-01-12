@@ -174,19 +174,21 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
             {/* 全螢幕預覽 Dialog */}
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-                <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0">
+                <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <VisuallyHidden>
                         <DialogTitle>圖片預覽</DialogTitle>
                     </VisuallyHidden>
                     {value && (
-                        <Image
-                            src={value}
-                            alt="Preview"
-                            fill
-                            className="object-contain cursor-pointer"
-                            onClick={() => setPreviewOpen(false)}
-                            unoptimized
-                        />
+                        <div className="relative w-full h-[80vh]">
+                            <Image
+                                src={value}
+                                alt="Preview"
+                                fill
+                                className="object-contain cursor-pointer"
+                                onClick={() => setPreviewOpen(false)}
+                                unoptimized
+                            />
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>

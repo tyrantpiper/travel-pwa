@@ -38,6 +38,7 @@ interface TimelineCardProps {
 
 export const TimelineCard = memo(function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: TimelineCardProps) {
     const [showDetail, setShowDetail] = useState(false)
+    const [showPhotoPreview, setShowPhotoPreview] = useState(false)  // 🆕 圖片預覽狀態
 
     // 判斷是否為 Header 卡片
     const isHeader = activity.category === 'header' || (activity.time || activity.time_slot || "00:00") === '00:00'
@@ -84,15 +85,18 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
     const renderContent = () => (
         <>
-            {/* Spot Photo */}
+            {/* Spot Photo - 可點擊預覽 */}
             {activity.image_url && (
-                <div className="mb-3 rounded-lg overflow-hidden h-32 w-full relative">
+                <div
+                    className="mb-3 rounded-lg overflow-hidden h-40 w-full relative cursor-pointer hover:opacity-90 transition-opacity bg-slate-100"
+                    onClick={() => setShowPhotoPreview(true)}
+                >
                     <Image
                         src={activity.image_url}
                         alt={activity.place || "Activity"}
                         fill
-                        className="object-cover"
-                        unoptimized  // 🔧 FIX: 繞過 Next.js 優化，避免 400 錯誤
+                        className="object-contain"  // 🔧 改用 contain 顯示完整圖片
+                        unoptimized
                         onError={(e) => { e.currentTarget.style.display = 'none' }}
                     />
                 </div>
@@ -222,6 +226,27 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 onUpdateMemo={onUpdateMemo}
                 onUpdateSubItems={onUpdateSubItems}
             />
+
+            {/* 🆕 全螢幕圖片預覽 */}
+            <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
+                <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>圖片預覽</DialogTitle>
+                    </DialogHeader>
+                    {activity.image_url && (
+                        <div className="relative w-full h-[80vh]">
+                            <Image
+                                src={activity.image_url}
+                                alt={activity.place || "Preview"}
+                                fill
+                                className="object-contain cursor-pointer"
+                                onClick={() => setShowPhotoPreview(false)}
+                                unoptimized
+                            />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 })
