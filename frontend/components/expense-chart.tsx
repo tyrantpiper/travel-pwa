@@ -74,32 +74,21 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
         if (total === 0 || data.length === 0) return { paths: [], centerTotal: 0 }
 
         let currentAngle = 0
-        const radius = 50 // Reduced to fit exploded segments
-        const innerRadius = 30 // Thicker donut
-        const center = 64 // Increased center for offset space
-        const explodeOffset = 6 // Distance each segment moves outward
+        const radius = 56 // w-28 = 112px / 2
+        const innerRadius = 35 // Thicker donut
+        const center = 56
 
         const paths = data.map(item => {
             const percent = item.amount / total
             const angle = percent * 360
-            const startAngle = currentAngle
-            const endAngle = currentAngle + angle
+            const path = describeArc(center, center, innerRadius, radius, currentAngle, currentAngle + angle)
 
-            // Calculate mid-angle for explode direction
-            const midAngle = (startAngle + endAngle) / 2
-            const offsetX = Math.cos((midAngle - 90) * Math.PI / 180) * explodeOffset
-            const offsetY = Math.sin((midAngle - 90) * Math.PI / 180) * explodeOffset
-
-            const path = describeArc(center, center, innerRadius, radius, startAngle, endAngle)
-
-            currentAngle = endAngle
+            currentAngle += angle
 
             return {
                 ...item,
                 percent: Math.round(percent * 100),
-                d: path,
-                offsetX,
-                offsetY
+                d: path
             }
         })
 
@@ -121,8 +110,8 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
     return (
         <div className="flex gap-4 items-start">
             {/* SVG Exploded Donut Chart */}
-            <div className="flex-shrink-0 relative w-32 h-32">
-                <svg width="128" height="128" viewBox="0 0 128 128" className="overflow-visible">
+            <div className="flex-shrink-0 relative w-28 h-28">
+                <svg width="112" height="112" viewBox="0 0 112 112" className="overflow-visible">
                     {paths.map((item) => {
                         const isActive = activeCategory === item.category
                         const isDimmed = activeCategory && !isActive
@@ -135,15 +124,13 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
                                 initial={{ opacity: 0, scale: 0.8 }}
                                 animate={{
                                     opacity: isDimmed ? 0.3 : 1,
-                                    scale: isActive ? 1.08 : 1,
-                                    x: item.offsetX,
-                                    y: item.offsetY
+                                    scale: isActive ? 1.08 : 1
                                 }}
-                                whileHover={{ scale: 1.1, opacity: 1 }}
+                                whileHover={{ scale: 1.05, opacity: 1 }}
                                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                 onClick={() => onCategoryClick?.(isActive ? "" : item.category)}
-                                className="cursor-pointer hover:drop-shadow-lg transition-shadow"
-                                style={{ transformOrigin: "64px 64px" }}
+                                className="cursor-pointer hover:drop-shadow-md transition-shadow"
+                                style={{ transformOrigin: "56px 56px" }}
                             />
                         )
                     })}

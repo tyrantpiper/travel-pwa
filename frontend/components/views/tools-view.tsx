@@ -431,7 +431,12 @@ export function ToolsView() {
     const foreignTotals = useMemo(() => {
         const totals: Record<string, { amount: number; symbol: string; flag: string }> = {}
 
-        filteredExpenses.forEach(e => {
+        // 🆕 Phase 9.5: Filter by activeCategory if set
+        const expensesToSum = activeCategory
+            ? filteredExpenses.filter(e => e.category === activeCategory)
+            : filteredExpenses
+
+        expensesToSum.forEach(e => {
             const c = e.currency || "JPY"
             if (c !== "TWD") {
                 const info = CURRENCIES.find(x => x.code === c)
@@ -445,7 +450,7 @@ export function ToolsView() {
         // Sort by amount descending
         return Object.entries(totals)
             .sort((a, b) => b[1].amount - a[1].amount)
-    }, [filteredExpenses])    // Date navigation
+    }, [filteredExpenses, activeCategory])    // Date navigation
     const navigateDate = (direction: 'prev' | 'next') => {
         const idx = allDates.indexOf(selectedDate)
         if (direction === 'prev' && idx > 0) {
@@ -498,7 +503,7 @@ export function ToolsView() {
             card_name: method === "JCB" || method === "VisaMaster" ? cardName : "",
             cashback_rate: method === "JCB" || method === "VisaMaster" ? rateNum : 0,
             image_url: receiptUrl || null,
-            expense_date: expenseDate || new Date().toISOString().split('T')[0]
+            expense_date: expenseDate || formatLocalDate(new Date())
         }
 
         const url = editItem ? `${API_BASE}/api/expenses/${editItem.id}` : `${API_BASE}/api/expenses`
