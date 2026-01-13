@@ -834,7 +834,7 @@ export function ToolsView() {
             </div>
 
             <PullToRefresh onRefresh={async () => { await Promise.all([fetchExpenses(), tripMutate(), fetchRate()]); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
-                <Tabs value={activeSection} onValueChange={setActiveSection}>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                     {/* Custom Sliding Tab Strip */}
                     <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
                         {[
@@ -844,10 +844,10 @@ export function ToolsView() {
                         ].map((tab) => (
                             <button
                                 key={tab.value}
-                                onClick={() => setActiveSection(tab.value)}
-                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => setActiveTab(tab.value)}
+                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                {activeSection === tab.value && (
+                                {activeTab === tab.value && (
                                     <motion.div
                                         layoutId="tools-tab-indicator"
                                         className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
