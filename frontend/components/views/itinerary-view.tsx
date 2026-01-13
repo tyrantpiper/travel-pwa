@@ -1,12 +1,26 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Download } from "lucide-react"
 import { Virtuoso } from "react-virtuoso"
-import { TimelineCard } from "@/components/timeline-card"
+// 🆕 DND-Kit imports
+import {
+    DndContext,
+    closestCenter,
+    TouchSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+    DragStartEvent,
+    DragOverlay
+} from "@dnd-kit/core"
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable"
+import { SortableTimelineCard } from "@/components/itinerary/SortableTimelineCard"
+import { TimelineCardOverlay } from "@/components/itinerary/TimelineCardOverlay"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -69,6 +83,22 @@ export function ItineraryView() {
     const [isAddMode, setIsAddMode] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
 
+    // 🆕 DND State
+    const [activeId, setActiveId] = useState<string | null>(null)
+    const [pendingReorder, setPendingReorder] = useState<{
+        itemId: string
+        oldIndex: number
+        newIndex: number
+        newOrder: Activity[]
+    } | null>(null)
+    const [isReorderDialogOpen, setIsReorderDialogOpen] = useState(false)
+
+    // 🆕 DND Sensors (同多圖拖曳)
+    const dndSensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+    )
+
     // 🆕 處理從地圖加入 POI
     const handleAddPOI = async (poi: POIBasicData, time: string, notes?: string) => {
         if (!activeTripId) return
@@ -104,6 +134,84 @@ export function ItineraryView() {
     const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
     // 🆕 P8: Active Flag (防止競態條件)
     const activeReqRef = useRef<string>("")
+
+    // 🆕 currentDayData - useMemo (defined after day state)
+    const currentDayData = useMemo(() => {
+        return currentTrip?.days
+            ? currentTrip.days.find((d) => d.day === day)?.activities || []
+            : []
+    }, [currentTrip?.days, day])
+
+    // 🆕 DND Event Handlers
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        setActiveId(event.active.id as string)
+    }, [])
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event
+        setActiveId(null)
+
+        if (!over || active.id === over.id) return
+        if (!isOnline) {
+            toast.error("✈️ 離線模式下無法調整順序")
+            return
+        }
+
+        const oldIndex = currentDayData.findIndex((item: Activity) => item.id === active.id)
+        const newIndex = currentDayData.findIndex((item: Activity) => item.id === over.id)
+
+        if (oldIndex === -1 || newIndex === -1) return
+
+        const newOrder = arrayMove([...currentDayData], oldIndex, newIndex)
+
+        setPendingReorder({
+            itemId: active.id as string,
+            oldIndex,
+            newIndex,
+            newOrder
+        })
+        setIsReorderDialogOpen(true)
+    }, [currentDayData, isOnline])
+
+    const handleDragCancel = useCallback(() => {
+        setActiveId(null)
+    }, [])
+
+    const handleReorderConfirm = useCallback(async (adjustTimes: boolean) => {
+        if (!pendingReorder || !activeTripId) return
+
+        try {
+            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+            const items = pendingReorder.newOrder.map((activity, index) => {
+                const baseTime = adjustTimes ? `${String(9 + Math.floor(index * 1.5)).padStart(2, '0')}:00` : null
+                return {
+                    item_id: activity.id,
+                    sort_order: index * 10,
+                    time_slot: baseTime
+                }
+            })
+
+            const res = await fetch(`${API_BASE}/api/items/reorder`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items, adjust_times: adjustTimes })
+            })
+
+            if (!res.ok) throw new Error("Reorder failed")
+
+            toast.success(adjustTimes ? "順序與時間已更新" : "順序已更新")
+            await reloadTripDetail()
+
+        } catch (e) {
+            console.error("Reorder error:", e)
+            toast.error("排序更新失敗")
+        } finally {
+            setPendingReorder(null)
+            setIsReorderDialogOpen(false)
+        }
+    }, [pendingReorder, activeTripId, reloadTripDetail])
+
 
     // 🆕 P7+: 定期清理過期快取 (防止記憶體累積)
     useEffect(() => {
@@ -1221,9 +1329,6 @@ export function ItineraryView() {
         )
     }
 
-    const currentDayData = currentTrip?.days
-        ? currentTrip.days.find((d) => d.day === day)?.activities || []
-        : []
 
     return (
         <div className="flex flex-col min-h-screen bg-stone-50 pb-32 overflow-x-hidden">
@@ -1873,46 +1978,71 @@ export function ItineraryView() {
                         });
 
                         return currentDayData.length > 0 ? (
-                            <Virtuoso
-                                useWindowScroll
-                                data={currentDayData}
-                                itemContent={(idx, item) => (
-                                    <TimelineCard
-                                        key={item.id}
-                                        activity={item}
-                                        index={realIndices[idx]}
-                                        isLast={idx === currentDayData.length - 1}
-                                        onEdit={(item: Activity) => {
-                                            if (!isOnline) {
-                                                toast.error("✈️ 離線模式下無法編輯")
-                                                return
-                                            }
-                                            setIsAddMode(false)
-                                            setEditItem({
-                                                id: item.id,
-                                                time: item.time || item.time_slot || "00:00",
-                                                place: item.place || item.place_name || "",
-                                                category: item.category || "sightseeing",
-                                                desc: item.desc || item.notes || "",
-                                                lat: item.lat,
-                                                lng: item.lng,
-                                                image_url: item.image_url,
-                                                tags: item.tags || []
-                                            })
-                                            setIsEditOpen(true)
+                            <DndContext
+                                sensors={dndSensors}
+                                collisionDetection={closestCenter}
+                                onDragStart={handleDragStart}
+                                onDragEnd={handleDragEnd}
+                                onDragCancel={handleDragCancel}
+                            >
+                                <SortableContext
+                                    items={currentDayData.map((a: Activity) => a.id)}
+                                    strategy={verticalListSortingStrategy}
+                                >
+                                    <Virtuoso
+                                        useWindowScroll
+                                        data={currentDayData}
+                                        itemContent={(idx, item) => {
+                                            const isHeader = item.category === 'header' || (item.time || item.time_slot || "00:00") === '00:00'
+                                            return (
+                                                <SortableTimelineCard
+                                                    key={item.id}
+                                                    activity={item}
+                                                    index={realIndices[idx]}
+                                                    isLast={idx === currentDayData.length - 1}
+                                                    isDragDisabled={isHeader || !isOnline}
+                                                    onEdit={(item: Activity) => {
+                                                        if (!isOnline) {
+                                                            toast.error("✈️ 離線模式下無法編輯")
+                                                            return
+                                                        }
+                                                        setIsAddMode(false)
+                                                        setEditItem({
+                                                            id: item.id,
+                                                            time: item.time || item.time_slot || "00:00",
+                                                            place: item.place || item.place_name || "",
+                                                            category: item.category || "sightseeing",
+                                                            desc: item.desc || item.notes || "",
+                                                            lat: item.lat,
+                                                            lng: item.lng,
+                                                            image_url: item.image_url,
+                                                            tags: item.tags || []
+                                                        })
+                                                        setIsEditOpen(true)
+                                                    }}
+                                                    onDelete={(id) => {
+                                                        if (!isOnline) {
+                                                            toast.error("✈️ 離線模式下無法刪除")
+                                                            return
+                                                        }
+                                                        handleDeleteItem(id)
+                                                    }}
+                                                    onUpdateMemo={handleUpdateMemo}
+                                                    onUpdateSubItems={handleUpdateSubItems}
+                                                />
+                                            )
                                         }}
-                                        onDelete={(id) => {
-                                            if (!isOnline) {
-                                                toast.error("✈️ 離線模式下無法刪除")
-                                                return
-                                            }
-                                            handleDeleteItem(id)
-                                        }}
-                                        onUpdateMemo={handleUpdateMemo}
-                                        onUpdateSubItems={handleUpdateSubItems}
                                     />
-                                )}
-                            />
+                                </SortableContext>
+
+                                {/* 🆕 DragOverlay - 拖曳時顯示的覆蓋層 */}
+                                <DragOverlay dropAnimation={null}>
+                                    {activeId && (() => {
+                                        const activity = currentDayData.find((a: Activity) => a.id === activeId)
+                                        return activity ? <TimelineCardOverlay activity={activity} /> : null
+                                    })()}
+                                </DragOverlay>
+                            </DndContext>
                         ) : null;
                     })()}
 
@@ -1958,6 +2088,34 @@ export function ItineraryView() {
                 tripTitle={currentTrip?.title}  // 🆕 智能搜尋
                 biasLoc={calculateBiasLocation(day)} // 🆕 注入位置權重 (Sequential Bias)
             />
+
+            {/* 🆕 Reorder Confirmation Dialog - 混合模式 */}
+            <AlertDialog open={isReorderDialogOpen} onOpenChange={setIsReorderDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>調整順序方式</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            請選擇如何處理時間：
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+                        <Button
+                            className="w-full"
+                            onClick={() => handleReorderConfirm(false)}
+                        >
+                            🕐 保持原時間
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            className="w-full"
+                            onClick={() => handleReorderConfirm(true)}
+                        >
+                            ⏱️ 自動調整時間
+                        </Button>
+                        <AlertDialogCancel className="w-full">取消</AlertDialogCancel>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     )
 }

@@ -51,12 +51,12 @@ export const SortableTimelineCard = memo(function SortableTimelineCard({
     })
 
     // 🔧 防抖動技術：使用 CSS.Translate 純平移
+    // 🔑 拖曳時隱藏原項目 (由 DragOverlay 顯示)
     const style: CSSProperties = {
         transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 50 : undefined,
-        opacity: isDragging ? 0.85 : 1,
-        boxShadow: isDragging ? "0 8px 25px rgba(0,0,0,0.2)" : undefined,
+        opacity: isDragging ? 0 : 1,  // 🆕 拖曳時完全隱藏
         WebkitTouchCallout: 'none',
         userSelect: 'none',
     }
