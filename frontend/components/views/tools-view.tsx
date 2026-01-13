@@ -357,6 +357,7 @@ export function ToolsView() {
     // Filter expenses based on view mode and owner filter
     const filteredExpenses = useMemo(() => {
         let filtered = expenses
+        console.log(`🔍 Filtering: View=${expenseView}, Date=${selectedDate}, Total=${expenses.length}`)
 
         // Owner filter
         if (ownerFilter === 'public') {
@@ -370,10 +371,16 @@ export function ToolsView() {
             filtered = filtered.filter(e => {
                 // 🆕 Phase 10.5: incurred_at fallback for DB column name compatibility
                 const d = e.expense_date || e.incurred_at || e.created_at?.split('T')[0]
-                return d === selectedDate
+                const match = d === selectedDate
+                if (!match && expenses.length < 20) {
+                    // Log mismatches for small datasets to debug
+                    console.log(`   ❌ Mismatch: ExpID=${e.id}, Date=${d}, Target=${selectedDate}, Raw=${JSON.stringify({ ed: e.expense_date, ia: e.incurred_at, ca: e.created_at })}`)
+                }
+                return match
             })
         }
 
+        console.log(`   ✅ Filtered Result: ${filtered.length} items`)
         return filtered
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
@@ -389,15 +396,7 @@ export function ToolsView() {
             return sum + (e.amount || 0) * usedRate
         }, 0)
 
-        // Foreign Total: Sum ONLY if expense currency matches selected currency
-        const foreignTotal = filteredExpenses.reduce((sum, e) => {
-            const expCurrency = e.currency || "JPY" // Backend default
-            const targetCurrency = selectedCurrency || "JPY" // Frontend view default
-            if (expCurrency === targetCurrency) {
-                return sum + (e.amount || 0)
-            }
-            return sum
-        }, 0)
+
 
         // 計算總回饋金額 (TWD)
         const cashbackTotal = filteredExpenses.reduce((sum, e) => {
@@ -518,7 +517,13 @@ export function ToolsView() {
                 toast.success(editItem ? "Updated" : "Saved")
                 closeDialog()
                 setReceiptUrl("")
-                fetchExpenses()
+
+                // 🆕 Phase 11: Auto-navigate to the added expense date
+                const targetDate = expenseDate || formatLocalDate(new Date())
+                setSelectedDate(targetDate)
+                setExpenseView('daily') // Auto switch to daily view to show the result
+
+                fetchExpenses() // This will refresh the list, and now selectedDate is already set
             } else {
                 throw new Error("API Error")
             }
