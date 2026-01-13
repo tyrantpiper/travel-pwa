@@ -17,6 +17,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  interactiveWidget: "resizes-content", // 🆕 Improves PWA keyboard handling
 }
 
 export const metadata: Metadata = {

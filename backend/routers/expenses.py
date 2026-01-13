@@ -82,7 +82,15 @@ async def update_expense(
         data = request.dict(exclude_unset=True)
         if 'amount_jpy' in data:
             data['amount'] = data.pop('amount_jpy')  # 對應 DB 欄位
-        
+            
+        # 🔧 FIX Phase 13: Map frontend 'expense_date' to DB 'incurred_at'
+        if 'expense_date' in data:
+            data['incurred_at'] = data.pop('expense_date')
+            
+        # 🔧 FIX Phase 13: Map frontend 'expense_date' to DB 'incurred_at'
+        if 'expense_date' in data:
+            data['incurred_at'] = data.pop('expense_date')
+
         # 🆕 Currency update is handled automatically if present in request due to Pydantic model
         
         supabase.table("expenses").update(data).eq("id", expense_id).execute()
