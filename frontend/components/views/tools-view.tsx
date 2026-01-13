@@ -29,6 +29,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { useHaptic } from "@/lib/hooks"
+import { debugLog } from "@/lib/debug"
 
 // Type definitions
 interface Expense {
@@ -362,7 +363,7 @@ export function ToolsView() {
     // Filter expenses based on view mode and owner filter
     const filteredExpenses = useMemo(() => {
         let filtered = expenses
-        console.log(`🔍 Filtering: View=${expenseView}, Date=${selectedDate}, Total=${expenses.length}`)
+        debugLog(`🔍 Filtering: View=${expenseView}, Date=${selectedDate}, Total=${expenses.length}`)
 
         // Owner filter
         if (ownerFilter === 'public') {
@@ -379,13 +380,13 @@ export function ToolsView() {
                 const match = d === selectedDate
                 if (!match && expenses.length < 20) {
                     // Log mismatches for small datasets to debug
-                    console.log(`   ❌ Mismatch: ExpID=${e.id}, Date=${d}, Target=${selectedDate}, Raw=${JSON.stringify({ ed: e.expense_date, ia: e.incurred_at, ca: e.created_at })}`)
+                    debugLog(`   ❌ Mismatch: ExpID=${e.id}, Date=${d}, Target=${selectedDate}, Raw=${JSON.stringify({ ed: e.expense_date, ia: e.incurred_at, ca: e.created_at })}`)
                 }
                 return match
             })
         }
 
-        console.log(`   ✅ Filtered Result: ${filtered.length} items`)
+        debugLog(`   ✅ Filtered Result: ${filtered.length} items`)
         return filtered
     }, [expenses, ownerFilter, expenseView, selectedDate])
 

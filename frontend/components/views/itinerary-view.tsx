@@ -46,6 +46,7 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 import { fetchWeatherWithSDK, generateHourlyCurve } from "@/lib/weather-api"  // 🆕 P6 + Phase 1
 import { useHaptic } from "@/lib/hooks"
+import { debugLog } from "@/lib/debug"
 import { Loader2, Clock } from "lucide-react"
 import { TripCardSkeleton } from "@/components/ui/skeleton"
 import { getNowInZone } from "@/lib/timezone"
@@ -243,7 +244,7 @@ export function ItineraryView() {
                     cleaned++
                 }
             })
-            if (cleaned > 0) console.log(`🧹 Weather cache cleaned: ${cleaned} expired entries`)
+            if (cleaned > 0) debugLog(`🧹 Weather cache cleaned: ${cleaned} expired entries`)
         }
 
         // 每 5 分鐘清理一次
@@ -274,18 +275,18 @@ export function ItineraryView() {
         // 🐛 FIX: Backend stores keys as strings ("1", "2"), but frontend uses numbers (1, 2)
         // Convert string keys to number keys to ensure dailyLocs[day] works correctly
         if (currentTrip) {
-            console.log("🔍 DEBUG: currentTrip Content Dump:", {
+            debugLog("🔍 DEBUG: currentTrip Content Dump:", {
                 checklist: currentTrip.day_checklists,
                 review: currentTrip.ai_review
             })
 
             const rawLocs = currentTrip.daily_locations || {}
-            console.log("🔍 DEBUG: currentTrip.daily_locations =", JSON.stringify(rawLocs))
+            debugLog("🔍 DEBUG: currentTrip.daily_locations =", JSON.stringify(rawLocs))
             const normalizedLocs: Record<number, DailyLocation> = {}
             for (const [key, value] of Object.entries(rawLocs)) {
                 normalizedLocs[Number(key)] = value as DailyLocation
             }
-            console.log("🔍 DEBUG: normalizedLocs (after conversion) =", JSON.stringify(normalizedLocs))
+            debugLog("🔍 DEBUG: normalizedLocs (after conversion) =", JSON.stringify(normalizedLocs))
             setDailyLocs(normalizedLocs)
         }
     }, [currentTrip])
@@ -295,7 +296,7 @@ export function ItineraryView() {
         if (isOnline && currentTrip && activeTripId) {
             try {
                 localStorage.setItem(`offline_trip_${activeTripId}`, JSON.stringify(currentTrip))
-                console.log(`✈️ 已快取行程: ${currentTrip.title}`)
+                debugLog(`✈️ 已快取行程: ${currentTrip.title}`)
             } catch (e) {
                 console.warn("快取行程失敗:", e)
             }
@@ -421,7 +422,7 @@ export function ItineraryView() {
             }
 
             if (cached && (Date.now() - cached.timestamp) < (cacheTTL[cached.mode] || 3600000)) {
-                console.log(`📦 Weather Cache HIT: ${cacheKey}`)
+                debugLog(`📦 Weather Cache HIT: ${cacheKey}`)
                 // 即時返回，不需要 active check 因為是同步的
                 setWeatherData(cached.data)
                 setWeatherMode(cached.mode)
@@ -435,7 +436,7 @@ export function ItineraryView() {
 
                     // 🛡️ P8: Race Check
                     if (activeReqRef.current !== currentReqId) {
-                        console.log('🛡️ Race Condition Prevented (SDK): Stale response ignored')
+                        debugLog('🛡️ Race Condition Prevented (SDK): Stale response ignored')
                         return
                     }
 
@@ -455,7 +456,7 @@ export function ItineraryView() {
                             mode: sdkResult.mode,
                             timestamp: Date.now()
                         })
-                        console.log(`💾 Weather Cache STORE (SDK): ${cacheKey}`)
+                        debugLog(`💾 Weather Cache STORE (SDK): ${cacheKey}`)
                         return  // SDK 成功，直接返回
                     }
                 }
@@ -489,7 +490,7 @@ export function ItineraryView() {
                     apiUrl = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,wind_speed_10m_max&start_date=${targetDate}&end_date=${targetDate}&timezone=auto`
                 }
 
-                console.log(`🌡️ Weather API Request: ${mode} mode`)
+                debugLog(`🌡️ Weather API Request: ${mode} mode`)
 
                 const res = await fetch(apiUrl, {
                     signal: controller.signal,
@@ -499,7 +500,7 @@ export function ItineraryView() {
 
                 // 🛡️ P8: Race Check (Post-fetch)
                 if (activeReqRef.current !== currentReqId) {
-                    console.log('🛡️ Race Condition Prevented (JSON): Stale response ignored')
+                    debugLog('🛡️ Race Condition Prevented (JSON): Stale response ignored')
                     return
                 }
 
@@ -553,7 +554,7 @@ export function ItineraryView() {
                         if (!isNaN(sunriseTime.getTime()) && !isNaN(sunsetTime.getTime())) {
                             sunriseHour = sunriseTime.getHours() + sunriseTime.getMinutes() / 60
                             sunsetHour = sunsetTime.getHours() + sunsetTime.getMinutes() / 60
-                            console.log(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
+                            debugLog(`🌅 Phase 2: sunrise=${sunriseHour.toFixed(1)}, sunset=${sunsetHour.toFixed(1)}`)
                         }
                     }
 
@@ -578,7 +579,7 @@ export function ItineraryView() {
 
                     // 🆕 P12.1: 讀取最大風速 (用於體感校正)
                     const windSpeedMax = data.daily?.wind_speed_10m_max?.[0] ?? 0
-                    console.log(`💨 P12.1: wind_speed_10m_max=${windSpeedMax} km/h`)
+                    debugLog(`💨 P12.1: wind_speed_10m_max=${windSpeedMax} km/h`)
 
                     // 🆕 P12.2: 濕度動態區間 (下雨 85-95%, 多雲 65-75%, 晴天 40-60%)
                     const getDynamicHumidity = () => {
@@ -635,7 +636,7 @@ export function ItineraryView() {
 
                 // 🆕 P7: 儲存至快取
                 weatherCache.current.set(cacheKey, { data: forecast, mode, timestamp: Date.now() })
-                console.log(`💾 Weather Cache STORE: ${cacheKey}`)
+                debugLog(`💾 Weather Cache STORE: ${cacheKey}`)
             } catch (e) {
                 // 忽略 AbortError（正常的取消操作）
                 if ((e as Error).name !== 'AbortError') {
@@ -681,7 +682,7 @@ export function ItineraryView() {
                         forecast.push({ time: `${i}:00`, temp: Math.round(temps[i]), code: codes[i] || 0 })
                     }
                     weatherCache.current.set(adjCacheKey, { data: forecast, mode: 'forecast', timestamp: Date.now() })
-                    console.log(`🔮 P5 Prefetch: Day ${adjDay} cached`)
+                    debugLog(`🔮 P5 Prefetch: Day ${adjDay} cached`)
                 } catch { /* 預取失敗不影響主流程 */ }
             }
         }
@@ -809,9 +810,9 @@ export function ItineraryView() {
 
                 // 顯示搜尋來源提示
                 if (data.source === "arcgis") {
-                    console.log("🗺️ 使用 ArcGIS 搜尋")
+                    debugLog("🗺️ 使用 ArcGIS 搜尋")
                 } else if (data.source === "photon") {
-                    console.log("🔍 使用 Photon 搜尋")
+                    debugLog("🔍 使用 Photon 搜尋")
                 }
             }
         } catch { toast.error("搜尋失敗") }
@@ -2008,7 +2009,7 @@ export function ItineraryView() {
                                 // 2. ⚡ 殭屍清除邏輯：如果是在 Day 1 編輯，且 Day 0 有資料，須將 Day 0 清空
                                 const hasDay0Items = (currentTrip?.day_checklists?.[0]?.length || 0) > 0
                                 if (day === 1 && hasDay0Items) {
-                                    console.log("🧹 Detecting Day 0 items after merge, clearing Day 0...")
+                                    debugLog("🧹 Detecting Day 0 items after merge, clearing Day 0...")
                                     await tripsApi.updateDayData(activeTripId, 0, {
                                         day_checklists: { "0": [] }
                                     })

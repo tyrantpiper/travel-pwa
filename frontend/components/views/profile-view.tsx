@@ -28,6 +28,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { TaskCard } from "@/components/onboarding/TaskCard"
+import { debugLog } from "@/lib/debug"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 
 
@@ -130,7 +131,7 @@ export function ProfileView() {
                     }
                 }
             } catch (err) {
-                console.log('[Donation] Failed to fetch progress:', err)
+                debugLog('[Donation] Failed to fetch progress:', err)
             }
         }
         fetchDonationProgress()

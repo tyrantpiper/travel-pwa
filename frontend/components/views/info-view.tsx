@@ -21,6 +21,7 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh"
 import { toast } from "sonner"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { geocodeApi } from "@/lib/api"
+import { debugLog } from "@/lib/debug"
 
 // API URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -601,12 +602,12 @@ export function InfoView() {
                                                         console.warn('❌ currentHotelIdxRef is null')
                                                         return
                                                     }
-                                                    console.log('🖼️ Image uploaded:', url.substring(0, 50) + '...', 'for hotel index:', idx)
+                                                    debugLog('🖼️ Image uploaded:', url.substring(0, 50) + '...', 'for hotel index:', idx)
                                                     setHotels(prev => {
                                                         const newHotels = [...prev]
                                                         if (newHotels[idx]) {
                                                             newHotels[idx] = { ...newHotels[idx], image_url: url }
-                                                            console.log('✅ Hotel updated with image_url')
+                                                            debugLog('✅ Hotel updated with image_url')
                                                         } else {
                                                             console.warn('❌ Hotel at index', idx, 'not found')
                                                         }
