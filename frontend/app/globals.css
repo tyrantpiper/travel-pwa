@@ -156,11 +156,9 @@ body,
   contain: layout style paint;
 }
 
-/* 動畫元素 GPU 加速 */
-[class*="motion"] {
-  will-change: transform, opacity;
-  transform: translateZ(0);
-}
+/* 🔧 FIX: Removed [class*="motion"] rule - was conflicting with Framer Motion
+   Framer Motion handles will-change and GPU compositing internally.
+   The global rule was causing downward scroll jitter on mobile. */
 
 /* ✨ 微動畫：按鈕按壓回饋 */
 button:not(:disabled),
