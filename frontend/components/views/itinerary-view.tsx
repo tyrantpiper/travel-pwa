@@ -92,6 +92,9 @@ export function ItineraryView() {
         newOrder: Activity[]
     } | null>(null)
     const [isReorderDialogOpen, setIsReorderDialogOpen] = useState(false)
+    const [isReordering, setIsReordering] = useState(false)
+    const [leavingTripId, setLeavingTripId] = useState<string | null>(null)
+    const [isSelectingLocation, setIsSelectingLocation] = useState(false)
 
     // 🆕 DND Sensors (同多圖拖曳)
     const dndSensors = useSensors(
@@ -179,6 +182,8 @@ export function ItineraryView() {
 
     const handleReorderConfirm = useCallback(async (adjustTimes: boolean) => {
         if (!pendingReorder || !activeTripId) return
+        if (isReordering) return // 🛡️ Prevent double click
+        setIsReordering(true)
 
         try {
             const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -209,8 +214,9 @@ export function ItineraryView() {
         } finally {
             setPendingReorder(null)
             setIsReorderDialogOpen(false)
+            setIsReordering(false)
         }
-    }, [pendingReorder, activeTripId, reloadTripDetail])
+    }, [pendingReorder, activeTripId, reloadTripDetail, isReordering])
 
 
     // 🆕 P7+: 定期清理過期快取 (防止記憶體累積)
@@ -685,8 +691,10 @@ export function ItineraryView() {
     }, [day, dailyLocs, currentTrip])
 
     const handleLeaveTrip = async (tripId: string) => {
+        if (leavingTripId) return // Prevent concurrent actions
         if (!confirm(t('confirm_delete') ? "您確定要退出此行程嗎？" : "Are you sure you want to leave this trip?")) return
 
+        setLeavingTripId(tripId)
         try {
             const res = await fetch(`${API_BASE}/api/trips/${tripId}/leave`, {
                 method: "POST",
@@ -706,6 +714,8 @@ export function ItineraryView() {
         } catch (e) {
             console.error(e)
             toast.error("退出行程失敗")
+        } finally {
+            setLeavingTripId(null)
         }
     }
 
@@ -806,6 +816,9 @@ export function ItineraryView() {
 
     const handleSelectLocation = async (loc: LocationInfo) => {
         if (!currentTrip) return
+        if (isSelectingLocation) return // Prevent double click
+        setIsSelectingLocation(true)
+
         try {
             const displayName = loc.admin2 || loc.admin1 ? `${loc.name}, ${loc.admin2 || loc.admin1}` : loc.name
             await fetch(`${API_BASE}/api/trips/${currentTrip.id}/location`, {
@@ -818,7 +831,11 @@ export function ItineraryView() {
             setNewLocName("")
             setLocSearchResults([])
             reloadTripDetail()
-        } catch { toast.error("更新失敗") }
+        } catch {
+            toast.error("更新失敗")
+        } finally {
+            setIsSelectingLocation(false)
+        }
     }
 
     const handleSaveEdit = async () => {
@@ -1310,12 +1327,13 @@ export function ItineraryView() {
                                                     variant="ghost"
                                                     size="sm"
                                                     className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
+                                                    disabled={leavingTripId === trip.id}
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         handleLeaveTrip(trip.id)
                                                     }}
                                                 >
-                                                    <LogOut className="w-3 h-3" /> 退出
+                                                    {leavingTripId === trip.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />} 退出
                                                 </Button>
                                             )}
                                         </div>
@@ -1596,7 +1614,8 @@ export function ItineraryView() {
                                                     <button
                                                         key={idx}
                                                         onClick={() => handleSelectLocation(loc)}
-                                                        className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors"
+                                                        disabled={isSelectingLocation}
+                                                        className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
@@ -2107,17 +2126,19 @@ export function ItineraryView() {
                         <Button
                             className="w-full"
                             onClick={() => handleReorderConfirm(false)}
+                            disabled={isReordering}
                         >
-                            🕐 保持原時間
+                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "🕐"} 保持原時間
                         </Button>
                         <Button
                             variant="secondary"
                             className="w-full"
                             onClick={() => handleReorderConfirm(true)}
+                            disabled={isReordering}
                         >
-                            ⏱️ 自動調整時間
+                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "⏱️"} 自動調整時間
                         </Button>
-                        <AlertDialogCancel className="w-full">取消</AlertDialogCancel>
+                        <AlertDialogCancel className="w-full" disabled={isReordering}>取消</AlertDialogCancel>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
