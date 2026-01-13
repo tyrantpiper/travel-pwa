@@ -51,12 +51,12 @@ export const SortableTimelineCard = memo(function SortableTimelineCard({
     })
 
     // 🔧 防抖動技術：使用 CSS.Translate 純平移
-    // 🔑 拖曳時隱藏原項目 (由 DragOverlay 顯示)
+    // 🔧 FIX 3: 半透明佔位器 (opacity 0.3 而非 0)
     const style: CSSProperties = {
         transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 50 : undefined,
-        opacity: isDragging ? 0 : 1,  // 🆕 拖曳時完全隱藏
+        opacity: isDragging ? 0.3 : 1,  // 🔧 FIX: 顯示佔位器
         WebkitTouchCallout: 'none',
         userSelect: 'none',
     }
@@ -70,26 +70,26 @@ export const SortableTimelineCard = memo(function SortableTimelineCard({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "relative",
+                "relative select-none",  // 🔧 FIX 2: 阻止文字選取
                 isDragging && "ring-2 ring-blue-400 ring-offset-2 rounded-xl",
                 !isDragging && "transition-shadow"
             )}
         >
-            {/* 拖曳把手 - 只在非 Header 時顯示 */}
+            {/* 拖曳把手 - 始終可見 */}
             {!isHeader && !isDragDisabled && (
                 <div
                     {...attributes}
                     {...listeners}
                     className={cn(
-                        "absolute -left-2 top-1/2 -translate-y-1/2 z-10",
+                        "absolute -left-1 top-1/2 -translate-y-1/2 z-10",
                         "p-2 rounded-lg",
-                        "text-slate-300 hover:text-slate-500 hover:bg-slate-100",
+                        "text-slate-400 hover:text-slate-600 hover:bg-slate-100",
                         "cursor-grab active:cursor-grabbing",
-                        "touch-none transition-colors",
-                        "opacity-0 group-hover:opacity-100 md:opacity-60"
+                        "touch-none select-none",  // 🔧 FIX 2: 阻止文字選取
+                        "opacity-50 hover:opacity-100 active:opacity-100"  // 🔧 FIX 1: 始終可見
                     )}
                 >
-                    <GripVertical className="w-4 h-4" />
+                    <GripVertical className="w-5 h-5" />
                 </div>
             )}
 
