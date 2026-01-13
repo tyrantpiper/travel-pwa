@@ -318,30 +318,35 @@ export function ToolsView() {
         return `${year}-${month}-${day}`
     }
 
-    // 🆕 Phase 8: Trip-date-driven allDates (instead of expense-driven)
+    // 🆕 Phase 12: Union of Trip Dates + Expense Dates (Prevent Orphaned Dates)
     const allDates = useMemo(() => {
-        // Priority 1: Use trip date range if available
-        if (activeTrip?.start_date) {
-            // Use T00:00:00 to force local timezone interpretation
-            const start = new Date(activeTrip.start_date + 'T00:00:00')
-            const end = activeTrip.end_date
-                ? new Date(activeTrip.end_date + 'T00:00:00')
-                : new Date(start.getTime() + ((activeTrip.days?.length || 7) - 1) * 24 * 60 * 60 * 1000)
+        const dateSet = new Set<string>()
 
-            const dates: string[] = []
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                dates.push(formatLocalDate(d))
+        // 1. Add Trip Dates (if active)
+        try {
+            if (activeTrip?.start_date) {
+                // Use T00:00:00 to force local timezone interpretation
+                const start = new Date(activeTrip.start_date + 'T00:00:00')
+                const end = activeTrip.end_date
+                    ? new Date(activeTrip.end_date + 'T00:00:00')
+                    : new Date(start.getTime() + ((activeTrip.days?.length || 7) - 1) * 24 * 60 * 60 * 1000)
+
+                if (!isNaN(start.getTime())) {
+                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                        dateSet.add(formatLocalDate(d))
+                    }
+                }
             }
-            return dates
-        }
+        } catch (e) { console.error("Error calculating trip dates:", e) }
 
-        // Fallback: Extract from expenses (when no trip selected)
-        const dates = new Set<string>()
+        // 2. Add Expense Dates (ALWAYS merge to ensure visibility)
         expenses.forEach(e => {
-            const d = e.expense_date || e.created_at?.split('T')[0]
-            if (d) dates.add(d)
+            const raw = e.expense_date || e.incurred_at || e.created_at
+            const d = raw ? raw.split('T')[0] : ''
+            if (d) dateSet.add(d)
         })
-        return Array.from(dates).sort()
+
+        return Array.from(dateSet).sort()
     }, [activeTrip, expenses])
 
     // Set initial selected date (prefer today if within trip range)
@@ -462,7 +467,15 @@ export function ToolsView() {
     }
 
     const formatDateDisplay = (dateStr: string) => {
+        if (!dateStr) return "Invalid Date"
         const d = new Date(dateStr + 'T00:00:00') // Force local timezone
+
+        // 🆕 Phase 12: NaN Guard
+        if (isNaN(d.getTime())) {
+            console.error(`❌ formatDateDisplay Invalid Date: "${dateStr}"`)
+            return dateStr || "Invalid Date"
+        }
+
         const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
         const dayIndex = allDates.indexOf(dateStr)
         const dayLabel = dayIndex >= 0 ? `Day ${dayIndex + 1}` : ''
