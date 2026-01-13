@@ -902,8 +902,10 @@ async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase))
         print(f"✅ 排序更新完成: {len(results)} 項目")
         return {"status": "success", "results": results}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"🔥 Reorder Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
 
 
 @router.delete("/items/{item_id}")
