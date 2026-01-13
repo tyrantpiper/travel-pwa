@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -18,74 +18,98 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     const startY = useRef(0)
     const isPulling = useRef(false)
 
-    const handleTouchStart = useCallback((e: React.TouchEvent) => {
-        // Only start pull if we're at the top
-        if (containerRef.current && containerRef.current.scrollTop <= 0) {
+    // 🆕 使用原生事件監聽器，可控制 passive
+    useEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        const handleNativeTouchStart = (e: TouchEvent) => {
+            // 🛡️ 嚴格邊界檢查：window + container
+            if (window.scrollY > 0 || container.scrollTop > 0) {
+                isPulling.current = false
+                return
+            }
             startY.current = e.touches[0].clientY
             isPulling.current = true
         }
-    }, [])
 
-    const handleTouchMove = useCallback((e: React.TouchEvent) => {
-        if (!isPulling.current || isRefreshing) return
-
-        // 🔧 FIX: Strictly check if we're still at the very top
-        // If user has scrolled down at all, cancel the pull gesture entirely
-        if (!containerRef.current || containerRef.current.scrollTop > 0) {
-            isPulling.current = false
-            setPullDistance(0)
-            return
-        }
-
-        const currentY = e.touches[0].clientY
-        const diff = currentY - startY.current
-
-        // Only allow pull down (positive diff) when at top
-        if (diff > 0) {
-            // Add resistance
-            const resistance = diff > pullThreshold ? 0.3 : 0.5
-            const newDistance = Math.min(diff * resistance, pullThreshold * 1.5)
-            setPullDistance(newDistance)
-
-            // Prevent scroll when pulling
-            if (diff > 10) {
-                e.preventDefault()
+        const handleNativeTouchMove = (e: TouchEvent) => {
+            // 🛡️ 如果頁面已捲動，完全放行給瀏覽器
+            if (window.scrollY > 0 || container.scrollTop > 0) {
+                if (isPulling.current) {
+                    isPulling.current = false
+                    setPullDistance(0)
+                }
+                return // 不做任何處理，讓瀏覽器執行原生慣性捲動
             }
-        } else {
-            // User is trying to scroll down (negative diff), cancel pull mode
-            isPulling.current = false
-            setPullDistance(0)
-        }
-    }, [isRefreshing, pullThreshold])
 
-    const handleTouchEnd = useCallback(async () => {
-        if (!isPulling.current) return
-        isPulling.current = false
+            if (!isPulling.current || isRefreshing) return
 
-        if (pullDistance >= pullThreshold && !isRefreshing) {
-            setIsRefreshing(true)
-            setPullDistance(50) // Keep indicator visible
+            const touch = e.touches[0]
+            const diff = touch.clientY - startY.current
 
-            try {
-                await onRefresh()
-            } finally {
-                setIsRefreshing(false)
+            if (diff > 0) {
+                // 下拉：應用阻力
+                const resistance = diff > pullThreshold ? 0.3 : 0.5
+                const newDistance = Math.min(diff * resistance, pullThreshold * 1.5)
+                setPullDistance(newDistance)
+
+                // 只在明確下拉時阻止預設行為
+                if (diff > 10) {
+                    e.preventDefault()
+                }
+            } else {
+                // 上滑：取消 PTR，讓瀏覽器捲動
+                isPulling.current = false
                 setPullDistance(0)
             }
-        } else {
-            setPullDistance(0)
         }
-    }, [pullDistance, pullThreshold, isRefreshing, onRefresh])
+
+        const handleNativeTouchEnd = async () => {
+            if (!isPulling.current) return
+            isPulling.current = false
+
+            if (pullDistance >= pullThreshold && !isRefreshing) {
+                setIsRefreshing(true)
+                setPullDistance(50)
+
+                try {
+                    await onRefresh()
+                } finally {
+                    setIsRefreshing(false)
+                    setPullDistance(0)
+                }
+            } else {
+                setPullDistance(0)
+            }
+        }
+
+        // 🆕 使用 passive: false 讓 preventDefault 生效
+        container.addEventListener('touchstart', handleNativeTouchStart, { passive: true })
+        container.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
+        container.addEventListener('touchend', handleNativeTouchEnd, { passive: true })
+
+        return () => {
+            container.removeEventListener('touchstart', handleNativeTouchStart)
+            container.removeEventListener('touchmove', handleNativeTouchMove)
+            container.removeEventListener('touchend', handleNativeTouchEnd)
+        }
+    }, [isRefreshing, pullThreshold, pullDistance, onRefresh])
 
     const progress = Math.min(pullDistance / pullThreshold, 1)
 
     return (
         <div
             ref={containerRef}
-            className={cn("relative overflow-auto", className)}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            className={cn(
+                "relative overflow-auto",
+                "overscroll-y-contain", // 🆕 阻止捲動鍊
+                "touch-pan-y",          // 🆕 讓瀏覽器優先處理垂直捲動
+                className
+            )}
+            style={{
+                WebkitOverflowScrolling: 'touch' // 🆕 iOS 慣性捲動
+            }}
         >
             {/* Pull indicator */}
             <div

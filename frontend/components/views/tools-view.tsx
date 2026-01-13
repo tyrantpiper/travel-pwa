@@ -40,6 +40,7 @@ interface Expense {
     is_public: boolean
     image_url?: string
     expense_date?: string
+    incurred_at?: string // 🆕 DB column name for compatibility
     created_at?: string
     exchange_rate?: number
     cashback_rate?: number
@@ -367,7 +368,8 @@ export function ToolsView() {
         // Date filter (daily mode)
         if (expenseView === 'daily' && selectedDate) {
             filtered = filtered.filter(e => {
-                const d = e.expense_date || e.created_at?.split('T')[0]
+                // 🆕 Phase 10.5: incurred_at fallback for DB column name compatibility
+                const d = e.expense_date || e.incurred_at || e.created_at?.split('T')[0]
                 return d === selectedDate
             })
         }

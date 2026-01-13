@@ -56,6 +56,9 @@ async def get_expenses(
         
         filtered = []
         for exp in all_expenses:
+            # 🆕 Phase 10.5: Map DB column to frontend field name
+            exp['expense_date'] = exp.get('incurred_at')
+            
             # 如果是公帳 -> 顯示
             if exp['is_public']:
                 filtered.append(exp)
