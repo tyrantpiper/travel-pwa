@@ -1034,8 +1034,18 @@ export function ToolsView() {
                                     <div className="flex justify-between items-center">
                                         <div>
                                             <p className="text-xs text-slate-500">{t('total')}</p>
-                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
-                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                            {selectedCurrency && selectedCurrency !== 'TWD' ? (
+                                                <>
+                                                    <p className="text-2xl font-bold text-slate-900">
+                                                        {totalForeign.toLocaleString()} <span className="text-sm font-normal text-slate-500">{selectedCurrency}</span>
+                                                    </p>
+                                                    <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                                </>
+                                            ) : (
+                                                <p className="text-2xl font-bold text-slate-900">
+                                                    {totalTWD.toLocaleString()} <span className="text-sm font-normal text-slate-500">TWD</span>
+                                                </p>
+                                            )}
                                             {totalCashback > 0 && (
                                                 <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
                                             )}
