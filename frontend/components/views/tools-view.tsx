@@ -152,6 +152,7 @@ export function ToolsView() {
     }, [trips, activeTripId])
 
     const [activeTab, setActiveTab] = useState("expense")
+    const [expenses, setExpenses] = useState<Expense[]>([]) // 🔧 FIX: Restore missing state
 
     // 🆕 Currency State
     const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null) // null = TWD only
