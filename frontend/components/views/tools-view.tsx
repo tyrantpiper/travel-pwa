@@ -1348,7 +1348,7 @@ export function ToolsView() {
                                             return Array.from({ length: totalDays }, (_, i) => {
                                                 const date = new Date(startDate)
                                                 date.setDate(date.getDate() + i)
-                                                const dateStr = date.toISOString().split('T')[0]
+                                                const dateStr = formatLocalDate(date)
                                                 const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
                                                 return (
                                                     <option key={i} value={dateStr}>
