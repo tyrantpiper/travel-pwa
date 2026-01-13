@@ -9,13 +9,13 @@
  * - ✨ 流暢動畫 (無抖動)
  */
 
-import { memo, CSSProperties } from "react"
+import { memo, useEffect } from "react"
 import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
 import { GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TimelineCard } from "@/components/timeline-card"
 import { Activity, SubItem } from "@/lib/itinerary-types"
+import { motion, useSpring } from "framer-motion"
 
 interface SortableTimelineCardProps {
     activity: Activity
@@ -28,54 +28,82 @@ interface SortableTimelineCardProps {
     onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean>
 }
 
-export const SortableTimelineCard = memo(function SortableTimelineCard({
-    activity,
-    index,
-    isLast,
-    isDragDisabled = false,
-    onEdit,
-    onDelete,
-    onUpdateMemo,
-    onUpdateSubItems
-}: SortableTimelineCardProps) {
+// ⚡ 1. Memoized Inner Component: 防止拖曳時內容重繪
+const MemoizedTimelineCard = memo(({ activity, index, isLast, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: SortableTimelineCardProps) => {
+    return (
+        <TimelineCard
+            activity={activity}
+            index={index}
+            isLast={isLast}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onUpdateMemo={onUpdateMemo}
+            onUpdateSubItems={onUpdateSubItems}
+        />
+    )
+}, (prev, next) => {
+    // 自定義比較邏輯：只有 ID, Time, Last 狀態改變才重繪
+    return prev.activity.id === next.activity.id &&
+        prev.activity.time === next.activity.time &&
+        prev.index === next.index &&
+        prev.isLast === next.isLast
+})
+
+MemoizedTimelineCard.displayName = "MemoizedTimelineCard"
+
+export const SortableTimelineCard = memo(function SortableTimelineCard(props: SortableTimelineCardProps) {
+    const { activity, isDragDisabled = false } = props
+
     const {
         attributes,
         listeners,
         setNodeRef,
         transform,
-        transition,
         isDragging
     } = useSortable({
         id: activity.id,
         disabled: isDragDisabled
     })
 
-    // 🔧 防抖動技術：使用 CSS.Translate 純平移
-    // 🔧 FIX 3: 半透明佔位器 (opacity 0.3 而非 0)
-    const style: CSSProperties = {
-        transform: CSS.Translate.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : undefined,
-        opacity: isDragging ? 0.3 : 1,  // 🔧 FIX: 顯示佔位器
-        WebkitTouchCallout: 'none',
-        userSelect: 'none',
+    // ⚡ 2. Physics Engine: Spring Animation
+    const springConfig = {
+        stiffness: 400, // 緊實
+        damping: 30,    // 微回彈
+        mass: 0.8       // 輕盈
     }
+
+    // 將 dnd-kit 的 transform 轉換為 Spring 值
+    const x = useSpring(0, springConfig)
+    const y = useSpring(0, springConfig)
+
+    useEffect(() => {
+        x.set(transform?.x || 0)
+        y.set(transform?.y || 0)
+    }, [transform, x, y])
 
     // Header 卡片 (00:00) 不可拖曳
     const isHeader = activity.category === 'header' ||
         (activity.time || activity.time_slot || "00:00") === '00:00'
 
     return (
-        <div
+        <motion.div
             ref={setNodeRef}
-            style={style}
+            data-testid="sortable-card"
+            style={{
+                x,
+                y,
+                scale: isDragging ? 1.02 : 1, // 🖱️ 拿起時微微放大
+                zIndex: isDragging ? 50 : undefined,
+                opacity: isDragging ? 0.3 : 1,
+            }}
             className={cn(
-                "relative select-none",  // 🔧 FIX 2: 阻止文字選取
-                isDragging && "ring-2 ring-blue-400 ring-offset-2 rounded-xl",
-                !isDragging && "transition-shadow"
+                "relative select-none",
+                // 移除 transition-shadow 因為 framer-motion 會處理
+                "touch-none", // ⚡ 3. Instant Touch
+                "will-change-transform" // ⚡ 4. GPU Acceleration
             )}
         >
-            {/* 拖曳把手 - 始終可見 */}
+            {/* 拖曳把手 */}
             {!isHeader && !isDragDisabled && (
                 <div
                     {...attributes}
@@ -85,26 +113,18 @@ export const SortableTimelineCard = memo(function SortableTimelineCard({
                         "p-2 rounded-lg",
                         "text-slate-400 hover:text-slate-600 hover:bg-slate-100",
                         "cursor-grab active:cursor-grabbing",
-                        "touch-none select-none",  // 🔧 FIX 2: 阻止文字選取
-                        "opacity-50 hover:opacity-100 active:opacity-100"  // 🔧 FIX 1: 始終可見
+                        "touch-none select-none",
+                        "opacity-50 hover:opacity-100 active:opacity-100"
                     )}
                 >
                     <GripVertical className="w-5 h-5" />
                 </div>
             )}
 
-            {/* 原有的 TimelineCard */}
+            {/* 原有的 TimelineCard (Memoized) */}
             <div className="group">
-                <TimelineCard
-                    activity={activity}
-                    index={index}
-                    isLast={isLast}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onUpdateMemo={onUpdateMemo}
-                    onUpdateSubItems={onUpdateSubItems}
-                />
+                <MemoizedTimelineCard {...props} />
             </div>
-        </div>
+        </motion.div>
     )
 })

@@ -18,6 +18,7 @@ import {
     DragStartEvent,
     DragOverlay
 } from "@dnd-kit/core"
+import { createPortal } from "react-dom"
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable"
 import { SortableTimelineCard } from "@/components/itinerary/SortableTimelineCard"
 import { TimelineCardOverlay } from "@/components/itinerary/TimelineCardOverlay"
@@ -82,6 +83,8 @@ export function ItineraryView() {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isAddMode, setIsAddMode] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), []) // 🔧 Client-side only rendering for Portal
 
     // 🆕 DND State
     const [activeId, setActiveId] = useState<string | null>(null)
@@ -147,12 +150,15 @@ export function ItineraryView() {
 
     // 🆕 DND Event Handlers
     const handleDragStart = useCallback((event: DragStartEvent) => {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10) // 📳 Haptic: Lift
         setActiveId(event.active.id as string)
     }, [])
 
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event
         setActiveId(null)
+
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([5, 20, 5]) // 📳 Haptic: Drop
 
         if (!over || active.id === over.id) return
         if (!isOnline) {
@@ -958,6 +964,35 @@ export function ItineraryView() {
         fetch(`${API_BASE}/api/items/${id}`, { method: "DELETE" })
             .catch(() => reloadTripDetail()) // Revert on error
     }, [t, currentTrip, reloadTripDetail])
+
+    // ⚡ Memoized Handlers for SortableTimelineCard (Fixed: Stable References)
+    const handleEditActivity = useCallback((item: Activity) => {
+        if (!isOnline) {
+            toast.error("✈️ 離線模式下無法編輯")
+            return
+        }
+        setIsAddMode(false)
+        setEditItem({
+            id: item.id,
+            time: item.time || item.time_slot || "00:00",
+            place: item.place || item.place_name || "",
+            category: item.category || "sightseeing",
+            desc: item.desc || item.notes || "",
+            lat: item.lat,
+            lng: item.lng,
+            image_url: item.image_url,
+            tags: item.tags || []
+        })
+        setIsEditOpen(true)
+    }, [isOnline])
+
+    const handleDeleteActivity = useCallback((id: string) => {
+        if (!isOnline) {
+            toast.error("✈️ 離線模式下無法刪除")
+            return
+        }
+        handleDeleteItem(id)
+    }, [isOnline, handleDeleteItem])
 
     const handleDeleteDay = async (dayNum: number) => {
         if (!currentTrip) return
@@ -2025,32 +2060,8 @@ export function ItineraryView() {
                                                     index={realIndices[idx]}
                                                     isLast={idx === currentDayData.length - 1}
                                                     isDragDisabled={isHeader || !isOnline}
-                                                    onEdit={(item: Activity) => {
-                                                        if (!isOnline) {
-                                                            toast.error("✈️ 離線模式下無法編輯")
-                                                            return
-                                                        }
-                                                        setIsAddMode(false)
-                                                        setEditItem({
-                                                            id: item.id,
-                                                            time: item.time || item.time_slot || "00:00",
-                                                            place: item.place || item.place_name || "",
-                                                            category: item.category || "sightseeing",
-                                                            desc: item.desc || item.notes || "",
-                                                            lat: item.lat,
-                                                            lng: item.lng,
-                                                            image_url: item.image_url,
-                                                            tags: item.tags || []
-                                                        })
-                                                        setIsEditOpen(true)
-                                                    }}
-                                                    onDelete={(id) => {
-                                                        if (!isOnline) {
-                                                            toast.error("✈️ 離線模式下無法刪除")
-                                                            return
-                                                        }
-                                                        handleDeleteItem(id)
-                                                    }}
+                                                    onEdit={handleEditActivity}
+                                                    onDelete={handleDeleteActivity}
                                                     onUpdateMemo={handleUpdateMemo}
                                                     onUpdateSubItems={handleUpdateSubItems}
                                                 />
@@ -2059,13 +2070,23 @@ export function ItineraryView() {
                                     />
                                 </SortableContext>
 
-                                {/* 🆕 DragOverlay - 拖曳時顯示的覆蓋層 */}
-                                <DragOverlay dropAnimation={null}>
-                                    {activeId && (() => {
-                                        const activity = currentDayData.find((a: Activity) => a.id === activeId)
-                                        return activity ? <TimelineCardOverlay activity={activity} /> : null
-                                    })()}
-                                </DragOverlay>
+                                {/* 🆕 DragOverlay - 🔧 FIX: 使用 Portal 渲染至 Body (避免 overflow 裁切) */}
+                                {
+                                    mounted && createPortal(
+                                        <DragOverlay
+                                            dropAnimation={{
+                                                duration: 250,
+                                                easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)', // 🔧 彈簧回彈效果
+                                            }}
+                                        >
+                                            {activeId && (() => {
+                                                const activity = currentDayData.find((a: Activity) => a.id === activeId)
+                                                return activity ? <TimelineCardOverlay activity={activity} /> : null
+                                            })()}
+                                        </DragOverlay>,
+                                        document.body
+                                    )
+                                }
                             </DndContext>
                         ) : null;
                     })()}
