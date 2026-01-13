@@ -98,9 +98,9 @@ export const SortableTimelineCard = memo(function SortableTimelineCard(props: So
             }}
             className={cn(
                 "relative select-none",
-                // 移除 transition-shadow 因為 framer-motion 會處理
-                "touch-none", // ⚡ 3. Instant Touch
-                "will-change-transform" // ⚡ 4. GPU Acceleration
+                // 🔧 FIX: Removed touch-none - it was blocking native scroll
+                // touch-none is now ONLY on drag handle (line 116)
+                "will-change-transform" // GPU Acceleration
             )}
         >
             {/* 拖曳把手 */}
