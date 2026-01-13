@@ -42,11 +42,16 @@ export const SortablePhoto = memo(function SortablePhoto({
         isDragging
     } = useSortable({ id })
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
+    // 🔧 修復抖動：使用 Translate (純平移)，不含 scale
+    const style: React.CSSProperties = {
+        transform: CSS.Translate.toString(transform),
         transition,
         zIndex: isDragging ? 50 : undefined,
-        opacity: isDragging ? 0.8 : 1,
+        opacity: isDragging ? 0.85 : 1,
+        boxShadow: isDragging ? "0 8px 20px rgba(0,0,0,0.25)" : undefined,
+        // 🆕 iOS 優化：防止 3D Touch 干擾
+        WebkitTouchCallout: 'none',
+        userSelect: 'none',
     }
 
     return (
@@ -54,10 +59,11 @@ export const SortablePhoto = memo(function SortablePhoto({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "relative group w-16 h-16 rounded-lg overflow-hidden border transition-all",
+                "relative group w-16 h-16 rounded-lg overflow-hidden border",
                 isDragging
-                    ? "border-blue-500 ring-2 ring-blue-300 scale-105 shadow-lg"
-                    : "border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500"
+                    ? "border-blue-500 ring-2 ring-blue-300"  // ✅ 移除 scale-105
+                    : "border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500",
+                !isDragging && "transition-shadow transition-colors"  // ✅ 拖曳時無 transition
             )}
         >
             {/* 圖片 - 點擊預覽 */}
