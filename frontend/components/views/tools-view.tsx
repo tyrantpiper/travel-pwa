@@ -871,619 +871,622 @@ export function ToolsView() {
     }
 
     return (
-        <div className="min-h-screen bg-stone-50 pb-32">
-            <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
-                <div className="space-y-3">
-                    <div>
-                        <h1 className="text-3xl font-serif mb-2">{t('tools')}</h1>
-                        <p className="text-slate-300 text-sm">{t('expense_ai')}</p>
+        // 🔧 Phase 14: View manages its own scrolling
+        <div className="h-full overflow-y-auto overscroll-contain">
+            <div className="min-h-screen bg-stone-50 pb-32">
+                <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
+                    <div className="space-y-3">
+                        <div>
+                            <h1 className="text-3xl font-serif mb-2">{t('tools')}</h1>
+                            <p className="text-slate-300 text-sm">{t('expense_ai')}</p>
+                        </div>
+                        <TripSwitcher className="bg-white/10 text-white border-white/20 hover:bg-white/20" />
                     </div>
-                    <TripSwitcher className="bg-white/10 text-white border-white/20 hover:bg-white/20" />
                 </div>
-            </div>
 
-            <PullToRefresh onRefresh={async () => {
-                const r = await getExchangeRate(selectedCurrency || 'JPY')
-                setRate(r)
-                await Promise.all([fetchExpenses(), tripMutate()])
-                toast.success("資料已更新")
-            }} className="flex-1 px-4 -mt-4">
-                <Tabs value={activeSection} onValueChange={setActiveSection}>
-                    {/* Custom Sliding Tab Strip */}
-                    <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
-                        {[
-                            { value: 'cards', label: '💳 卡片' },
-                            { value: 'expense', label: t('expense') },
-                            { value: 'ai', label: t('ai_tools') }
-                        ].map((tab) => (
-                            <button
-                                key={tab.value}
-                                onClick={() => setActiveSection(tab.value)}
-                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                {activeSection === tab.value && (
-                                    <motion.div
-                                        layoutId="tools-tab-indicator"
-                                        className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
-                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                    />
-                                )}
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
+                <PullToRefresh onRefresh={async () => {
+                    const r = await getExchangeRate(selectedCurrency || 'JPY')
+                    setRate(r)
+                    await Promise.all([fetchExpenses(), tripMutate()])
+                    toast.success("資料已更新")
+                }} className="flex-1 px-4 -mt-4">
+                    <Tabs value={activeSection} onValueChange={setActiveSection}>
+                        {/* Custom Sliding Tab Strip */}
+                        <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
+                            {[
+                                { value: 'cards', label: '💳 卡片' },
+                                { value: 'expense', label: t('expense') },
+                                { value: 'ai', label: t('ai_tools') }
+                            ].map((tab) => (
+                                <button
+                                    key={tab.value}
+                                    onClick={() => setActiveSection(tab.value)}
+                                    className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {activeSection === tab.value && (
+                                        <motion.div
+                                            layoutId="tools-tab-indicator"
+                                            className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
+                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
 
-                    {/* 🆕 v3.8: 信用卡回饋彙整 */}
-                    <TabsContent value="cards" className="mt-4 space-y-4">
-                        <Card>
-                            <CardContent className="pt-4">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-semibold text-slate-900">我的信用卡</h3>
-                                    <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900">
-                                        <Plus className="w-4 h-4 mr-1" /> 新增
+                        {/* 🆕 v3.8: 信用卡回饋彙整 */}
+                        <TabsContent value="cards" className="mt-4 space-y-4">
+                            <Card>
+                                <CardContent className="pt-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-semibold text-slate-900">我的信用卡</h3>
+                                        <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900">
+                                            <Plus className="w-4 h-4 mr-1" /> 新增
+                                        </Button>
+                                    </div>
+
+                                    {creditCards.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400 text-sm">
+                                            <CreditCard className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                                            <p>尚未新增任何卡片</p>
+                                            <p className="text-xs mt-1">點擊「新增」開始記錄回饋資訊</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {creditCards.map((card) => (
+                                                <div key={card.id} className="relative group">
+                                                    {/* 🆕 Trash button: always visible on mobile, hover on desktop */}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
+                                                        className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
+                                                        aria-label="刪除卡片"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5 text-white" />
+                                                    </button>
+                                                    <div
+                                                        onClick={() => openEditCardDialog(card)}
+                                                        className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
+                                                    >
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-semibold text-lg">{card.name}</p>
+                                                                    {card.is_public ? (
+                                                                        <div className="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                            <Users className="w-3 h-3" /> 共享
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                            <User className="w-3 h-3" /> 私有
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-slate-300 text-sm mt-1">
+                                                                    回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
+                                                                    {card.rewardLimit > 0 && (
+                                                                        <span className="ml-2">上限 ${card.rewardLimit.toLocaleString()}</span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                            <CreditCard className="w-6 h-6 text-slate-400" />
+                                                        </div>
+                                                        {card.notes && (
+                                                            <p className="text-xs text-slate-400 mt-2 line-clamp-2">📝 {card.notes}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        <TabsContent value="expense" className="mt-4 space-y-4">
+                            {/* View Mode Toggle */}
+                            <div className="flex gap-2">
+                                <Button
+                                    variant={expenseView === 'summary' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
+                                    onClick={() => setExpenseView('summary')}
+                                >
+                                    <PieChart className="w-4 h-4 mr-2" /> {t('total')}
+                                </Button>
+                                <Button
+                                    variant={expenseView === 'daily' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
+                                    onClick={() => setExpenseView('daily')}
+                                >
+                                    <List className="w-4 h-4 mr-2" /> 每日
+                                </Button>
+                            </div>
+
+                            {/* Owner Filter */}
+                            <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
+                                {(['all', 'public', 'private'] as const).map(filter => (
+                                    <button
+                                        key={filter}
+                                        onClick={() => setOwnerFilter(filter)}
+                                        className={cn(
+                                            "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
+                                            ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
+                                        )}
+                                    >
+                                        {filter === 'all' && <>全部</>}
+                                        {filter === 'public' && <><Users className="w-3 h-3" /> 公帳</>}
+                                        {filter === 'private' && <><User className="w-3 h-3" /> 私帳</>}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Daily Mode: Date Navigation */}
+                            {expenseView === 'daily' && (
+                                <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')} disabled={allDates.indexOf(selectedDate) === 0}>
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </Button>
+                                    <span className="font-bold text-slate-800">{selectedDate ? formatDateDisplay(selectedDate) : '-'}</span>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('next')} disabled={allDates.indexOf(selectedDate) === allDates.length - 1}>
+                                        <ChevronRight className="w-4 h-4" />
                                     </Button>
                                 </div>
+                            )}
 
-                                {creditCards.length === 0 ? (
-                                    <div className="text-center py-8 text-slate-400 text-sm">
-                                        <CreditCard className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                        <p>尚未新增任何卡片</p>
-                                        <p className="text-xs mt-1">點擊「新增」開始記錄回饋資訊</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {creditCards.map((card) => (
-                                            <div key={card.id} className="relative group">
-                                                {/* 🆕 Trash button: always visible on mobile, hover on desktop */}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
-                                                    className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
-                                                    aria-label="刪除卡片"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5 text-white" />
-                                                </button>
-                                                <div
-                                                    onClick={() => openEditCardDialog(card)}
-                                                    className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
-                                                >
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="font-semibold text-lg">{card.name}</p>
-                                                                {card.is_public ? (
-                                                                    <div className="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                                        <Users className="w-3 h-3" /> 共享
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                                        <User className="w-3 h-3" /> 私有
-                                                                    </div>
-                                                                )}
+                            {/* Summary Card */}
+                            <Card className="border-0 shadow-sm">
+                                <CardContent className="p-4">
+                                    {expenseView === 'summary' ? (
+                                        <div className="space-y-4">
+                                            <ExpenseChart
+                                                data={categoryData}
+                                                total={totalTWD}
+                                                currencySymbol="NT$"
+                                                activeCategory={activeCategory}
+                                                onCategoryClick={setActiveCategory}
+                                            />
+
+                                            <div className="flex flex-col items-center gap-3 pt-2 border-t">
+                                                {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
+                                                {foreignTotals.length > 0 && (
+                                                    <div className="flex flex-wrap justify-center gap-3">
+                                                        {foreignTotals.map(([code, info]) => (
+                                                            <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
+                                                                <span className="text-lg mr-1">{info.flag}</span>
+                                                                <span className="font-mono font-bold text-slate-800">
+                                                                    {info.symbol}{Math.round(info.amount).toLocaleString()}
+                                                                </span>
+                                                                <span className="text-xs text-slate-500 ml-1">{code}</span>
                                                             </div>
-                                                            <p className="text-slate-300 text-sm mt-1">
-                                                                回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
-                                                                {card.rewardLimit > 0 && (
-                                                                    <span className="ml-2">上限 ${card.rewardLimit.toLocaleString()}</span>
-                                                                )}
-                                                            </p>
-                                                        </div>
-                                                        <CreditCard className="w-6 h-6 text-slate-400" />
+                                                        ))}
                                                     </div>
-                                                    {card.notes && (
-                                                        <p className="text-xs text-slate-400 mt-2 line-clamp-2">📝 {card.notes}</p>
+                                                )}
+
+                                                <div className="text-center">
+                                                    <p className="text-xs text-slate-500">
+                                                        {activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total')}
+                                                    </p>
+                                                    <div className="text-3xl font-bold text-slate-900">
+                                                        <CountingNumber
+                                                            value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
+                                                            prefix="NT$"
+                                                        />
+                                                    </div>
+                                                    {totalCashback > 0 && (
+                                                        <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
                                                     )}
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="expense" className="mt-4 space-y-4">
-                        {/* View Mode Toggle */}
-                        <div className="flex gap-2">
-                            <Button
-                                variant={expenseView === 'summary' ? 'default' : 'outline'}
-                                size="sm"
-                                className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
-                                onClick={() => setExpenseView('summary')}
-                            >
-                                <PieChart className="w-4 h-4 mr-2" /> {t('total')}
-                            </Button>
-                            <Button
-                                variant={expenseView === 'daily' ? 'default' : 'outline'}
-                                size="sm"
-                                className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
-                                onClick={() => setExpenseView('daily')}
-                            >
-                                <List className="w-4 h-4 mr-2" /> 每日
-                            </Button>
-                        </div>
-
-                        {/* Owner Filter */}
-                        <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
-                            {(['all', 'public', 'private'] as const).map(filter => (
-                                <button
-                                    key={filter}
-                                    onClick={() => setOwnerFilter(filter)}
-                                    className={cn(
-                                        "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
-                                        ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
-                                    )}
-                                >
-                                    {filter === 'all' && <>全部</>}
-                                    {filter === 'public' && <><Users className="w-3 h-3" /> 公帳</>}
-                                    {filter === 'private' && <><User className="w-3 h-3" /> 私帳</>}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Daily Mode: Date Navigation */}
-                        {expenseView === 'daily' && (
-                            <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')} disabled={allDates.indexOf(selectedDate) === 0}>
-                                    <ChevronLeft className="w-4 h-4" />
-                                </Button>
-                                <span className="font-bold text-slate-800">{selectedDate ? formatDateDisplay(selectedDate) : '-'}</span>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('next')} disabled={allDates.indexOf(selectedDate) === allDates.length - 1}>
-                                    <ChevronRight className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* Summary Card */}
-                        <Card className="border-0 shadow-sm">
-                            <CardContent className="p-4">
-                                {expenseView === 'summary' ? (
-                                    <div className="space-y-4">
-                                        <ExpenseChart
-                                            data={categoryData}
-                                            total={totalTWD}
-                                            currencySymbol="NT$"
-                                            activeCategory={activeCategory}
-                                            onCategoryClick={setActiveCategory}
-                                        />
-
-                                        <div className="flex flex-col items-center gap-3 pt-2 border-t">
-                                            {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
-                                            {foreignTotals.length > 0 && (
-                                                <div className="flex flex-wrap justify-center gap-3">
-                                                    {foreignTotals.map(([code, info]) => (
-                                                        <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
-                                                            <span className="text-lg mr-1">{info.flag}</span>
-                                                            <span className="font-mono font-bold text-slate-800">
-                                                                {info.symbol}{Math.round(info.amount).toLocaleString()}
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-xs text-slate-500">{t('total')}</p>
+                                                {/* Multi-currency display for daily view too */}
+                                                {foreignTotals.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mb-1">
+                                                        {foreignTotals.map(([code, info]) => (
+                                                            <span key={code} className="font-mono font-bold text-slate-900">
+                                                                {info.flag} {info.symbol}{Math.round(info.amount).toLocaleString()}
                                                             </span>
-                                                            <span className="text-xs text-slate-500 ml-1">{code}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            <div className="text-center">
-                                                <p className="text-xs text-slate-500">
-                                                    {activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total')}
-                                                </p>
-                                                <div className="text-3xl font-bold text-slate-900">
-                                                    <CountingNumber
-                                                        value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
-                                                        prefix="NT$"
-                                                    />
-                                                </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <p className="text-2xl font-bold text-slate-900">NT${totalTWD.toLocaleString()}</p>
                                                 {totalCashback > 0 && (
-                                                    <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
+                                                    <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
                                                 )}
                                             </div>
+                                            <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
+                                                <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
+                                            </Button>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="text-xs text-slate-500">{t('total')}</p>
-                                            {/* Multi-currency display for daily view too */}
-                                            {foreignTotals.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-1">
-                                                    {foreignTotals.map(([code, info]) => (
-                                                        <span key={code} className="font-mono font-bold text-slate-900">
-                                                            {info.flag} {info.symbol}{Math.round(info.amount).toLocaleString()}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <p className="text-2xl font-bold text-slate-900">NT${totalTWD.toLocaleString()}</p>
-                                            {totalCashback > 0 && (
-                                                <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
-                                            )}
-                                        </div>
-                                        <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
-                                            <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Summary Mode: Add Button */}
+                            {expenseView === 'summary' && (
+                                <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
+                                    <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
+                                </Button>
+                            )}
+
+                            {/* Expense List */}
+                            <div className="space-y-2">
+                                {filteredExpenses.filter(item => !activeCategory || item.category === activeCategory).map((item: Expense) => (
+                                    <ExpenseItem key={item.id} item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
+                                ))}
+                                {filteredExpenses.length === 0 && (
+                                    <div className="text-center py-10 text-slate-400">
+                                        <div className="text-3xl mb-2">📭</div>
+                                        <p className="text-sm mb-3">
+                                            {expenseView === 'daily'
+                                                ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
+                                                : '暫無記錄'
+                                            }
+                                        </p>
+                                        <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
+                                            <Plus className="w-4 h-4 mr-1" /> 新增支出
                                         </Button>
                                     </div>
                                 )}
-                            </CardContent>
-                        </Card>
+                            </div>
+                        </TabsContent>
 
-                        {/* Summary Mode: Add Button */}
-                        {expenseView === 'summary' && (
-                            <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
-                                <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
-                            </Button>
-                        )}
-
-                        {/* Expense List */}
-                        <div className="space-y-2">
-                            {filteredExpenses.filter(item => !activeCategory || item.category === activeCategory).map((item: Expense) => (
-                                <ExpenseItem key={item.id} item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
-                            ))}
-                            {filteredExpenses.length === 0 && (
-                                <div className="text-center py-10 text-slate-400">
-                                    <div className="text-3xl mb-2">📭</div>
-                                    <p className="text-sm mb-3">
-                                        {expenseView === 'daily'
-                                            ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
-                                            : '暫無記錄'
-                                        }
+                        <TabsContent value="ai" className="mt-4 space-y-4">
+                            {/* API Key Prompt */}
+                            {!hasApiKey && (
+                                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-amber-100 p-2 rounded-full">
+                                            <Key className="w-4 h-4 text-amber-600" />
+                                        </div>
+                                        <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
+                                    </div>
+                                    <p className="text-sm text-amber-700">
+                                        使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
                                     </p>
-                                    <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
-                                        <Plus className="w-4 h-4 mr-1" /> 新增支出
-                                    </Button>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-amber-600">💡 完全免費！</span>
+                                        <Button
+                                            size="sm"
+                                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                                            onClick={() => {
+                                                // Navigate to profile (need to use custom event or context)
+                                                const event = new CustomEvent('navigate-to-profile')
+                                                window.dispatchEvent(event)
+                                                toast.info("請在 Profile 頁面設定 AI API Key")
+                                            }}
+                                        >
+                                            前往 Profile 設定 →
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
-                        </div>
-                    </TabsContent>
 
-                    <TabsContent value="ai" className="mt-4 space-y-4">
-                        {/* API Key Prompt */}
-                        {!hasApiKey && (
-                            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <div className="bg-amber-100 p-2 rounded-full">
-                                        <Key className="w-4 h-4 text-amber-600" />
-                                    </div>
-                                    <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
+                            {hasApiKey && (
+                                <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    <span>AI 功能已啟用</span>
                                 </div>
-                                <p className="text-sm text-amber-700">
-                                    使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
-                                </p>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-amber-600">💡 完全免費！</span>
-                                    <Button
-                                        size="sm"
-                                        className="bg-amber-500 hover:bg-amber-600 text-white"
-                                        onClick={() => {
-                                            // Navigate to profile (need to use custom event or context)
-                                            const event = new CustomEvent('navigate-to-profile')
-                                            window.dispatchEvent(event)
-                                            toast.info("請在 Profile 頁面設定 AI API Key")
-                                        }}
-                                    >
-                                        前往 Profile 設定 →
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-
-                        {hasApiKey && (
-                            <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>AI 功能已啟用</span>
-                            </div>
-                        )}
-
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button variant="outline" className="h-14 w-full bg-white justify-between">
-                                    <span className="flex items-center gap-3">
-                                        <div className="bg-amber-100 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600" /></div>
-                                        {t('ai_generator')}
-                                    </span>
-                                    <ChevronRight className="w-4 h-4 opacity-30" />
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                                <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
-                                <div className="flex-1 space-y-4 py-4">
-                                    <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
-                                    <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
-                                    {aiResult?.items && (
-                                        <div className="p-4 bg-stone-100 rounded-xl space-y-3">
-                                            <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
-
-                                            <div className="space-y-1">
-                                                <Label className="text-xs text-slate-500">儲存位置</Label>
-                                                <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                    <SelectTrigger className="w-full bg-white">
-                                                        <SelectValue placeholder="選擇儲存位置" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
-                                                        {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                        {trips.map((trip: Trip) => (
-                                                            <SelectItem key={trip.id} value={trip.id}>
-                                                                📂 {trip.title} (Day {trip.days?.length || 1})
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
-                                                {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-
-                        <Sheet>
-                            <SheetTrigger asChild>
-                                <Button variant="outline" className="h-14 w-full bg-white justify-between">
-                                    <span className="flex items-center gap-3">
-                                        <div className="bg-blue-100 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600" /></div>
-                                        {t('markdown_import')}
-                                    </span>
-                                    <ChevronRight className="w-4 h-4 opacity-30" />
-                                </Button>
-                            </SheetTrigger>
-                            <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                                <SheetHeader><SheetTitle>{t('markdown_import')}</SheetTitle></SheetHeader>
-                                <div className="flex-1 space-y-4 py-4">
-                                    <div className="flex justify-between items-center">
-                                        <Label className="text-xs">{t('input_or_upload')}</Label>
-                                        <div>
-                                            <input type="file" id="file-upload" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
-                                            <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
-                                        </div>
-                                    </div>
-                                    <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
-                                    <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
-                                    {mdResult?.items && (
-                                        <div className="p-4 bg-stone-100 rounded-xl space-y-3">
-                                            <p className="text-sm text-green-600 font-medium">✅ 已解析 {mdResult.items.length} 個地點</p>
-
-                                            <div className="space-y-1">
-                                                <Label className="text-xs text-slate-500">儲存位置</Label>
-                                                <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                    <SelectTrigger className="w-full bg-white">
-                                                        <SelectValue placeholder="選擇儲存位置" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
-                                                        {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                        {trips.map((trip: Trip) => (
-                                                            <SelectItem key={trip.id} value={trip.id}>
-                                                                📂 {trip.title} ({trip.share_code})
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
-                                                {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </SheetContent>
-                        </Sheet>
-                    </TabsContent>
-                </Tabs>
-            </PullToRefresh >
-
-            {/* 🆕 Card Delete Confirmation Dialog */}
-            < AlertDialog open={!!deletingCardId
-            } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>確定刪除此卡片？</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            刪除後將無法恢復。如果是共享卡片，其他成員也將無法看到。
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeletingCard}>取消</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmDeleteCard}
-                            disabled={isDeletingCard}
-                            className="bg-red-500 hover:bg-red-600"
-                        >
-                            {isDeletingCard ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                            刪除
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog >
-
-            {/* Expense Dialog */}
-            < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="flex gap-2 items-center">
-                            {/* 🆕 Currency Selector */}
-                            {/* 🆕 Premium Currency Selector */}
-                            <Select value={inputCurrency} onValueChange={setInputCurrency}>
-                                <SelectTrigger className="h-10 w-[110px] bg-white border-slate-200 font-bold font-mono">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {CURRENCIES.map(c => (
-                                        <SelectItem key={c.code} value={c.code} className="font-mono">
-                                            <span className="mr-2">{c.flag}</span>
-                                            {c.code}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            <Input placeholder="Amount" type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold flex-1" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
-                            <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * inputRate)} TWD</div>
-                        </div>
-                        <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
-
-                        {/* Date picker - 根據行程天數選擇 */}
-                        <div className="space-y-1">
-                            <Label className="text-xs text-slate-500">📅 日期</Label>
-                            {activeTrip?.start_date ? (
-                                <select
-                                    value={expenseDate}
-                                    onChange={e => setExpenseDate(e.target.value)}
-                                    className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
-                                >
-                                    {(() => {
-                                        // 計算行程天數（從 days array 或 start/end date）
-                                        const trip = activeTrip as Trip // 🔧 FIX #7: Explicit cast
-                                        const startDate = new Date(trip.start_date!) // 🔧 FIX #7: Assert non-null
-                                        const endDate = trip.end_date ? new Date(trip.end_date) : null
-                                        const totalDays = trip.days?.length ||
-                                            (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
-
-                                        return Array.from({ length: totalDays }, (_, i) => {
-                                            const date = new Date(startDate)
-                                            date.setDate(date.getDate() + i)
-                                            const dateStr = date.toISOString().split('T')[0]
-                                            const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
-                                            return (
-                                                <option key={i} value={dateStr}>
-                                                    Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
-                                                </option>
-                                            )
-                                        })
-                                    })()}
-                                </select>
-                            ) : (
-                                <div className="text-xs text-slate-400 py-2">請先選擇行程</div>
                             )}
-                        </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            {Object.entries(CATEGORIES).map(([key, info]) => (
-                                <button key={key} onClick={() => setCategory(key)} className={cn("flex items-center justify-center gap-1 p-2 rounded-lg border text-xs transition-all", category === key ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
-                                    <info.icon className="w-3 h-3" /> {info.label}
-                                </button>
-                            ))}
-                        </div>
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <div className="bg-amber-100 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600" /></div>
+                                            {t('ai_generator')}
+                                        </span>
+                                        <ChevronRight className="w-4 h-4 opacity-30" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
+                                    <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
+                                    <div className="flex-1 space-y-4 py-4">
+                                        <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
+                                        <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
+                                        {aiResult?.items && (
+                                            <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                                <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
 
-                        {/* Receipt Upload */}
-                        <div className="space-y-1">
-                            <Label className="text-xs text-slate-500">收據 / 照片</Label>
-                            <ImageUpload
-                                value={receiptUrl}
-                                onChange={(url) => setReceiptUrl(url)}
-                                onRemove={() => setReceiptUrl("")}
-                                folder="ryan_travel/receipts"
-                            />
-                        </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                    <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
+                                                        <SelectTrigger className="w-full bg-white">
+                                                            <SelectValue placeholder="選擇儲存位置" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                            {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
+                                                            {trips.map((trip: Trip) => (
+                                                                <SelectItem key={trip.id} value={trip.id}>
+                                                                    📂 {trip.title} (Day {trip.days?.length || 1})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
 
-                        <div className="grid grid-cols-4 gap-2">
-                            {PAYMENT_METHODS.map(m => (
-                                <button key={m.id} onClick={() => setMethod(m.id)} className={cn("flex flex-col items-center justify-center p-2 rounded-lg border text-xs transition-all", method === m.id ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
-                                    <m.icon className="w-4 h-4 mb-1" />{m.label}
-                                </button>
-                            ))}
-                        </div>
+                                                <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                    {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
 
-                        {(method === "JCB" || method === "VisaMaster") && (
-                            <div className="flex gap-2">
-                                <Input placeholder="Card name" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
-                                <div className="relative w-28">
-                                    <input
-                                        type="text"
-                                        list="cashback-rates"
-                                        placeholder="回饋 %"
-                                        value={cashback}
-                                        onChange={e => setCashback(e.target.value)}
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                        <span className="flex items-center gap-3">
+                                            <div className="bg-blue-100 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600" /></div>
+                                            {t('markdown_import')}
+                                        </span>
+                                        <ChevronRight className="w-4 h-4 opacity-30" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
+                                    <SheetHeader><SheetTitle>{t('markdown_import')}</SheetTitle></SheetHeader>
+                                    <div className="flex-1 space-y-4 py-4">
+                                        <div className="flex justify-between items-center">
+                                            <Label className="text-xs">{t('input_or_upload')}</Label>
+                                            <div>
+                                                <input type="file" id="file-upload" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
+                                                <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
+                                            </div>
+                                        </div>
+                                        <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
+                                        <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
+                                        {mdResult?.items && (
+                                            <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                                <p className="text-sm text-green-600 font-medium">✅ 已解析 {mdResult.items.length} 個地點</p>
+
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                    <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
+                                                        <SelectTrigger className="w-full bg-white">
+                                                            <SelectValue placeholder="選擇儲存位置" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                            {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
+                                                            {trips.map((trip: Trip) => (
+                                                                <SelectItem key={trip.id} value={trip.id}>
+                                                                    📂 {trip.title} ({trip.share_code})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                    {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
+                        </TabsContent>
+                    </Tabs>
+                </PullToRefresh >
+
+                {/* 🆕 Card Delete Confirmation Dialog */}
+                < AlertDialog open={!!deletingCardId
+                } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>確定刪除此卡片？</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                刪除後將無法恢復。如果是共享卡片，其他成員也將無法看到。
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeletingCard}>取消</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmDeleteCard}
+                                disabled={isDeletingCard}
+                                className="bg-red-500 hover:bg-red-600"
+                            >
+                                {isDeletingCard ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                                刪除
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog >
+
+                {/* Expense Dialog */}
+                < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
+                        <div className="space-y-4 py-2">
+                            <div className="flex gap-2 items-center">
+                                {/* 🆕 Currency Selector */}
+                                {/* 🆕 Premium Currency Selector */}
+                                <Select value={inputCurrency} onValueChange={setInputCurrency}>
+                                    <SelectTrigger className="h-10 w-[110px] bg-white border-slate-200 font-bold font-mono">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {CURRENCIES.map(c => (
+                                            <SelectItem key={c.code} value={c.code} className="font-mono">
+                                                <span className="mr-2">{c.flag}</span>
+                                                {c.code}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Input placeholder="Amount" type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold flex-1" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
+                                <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * inputRate)} TWD</div>
+                            </div>
+                            <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
+
+                            {/* Date picker - 根據行程天數選擇 */}
+                            <div className="space-y-1">
+                                <Label className="text-xs text-slate-500">📅 日期</Label>
+                                {activeTrip?.start_date ? (
+                                    <select
+                                        value={expenseDate}
+                                        onChange={e => setExpenseDate(e.target.value)}
                                         className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
+                                    >
+                                        {(() => {
+                                            // 計算行程天數（從 days array 或 start/end date）
+                                            const trip = activeTrip as Trip // 🔧 FIX #7: Explicit cast
+                                            const startDate = new Date(trip.start_date!) // 🔧 FIX #7: Assert non-null
+                                            const endDate = trip.end_date ? new Date(trip.end_date) : null
+                                            const totalDays = trip.days?.length ||
+                                                (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
+
+                                            return Array.from({ length: totalDays }, (_, i) => {
+                                                const date = new Date(startDate)
+                                                date.setDate(date.getDate() + i)
+                                                const dateStr = date.toISOString().split('T')[0]
+                                                const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                                                return (
+                                                    <option key={i} value={dateStr}>
+                                                        Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
+                                                    </option>
+                                                )
+                                            })
+                                        })()}
+                                    </select>
+                                ) : (
+                                    <div className="text-xs text-slate-400 py-2">請先選擇行程</div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                {Object.entries(CATEGORIES).map(([key, info]) => (
+                                    <button key={key} onClick={() => setCategory(key)} className={cn("flex items-center justify-center gap-1 p-2 rounded-lg border text-xs transition-all", category === key ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
+                                        <info.icon className="w-3 h-3" /> {info.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Receipt Upload */}
+                            <div className="space-y-1">
+                                <Label className="text-xs text-slate-500">收據 / 照片</Label>
+                                <ImageUpload
+                                    value={receiptUrl}
+                                    onChange={(url) => setReceiptUrl(url)}
+                                    onRemove={() => setReceiptUrl("")}
+                                    folder="ryan_travel/receipts"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-2">
+                                {PAYMENT_METHODS.map(m => (
+                                    <button key={m.id} onClick={() => setMethod(m.id)} className={cn("flex flex-col items-center justify-center p-2 rounded-lg border text-xs transition-all", method === m.id ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
+                                        <m.icon className="w-4 h-4 mb-1" />{m.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {(method === "JCB" || method === "VisaMaster") && (
+                                <div className="flex gap-2">
+                                    <Input placeholder="Card name" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
+                                    <div className="relative w-28">
+                                        <input
+                                            type="text"
+                                            list="cashback-rates"
+                                            placeholder="回饋 %"
+                                            value={cashback}
+                                            onChange={e => setCashback(e.target.value)}
+                                            className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
+                                        />
+                                        <datalist id="cashback-rates">
+                                            <option value="0.5">0.5%</option>
+                                            <option value="1">1%</option>
+                                            <option value="1.5">1.5%</option>
+                                            <option value="2">2%</option>
+                                            <option value="2.5">2.5%</option>
+                                            <option value="3">3%</option>
+                                            <option value="5">5%</option>
+                                        </datalist>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                <Label className="text-sm flex items-center gap-2">
+                                    {isPublic ? <><Users className="w-4 h-4 text-blue-500" /> {t('shared')}</> : <><User className="w-4 h-4 text-amber-500" /> {t('private')}</>}
+                                </Label>
+                                <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                            </div>
+
+                            <Button className="w-full bg-slate-900" onClick={handleSaveExpense} disabled={isSavingExpense}>
+                                {isSavingExpense ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />儲存中...</> : t('save')}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog >
+
+                {/* 🆕 v3.8: 信用卡編輯 Dialog */}
+                < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >
+                    <DialogContent className="max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>{editingCard ? "編輯卡片" : "新增卡片"}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label>卡片名稱 *</Label>
+                                <Input
+                                    placeholder="例：玉山 Pi 拍錢包"
+                                    value={newCardName}
+                                    onChange={(e) => setNewCardName(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label>回饋趴數 (%)</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="例：3.5"
+                                        value={newRewardRate}
+                                        onChange={(e) => setNewRewardRate(e.target.value)}
                                     />
-                                    <datalist id="cashback-rates">
-                                        <option value="0.5">0.5%</option>
-                                        <option value="1">1%</option>
-                                        <option value="1.5">1.5%</option>
-                                        <option value="2">2%</option>
-                                        <option value="2.5">2.5%</option>
-                                        <option value="3">3%</option>
-                                        <option value="5">5%</option>
-                                    </datalist>
+                                </div>
+                                <div>
+                                    <Label>回饋上限 (TWD)</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="例：500"
+                                        value={newRewardLimit}
+                                        onChange={(e) => setNewRewardLimit(e.target.value)}
+                                    />
                                 </div>
                             </div>
-                        )}
-
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                            <Label className="text-sm flex items-center gap-2">
-                                {isPublic ? <><Users className="w-4 h-4 text-blue-500" /> {t('shared')}</> : <><User className="w-4 h-4 text-amber-500" /> {t('private')}</>}
-                            </Label>
-                            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                        </div>
-
-                        <Button className="w-full bg-slate-900" onClick={handleSaveExpense} disabled={isSavingExpense}>
-                            {isSavingExpense ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />儲存中...</> : t('save')}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog >
-
-            {/* 🆕 v3.8: 信用卡編輯 Dialog */}
-            < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >
-                <DialogContent className="max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>{editingCard ? "編輯卡片" : "新增卡片"}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div>
-                            <Label>卡片名稱 *</Label>
-                            <Input
-                                placeholder="例：玉山 Pi 拍錢包"
-                                value={newCardName}
-                                onChange={(e) => setNewCardName(e.target.value)}
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Label>回饋趴數 (%)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="例：3.5"
-                                    value={newRewardRate}
-                                    onChange={(e) => setNewRewardRate(e.target.value)}
+                                <Label>備忘錄</Label>
+                                <Textarea
+                                    placeholder="例：海外消費限定、需登錄活動..."
+                                    value={newCardNotes}
+                                    onChange={(e) => setNewCardNotes(e.target.value)}
+                                    rows={3}
                                 />
                             </div>
-                            <div>
-                                <Label>回饋上限 (TWD)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="例：500"
-                                    value={newRewardLimit}
-                                    onChange={(e) => setNewRewardLimit(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <Label>備忘錄</Label>
-                            <Textarea
-                                placeholder="例：海外消費限定、需登錄活動..."
-                                value={newCardNotes}
-                                onChange={(e) => setNewCardNotes(e.target.value)}
-                                rows={3}
-                            />
-                        </div>
 
-                        <div className="flex items-center justify-between bg-slate-100 p-3 rounded-xl">
-                            <Label className="flex items-center gap-2 text-sm text-slate-700">
-                                {newCardIsPublic ? <><Users className="w-4 h-4 text-blue-500" /> 公開給行程成員</> : <><User className="w-4 h-4 text-amber-500" /> 僅存於此裝置</>}
-                            </Label>
-                            <Switch checked={newCardIsPublic} onCheckedChange={setNewCardIsPublic} />
+                            <div className="flex items-center justify-between bg-slate-100 p-3 rounded-xl">
+                                <Label className="flex items-center gap-2 text-sm text-slate-700">
+                                    {newCardIsPublic ? <><Users className="w-4 h-4 text-blue-500" /> 公開給行程成員</> : <><User className="w-4 h-4 text-amber-500" /> 僅存於此裝置</>}
+                                </Label>
+                                <Switch checked={newCardIsPublic} onCheckedChange={setNewCardIsPublic} />
+                            </div>
+                            <Button className="w-full bg-slate-900" onClick={handleSaveCard} disabled={isSavingCard}>
+                                {isSavingCard ? "儲存中..." : (editingCard ? "更新" : "新增")}
+                            </Button>
                         </div>
-                        <Button className="w-full bg-slate-900" onClick={handleSaveCard} disabled={isSavingCard}>
-                            {isSavingCard ? "儲存中..." : (editingCard ? "更新" : "新增")}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog >
-        </div >
+                    </DialogContent>
+                </Dialog >
+            </div >
+        </div>
     )
 }
 

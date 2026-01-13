@@ -26,12 +26,12 @@ export function AppShell() {
         <>
             <OfflineBanner />
             <div className="min-h-screen bg-background flex flex-col">
-                {/* 🔧 Mobile Optimization: overscroll-none (prevents browser pull-to-refresh), touch-pan-y (optimizes vertical scroll) */}
-                <main className="flex-1 pb-20 overflow-y-auto overscroll-none touch-pan-y" data-scroll="true">
-                    <div className={activeView === "itinerary" ? "block" : "hidden"}><ItineraryView /></div>
-                    <div className={activeView === "info" ? "block" : "hidden"}><InfoView /></div>
-                    <div className={activeView === "tools" ? "block" : "hidden"}><ToolsView /></div>
-                    <div className={activeView === "profile" ? "block" : "hidden"}><ProfileView /></div>
+                {/* 🔧 Phase 14: Scroll Architecture Refactor - AppShell no longer scrolls, each View manages its own scroll */}
+                <main className="flex-1 pb-20 overflow-hidden flex flex-col" data-scroll="true">
+                    <div className={activeView === "itinerary" ? "flex-1 h-full overflow-hidden" : "hidden"}><ItineraryView /></div>
+                    <div className={activeView === "info" ? "flex-1 h-full overflow-hidden" : "hidden"}><InfoView /></div>
+                    <div className={activeView === "tools" ? "flex-1 h-full overflow-hidden" : "hidden"}><ToolsView /></div>
+                    <div className={activeView === "profile" ? "flex-1 h-full overflow-hidden" : "hidden"}><ProfileView /></div>
                 </main>
                 <BottomNav activeTab={activeView} onTabChange={setActiveView} />
             </div>

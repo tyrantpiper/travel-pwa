@@ -252,413 +252,416 @@ export function InfoView() {
     }
 
     return (
-        <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
-            <header className="mb-6 space-y-3">
-                <div>
-                    <h1 className="text-3xl font-serif text-slate-900">{t('trip_info')}</h1>
-                    <p className="text-slate-500 text-sm">{t('trip_details')}</p>
-                </div>
-                <TripSwitcher />
-                <Button
-                    variant={isEditing ? "default" : "outline"}
-                    size="sm"
-                    disabled={!activeTripId}
-                    onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                    className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
-                >
-                    {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
-                </Button>
-            </header>
+        // 🔧 Phase 14: View manages its own scrolling
+        <div className="h-full overflow-y-auto overscroll-contain">
+            <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
+                <header className="mb-6 space-y-3">
+                    <div>
+                        <h1 className="text-3xl font-serif text-slate-900">{t('trip_info')}</h1>
+                        <p className="text-slate-500 text-sm">{t('trip_details')}</p>
+                    </div>
+                    <TripSwitcher />
+                    <Button
+                        variant={isEditing ? "default" : "outline"}
+                        size="sm"
+                        disabled={!activeTripId}
+                        onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                        className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
+                    >
+                        {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
+                    </Button>
+                </header>
 
-            <PullToRefresh onRefresh={refreshInfo} className="flex-1">
-                <div className="space-y-8">
-                    {!activeTripId ? (
-                        <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
-                            <Info className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                            <p>No trip selected</p>
-                            <p className="text-sm">Please select or create a trip to view details.</p>
-                        </div>
-                    ) : (
-                        <>
-                            <motion.section
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.4, ease: "easeOut" }}
-                            >
-                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <Plane className="w-4 h-4" /> {t('flight_details')}
-                                </h2>
-                                {/* Flight Tabs with Sliding Indicator */}
-                                <div className="w-full">
-                                    <div className="grid grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl relative">
-                                        {(['outbound', 'inbound'] as const).map((tab) => (
-                                            <button
-                                                key={tab}
-                                                onClick={() => setFlightTab(tab)}
-                                                className={`relative z-10 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${flightTab === tab ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                                            >
-                                                {flightTab === tab && (
-                                                    <motion.div
-                                                        layoutId="flight-tab-indicator"
-                                                        className="absolute inset-0 bg-white rounded-lg shadow-sm -z-10"
-                                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                                    />
-                                                )}
-                                                {tab === 'outbound' ? t('outbound') : t('inbound')}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <motion.div
-                                        key={flightTab}
-                                        initial={{ opacity: 0, x: flightTab === 'outbound' ? -20 : 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ duration: 0.3, ease: "easeOut" }}
-                                    >
-                                        {flightTab === 'outbound' && (
-                                            <FlightCard
-                                                data={flights.outbound}
-                                                isEditing={isEditing}
-                                                onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, outbound: { ...prev.outbound, [f]: v } }))}
-                                                onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
-                                            />
-                                        )}
-                                        {flightTab === 'inbound' && (
-                                            <FlightCard
-                                                data={flights.inbound}
-                                                isEditing={isEditing}
-                                                onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, inbound: { ...prev.inbound, [f]: v } }))}
-                                                onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
-                                            />
-                                        )}
-                                    </motion.div>
-                                </div>
-                            </motion.section>
-
-                            <motion.section
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
-                            >
-                                <div className="flex justify-between items-center mb-3">
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Bed className="w-4 h-4" /> {t('accommodation')}
-                                    </h2>
-                                    {isEditing && <Button size="sm" variant="ghost" onClick={addHotel} className="h-6 text-xs text-blue-600">{t('add_hotel')}</Button>}
-                                </div>
-
-                                <motion.div
-                                    className="space-y-3"
-                                    initial="hidden"
-                                    animate="visible"
-                                    variants={{
-                                        hidden: {},
-                                        visible: {
-                                            transition: {
-                                                staggerChildren: 0.08,
-                                                delayChildren: 0.2
-                                            }
-                                        }
-                                    }}
-                                >
-                                    <AnimatePresence mode="popLayout">
-                                        {hotels.map((item, idx) => (
-                                            <motion.div
-                                                key={idx}
-                                                layout
-                                                initial={{ opacity: 0, y: 20, scale: 0.98 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                                                transition={{ duration: 0.35, ease: "easeOut" }}
-                                            >
-                                                <Card className="border-0 shadow-sm relative group overflow-hidden">
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
-                                                    <CardContent className="p-4 pl-6">
-                                                        {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
-
-                                                        <div className="space-y-3">
-                                                            <div className="space-y-1">
-                                                                <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
-                                                                <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
-                                                            </div>
-                                                            {/* Place Search - 全寬顯示 */}
-                                                            <div className="space-y-2">
-                                                                <Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1">
-                                                                    <MapPin className="w-3 h-3" /> Place
-                                                                </Label>
-                                                                {isEditing ? (
-                                                                    <div className="space-y-2">
-                                                                        <div className="flex gap-1">
-                                                                            <select
-                                                                                className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2"
-                                                                                value={hotelSearchCountry}
-                                                                                onChange={e => { setHotelSearchCountry(e.target.value); setHotelSearchRegion("") }}
-                                                                            >
-                                                                                <option value="">🌍 Country</option>
-                                                                                <option value="Japan">🇯🇵 Japan</option>
-                                                                                <option value="Taiwan">🇹🇼 Taiwan</option>
-                                                                                <option value="South Korea">🇰🇷 Korea</option>
-                                                                                <option value="Thailand">🇹🇭 Thailand</option>
-                                                                                <option value="Hong Kong">🇭🇰 HK</option>
-                                                                                <option value="Singapore">🇸🇬 SG</option>
-                                                                            </select>
-                                                                            {hotelSearchCountry && COUNTRY_REGIONS[hotelSearchCountry] && (
-                                                                                <select
-                                                                                    className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2 flex-1"
-                                                                                    value={hotelSearchRegion}
-                                                                                    onChange={e => setHotelSearchRegion(e.target.value)}
-                                                                                >
-                                                                                    <option value="">🏙️ Region</option>
-                                                                                    {COUNTRY_REGIONS[hotelSearchCountry].map(r => (
-                                                                                        <option key={r} value={r}>{r}</option>
-                                                                                    ))}
-                                                                                </select>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex gap-1">
-                                                                            <Input
-                                                                                className="h-8 text-xs flex-1"
-                                                                                placeholder="搜尋飯店..."
-                                                                                value={hotelSearchQuery}
-                                                                                onChange={e => setHotelSearchQuery(e.target.value)}
-                                                                                onKeyDown={e => e.key === 'Enter' && handleSearchHotelPlace(idx)}
-                                                                            />
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline"
-                                                                                className="h-8 px-2"
-                                                                                onClick={() => handleSearchHotelPlace(idx)}
-                                                                                disabled={isHotelSearching && searchingHotelIdx === idx}
-                                                                            >
-                                                                                {isHotelSearching && searchingHotelIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                                                                            </Button>
-                                                                        </div>
-                                                                        {/* 搜尋結果 */}
-                                                                        {searchingHotelIdx === idx && hotelSearchResults.length > 0 && (
-                                                                            <div className="bg-slate-50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto border border-slate-200">
-                                                                                {hotelSearchResults.map((place, pIdx) => (
-                                                                                    <button
-                                                                                        key={pIdx}
-                                                                                        className="w-full text-left p-2 text-xs rounded hover:bg-indigo-50 transition-colors"
-                                                                                        onClick={() => handleSelectHotelPlace(idx, place)}
-                                                                                    >
-                                                                                        <div className="font-bold text-slate-700">{place.name}</div>
-                                                                                        <div className="text-slate-400 text-[10px] line-clamp-2">{place.display_name}</div>
-                                                                                    </button>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                        {/* 已選擇的地點 - 顯示商家名稱（不是經緯度）*/}
-                                                                        {(item.address || (item.lat && item.lng)) && (
-                                                                            <div className="text-sm text-slate-700 bg-green-50 p-2.5 rounded-lg flex items-center gap-2 border border-green-200">
-                                                                                <MapPin className="w-4 h-4 text-green-600 shrink-0" />
-                                                                                <span className="font-medium">
-                                                                                    {/* 優先顯示地址/名稱，沒有才顯示經緯度 */}
-                                                                                    {item.address || item.name || `${item.lat?.toFixed(4)}, ${item.lng?.toFixed(4)}`}
-                                                                                </span>
-                                                                            </div>
-                                                                        )}
-                                                                        {/* 手動輸入經緯度 */}
-                                                                        <div className="flex gap-2 items-center">
-                                                                            <span className="text-[10px] text-slate-400">📍 手動座標:</span>
-                                                                            <Input
-                                                                                type="number"
-                                                                                step="any"
-                                                                                className="h-7 text-xs w-24 text-center font-mono"
-                                                                                placeholder="緯度 Lat"
-                                                                                value={item.lat ?? ''}
-                                                                                onChange={e => updateHotel(idx, 'lat', e.target.value ? parseFloat(e.target.value) : null)}
-                                                                            />
-                                                                            <Input
-                                                                                type="number"
-                                                                                step="any"
-                                                                                className="h-7 text-xs w-24 text-center font-mono"
-                                                                                placeholder="經度 Lng"
-                                                                                value={item.lng ?? ''}
-                                                                                onChange={e => updateHotel(idx, 'lng', e.target.value ? parseFloat(e.target.value) : null)}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex items-center gap-2">
-                                                                        {/* 非編輯模式：顯示商家名稱 */}
-                                                                        {item.address || item.name ? (
-                                                                            <span className="text-sm text-slate-700 font-medium">{item.address || item.name}</span>
-                                                                        ) : item.lat && item.lng ? (
-                                                                            <span className="text-sm text-slate-500">{item.lat.toFixed(4)}, {item.lng.toFixed(4)}</span>
-                                                                        ) : (
-                                                                            <span className="text-sm text-slate-400 italic">未設定地點</span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="pt-2 border-t border-slate-100 mt-2 flex gap-2">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="flex-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
-                                                                    onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
-                                                                >
-                                                                    <Info className="w-3 h-3 mr-2" /> {t('details')}
-                                                                </Button>
-                                                                {/* 導航按鈕：使用經緯度定位 + 商家名稱搜尋 */}
-                                                                {(item.lat && item.lng) || item.address || item.name ? (
-                                                                    <a
-                                                                        href={
-                                                                            // 使用經緯度定位 + 商家名稱搜尋
-                                                                            item.lat && item.lng && (item.address || item.name)
-                                                                                ? `https://www.google.com/maps/search/${encodeURIComponent(item.address || item.name || '')}/@${item.lat},${item.lng},17z`
-                                                                                : item.lat && item.lng
-                                                                                    ? `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`
-                                                                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address || item.name || '')}`
-                                                                        }
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                        className="flex items-center gap-1 px-3 h-8 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
-                                                                    >
-                                                                        <Navigation2 className="w-3 h-3" /> Maps
-                                                                    </a>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            </motion.div>
-                                        ))}
-                                    </AnimatePresence>
-                                </motion.div>
-                            </motion.section>
-                        </>
-                    )}
-                </div>
-            </PullToRefresh>
-
-            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                <DialogContent className="sm:max-w-md h-[85vh] flex flex-col p-0 gap-0">
-                    {currentHotelIdx !== null && hotels[currentHotelIdx] && (
-                        <>
-                            <div className="p-6 bg-slate-50 border-b border-slate-200">
-                                <DialogHeader>
-                                    <DialogTitle className="text-xl font-bold text-slate-900 line-clamp-1">{hotels[currentHotelIdx].name || "Untitled Hotel"}</DialogTitle>
-                                </DialogHeader>
-
-                                <div className="grid grid-cols-2 gap-3 mt-4">
-                                    <div className="bg-white p-2 rounded border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Clock className="w-3 h-3" /> Check-In / Out</span>
-                                        <div className="flex gap-2 mt-1 items-center">
-                                            <Input
-                                                className="h-6 text-xs w-full px-1 text-center font-bold" placeholder="15:00"
-                                                value={hotels[currentHotelIdx].check_in}
-                                                onChange={e => updateHotel(currentHotelIdx, 'check_in', e.target.value)}
-                                            />
-                                            <span className="text-slate-300">/</span>
-                                            <Input
-                                                className="h-6 text-xs w-full px-1 text-center font-bold" placeholder="11:00"
-                                                value={hotels[currentHotelIdx].check_out}
-                                                onChange={e => updateHotel(currentHotelIdx, 'check_out', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-2 rounded border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Phone className="w-3 h-3" /> Tel</span>
-                                        <Input
-                                            className="h-6 text-xs mt-1 px-1 border-0 border-b rounded-none focus-visible:ring-0 font-mono"
-                                            placeholder="03-1234-5678"
-                                            value={hotels[currentHotelIdx].phone}
-                                            onChange={e => updateHotel(currentHotelIdx, 'phone', e.target.value)}
-                                        />
-                                    </div>
-                                </div>
+                <PullToRefresh onRefresh={refreshInfo} className="flex-1">
+                    <div className="space-y-8">
+                        {!activeTripId ? (
+                            <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                                <Info className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                                <p>No trip selected</p>
+                                <p className="text-sm">Please select or create a trip to view details.</p>
                             </div>
-
-                            <ScrollArea className="flex-1 p-6">
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            <Wifi className="w-3 h-3" /> Memo (Wi-Fi / Lock / Storage)
-                                        </Label>
-                                        <Textarea
-                                            className="min-h-[150px] bg-yellow-50/50 border-amber-200 text-sm focus-visible:ring-amber-200 leading-relaxed"
-                                            placeholder="Enter memo..."
-                                            value={hotels[currentHotelIdx].memo}
-                                            onChange={e => updateHotel(currentHotelIdx, 'memo', e.target.value)}
-                                        />
-                                    </div>
-
-                                    {/* Booking Confirmation Image */}
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase">
-                                            Booking Confirmation
-                                        </Label>
-                                        <ImageUpload
-                                            value={hotels[currentHotelIdx].image_url}
-                                            onChange={(url) => {
-                                                // 使用 ref 獲取最新的索引值
-                                                const idx = currentHotelIdxRef.current
-                                                if (idx === null) {
-                                                    console.warn('❌ currentHotelIdxRef is null')
-                                                    return
-                                                }
-                                                console.log('🖼️ Image uploaded:', url.substring(0, 50) + '...', 'for hotel index:', idx)
-                                                setHotels(prev => {
-                                                    const newHotels = [...prev]
-                                                    if (newHotels[idx]) {
-                                                        newHotels[idx] = { ...newHotels[idx], image_url: url }
-                                                        console.log('✅ Hotel updated with image_url')
-                                                    } else {
-                                                        console.warn('❌ Hotel at index', idx, 'not found')
-                                                    }
-                                                    return newHotels
-                                                })
-                                            }}
-                                            onRemove={() => {
-                                                const idx = currentHotelIdxRef.current
-                                                if (idx === null) return
-                                                setHotels(prev => {
-                                                    const newHotels = [...prev]
-                                                    if (newHotels[idx]) {
-                                                        newHotels[idx] = { ...newHotels[idx], image_url: '' }
-                                                    }
-                                                    return newHotels
-                                                })
-                                            }}
-                                            folder="ryan_travel/hotels"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-3 pt-4 border-t border-dashed border-slate-200">
-                                        <div className="flex justify-between items-center">
-                                            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                                <LinkIcon className="w-3 h-3" /> Links
-                                            </Label>
-                                            <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-600 hover:bg-blue-50" onClick={() => addLink(currentHotelIdx)}>
-                                                <Plus className="w-3 h-3 mr-1" /> Add Link
-                                            </Button>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            {hotels[currentHotelIdx].links?.map((link: { title: string; url: string }, i: number) => (
-                                                <div key={i} className="flex gap-2 items-center bg-white p-2 rounded border border-slate-100">
-                                                    <Input className="h-7 text-xs w-1/3 border-0 bg-slate-50" placeholder="Title" value={link.title} onChange={e => updateLink(currentHotelIdx, i, 'title', e.target.value)} />
-                                                    <Input className="h-7 text-xs flex-1 font-mono text-slate-500 border-0" placeholder="https://..." value={link.url} onChange={e => updateLink(currentHotelIdx, i, 'url', e.target.value)} />
-                                                    {link.url && <a href={link.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:bg-blue-50 p-1.5 rounded-full"><ExternalLink className="w-3 h-3" /></a>}
-                                                    <button onClick={() => removeLink(currentHotelIdx, i)} className="text-slate-300 hover:text-red-500 p-1.5"><Trash2 className="w-3 h-3" /></button>
-                                                </div>
+                        ) : (
+                            <>
+                                <motion.section
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.4, ease: "easeOut" }}
+                                >
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <Plane className="w-4 h-4" /> {t('flight_details')}
+                                    </h2>
+                                    {/* Flight Tabs with Sliding Indicator */}
+                                    <div className="w-full">
+                                        <div className="grid grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl relative">
+                                            {(['outbound', 'inbound'] as const).map((tab) => (
+                                                <button
+                                                    key={tab}
+                                                    onClick={() => setFlightTab(tab)}
+                                                    className={`relative z-10 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${flightTab === tab ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                                >
+                                                    {flightTab === tab && (
+                                                        <motion.div
+                                                            layoutId="flight-tab-indicator"
+                                                            className="absolute inset-0 bg-white rounded-lg shadow-sm -z-10"
+                                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                                        />
+                                                    )}
+                                                    {tab === 'outbound' ? t('outbound') : t('inbound')}
+                                                </button>
                                             ))}
                                         </div>
+                                        <motion.div
+                                            key={flightTab}
+                                            initial={{ opacity: 0, x: flightTab === 'outbound' ? -20 : 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ duration: 0.3, ease: "easeOut" }}
+                                        >
+                                            {flightTab === 'outbound' && (
+                                                <FlightCard
+                                                    data={flights.outbound}
+                                                    isEditing={isEditing}
+                                                    onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, outbound: { ...prev.outbound, [f]: v } }))}
+                                                    onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
+                                                />
+                                            )}
+                                            {flightTab === 'inbound' && (
+                                                <FlightCard
+                                                    data={flights.inbound}
+                                                    isEditing={isEditing}
+                                                    onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, inbound: { ...prev.inbound, [f]: v } }))}
+                                                    onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
+                                                />
+                                            )}
+                                        </motion.div>
+                                    </div>
+                                </motion.section>
+
+                                <motion.section
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+                                >
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Bed className="w-4 h-4" /> {t('accommodation')}
+                                        </h2>
+                                        {isEditing && <Button size="sm" variant="ghost" onClick={addHotel} className="h-6 text-xs text-blue-600">{t('add_hotel')}</Button>}
+                                    </div>
+
+                                    <motion.div
+                                        className="space-y-3"
+                                        initial="hidden"
+                                        animate="visible"
+                                        variants={{
+                                            hidden: {},
+                                            visible: {
+                                                transition: {
+                                                    staggerChildren: 0.08,
+                                                    delayChildren: 0.2
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <AnimatePresence mode="popLayout">
+                                            {hotels.map((item, idx) => (
+                                                <motion.div
+                                                    key={idx}
+                                                    layout
+                                                    initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                                                    transition={{ duration: 0.35, ease: "easeOut" }}
+                                                >
+                                                    <Card className="border-0 shadow-sm relative group overflow-hidden">
+                                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
+                                                        <CardContent className="p-4 pl-6">
+                                                            {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
+
+                                                            <div className="space-y-3">
+                                                                <div className="space-y-1">
+                                                                    <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
+                                                                    <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
+                                                                </div>
+                                                                {/* Place Search - 全寬顯示 */}
+                                                                <div className="space-y-2">
+                                                                    <Label className="text-[10px] text-slate-400 uppercase flex items-center gap-1">
+                                                                        <MapPin className="w-3 h-3" /> Place
+                                                                    </Label>
+                                                                    {isEditing ? (
+                                                                        <div className="space-y-2">
+                                                                            <div className="flex gap-1">
+                                                                                <select
+                                                                                    className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2"
+                                                                                    value={hotelSearchCountry}
+                                                                                    onChange={e => { setHotelSearchCountry(e.target.value); setHotelSearchRegion("") }}
+                                                                                >
+                                                                                    <option value="">🌍 Country</option>
+                                                                                    <option value="Japan">🇯🇵 Japan</option>
+                                                                                    <option value="Taiwan">🇹🇼 Taiwan</option>
+                                                                                    <option value="South Korea">🇰🇷 Korea</option>
+                                                                                    <option value="Thailand">🇹🇭 Thailand</option>
+                                                                                    <option value="Hong Kong">🇭🇰 HK</option>
+                                                                                    <option value="Singapore">🇸🇬 SG</option>
+                                                                                </select>
+                                                                                {hotelSearchCountry && COUNTRY_REGIONS[hotelSearchCountry] && (
+                                                                                    <select
+                                                                                        className="h-8 text-xs rounded-md border border-slate-200 bg-white px-2 flex-1"
+                                                                                        value={hotelSearchRegion}
+                                                                                        onChange={e => setHotelSearchRegion(e.target.value)}
+                                                                                    >
+                                                                                        <option value="">🏙️ Region</option>
+                                                                                        {COUNTRY_REGIONS[hotelSearchCountry].map(r => (
+                                                                                            <option key={r} value={r}>{r}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex gap-1">
+                                                                                <Input
+                                                                                    className="h-8 text-xs flex-1"
+                                                                                    placeholder="搜尋飯店..."
+                                                                                    value={hotelSearchQuery}
+                                                                                    onChange={e => setHotelSearchQuery(e.target.value)}
+                                                                                    onKeyDown={e => e.key === 'Enter' && handleSearchHotelPlace(idx)}
+                                                                                />
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="outline"
+                                                                                    className="h-8 px-2"
+                                                                                    onClick={() => handleSearchHotelPlace(idx)}
+                                                                                    disabled={isHotelSearching && searchingHotelIdx === idx}
+                                                                                >
+                                                                                    {isHotelSearching && searchingHotelIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                                                                </Button>
+                                                                            </div>
+                                                                            {/* 搜尋結果 */}
+                                                                            {searchingHotelIdx === idx && hotelSearchResults.length > 0 && (
+                                                                                <div className="bg-slate-50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto border border-slate-200">
+                                                                                    {hotelSearchResults.map((place, pIdx) => (
+                                                                                        <button
+                                                                                            key={pIdx}
+                                                                                            className="w-full text-left p-2 text-xs rounded hover:bg-indigo-50 transition-colors"
+                                                                                            onClick={() => handleSelectHotelPlace(idx, place)}
+                                                                                        >
+                                                                                            <div className="font-bold text-slate-700">{place.name}</div>
+                                                                                            <div className="text-slate-400 text-[10px] line-clamp-2">{place.display_name}</div>
+                                                                                        </button>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 已選擇的地點 - 顯示商家名稱（不是經緯度）*/}
+                                                                            {(item.address || (item.lat && item.lng)) && (
+                                                                                <div className="text-sm text-slate-700 bg-green-50 p-2.5 rounded-lg flex items-center gap-2 border border-green-200">
+                                                                                    <MapPin className="w-4 h-4 text-green-600 shrink-0" />
+                                                                                    <span className="font-medium">
+                                                                                        {/* 優先顯示地址/名稱，沒有才顯示經緯度 */}
+                                                                                        {item.address || item.name || `${item.lat?.toFixed(4)}, ${item.lng?.toFixed(4)}`}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 手動輸入經緯度 */}
+                                                                            <div className="flex gap-2 items-center">
+                                                                                <span className="text-[10px] text-slate-400">📍 手動座標:</span>
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    step="any"
+                                                                                    className="h-7 text-xs w-24 text-center font-mono"
+                                                                                    placeholder="緯度 Lat"
+                                                                                    value={item.lat ?? ''}
+                                                                                    onChange={e => updateHotel(idx, 'lat', e.target.value ? parseFloat(e.target.value) : null)}
+                                                                                />
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    step="any"
+                                                                                    className="h-7 text-xs w-24 text-center font-mono"
+                                                                                    placeholder="經度 Lng"
+                                                                                    value={item.lng ?? ''}
+                                                                                    onChange={e => updateHotel(idx, 'lng', e.target.value ? parseFloat(e.target.value) : null)}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex items-center gap-2">
+                                                                            {/* 非編輯模式：顯示商家名稱 */}
+                                                                            {item.address || item.name ? (
+                                                                                <span className="text-sm text-slate-700 font-medium">{item.address || item.name}</span>
+                                                                            ) : item.lat && item.lng ? (
+                                                                                <span className="text-sm text-slate-500">{item.lat.toFixed(4)}, {item.lng.toFixed(4)}</span>
+                                                                            ) : (
+                                                                                <span className="text-sm text-slate-400 italic">未設定地點</span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="pt-2 border-t border-slate-100 mt-2 flex gap-2">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="flex-1 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 h-8 text-xs"
+                                                                        onClick={() => { setCurrentHotelIdx(idx); setDetailOpen(true); }}
+                                                                    >
+                                                                        <Info className="w-3 h-3 mr-2" /> {t('details')}
+                                                                    </Button>
+                                                                    {/* 導航按鈕：使用經緯度定位 + 商家名稱搜尋 */}
+                                                                    {(item.lat && item.lng) || item.address || item.name ? (
+                                                                        <a
+                                                                            href={
+                                                                                // 使用經緯度定位 + 商家名稱搜尋
+                                                                                item.lat && item.lng && (item.address || item.name)
+                                                                                    ? `https://www.google.com/maps/search/${encodeURIComponent(item.address || item.name || '')}/@${item.lat},${item.lng},17z`
+                                                                                    : item.lat && item.lng
+                                                                                        ? `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`
+                                                                                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address || item.name || '')}`
+                                                                            }
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="flex items-center gap-1 px-3 h-8 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                                                                        >
+                                                                            <Navigation2 className="w-3 h-3" /> Maps
+                                                                        </a>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                </motion.section>
+                            </>
+                        )}
+                    </div>
+                </PullToRefresh>
+
+                <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                    <DialogContent className="sm:max-w-md h-[85vh] flex flex-col p-0 gap-0">
+                        {currentHotelIdx !== null && hotels[currentHotelIdx] && (
+                            <>
+                                <div className="p-6 bg-slate-50 border-b border-slate-200">
+                                    <DialogHeader>
+                                        <DialogTitle className="text-xl font-bold text-slate-900 line-clamp-1">{hotels[currentHotelIdx].name || "Untitled Hotel"}</DialogTitle>
+                                    </DialogHeader>
+
+                                    <div className="grid grid-cols-2 gap-3 mt-4">
+                                        <div className="bg-white p-2 rounded border border-slate-200">
+                                            <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Clock className="w-3 h-3" /> Check-In / Out</span>
+                                            <div className="flex gap-2 mt-1 items-center">
+                                                <Input
+                                                    className="h-6 text-xs w-full px-1 text-center font-bold" placeholder="15:00"
+                                                    value={hotels[currentHotelIdx].check_in}
+                                                    onChange={e => updateHotel(currentHotelIdx, 'check_in', e.target.value)}
+                                                />
+                                                <span className="text-slate-300">/</span>
+                                                <Input
+                                                    className="h-6 text-xs w-full px-1 text-center font-bold" placeholder="11:00"
+                                                    value={hotels[currentHotelIdx].check_out}
+                                                    onChange={e => updateHotel(currentHotelIdx, 'check_out', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="bg-white p-2 rounded border border-slate-200">
+                                            <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Phone className="w-3 h-3" /> Tel</span>
+                                            <Input
+                                                className="h-6 text-xs mt-1 px-1 border-0 border-b rounded-none focus-visible:ring-0 font-mono"
+                                                placeholder="03-1234-5678"
+                                                value={hotels[currentHotelIdx].phone}
+                                                onChange={e => updateHotel(currentHotelIdx, 'phone', e.target.value)}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </ScrollArea>
 
-                            <div className="p-4 border-t border-slate-100 bg-white">
-                                <Button className="w-full bg-slate-900 text-white hover:bg-slate-800" onClick={() => { setDetailOpen(false); handleSave(); }}>
-                                    {t('save_and_close')}
-                                </Button>
-                            </div>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+                                <ScrollArea className="flex-1 p-6">
+                                    <div className="space-y-6">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                <Wifi className="w-3 h-3" /> Memo (Wi-Fi / Lock / Storage)
+                                            </Label>
+                                            <Textarea
+                                                className="min-h-[150px] bg-yellow-50/50 border-amber-200 text-sm focus-visible:ring-amber-200 leading-relaxed"
+                                                placeholder="Enter memo..."
+                                                value={hotels[currentHotelIdx].memo}
+                                                onChange={e => updateHotel(currentHotelIdx, 'memo', e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* Booking Confirmation Image */}
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-slate-500 uppercase">
+                                                Booking Confirmation
+                                            </Label>
+                                            <ImageUpload
+                                                value={hotels[currentHotelIdx].image_url}
+                                                onChange={(url) => {
+                                                    // 使用 ref 獲取最新的索引值
+                                                    const idx = currentHotelIdxRef.current
+                                                    if (idx === null) {
+                                                        console.warn('❌ currentHotelIdxRef is null')
+                                                        return
+                                                    }
+                                                    console.log('🖼️ Image uploaded:', url.substring(0, 50) + '...', 'for hotel index:', idx)
+                                                    setHotels(prev => {
+                                                        const newHotels = [...prev]
+                                                        if (newHotels[idx]) {
+                                                            newHotels[idx] = { ...newHotels[idx], image_url: url }
+                                                            console.log('✅ Hotel updated with image_url')
+                                                        } else {
+                                                            console.warn('❌ Hotel at index', idx, 'not found')
+                                                        }
+                                                        return newHotels
+                                                    })
+                                                }}
+                                                onRemove={() => {
+                                                    const idx = currentHotelIdxRef.current
+                                                    if (idx === null) return
+                                                    setHotels(prev => {
+                                                        const newHotels = [...prev]
+                                                        if (newHotels[idx]) {
+                                                            newHotels[idx] = { ...newHotels[idx], image_url: '' }
+                                                        }
+                                                        return newHotels
+                                                    })
+                                                }}
+                                                folder="ryan_travel/hotels"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-3 pt-4 border-t border-dashed border-slate-200">
+                                            <div className="flex justify-between items-center">
+                                                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                                    <LinkIcon className="w-3 h-3" /> Links
+                                                </Label>
+                                                <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-600 hover:bg-blue-50" onClick={() => addLink(currentHotelIdx)}>
+                                                    <Plus className="w-3 h-3 mr-1" /> Add Link
+                                                </Button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {hotels[currentHotelIdx].links?.map((link: { title: string; url: string }, i: number) => (
+                                                    <div key={i} className="flex gap-2 items-center bg-white p-2 rounded border border-slate-100">
+                                                        <Input className="h-7 text-xs w-1/3 border-0 bg-slate-50" placeholder="Title" value={link.title} onChange={e => updateLink(currentHotelIdx, i, 'title', e.target.value)} />
+                                                        <Input className="h-7 text-xs flex-1 font-mono text-slate-500 border-0" placeholder="https://..." value={link.url} onChange={e => updateLink(currentHotelIdx, i, 'url', e.target.value)} />
+                                                        {link.url && <a href={link.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:bg-blue-50 p-1.5 rounded-full"><ExternalLink className="w-3 h-3" /></a>}
+                                                        <button onClick={() => removeLink(currentHotelIdx, i)} className="text-slate-300 hover:text-red-500 p-1.5"><Trash2 className="w-3 h-3" /></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </ScrollArea>
+
+                                <div className="p-4 border-t border-slate-100 bg-white">
+                                    <Button className="w-full bg-slate-900 text-white hover:bg-slate-800" onClick={() => { setDetailOpen(false); handleSave(); }}>
+                                        {t('save_and_close')}
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            </div>
         </div>
     )
 }
