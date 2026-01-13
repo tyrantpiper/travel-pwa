@@ -9,7 +9,7 @@ import { Virtuoso } from "react-virtuoso"
 // 🆕 DND-Kit imports
 import {
     DndContext,
-    closestCenter,
+    closestCorners,  // 🔧 Phase 1: 改用 closestCorners (比 closestCenter 穩定)
     TouchSensor,
     PointerSensor,
     useSensor,
@@ -1980,7 +1980,12 @@ export function ItineraryView() {
                         return currentDayData.length > 0 ? (
                             <DndContext
                                 sensors={dndSensors}
-                                collisionDetection={closestCenter}
+                                collisionDetection={closestCorners}  // 🔧 Phase 1: 比 closestCenter 穩定
+                                autoScroll={{
+                                    threshold: { x: 0, y: 0.15 },  // 15% 邊緣觸發
+                                    acceleration: 25,               // 加速度
+                                    interval: 10,                   // 刷新頻率 (ms)
+                                }}
                                 onDragStart={handleDragStart}
                                 onDragEnd={handleDragEnd}
                                 onDragCancel={handleDragCancel}
