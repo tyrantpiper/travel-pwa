@@ -136,7 +136,7 @@ const CURRENCIES = [
 ] as const
 
 export function ToolsView() {
-    const { trips } = useTripContext()
+    const { trips, mutate: tripMutate } = useTripContext()
     const { mutate } = useSWRConfig()
     const { t } = useLanguage()
 
