@@ -238,7 +238,8 @@ class ExpenseRequest(BaseModel):
     """新增消費請求"""
     itinerary_id: Optional[str] = None
     title: Optional[str] = None
-    amount_jpy: Optional[float] = None
+    amount_jpy: Optional[float] = None  # Note: Field named amount_jpy for legacy, stores any currency amount
+    currency: Optional[str] = "JPY"  # 🆕 Multi-currency support (default JPY for backward compat)
     exchange_rate: Optional[float] = None
     payment_method: Optional[str] = None
     category: Optional[str] = None
@@ -260,6 +261,7 @@ class UpdateExpenseRequest(BaseModel):
     """更新消費請求"""
     title: Optional[str] = None
     amount_jpy: Optional[float] = None
+    currency: Optional[str] = None  # 🆕 Multi-currency support
     is_public: Optional[bool] = None
     payment_method: Optional[str] = None
     image_url: Optional[str] = None

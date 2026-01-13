@@ -20,7 +20,7 @@ async def add_expense(request: ExpenseRequest, supabase=Depends(get_supabase)):
             "itinerary_id": request.itinerary_id,
             "title": request.title,
             "amount": request.amount_jpy,
-            "currency": "JPY",
+            "currency": request.currency or "JPY",  # 🆕 Use dynamic currency
             "category": request.category,
             "is_public": request.is_public,
             "created_by": request.created_by,
@@ -79,6 +79,8 @@ async def update_expense(
         data = request.dict(exclude_unset=True)
         if 'amount_jpy' in data:
             data['amount'] = data.pop('amount_jpy')  # 對應 DB 欄位
+        
+        # 🆕 Currency update is handled automatically if present in request due to Pydantic model
         
         supabase.table("expenses").update(data).eq("id", expense_id).execute()
         return {"status": "success"}

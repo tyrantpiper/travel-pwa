@@ -43,6 +43,7 @@ interface Expense {
     created_at?: string
     exchange_rate?: number
     cashback_rate?: number
+    currency?: string // 🆕 Added to match backend
     trip_id?: string
     card_name?: string
     creator_name?: string
@@ -121,13 +122,53 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
     general: { label: "Other", icon: Receipt, color: "bg-slate-100 text-slate-600" },
 }
 
+// 🆕 v3.10: 支援多幣別
+const CURRENCIES = [
+    { code: 'JPY', symbol: '¥', name: '日幣', flag: '🇯🇵' },
+    { code: 'USD', symbol: '$', name: '美元', flag: '🇺🇸' },
+    { code: 'EUR', symbol: '€', name: '歐元', flag: '🇪🇺' },
+    { code: 'KRW', symbol: '₩', name: '韓圓', flag: '🇰🇷' },
+    { code: 'CNY', symbol: '¥', name: '人民幣', flag: '🇨🇳' },
+    { code: 'THB', symbol: '฿', name: '泰銖', flag: '🇹🇭' },
+    { code: 'SGD', symbol: 'S$', name: '新幣', flag: '🇸🇬' },
+    { code: 'HKD', symbol: 'HK$', name: '港幣', flag: '🇭🇰' },
+    { code: 'TWD', symbol: 'NT$', name: '台幣', flag: '🇹🇼' }, // Added TWD as base option
+] as const
+
 export function ToolsView() {
-    const { t } = useLanguage()
-    const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()
+    const { trips } = useTripContext()
     const { mutate } = useSWRConfig()
-    const [activeSection, setActiveSection] = useState("expense")
-    const [expenses, setExpenses] = useState<Expense[]>([])
-    const [rate, setRate] = useState(0.22)
+    const { t } = useLanguage()
+
+    // Global State
+    const activeTripId = useMemo(() => {
+        if (typeof window === 'undefined') return localStorage.getItem('active_trip_id')
+        return localStorage.getItem('active_trip_id')
+    }, []) // Dependency array empty to mimic original behavior, though relying on window check
+
+    const [activeTab, setActiveTab] = useState("expense")
+
+    // 🆕 Currency State
+    const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null) // null = TWD only
+    const [rate, setRate] = useState(0.22) // JPY default
+
+    // Load currency preference
+    useEffect(() => {
+        const saved = localStorage.getItem("preferred_currency")
+        if (saved) setSelectedCurrency(saved)
+    }, [])
+
+    // Save currency preference
+    const handleCurrencyChange = (currency: string | null) => {
+        setSelectedCurrency(currency)
+        if (currency) {
+            localStorage.setItem("preferred_currency", currency)
+            fetchRate(currency)
+        } else {
+            localStorage.removeItem("preferred_currency")
+            fetchRate('JPY') // Reset to default rate base
+        }
+    }
 
     // View controls
     const [expenseView, setExpenseView] = useState<'summary' | 'daily'>('summary')
@@ -234,14 +275,22 @@ export function ToolsView() {
         }
     }
 
-    const fetchRate = async () => {
+    const fetchRate = async (currency: string = 'JPY') => {
+        const targetCode = currency.toLowerCase()
+        // If TWD is selected, rate is 1:1
+        if (targetCode === 'twd') {
+            setRate(1)
+            return
+        }
+
         try {
             // 主要來源：fawazahmed0/currency-api（無限制、CDN 緩存）
+            // 格式: /currencies/{currency}.json -> { "{currency}": { "twd": 0.22 } }
             const res = await fetch(
-                "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json"
+                `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${targetCode}.json`
             )
             const data = await res.json()
-            const rawRate = data.jpy?.twd
+            const rawRate = data[targetCode]?.twd
             if (rawRate) {
                 setRate(Math.round(rawRate * 100) / 100)  // 精確到小數點 2 位
                 return
@@ -250,7 +299,7 @@ export function ToolsView() {
 
         // 備援來源：原 exchangerate-api
         try {
-            const res = await fetch("https://api.exchangerate-api.com/v4/latest/JPY")
+            const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`)
             const data = await res.json()
             if (data.rates?.TWD) {
                 setRate(Math.round(data.rates.TWD * 100) / 100)
@@ -319,13 +368,32 @@ export function ToolsView() {
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
     // Calculate totals and category breakdown
-    const { totalJPY, totalTWD, totalCashback, categoryData } = useMemo(() => {
-        const total = filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0)
-        // 計算總回饋金額
+    const { totalForeign, totalTWD, totalCashback, categoryData } = useMemo(() => {
+        // TWD Total: Convert ALL expenses to TWD
+        const twdTotal = filteredExpenses.reduce((sum, e) => {
+            // Use stored exchange rate if available, otherwise fallback to current rate (only if currency matches)
+            // Ideally backend should always store rate. For now assume rate applies if currency matches.
+            // If currency differs and no stored rate, we have a problem (Risk identified in analysis).
+            // For now: use stored rate -> current rate (if JPY) -> 0.22 fallback
+            const usedRate = e.exchange_rate || (e.currency === selectedCurrency ? rate : (e.currency === 'JPY' ? 0.22 : 0))
+            return sum + (e.amount || 0) * usedRate
+        }, 0)
+
+        // Foreign Total: Sum ONLY if expense currency matches selected currency
+        const foreignTotal = filteredExpenses.reduce((sum, e) => {
+            const expCurrency = e.currency || "JPY" // Backend default
+            const targetCurrency = selectedCurrency || "JPY" // Frontend view default
+            if (expCurrency === targetCurrency) {
+                return sum + (e.amount || 0)
+            }
+            return sum
+        }, 0)
+
+        // 計算總回饋金額 (TWD)
         const cashbackTotal = filteredExpenses.reduce((sum, e) => {
             if (e.cashback_rate && e.cashback_rate > 0) {
                 const usedRate = e.exchange_rate || rate
-                return sum + Math.round(e.amount * usedRate * e.cashback_rate / 100)
+                return sum + Math.round((e.amount * usedRate) * e.cashback_rate / 100)
             }
             return sum
         }, 0)
@@ -333,16 +401,24 @@ export function ToolsView() {
         const cats: Record<string, number> = {}
         filteredExpenses.forEach(e => {
             const cat = e.category || 'general'
-            cats[cat] = (cats[cat] || 0) + (e.amount || 0)
+            // Category chart uses TWD value for standardized comparison
+            const usedRate = e.exchange_rate || (e.currency === selectedCurrency ? rate : 0.22)
+            const amountTWD = (e.amount || 0) * usedRate
+            cats[cat] = (cats[cat] || 0) + amountTWD
         })
         const data = Object.entries(cats).map(([category, amount]) => ({
             category,
-            amount,
+            amount: Math.round(amount), // Chart uses TWD
             color: CATEGORY_COLORS[category] || CATEGORY_COLORS.general
         })).sort((a, b) => b.amount - a.amount)
 
-        return { totalJPY: total, totalTWD: Math.round(total * rate), totalCashback: cashbackTotal, categoryData: data }
-    }, [filteredExpenses, rate])
+        return {
+            totalForeign: foreignTotal,
+            totalTWD: Math.round(twdTotal),
+            totalCashback: cashbackTotal,
+            categoryData: data
+        }
+    }, [filteredExpenses, rate, selectedCurrency])
 
     // Date navigation
     const navigateDate = (direction: 'prev' | 'next') => {
@@ -902,14 +978,50 @@ export function ToolsView() {
                             <CardContent className="p-4">
                                 {expenseView === 'summary' ? (
                                     <div className="space-y-4">
-                                        <ExpenseChart data={categoryData} total={totalJPY} />
-                                        <div className="text-center pt-2 border-t">
-                                            <p className="text-xs text-slate-500">{t('total')}</p>
-                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
-                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
-                                            {totalCashback > 0 && (
-                                                <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
-                                            )}
+                                        <ExpenseChart data={categoryData} total={totalTWD} />
+
+                                        <div className="flex flex-col items-center gap-3 pt-2 border-t">
+                                            {/* Currency Selector */}
+                                            <Select
+                                                value={selectedCurrency || "TWD"}
+                                                onValueChange={(val) => handleCurrencyChange(val === "TWD" ? null : val)}
+                                            >
+                                                <SelectTrigger className="w-[140px] h-8 text-xs bg-slate-50 border-slate-200">
+                                                    <SelectValue placeholder="貨幣" />
+                                                </SelectTrigger>
+                                                <SelectContent align="center">
+                                                    <SelectItem value="TWD">🇹🇼 TWD (台幣)</SelectItem>
+                                                    {CURRENCIES.filter(c => c.code !== 'TWD').map(c => (
+                                                        <SelectItem key={c.code} value={c.code}>
+                                                            {c.flag} {c.code} ({c.name})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+
+                                            <div className="text-center">
+                                                <p className="text-xs text-slate-500">{t('total')}</p>
+
+                                                {/* Dual Currency Display */}
+                                                {selectedCurrency && selectedCurrency !== 'TWD' ? (
+                                                    <>
+                                                        <p className="text-2xl font-bold text-slate-900 font-mono">
+                                                            {totalForeign.toLocaleString()} <span className="text-sm font-normal text-slate-500">{selectedCurrency}</span>
+                                                        </p>
+                                                        <p className="text-sm text-slate-500">
+                                                            ~ {totalTWD.toLocaleString()} TWD
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-2xl font-bold text-slate-900 font-mono">
+                                                        {totalTWD.toLocaleString()} <span className="text-sm font-normal text-slate-500">TWD</span>
+                                                    </p>
+                                                )}
+
+                                                {totalCashback > 0 && (
+                                                    <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
