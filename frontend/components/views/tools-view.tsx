@@ -146,6 +146,11 @@ export function ToolsView() {
         return localStorage.getItem('active_trip_id')
     }, []) // Dependency array empty to mimic original behavior, though relying on window check
 
+    // 🔧 FIX: Derive activeTrip from trips array for credit card sharing logic
+    const activeTrip = useMemo(() => {
+        return trips?.find(t => t.id === activeTripId)
+    }, [trips, activeTripId])
+
     const [activeTab, setActiveTab] = useState("expense")
 
     // 🆕 Currency State
