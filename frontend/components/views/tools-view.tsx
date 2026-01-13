@@ -161,27 +161,6 @@ export function ToolsView() {
         if (saved) setSelectedCurrency(saved)
     }, [])
 
-    // Load currency preference
-    useEffect(() => {
-        const saved = localStorage.getItem("preferred_currency")
-        if (saved) setSelectedCurrency(saved)
-    }, [])
-
-    // Save currency preference
-    // Save currency preference
-    const handleCurrencyChange = async (currency: string | null) => {
-        setSelectedCurrency(currency)
-        if (currency) {
-            localStorage.setItem("preferred_currency", currency)
-            const r = await getExchangeRate(currency)
-            setRate(r)
-        } else {
-            localStorage.removeItem("preferred_currency")
-            const r = await getExchangeRate('JPY')
-            setRate(r)
-        }
-    }
-
     // Initial Rate Fetch (View)
     useEffect(() => {
         const initRate = async () => {
@@ -324,6 +303,20 @@ export function ToolsView() {
         fetchExpenses()
     }, [activeTripId])
 
+    // 🆕 Phase 9: Reset selectedDate when trip changes
+    useEffect(() => {
+        setSelectedDate("")
+        setActiveCategory(null)
+    }, [activeTripId])
+
+    // Helper: Format date in local timezone (avoid UTC offset issues)
+    const formatLocalDate = (d: Date): string => {
+        const year = d.getFullYear()
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+    }
+
     // 🆕 Phase 8: Trip-date-driven allDates (instead of expense-driven)
     const allDates = useMemo(() => {
         // Priority 1: Use trip date range if available
@@ -336,7 +329,7 @@ export function ToolsView() {
 
             const dates: string[] = []
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                dates.push(d.toISOString().split('T')[0])
+                dates.push(formatLocalDate(d))
             }
             return dates
         }
@@ -353,7 +346,7 @@ export function ToolsView() {
     // Set initial selected date (prefer today if within trip range)
     useEffect(() => {
         if (allDates.length > 0 && !selectedDate) {
-            const today = new Date().toISOString().split('T')[0]
+            const today = formatLocalDate(new Date())
             // If today is within trip range, default to today; otherwise first day
             const initialDate = allDates.includes(today) ? today : allDates[0]
             setSelectedDate(initialDate)
@@ -383,7 +376,7 @@ export function ToolsView() {
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
     // Calculate totals and category breakdown
-    const { totalTWD, totalCashback, totalJPY, categoryData } = useMemo(() => {
+    const { totalTWD, totalCashback, categoryData } = useMemo(() => {
         // TWD Total: Convert ALL expenses to TWD
         const twdTotal = filteredExpenses.reduce((sum, e) => {
             // Use stored exchange rate if available, otherwise fallback to current rate (only if currency matches)
@@ -430,12 +423,29 @@ export function ToolsView() {
         return {
             totalTWD: Math.round(twdTotal),
             totalCashback: cashbackTotal,
-            totalJPY: foreignTotal, // 🆕 Alias for backward compatibility (Fix #5)
             categoryData: data
         }
     }, [filteredExpenses, rate, selectedCurrency])
 
-    // Date navigation
+    // 🆕 Phase 9: Calculate foreign currency totals for multi-currency display
+    const foreignTotals = useMemo(() => {
+        const totals: Record<string, { amount: number; symbol: string; flag: string }> = {}
+
+        filteredExpenses.forEach(e => {
+            const c = e.currency || "JPY"
+            if (c !== "TWD") {
+                const info = CURRENCIES.find(x => x.code === c)
+                if (!totals[c]) {
+                    totals[c] = { amount: 0, symbol: info?.symbol || '', flag: info?.flag || '' }
+                }
+                totals[c].amount += e.amount || 0
+            }
+        })
+
+        // Sort by amount descending
+        return Object.entries(totals)
+            .sort((a, b) => b[1].amount - a[1].amount)
+    }, [filteredExpenses])    // Date navigation
     const navigateDate = (direction: 'prev' | 'next') => {
         const idx = allDates.indexOf(selectedDate)
         if (direction === 'prev' && idx > 0) {
@@ -1012,23 +1022,20 @@ export function ToolsView() {
                                         />
 
                                         <div className="flex flex-col items-center gap-3 pt-2 border-t">
-                                            {/* Currency Selector */}
-                                            <Select
-                                                value={selectedCurrency || "TWD"}
-                                                onValueChange={(val) => handleCurrencyChange(val === "TWD" ? null : val)}
-                                            >
-                                                <SelectTrigger className="w-[140px] h-8 text-xs bg-slate-50 border-slate-200">
-                                                    <SelectValue placeholder="貨幣" />
-                                                </SelectTrigger>
-                                                <SelectContent align="center">
-                                                    <SelectItem value="TWD">🇹🇼 TWD (台幣)</SelectItem>
-                                                    {CURRENCIES.filter(c => c.code !== 'TWD').map(c => (
-                                                        <SelectItem key={c.code} value={c.code}>
-                                                            {c.flag} {c.code} ({c.name})
-                                                        </SelectItem>
+                                            {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
+                                            {foreignTotals.length > 0 && (
+                                                <div className="flex flex-wrap justify-center gap-3">
+                                                    {foreignTotals.map(([code, info]) => (
+                                                        <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
+                                                            <span className="text-lg mr-1">{info.flag}</span>
+                                                            <span className="font-mono font-bold text-slate-800">
+                                                                {info.symbol}{Math.round(info.amount).toLocaleString()}
+                                                            </span>
+                                                            <span className="text-xs text-slate-500 ml-1">{code}</span>
+                                                        </div>
                                                     ))}
-                                                </SelectContent>
-                                            </Select>
+                                                </div>
+                                            )}
 
                                             <div className="text-center">
                                                 <p className="text-xs text-slate-500">
@@ -1040,6 +1047,9 @@ export function ToolsView() {
                                                         prefix="NT$"
                                                     />
                                                 </div>
+                                                {totalCashback > 0 && (
+                                                    <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1047,8 +1057,17 @@ export function ToolsView() {
                                     <div className="flex justify-between items-center">
                                         <div>
                                             <p className="text-xs text-slate-500">{t('total')}</p>
-                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
-                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
+                                            {/* Multi-currency display for daily view too */}
+                                            {foreignTotals.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-1">
+                                                    {foreignTotals.map(([code, info]) => (
+                                                        <span key={code} className="font-mono font-bold text-slate-900">
+                                                            {info.flag} {info.symbol}{Math.round(info.amount).toLocaleString()}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <p className="text-2xl font-bold text-slate-900">NT${totalTWD.toLocaleString()}</p>
                                             {totalCashback > 0 && (
                                                 <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
                                             )}
