@@ -57,6 +57,8 @@ interface Trip {
     credit_cards?: CreditCard[]  // 🆕 Type Safety
     flight_info?: Record<string, unknown>
     hotel_info?: Record<string, unknown>
+    start_date?: string
+    end_date?: string
 }
 
 interface ParseResult {
@@ -136,27 +138,21 @@ const CURRENCIES = [
 ] as const
 
 export function ToolsView() {
-    const { trips, mutate: tripMutate } = useTripContext()
-    const { mutate } = useSWRConfig()
     const { t } = useLanguage()
-
-    // Global State
-    const activeTripId = useMemo(() => {
-        if (typeof window === 'undefined') return localStorage.getItem('active_trip_id')
-        return localStorage.getItem('active_trip_id')
-    }, []) // Dependency array empty to mimic original behavior, though relying on window check
-
-    // 🔧 FIX: Derive activeTrip from trips array for credit card sharing logic
-    const activeTrip = useMemo(() => {
-        return trips?.find(t => t.id === activeTripId)
-    }, [trips, activeTripId])
-
-    const [activeTab, setActiveTab] = useState("expense")
-    const [expenses, setExpenses] = useState<Expense[]>([]) // 🔧 FIX: Restore missing state
+    const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()  // 🔧 FIX: Restore full context
+    const { mutate } = useSWRConfig()
+    const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
+    const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
+    const [rate, setRate] = useState(0.22)
 
     // 🆕 Currency State
     const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null) // null = TWD only
-    const [rate, setRate] = useState(0.22) // JPY default
+
+    // Load currency preference
+    useEffect(() => {
+        const saved = localStorage.getItem("preferred_currency")
+        if (saved) setSelectedCurrency(saved)
+    }, [])
 
     // Load currency preference
     useEffect(() => {
@@ -374,7 +370,7 @@ export function ToolsView() {
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
     // Calculate totals and category breakdown
-    const { totalForeign, totalTWD, totalCashback, categoryData } = useMemo(() => {
+    const { totalForeign, totalTWD, totalCashback, totalJPY, categoryData } = useMemo(() => {
         // TWD Total: Convert ALL expenses to TWD
         const twdTotal = filteredExpenses.reduce((sum, e) => {
             // Use stored exchange rate if available, otherwise fallback to current rate (only if currency matches)
@@ -422,6 +418,7 @@ export function ToolsView() {
             totalForeign: foreignTotal,
             totalTWD: Math.round(twdTotal),
             totalCashback: cashbackTotal,
+            totalJPY: foreignTotal, // 🆕 Alias for backward compatibility (Fix #5)
             categoryData: data
         }
     }, [filteredExpenses, rate, selectedCurrency])
@@ -834,7 +831,7 @@ export function ToolsView() {
             </div>
 
             <PullToRefresh onRefresh={async () => { await Promise.all([fetchExpenses(), tripMutate(), fetchRate()]); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <Tabs value={activeSection} onValueChange={setActiveSection}>
                     {/* Custom Sliding Tab Strip */}
                     <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
                         {[
@@ -844,10 +841,10 @@ export function ToolsView() {
                         ].map((tab) => (
                             <button
                                 key={tab.value}
-                                onClick={() => setActiveTab(tab.value)}
-                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                onClick={() => setActiveSection(tab.value)}
+                                className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                             >
-                                {activeTab === tab.value && (
+                                {activeSection === tab.value && (
                                     <motion.div
                                         layoutId="tools-tab-indicator"
                                         className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
@@ -1034,18 +1031,8 @@ export function ToolsView() {
                                     <div className="flex justify-between items-center">
                                         <div>
                                             <p className="text-xs text-slate-500">{t('total')}</p>
-                                            {selectedCurrency && selectedCurrency !== 'TWD' ? (
-                                                <>
-                                                    <p className="text-2xl font-bold text-slate-900">
-                                                        {totalForeign.toLocaleString()} <span className="text-sm font-normal text-slate-500">{selectedCurrency}</span>
-                                                    </p>
-                                                    <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
-                                                </>
-                                            ) : (
-                                                <p className="text-2xl font-bold text-slate-900">
-                                                    {totalTWD.toLocaleString()} <span className="text-sm font-normal text-slate-500">TWD</span>
-                                                </p>
-                                            )}
+                                            <p className="text-2xl font-bold text-slate-900">{totalJPY.toLocaleString()} JPY</p>
+                                            <p className="text-sm text-slate-500">~ {totalTWD.toLocaleString()} TWD</p>
                                             {totalCashback > 0 && (
                                                 <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
                                             )}
@@ -1261,13 +1248,14 @@ export function ToolsView() {
                                 >
                                     {(() => {
                                         // 計算行程天數（從 days array 或 start/end date）
-                                        const startDate = new Date(activeTrip.start_date)
-                                        const endDate = activeTrip.end_date ? new Date(activeTrip.end_date) : null
-                                        const totalDays = activeTrip.days?.length ||
+                                        const trip = activeTrip as Trip // 🔧 FIX #7: Explicit cast
+                                        const startDate = new Date(trip.start_date!) // 🔧 FIX #7: Assert non-null
+                                        const endDate = trip.end_date ? new Date(trip.end_date) : null
+                                        const totalDays = trip.days?.length ||
                                             (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
 
                                         return Array.from({ length: totalDays }, (_, i) => {
-                                            const date = new Date(activeTrip.start_date)
+                                            const date = new Date(startDate)
                                             date.setDate(date.getDate() + i)
                                             const dateStr = date.toISOString().split('T')[0]
                                             const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
