@@ -25,7 +25,8 @@ from models.base import (
     UpdateInfoRequest,
     CreateItemRequest,
     UpdateItemRequest,
-    AddDayRequest
+    AddDayRequest,
+    ReorderRequest  # 🆕 拖曳排序
 )
 from utils.deps import get_supabase
 from utils.helpers import generate_room_code
@@ -113,8 +114,8 @@ async def get_trip_by_id(
         else:
             print(f"🔍 [DEBUG] No user_id provided, treating as non-member")
         
-        # 2. 抓該行程的所有細項
-        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()
+        # 2. 抓該行程的所有細項 (按 sort_order 排序，支援拖曳)
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
         
         # 3. 整理成前端要的格式
         days_map = {}
@@ -344,8 +345,8 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
             
         trip = trip_res.data[0]
         
-        # 2. 抓該行程的所有細項
-        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").execute()
+        # 2. 抓該行程的所有細項 (按 sort_order 排序，支援拖曳)
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
         
         # 3. 整理成前端要的格式
         days_map = {}
@@ -861,6 +862,8 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         if request.image_url is not None: data["image_url"] = request.image_url
         # 🆕 新增：處理多圖片 URLs
         if request.image_urls is not None: data["image_urls"] = request.image_urls
+        # 🆕 新增：處理排序順序 (拖曳排序)
+        if request.sort_order is not None: data["sort_order"] = request.sort_order
         
         if not data:
             print("⚠️ 沒有資料需要更新")
@@ -876,6 +879,30 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         return {"status": "success", "data": res.data}
     except Exception as e:
         print(f"🔥 Update Item Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🆕 批次排序更新 API
+@router.patch("/items/reorder")
+async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase)):
+    """🔄 批次更新多個項目的排序順序"""
+    print(f"🔄 批次排序: {len(request.items)} 項目, adjust_times={request.adjust_times}")
+    try:
+        results = []
+        for item in request.items:
+            data = {"sort_order": item.sort_order}
+            
+            # 如果選擇自動調整時間
+            if request.adjust_times and item.time_slot:
+                data["time_slot"] = item.time_slot
+            
+            res = supabase.table("itinerary_items").update(data).eq("id", item.item_id).execute()
+            results.append({"id": item.item_id, "updated": bool(res.data)})
+        
+        print(f"✅ 排序更新完成: {len(results)} 項目")
+        return {"status": "success", "results": results}
+    except Exception as e:
+        print(f"🔥 Reorder Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

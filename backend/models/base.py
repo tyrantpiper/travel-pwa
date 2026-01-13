@@ -122,6 +122,7 @@ class UpdateItemRequest(BaseModel):
     image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
     category: Optional[str] = None
     tags: Optional[List[str]] = None
+    sort_order: Optional[int] = None  # 🆕 拖曳排序
 
 
 class CreateItemRequest(BaseModel):
@@ -138,6 +139,18 @@ class CreateItemRequest(BaseModel):
     image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
     tags: Optional[List[str]] = None
 
+
+# 🆕 拖曳排序請求
+class ReorderItemRequest(BaseModel):
+    """單一項目的排序更新"""
+    item_id: str
+    sort_order: int
+    time_slot: Optional[str] = None  # 可選：同時更新時間
+
+class ReorderRequest(BaseModel):
+    """批次排序更新請求"""
+    items: List[ReorderItemRequest]
+    adjust_times: bool = False  # 是否自動重分配時間
 
 
 class ImportToTripRequest(BaseModel):

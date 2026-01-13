@@ -77,6 +77,7 @@ export interface Activity {
     sub_items?: SubItem[]
     link_url?: string // External link for the place itself
     is_highlight?: boolean
+    sort_order?: number  // 🆕 拖曳排序
 }
 
 export interface TripDay {

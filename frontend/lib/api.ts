@@ -66,6 +66,7 @@ export interface UpdateItemParams {
     image_urls?: string[]  // 🆕 多圖片
     memo?: string
     sub_items?: { name: string; checked: boolean }[]
+    sort_order?: number  // 🆕 拖曳排序
 }
 
 export interface GeocodeSearchParams {
