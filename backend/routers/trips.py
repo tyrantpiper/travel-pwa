@@ -837,6 +837,32 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# 🆕 批次排序更新 API (Moved up to avoid conflict with {item_id})
+@router.patch("/items/reorder")
+async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase)):
+    """🔄 批次更新多個項目的排序順序"""
+    print(f"🔄 批次排序: {len(request.items)} 項目, adjust_times={request.adjust_times}")
+    try:
+        results = []
+        for item in request.items:
+            data = {"sort_order": item.sort_order}
+            
+            # 如果選擇自動調整時間
+            if request.adjust_times and item.time_slot:
+                data["time_slot"] = item.time_slot
+            
+            res = supabase.table("itinerary_items").update(data).eq("id", item.item_id).execute()
+            results.append({"id": item.item_id, "updated": bool(res.data)})
+        
+        print(f"✅ 排序更新完成: {len(results)} 項目")
+        return {"status": "success", "results": results}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"🔥 Reorder Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
+
+
 @router.patch("/items/{item_id}")
 async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends(get_supabase)):
     """📝 修改單一細項"""
@@ -880,32 +906,6 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
     except Exception as e:
         print(f"🔥 Update Item Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# 🆕 批次排序更新 API
-@router.patch("/items/reorder")
-async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase)):
-    """🔄 批次更新多個項目的排序順序"""
-    print(f"🔄 批次排序: {len(request.items)} 項目, adjust_times={request.adjust_times}")
-    try:
-        results = []
-        for item in request.items:
-            data = {"sort_order": item.sort_order}
-            
-            # 如果選擇自動調整時間
-            if request.adjust_times and item.time_slot:
-                data["time_slot"] = item.time_slot
-            
-            res = supabase.table("itinerary_items").update(data).eq("id", item.item_id).execute()
-            results.append({"id": item.item_id, "updated": bool(res.data)})
-        
-        print(f"✅ 排序更新完成: {len(results)} 項目")
-        return {"status": "success", "results": results}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"🔥 Reorder Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
 
 
 @router.delete("/items/{item_id}")
