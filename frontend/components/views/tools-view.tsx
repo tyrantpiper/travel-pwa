@@ -137,6 +137,9 @@ const CURRENCIES = [
     { code: 'TWD', symbol: 'NT$', name: '台幣', flag: '🇹🇼' }, // Added TWD as base option
 ] as const
 
+import { getExchangeRate } from "@/lib/currency"
+import { CountingNumber } from "@/components/ui/counting-number"
+
 export function ToolsView() {
     const { t } = useLanguage()
     const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()  // 🔧 FIX: Restore full context
@@ -144,6 +147,10 @@ export function ToolsView() {
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
     const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
     const [rate, setRate] = useState(0.22)
+
+    // 🆕 Currency State (Input Dialog) - Isolated
+    const [inputCurrency, setInputCurrency] = useState("JPY")
+    const [inputRate, setInputRate] = useState(0.22)
 
     // 🆕 Currency State
     const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null) // null = TWD only
@@ -161,21 +168,44 @@ export function ToolsView() {
     }, [])
 
     // Save currency preference
-    const handleCurrencyChange = (currency: string | null) => {
+    // Save currency preference
+    const handleCurrencyChange = async (currency: string | null) => {
         setSelectedCurrency(currency)
         if (currency) {
             localStorage.setItem("preferred_currency", currency)
-            fetchRate(currency)
+            const r = await getExchangeRate(currency)
+            setRate(r)
         } else {
             localStorage.removeItem("preferred_currency")
-            fetchRate('JPY') // Reset to default rate base
+            const r = await getExchangeRate('JPY')
+            setRate(r)
         }
     }
+
+    // Initial Rate Fetch (View)
+    useEffect(() => {
+        const initRate = async () => {
+            const r = await getExchangeRate(selectedCurrency || 'JPY')
+            setRate(r)
+        }
+        initRate()
+    }, [selectedCurrency])
+
+    // 🆕 Input Rate Effect
+    useEffect(() => {
+        const updateInputRate = async () => {
+            const r = await getExchangeRate(inputCurrency)
+            setInputRate(r)
+        }
+        updateInputRate()
+    }, [inputCurrency])
 
     // View controls
     const [expenseView, setExpenseView] = useState<'summary' | 'daily'>('summary')
     const [ownerFilter, setOwnerFilter] = useState<'all' | 'public' | 'private'>('all')
     const [selectedDate, setSelectedDate] = useState<string>("")
+    // 🆕 Chart Filtering State
+    const [activeCategory, setActiveCategory] = useState<string | null>(null)
 
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -277,42 +307,6 @@ export function ToolsView() {
         }
     }
 
-    const fetchRate = async (currency: string = 'JPY') => {
-        const targetCode = currency.toLowerCase()
-        // If TWD is selected, rate is 1:1
-        if (targetCode === 'twd') {
-            setRate(1)
-            return
-        }
-
-        try {
-            // 主要來源：fawazahmed0/currency-api（無限制、CDN 緩存）
-            // 格式: /currencies/{currency}.json -> { "{currency}": { "twd": 0.22 } }
-            const res = await fetch(
-                `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${targetCode}.json`
-            )
-            const data = await res.json()
-            const rawRate = data[targetCode]?.twd
-            if (rawRate) {
-                setRate(Math.round(rawRate * 100) / 100)  // 精確到小數點 2 位
-                return
-            }
-        } catch { /* 嘗試備援 */ }
-
-        // 備援來源：原 exchangerate-api
-        try {
-            const res = await fetch(`https://api.exchangerate-api.com/v4/latest/${currency}`)
-            const data = await res.json()
-            if (data.rates?.TWD) {
-                setRate(Math.round(data.rates.TWD * 100) / 100)
-            }
-        } catch { /* 使用預設值 */ }
-    }
-
-    useEffect(() => {
-        fetchRate()
-    }, [])
-
     useEffect(() => {
         const fetchExpenses = async () => {
             try {
@@ -330,20 +324,39 @@ export function ToolsView() {
         fetchExpenses()
     }, [activeTripId])
 
-    // Get all unique dates from expenses
+    // 🆕 Phase 8: Trip-date-driven allDates (instead of expense-driven)
     const allDates = useMemo(() => {
+        // Priority 1: Use trip date range if available
+        if (activeTrip?.start_date) {
+            // Use T00:00:00 to force local timezone interpretation
+            const start = new Date(activeTrip.start_date + 'T00:00:00')
+            const end = activeTrip.end_date
+                ? new Date(activeTrip.end_date + 'T00:00:00')
+                : new Date(start.getTime() + ((activeTrip.days?.length || 7) - 1) * 24 * 60 * 60 * 1000)
+
+            const dates: string[] = []
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                dates.push(d.toISOString().split('T')[0])
+            }
+            return dates
+        }
+
+        // Fallback: Extract from expenses (when no trip selected)
         const dates = new Set<string>()
         expenses.forEach(e => {
-            const d = e.expense_date || e.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
-            dates.add(d)
+            const d = e.expense_date || e.created_at?.split('T')[0]
+            if (d) dates.add(d)
         })
         return Array.from(dates).sort()
-    }, [expenses])
+    }, [activeTrip, expenses])
 
-    // Set initial selected date
+    // Set initial selected date (prefer today if within trip range)
     useEffect(() => {
         if (allDates.length > 0 && !selectedDate) {
-            setSelectedDate(allDates[allDates.length - 1])
+            const today = new Date().toISOString().split('T')[0]
+            // If today is within trip range, default to today; otherwise first day
+            const initialDate = allDates.includes(today) ? today : allDates[0]
+            setSelectedDate(initialDate)
         }
     }, [allDates, selectedDate])
 
@@ -370,7 +383,7 @@ export function ToolsView() {
     }, [expenses, ownerFilter, expenseView, selectedDate])
 
     // Calculate totals and category breakdown
-    const { totalForeign, totalTWD, totalCashback, totalJPY, categoryData } = useMemo(() => {
+    const { totalTWD, totalCashback, totalJPY, categoryData } = useMemo(() => {
         // TWD Total: Convert ALL expenses to TWD
         const twdTotal = filteredExpenses.reduce((sum, e) => {
             // Use stored exchange rate if available, otherwise fallback to current rate (only if currency matches)
@@ -415,7 +428,6 @@ export function ToolsView() {
         })).sort((a, b) => b.amount - a.amount)
 
         return {
-            totalForeign: foreignTotal,
             totalTWD: Math.round(twdTotal),
             totalCashback: cashbackTotal,
             totalJPY: foreignTotal, // 🆕 Alias for backward compatibility (Fix #5)
@@ -434,9 +446,11 @@ export function ToolsView() {
     }
 
     const formatDateDisplay = (dateStr: string) => {
-        const d = new Date(dateStr)
-        const day = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-        return `${d.getMonth() + 1}/${d.getDate()} (${day})`
+        const d = new Date(dateStr + 'T00:00:00') // Force local timezone
+        const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+        const dayIndex = allDates.indexOf(dateStr)
+        const dayLabel = dayIndex >= 0 ? `Day ${dayIndex + 1}` : ''
+        return `${dayLabel} ${d.getMonth() + 1}/${d.getDate()} (${weekday})`
     }
 
     // fetchExpenses function for use outside of useEffect
@@ -467,7 +481,8 @@ export function ToolsView() {
 
         const rateNum = parseFloat(cashback) || 0
         const payload = {
-            itinerary_id: activeTripId, title, amount_jpy: parseInt(amountJPY), exchange_rate: rate,
+            itinerary_id: activeTripId, title, amount_jpy: parseInt(amountJPY), exchange_rate: inputRate, // 🆕 Isolated rate
+            currency: inputCurrency, // 🆕 Isolated currency
             payment_method: method, category: category, is_public: isPublic,
             created_by: userId, creator_name: userName,
             card_name: method === "JCB" || method === "VisaMaster" ? cardName : "",
@@ -505,11 +520,13 @@ export function ToolsView() {
     const openAddDialog = () => {
         setEditItem(null); setTitle(""); setAmountJPY(""); setMethod("Cash"); setCategory("general"); setIsPublic(true); setReceiptUrl("")
         setExpenseDate(selectedDate || new Date().toISOString().split('T')[0])
+        setInputCurrency(selectedCurrency || "JPY") // 🆕 Init with view currency
         setIsDialogOpen(true)
     }
     const openEditDialog = (item: Expense) => {
         setEditItem(item); setTitle(item.title); setAmountJPY(item.amount.toString()); setMethod(item.payment_method || "Cash"); setCategory(item.category || "general"); setIsPublic(item.is_public); setReceiptUrl(item.image_url || "")
         setExpenseDate(item.expense_date || item.created_at?.split('T')[0] || "")
+        setInputCurrency(item.currency || "JPY") // 🆕 Load existing currency
         setIsDialogOpen(true)
     }
     const closeDialog = () => { setIsDialogOpen(false); setEditItem(null); setReceiptUrl("") }
@@ -830,7 +847,12 @@ export function ToolsView() {
                 </div>
             </div>
 
-            <PullToRefresh onRefresh={async () => { await Promise.all([fetchExpenses(), tripMutate(), fetchRate()]); toast.success("資料已更新") }} className="flex-1 px-4 -mt-4">
+            <PullToRefresh onRefresh={async () => {
+                const r = await getExchangeRate(selectedCurrency || 'JPY')
+                setRate(r)
+                await Promise.all([fetchExpenses(), tripMutate()])
+                toast.success("資料已更新")
+            }} className="flex-1 px-4 -mt-4">
                 <Tabs value={activeSection} onValueChange={setActiveSection}>
                     {/* Custom Sliding Tab Strip */}
                     <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
@@ -981,7 +1003,13 @@ export function ToolsView() {
                             <CardContent className="p-4">
                                 {expenseView === 'summary' ? (
                                     <div className="space-y-4">
-                                        <ExpenseChart data={categoryData} total={totalTWD} />
+                                        <ExpenseChart
+                                            data={categoryData}
+                                            total={totalTWD}
+                                            currencySymbol="NT$"
+                                            activeCategory={activeCategory}
+                                            onCategoryClick={setActiveCategory}
+                                        />
 
                                         <div className="flex flex-col items-center gap-3 pt-2 border-t">
                                             {/* Currency Selector */}
@@ -1003,27 +1031,15 @@ export function ToolsView() {
                                             </Select>
 
                                             <div className="text-center">
-                                                <p className="text-xs text-slate-500">{t('total')}</p>
-
-                                                {/* Dual Currency Display */}
-                                                {selectedCurrency && selectedCurrency !== 'TWD' ? (
-                                                    <>
-                                                        <p className="text-2xl font-bold text-slate-900 font-mono">
-                                                            {totalForeign.toLocaleString()} <span className="text-sm font-normal text-slate-500">{selectedCurrency}</span>
-                                                        </p>
-                                                        <p className="text-sm text-slate-500">
-                                                            ~ {totalTWD.toLocaleString()} TWD
-                                                        </p>
-                                                    </>
-                                                ) : (
-                                                    <p className="text-2xl font-bold text-slate-900 font-mono">
-                                                        {totalTWD.toLocaleString()} <span className="text-sm font-normal text-slate-500">TWD</span>
-                                                    </p>
-                                                )}
-
-                                                {totalCashback > 0 && (
-                                                    <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
-                                                )}
+                                                <p className="text-xs text-slate-500">
+                                                    {activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total')}
+                                                </p>
+                                                <div className="text-3xl font-bold text-slate-900">
+                                                    <CountingNumber
+                                                        value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
+                                                        prefix="NT$"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1054,11 +1070,22 @@ export function ToolsView() {
 
                         {/* Expense List */}
                         <div className="space-y-2">
-                            {filteredExpenses.map((item: Expense) => (
+                            {filteredExpenses.filter(item => !activeCategory || item.category === activeCategory).map((item: Expense) => (
                                 <ExpenseItem key={item.id} item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
                             ))}
                             {filteredExpenses.length === 0 && (
-                                <div className="text-center py-8 text-slate-400 text-sm">暫無記錄</div>
+                                <div className="text-center py-10 text-slate-400">
+                                    <div className="text-3xl mb-2">📭</div>
+                                    <p className="text-sm mb-3">
+                                        {expenseView === 'daily'
+                                            ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
+                                            : '暫無記錄'
+                                        }
+                                    </p>
+                                    <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
+                                        <Plus className="w-4 h-4 mr-1" /> 新增支出
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </TabsContent>
@@ -1201,10 +1228,11 @@ export function ToolsView() {
                         </Sheet>
                     </TabsContent>
                 </Tabs>
-            </PullToRefresh>
+            </PullToRefresh >
 
             {/* 🆕 Card Delete Confirmation Dialog */}
-            <AlertDialog open={!!deletingCardId} onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
+            < AlertDialog open={!!deletingCardId
+            } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>確定刪除此卡片？</AlertDialogTitle>
@@ -1224,16 +1252,32 @@ export function ToolsView() {
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
+            </AlertDialog >
 
             {/* Expense Dialog */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
                     <div className="space-y-4 py-2">
-                        <div className="flex gap-2">
-                            <Input placeholder={t('amount_jpy')} type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
-                            <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * rate)} TWD</div>
+                        <div className="flex gap-2 items-center">
+                            {/* 🆕 Currency Selector */}
+                            {/* 🆕 Premium Currency Selector */}
+                            <Select value={inputCurrency} onValueChange={setInputCurrency}>
+                                <SelectTrigger className="h-10 w-[110px] bg-white border-slate-200 font-bold font-mono">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CURRENCIES.map(c => (
+                                        <SelectItem key={c.code} value={c.code} className="font-mono">
+                                            <span className="mr-2">{c.flag}</span>
+                                            {c.code}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <Input placeholder="Amount" type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold flex-1" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
+                            <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * inputRate)} TWD</div>
                         </div>
                         <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
 
@@ -1336,10 +1380,10 @@ export function ToolsView() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* 🆕 v3.8: 信用卡編輯 Dialog */}
-            <Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen}>
+            < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
                         <DialogTitle>{editingCard ? "編輯卡片" : "新增卡片"}</DialogTitle>
@@ -1394,8 +1438,8 @@ export function ToolsView() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
-        </div>
+            </Dialog >
+        </div >
     )
 }
 
@@ -1428,7 +1472,23 @@ function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
                 </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-                <div className="text-right mr-2"><div className="font-mono font-bold text-slate-900 text-sm">{item.amount.toLocaleString()} JPY</div><div className="text-[10px] text-slate-400 flex flex-col items-end"><span>~ {finalTWD.toLocaleString()} TWD</span>{(item.cashback_rate ?? 0) > 0 && <span className="text-green-500">(-{Math.round(cashback)})</span>}</div></div>
+                <div className="text-right mr-2">
+                    {/* Smart Formatting */}
+                    {(item.currency && item.currency !== "TWD") ? (
+                        <div className="flex flex-col items-end">
+                            <div className="font-mono font-bold text-slate-900 text-sm flex items-center gap-1">
+                                <span className="text-[10px]">{CURRENCIES.find(c => c.code === item.currency)?.flag}</span>
+                                {item.amount.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <span>≈ NT${finalTWD.toLocaleString()}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="font-mono font-bold text-slate-900 text-sm">NT${item.amount.toLocaleString()}</div>
+                    )}
+                    {(item.cashback_rate ?? 0) > 0 && <span className="text-[10px] text-green-500 block text-right">(-{Math.round(cashback)})</span>}
+                </div>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
             </div>
