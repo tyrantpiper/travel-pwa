@@ -54,27 +54,52 @@ async def get_trips(
         raise HTTPException(status_code=401, detail="需要提供 X-User-ID Header")
     
     try:
-        # 這是 SQL 的 Join 概念：找出 trip_members 裡有我 user_id 的所有 itinerary
-        res = supabase.table("trip_members")\
+        # 1. 找出我參與的行程 (trip_members)
+        res_member = supabase.table("trip_members")\
             .select("itinerary_id, itineraries(*)")\
             .eq("user_id", user_id)\
             .execute()
             
+        # 2. 找出我建立的行程 (itineraries created_by) - 針對舊資料或建檔不完全的情況
+        res_created = supabase.table("itineraries")\
+            .select("*")\
+            .eq("created_by", user_id)\
+            .execute()
+            
+        # 3. 合併並去重
+        trip_map = {}
+        
+        # 處理參與的行程
+        for item in res_member.data:
+            if item.get('itineraries'):
+                trip = item['itineraries']
+                trip_map[trip['id']] = trip
+
+        # 處理自己建立的行程
+        for trip in res_created.data:
+            if trip['id'] not in trip_map:
+                trip_map[trip['id']] = trip
+                # 🚑 Self-Healing (Optional): 如果是創建者但不在成員名單，可以在這裡補發，暫時先不自動補，避免副作用
+                print(f"⚠️ User {user_id} is creator of {trip['id']} but not in trip_members")
+        
+        trips_data = list(trip_map.values())
+            
         # 整理資料結構 - 🔧 FIX: 解析 content 欄位，將 daily_locations 提升到頂層
         trips = []
-        for item in res.data:
-            if item.get('itineraries'):  # 確保關聯存在
-                trip = item['itineraries']
-                content = trip.get('content') or {}
-                # 🆕 將 content 內的欄位提升到頂層，與 get_trip_by_id 格式一致
-                trip['daily_locations'] = content.get('daily_locations', {})
-                trip['day_notes'] = content.get('day_notes', {})
-                trip['day_costs'] = content.get('day_costs', {})
-                trip['day_tickets'] = content.get('day_tickets', {})
-                trip['day_checklists'] = content.get('day_checklists', {})
-                trip['ai_review'] = content.get('ai_review', "")
-                trip['credit_cards'] = content.get('credit_cards', [])
-                trips.append(trip)
+        for trip in trips_data:
+            content = trip.get('content') or {}
+            # 🆕 將 content 內的欄位提升到頂層，與 get_trip_by_id 格式一致
+            trip['daily_locations'] = content.get('daily_locations', {})
+            trip['day_notes'] = content.get('day_notes', {})
+            trip['day_costs'] = content.get('day_costs', {})
+            trip['day_tickets'] = content.get('day_tickets', {})
+            trip['day_checklists'] = content.get('day_checklists', {})
+            trip['ai_review'] = content.get('ai_review', "")
+            trip['credit_cards'] = content.get('credit_cards', [])
+            trips.append(trip)
+        
+        print(f"✅ 找到 {len(trips)} 個行程")
+        return trips
         
         print(f"✅ 找到 {len(trips)} 個行程")
         return trips
