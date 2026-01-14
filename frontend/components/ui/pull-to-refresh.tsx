@@ -282,13 +282,31 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             container.removeEventListener('touchmove', handleNativeTouchMove)
             container.removeEventListener('touchend', handleNativeTouchEnd)
         }
-    }, [ptrState.status, pullThreshold, onRefresh, haptic])
+    }, [pullThreshold, onRefresh, haptic])  // 🔧 FIX: 移除 ptrState.status 依賴，避免 cleanup 清除 timeout
+
+    // 🆕 獨立的 SUCCESS/ERROR 重置 useEffect
+    useEffect(() => {
+        if (ptrState.status === PTRStatus.SUCCESS) {
+            const timer = setTimeout(() => {
+                resetPosition()
+            }, 1500)
+            return () => clearTimeout(timer)
+        }
+        if (ptrState.status === PTRStatus.ERROR) {
+            const timer = setTimeout(() => {
+                resetPosition()
+            }, 2000)
+            return () => clearTimeout(timer)
+        }
+    }, [ptrState.status])
 
     // 🎨 當前配置
     const config = PTR_STATUS_CONFIG[ptrState.status]
     const Icon = ICON_MAP[config.icon]
     const progress = Math.min(ptrState.pullDistance / pullThreshold, 1)
-    const opacity = Math.min(progress * 2, 1)
+    // 🔧 FIX: IDLE 狀態且 pullDistance 為 0 時完全隱藏
+    const isVisible = ptrState.status !== PTRStatus.IDLE || ptrState.pullDistance > 0
+    const opacity = isVisible ? Math.min(progress * 2, 1) : 0
 
     return (
         <div
