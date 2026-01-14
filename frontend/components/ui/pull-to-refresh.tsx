@@ -12,7 +12,7 @@
  * - 10s timeout protection
  */
 
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react"
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     ChevronDown,
@@ -116,11 +116,11 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     }, [ptrState.status])
 
     // 🎯 狀態計算邏輯
-    const calculateStatus = (distance: number): PTRStatus => {
+    const calculateStatus = useCallback((distance: number): PTRStatus => {
         if (distance < pullThreshold * 0.3) return PTRStatus.IDLE
         if (distance < pullThreshold) return PTRStatus.PULLING
         return PTRStatus.READY
-    }
+    }, [pullThreshold])
 
     // 🎬 Reset position
     const resetPosition = () => {
@@ -255,10 +255,9 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 willChangeApplied.current = false
             }, 300)
 
-            const { status, pullDistance } = ptrState
-
             // 🚀 觸發刷新
-            if (status === PTRStatus.READY) {
+            // 🔧 FIX: Use statusRef to avoid stale closure (was ptrState.status) and remove unused pullDistance
+            if (statusRef.current === PTRStatus.READY) {
                 setPtrState({
                     status: PTRStatus.REFRESHING,
                     pullDistance: 80  // 🔧 Fix: Increase to 80 (threshold) to prevent overlap
@@ -327,7 +326,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             container.removeEventListener('touchmove', handleNativeTouchMove)
             container.removeEventListener('touchend', handleNativeTouchEnd)
         }
-    }, [pullThreshold, onRefresh, haptic])  // 🔧 FIX: 移除 ptrState.status 依賴，避免 cleanup 清除 timeout
+    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef])  // 🔧 FIX: All dependencies included
 
     // 🆕 獨立的 SUCCESS/ERROR 重置 useEffect
     useEffect(() => {
