@@ -376,7 +376,9 @@ export function ToolsView() {
         if (expenseView === 'daily' && selectedDate) {
             filtered = filtered.filter(e => {
                 // 🆕 Phase 10.5: incurred_at fallback for DB column name compatibility
-                const d = e.expense_date || e.incurred_at || e.created_at?.split('T')[0]
+                // 🔧 Phase 16.2: Normalize all dates to YYYY-MM-DD format (split at 'T')
+                const rawDate = e.expense_date || e.incurred_at || e.created_at
+                const d = rawDate ? rawDate.split('T')[0] : ''
                 const match = d === selectedDate
                 if (!match && expenses.length < 20) {
                     // Log mismatches for small datasets to debug
@@ -1036,84 +1038,61 @@ export function ToolsView() {
                                 </div>
                             )}
 
-                            {/* Summary Card */}
+                            {/* Summary Card - Unified for both Summary and Daily views */}
                             <Card className="border-0 shadow-sm">
                                 <CardContent className="p-4">
-                                    {expenseView === 'summary' ? (
-                                        <div className="space-y-4">
-                                            <ExpenseChart
-                                                data={categoryData}
-                                                total={totalTWD}
-                                                currencySymbol="NT$"
-                                                activeCategory={activeCategory}
-                                                onCategoryClick={setActiveCategory}
-                                            />
+                                    <div className="space-y-4">
+                                        <ExpenseChart
+                                            data={categoryData}
+                                            total={totalTWD}
+                                            currencySymbol="NT$"
+                                            activeCategory={activeCategory}
+                                            onCategoryClick={setActiveCategory}
+                                        />
 
-                                            <div className="flex flex-col items-center gap-3 pt-2 border-t">
-                                                {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
-                                                {foreignTotals.length > 0 && (
-                                                    <div className="flex flex-wrap justify-center gap-3">
-                                                        {foreignTotals.map(([code, info]) => (
-                                                            <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
-                                                                <span className="text-lg mr-1">{info.flag}</span>
-                                                                <span className="font-mono font-bold text-slate-800">
-                                                                    {info.symbol}{Math.round(info.amount).toLocaleString()}
-                                                                </span>
-                                                                <span className="text-xs text-slate-500 ml-1">{code}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                <div className="text-center">
-                                                    <p className="text-xs text-slate-500">
-                                                        {activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total')}
-                                                    </p>
-                                                    <div className="text-3xl font-bold text-slate-900">
-                                                        <CountingNumber
-                                                            value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
-                                                            prefix="NT$"
-                                                        />
-                                                    </div>
-                                                    {totalCashback > 0 && (
-                                                        <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="text-xs text-slate-500">{t('total')}</p>
-                                                {/* Multi-currency display for daily view too */}
-                                                {foreignTotals.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2 mb-1">
-                                                        {foreignTotals.map(([code, info]) => (
-                                                            <span key={code} className="font-mono font-bold text-slate-900">
-                                                                {info.flag} {info.symbol}{Math.round(info.amount).toLocaleString()}
+                                        <div className="flex flex-col items-center gap-3 pt-2 border-t">
+                                            {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
+                                            {foreignTotals.length > 0 && (
+                                                <div className="flex flex-wrap justify-center gap-3">
+                                                    {foreignTotals.map(([code, info]) => (
+                                                        <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
+                                                            <span className="text-lg mr-1">{info.flag}</span>
+                                                            <span className="font-mono font-bold text-slate-800">
+                                                                {info.symbol}{Math.round(info.amount).toLocaleString()}
                                                             </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                <p className="text-2xl font-bold text-slate-900">NT${totalTWD.toLocaleString()}</p>
+                                                            <span className="text-xs text-slate-500 ml-1">{code}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            <div className="text-center">
+                                                <p className="text-xs text-slate-500">
+                                                    {/* Phase 17: Show date for Daily view, category/total for Summary */}
+                                                    {expenseView === 'daily'
+                                                        ? formatDateDisplay(selectedDate)
+                                                        : (activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total'))
+                                                    }
+                                                </p>
+                                                <div className="text-3xl font-bold text-slate-900">
+                                                    <CountingNumber
+                                                        value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
+                                                        prefix="NT$"
+                                                    />
+                                                </div>
                                                 {totalCashback > 0 && (
-                                                    <p className="text-xs text-green-600 font-medium">💰 -{totalCashback.toLocaleString()} TWD</p>
+                                                    <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
                                                 )}
                                             </div>
-                                            <Button disabled={!activeTripId} onClick={openAddDialog} className="bg-slate-900">
-                                                <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Select Trip"}
-                                            </Button>
                                         </div>
-                                    )}
+                                    </div>
                                 </CardContent>
                             </Card>
 
-                            {/* Summary Mode: Add Button */}
-                            {expenseView === 'summary' && (
-                                <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
-                                    <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
-                                </Button>
-                            )}
+                            {/* Add Button - Now shown for both views */}
+                            <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
+                                <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
+                            </Button>
 
                             {/* Expense List */}
                             <div className="space-y-2">
