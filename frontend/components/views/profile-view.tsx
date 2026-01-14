@@ -30,6 +30,7 @@ import { Switch } from "@/components/ui/switch"
 import { TaskCard } from "@/components/onboarding/TaskCard"
 import { debugLog } from "@/lib/debug"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
+import { usersApi } from "@/lib/api"
 
 
 
@@ -65,22 +66,40 @@ export function ProfileView() {
     })
 
     useEffect(() => {
+        const userId = localStorage.getItem("user_uuid")
         const name = localStorage.getItem("user_nickname")
         const avatar = localStorage.getItem("user_avatar")
-        // Check localStorage and DEV key
-        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
 
+        // 1. Load from cache first (Optimistic)
         setProfile(prev => ({
             ...prev,
             nickname: name || "Traveler",
             avatarUrl: avatar || ""
         }))
 
+        // 2. Fetch from API (Single Source of Truth)
+        if (userId) {
+            usersApi.getProfile(userId)
+                .then(data => {
+                    setProfile(prev => ({
+                        ...prev,
+                        nickname: data.nickname || prev.nickname,
+                        avatarUrl: data.avatar_url || prev.avatarUrl
+                    }))
+                    // Sync cache
+                    if (data.nickname) localStorage.setItem("user_nickname", data.nickname)
+                    if (data.avatar_url) localStorage.setItem("user_avatar", data.avatar_url)
+                })
+                .catch(err => console.error("Failed to fetch profile:", err))
+        }
+
+        // Check keys
+        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
+        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
+
         if (storedKey) {
             setApiKey(devKey ? "(開發者模式)" : storedKey)
             setHasApiKey(true)
-            // Migrate old key name to new key name (only for non-dev keys)
             if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
                 localStorage.setItem("user_gemini_key", storedKey)
                 localStorage.removeItem("gemini_api_key")
@@ -136,24 +155,60 @@ export function ProfileView() {
         fetchDonationProgress()
     }, [])
 
-    const handleSaveProfile = () => {
-        localStorage.setItem("user_nickname", profile.nickname)
-        setIsEditing(false)
-        toast.success("Profile updated!")
+    const handleSaveProfile = async () => {
+        const userId = localStorage.getItem("user_uuid")
+        if (!userId) {
+            toast.error("User ID not found")
+            return
+        }
+
+        try {
+            // Optimistic update
+            localStorage.setItem("user_nickname", profile.nickname)
+            setIsEditing(false)
+
+            // API update
+            await usersApi.updateProfile(userId, { name: profile.nickname })
+            toast.success("Profile updated!")
+        } catch (error) {
+            console.error(error)
+            toast.error("Failed to update profile on server")
+        }
     }
 
-    const handleRemoveAvatar = () => {
+    const handleRemoveAvatar = async () => {
         if (!confirm("Remove avatar?")) return
+        const userId = localStorage.getItem("user_uuid")
+
         setProfile(prev => ({ ...prev, avatarUrl: "" }))
         localStorage.removeItem("user_avatar")
+
+        if (userId) {
+            try {
+                await usersApi.updateProfile(userId, { avatar_url: "" }) // Send empty string to clear
+            } catch (err) {
+                console.error("Failed to remove avatar on server:", err)
+            }
+        }
     }
 
-    const handleAvatarChange = (url: string) => {
+    const handleAvatarChange = async (url: string) => {
+        const userId = localStorage.getItem("user_uuid")
+
         setProfile(prev => ({ ...prev, avatarUrl: url }))
         if (url) {
             localStorage.setItem("user_avatar", url)
         } else {
             localStorage.removeItem("user_avatar")
+        }
+
+        if (userId) {
+            try {
+                await usersApi.updateProfile(userId, { avatar_url: url })
+            } catch (err) {
+                console.error("Failed to update avatar on server:", err)
+                toast.error("Failed to sync avatar")
+            }
         }
     }
 

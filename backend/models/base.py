@@ -342,3 +342,9 @@ class SmartSearchResponse(BaseModel):
     understood_intent: str              # AI 理解的意圖
     recommendations: List[SmartSearchRecommendation]
     source: str                         # gemma, poi_fallback, geocode_fallback
+
+
+class UpdateProfileRequest(BaseModel):
+    """更新使用者資料請求"""
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None

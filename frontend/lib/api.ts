@@ -20,6 +20,7 @@ export const API = {
     POI: `${API_HOST}/api/poi`,
     CHAT: `${API_HOST}/api/chat`,
     ROUTE: `${API_HOST}/api/route`,
+    USERS: `${API_HOST}/api/users`,
 }
 
 export { API_HOST }
@@ -362,6 +363,32 @@ export const expensesApi = {
     delete: async (expenseId: string) => {
         const res = await fetch(`${API.EXPENSES}/${expenseId}`, { method: "DELETE" })
         if (!res.ok) throw new Error("Failed to delete expense")
+        return res.json()
+    },
+}
+
+/**
+ * User API Functions
+ */
+export const usersApi = {
+    /** Get user profile */
+    getProfile: async (userId: string) => {
+        const res = await fetch(`${API.USERS}/${userId}/profile`)
+        if (!res.ok) throw new Error("Failed to fetch profile")
+        return res.json()
+    },
+
+    /** Update user profile */
+    updateProfile: async (userId: string, data: { name?: string; avatar_url?: string }) => {
+        const res = await fetch(`${API.USERS}/me`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-ID": userId
+            },
+            body: JSON.stringify(data)
+        })
+        if (!res.ok) throw new Error("Failed to update profile")
         return res.json()
     },
 }
