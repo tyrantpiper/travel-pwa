@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { PTRStatus, PTRState, PTR_STATUS_CONFIG, PTRIconName } from "@/types/ptr"
+import { CircularProgress } from "./circular-progress"  // 🆕 P2
 
 // 🎨 Icon Mapping
 const ICON_MAP: Record<PTRIconName, React.ComponentType<{ className?: string }>> = {
@@ -387,28 +388,50 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                         : opacity
                 }}
             >
-                {/* 🎨 Icon Container */}
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={ptrState.status}
-                        initial={{ scale: 0.5, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        exit={{ scale: 0.5, rotate: 180 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                        className={cn(
-                            "w-12 h-12 rounded-full bg-white shadow-lg border border-slate-100",
-                            "flex items-center justify-center",
-                            config.color
+                {/* 🎨 Icon Container (wrapped for CircularProgress) */}
+                <div className="relative">
+                    {/* 🆕 P2: CircularProgress（PULLING 狀態時顯示） */}
+                    <AnimatePresence>
+                        {ptrState.status === PTRStatus.PULLING && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                transition={{ duration: 0.15 }}
+                                className="absolute inset-0 flex items-center justify-center"
+                            >
+                                <CircularProgress
+                                    progress={progress}
+                                    size={56}
+                                    strokeWidth={2.5}
+                                />
+                            </motion.div>
                         )}
-                    >
-                        <Icon
+                    </AnimatePresence>
+
+                    {/* 原本的 Icon */}
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={ptrState.status}
+                            initial={{ scale: 0.5, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            exit={{ scale: 0.5, rotate: 180 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             className={cn(
-                                "w-6 h-6",
-                                config.spin && "animate-spin"
+                                "w-12 h-12 rounded-full bg-white shadow-lg border border-slate-100",
+                                "flex items-center justify-center",
+                                config.color
                             )}
-                        />
-                    </motion.div>
-                </AnimatePresence>
+                        >
+                            <Icon
+                                className={cn(
+                                    "w-6 h-6",
+                                    config.spin && "animate-spin"
+                                )}
+                            />
+                        </motion.div>
+                    </AnimatePresence>
+                </div>
 
                 {/* 📝 Text */}
                 <AnimatePresence mode="wait">
