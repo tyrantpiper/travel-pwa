@@ -98,7 +98,11 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     const ticking = useRef(false)
     const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
-    const willChangeApplied = useRef(false)  // 🆕 動態 will-change 控制
+    const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)  // 🆕 閉包陷阱修復
+    const willChangeApplied = useRef(false)
+
+    // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
+    statusRef.current = ptrState.status
 
     // 🎯 狀態計算邏輯
     const calculateStatus = (distance: number): PTRStatus => {
@@ -129,9 +133,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             }
 
             // 🛡️ Guard: 正在刷新或顯示結果時不允許新的拖曳
-            if (ptrState.status === PTRStatus.REFRESHING ||
-                ptrState.status === PTRStatus.SUCCESS ||
-                ptrState.status === PTRStatus.ERROR) {
+            // 🔧 使用 statusRef 避免閉包陷阱
+            if (statusRef.current === PTRStatus.REFRESHING ||
+                statusRef.current === PTRStatus.SUCCESS ||
+                statusRef.current === PTRStatus.ERROR) {
                 isPulling.current = false
                 return
             }
@@ -144,6 +149,8 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             // 🆕 動態啟用 will-change（只在拖動時開啟）
             if (!willChangeApplied.current && contentRef.current) {
                 contentRef.current.style.willChange = 'transform'
+                // 🔧 P1: 下拉階段禁用 transition
+                contentRef.current.style.transition = 'none'
                 willChangeApplied.current = true
             }
         }
@@ -160,9 +167,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             if (!isPulling.current) return
 
             // 正在刷新時不處理
-            if (ptrState.status === PTRStatus.REFRESHING ||
-                ptrState.status === PTRStatus.SUCCESS ||
-                ptrState.status === PTRStatus.ERROR) {
+            // 🔧 使用 statusRef 避免閉包陷阱
+            if (statusRef.current === PTRStatus.REFRESHING ||
+                statusRef.current === PTRStatus.SUCCESS ||
+                statusRef.current === PTRStatus.ERROR) {
                 return
             }
 
@@ -221,10 +229,16 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             }
             ticking.current = false
 
-            // 🆕 觸控結束後延遲移除 will-change（等待回彈動畫完成）
+            // 🔧 P1: 釋放時啟用回彈 transition
+            if (contentRef.current) {
+                contentRef.current.style.transition = 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+            }
+
+            // 觸控結束後延遲移除 will-change（等待回彈動畫完成）
             setTimeout(() => {
                 if (contentRef.current) {
                     contentRef.current.style.willChange = 'auto'
+                    contentRef.current.style.transition = 'none'  // 回彈後復原
                 }
                 willChangeApplied.current = false
             }, 300)
@@ -248,9 +262,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                     ])
 
                     // ✅ Success
+                    // 🔧 P0: pullDistance = 0，讓 content 立即回原位
                     setPtrState({
                         status: PTRStatus.SUCCESS,
-                        pullDistance: 50
+                        pullDistance: 0
                     })
                     prevStatusRef.current = PTRStatus.SUCCESS
                     haptic.success()
@@ -262,9 +277,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
 
                 } catch (error) {
                     // ❌ Error
+                    // 🔧 P0: pullDistance = 0，讓 content 立即回原位
                     setPtrState({
                         status: PTRStatus.ERROR,
-                        pullDistance: 50
+                        pullDistance: 0
                     })
                     prevStatusRef.current = PTRStatus.ERROR
 
@@ -406,11 +422,11 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             {/* 📜 Content with transform (GPU 加速) */}
             <div
                 ref={contentRef}
-                className="transition-transform duration-150"
                 style={{
                     // 🔥 關鍵：translate3d 強制 GPU + Math.round 消除亞像素
                     transform: `translate3d(0, ${Math.round(ptrState.pullDistance)}px, 0)`,
                     backfaceVisibility: 'hidden'
+                    // 🔧 P1: transition 由 JS 動態控制，不使用 CSS class
                 }}
             >
                 {children}
