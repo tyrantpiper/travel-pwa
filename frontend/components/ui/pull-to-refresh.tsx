@@ -350,10 +350,14 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                     "transition-all duration-150"
                 )}
                 style={{
-                    // 🔧 FIX: 置中於下拉空間 (pullDistance / 2) 而非固定位置
-                    // 這樣 indicator 永遠在內容上方的空白區域，不會遮擋內容
-                    top: Math.max(ptrState.pullDistance / 2 - 30, -60),
-                    opacity
+                    // 🔧 FIX: SUCCESS/ERROR 狀態時隱藏 indicator（已有 toast 提示）
+                    // PULLING/READY 狀態時置中於下拉空間
+                    top: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
+                        ? -80  // 隱藏在視窗外
+                        : Math.max(ptrState.pullDistance / 2 - 30, -60),
+                    opacity: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
+                        ? 0  // 完全透明
+                        : opacity
                 }}
             >
                 {/* 🎨 Icon Container */}
@@ -442,6 +446,6 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             >
                 重新整理
             </button>
-        </div>
+        </div >
     )
 }
