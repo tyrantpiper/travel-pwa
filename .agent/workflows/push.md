@@ -1,0 +1,25 @@
+---
+description: Smart commit and push with TypeScript quality check
+---
+
+## Pre-flight Check
+1. Run `git status --porcelain` to check for changes
+   - If empty output → Report "沒有變更需要提交" and stop
+
+## Quality Gate
+// turbo
+2. Run `npx tsc --noEmit 2>&1 | Select-Object -First 20` to verify TypeScript
+   - If errors → Report errors and stop (use --force to skip)
+
+## Commit Phase
+// turbo
+3. Run `git add .` to stage all changes
+
+4. Run `git commit -m "<message>"` with the provided commit message
+   - If no message provided → Suggest based on changed files
+
+## Push Phase
+5. Run `git push` to push to remote
+
+## Post-Push
+6. Report: "✅ Pushed successfully!"
