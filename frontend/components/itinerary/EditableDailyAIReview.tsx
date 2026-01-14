@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { ChevronDown, Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { tripsApi } from "@/lib/api"
 import { toast } from "sonner"
@@ -31,6 +31,7 @@ export default function EditableDailyAIReview({
 }: EditableDailyAIReviewProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [loadingAction, setLoadingAction] = useState<"generate" | "clear" | null>(null)
+    const [isExpanded, setIsExpanded] = useState(false)  // 🆕 Collapsible state
 
     // 生成/重新生成 AI 審核
     const handleGenerate = async () => {
@@ -145,15 +146,24 @@ export default function EditableDailyAIReview({
         )
     }
 
-    // 有審核報告 - 顯示報告 + 操作按鈕
+    // 有審核報告 - 顯示報告 + 操作按鈕 (可收合)
     return (
         <div className="mx-6 mt-4 p-5 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl shadow-sm">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-3">
+            {/* Header - 點擊展開/收合 */}
+            <div
+                className="flex items-center justify-between cursor-pointer select-none"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
                 <h3 className="text-base font-bold text-indigo-900 flex items-center gap-2">
                     <span className="text-lg">🕵️</span> AI 深度審核報告
+                    <ChevronDown
+                        className={cn(
+                            "w-4 h-4 text-indigo-500 transition-transform duration-200",
+                            isExpanded && "rotate-180"
+                        )}
+                    />
                 </h3>
-                <div className="flex gap-1">
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     {/* 重新審核 */}
                     <Button
                         variant="ghost"
@@ -187,9 +197,16 @@ export default function EditableDailyAIReview({
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="text-sm text-indigo-800 leading-relaxed space-y-1">
-                {formatReview(review)}
+            {/* Content - 可收合 */}
+            <div
+                className={cn(
+                    "overflow-hidden transition-all duration-300 ease-in-out",
+                    isExpanded ? "max-h-[2000px] opacity-100 mt-3" : "max-h-0 opacity-0 mt-0"
+                )}
+            >
+                <div className="text-sm text-indigo-800 leading-relaxed space-y-1">
+                    {formatReview(review)}
+                </div>
             </div>
         </div>
     )
