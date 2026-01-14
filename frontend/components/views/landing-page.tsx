@@ -10,6 +10,7 @@ import { WelcomeWizard } from "@/components/onboarding/WelcomeWizard"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 
 import { toast } from "sonner"
+import { usersApi } from "@/lib/api"
 
 function generateUUID() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -73,14 +74,15 @@ export function LandingPage() {
         const toastId = toast.loading("Verifying identity...")
         try {
             // Default nickname fallback
-            const fallbackName = nickname || "Returned Traveler"
+            const fallbackName = nickname || "Traveler"
             let fetchedName = fallbackName
 
-            // Call API
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/${recoverCode}/profile`)
-            if (response.ok) {
-                const data = await response.json()
+            // Call API via usersApi (Unified)
+            try {
+                const data = await usersApi.getProfile(recoverCode)
                 if (data.nickname) fetchedName = data.nickname
+            } catch (err) {
+                console.warn("Profile fetch failed, using fallback", err)
             }
 
             localStorage.setItem("user_uuid", recoverCode)
@@ -98,7 +100,7 @@ export function LandingPage() {
 
             // Fallback anyway to allow recovery even if API fails
             localStorage.setItem("user_uuid", recoverCode)
-            localStorage.setItem("user_nickname", nickname || "Returned Traveler")
+            localStorage.setItem("user_nickname", nickname || "Traveler")
             toast.success("Account recovered (Offline Mode)")
             setTimeout(() => window.location.reload(), 1000)
         }
