@@ -231,6 +231,19 @@ export const tripsApi = {
         if (!res.ok) throw new Error("Failed to clear AI review")
         return res.json()
     },
+
+    /** 🚫 Kick a member from trip (only creator can do this) */
+    kickMember: async (tripId: string, memberUserId: string, currentUserId: string) => {
+        const res = await fetch(`${API.TRIPS}/${tripId}/members/${memberUserId}`, {
+            method: "DELETE",
+            headers: { "X-User-ID": currentUserId }
+        })
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: "無法踢出成員" }))
+            throw new Error(error.detail || "無法踢出成員")
+        }
+        return res.json()
+    },
 }
 
 /**

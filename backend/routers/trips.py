@@ -114,6 +114,11 @@ async def get_trip_by_id(
         else:
             print(f"🔍 [DEBUG] No user_id provided, treating as non-member")
         
+        # 🆕 取得所有成員 (用於成員列表功能)
+        all_members_res = supabase.table("trip_members").select("user_id, user_name").eq("itinerary_id", trip_id).execute()
+        members = all_members_res.data or []
+        created_by = trip.get("created_by", "")
+        
         # 2. 抓該行程的所有細項 (按 sort_order 排序，支援拖曳)
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
         
@@ -185,6 +190,8 @@ async def get_trip_by_id(
             "hotel_info": trip.get("hotel_info") or {},
             "credit_cards": content.get("credit_cards", []),
             "is_member": is_member,  # 🆕 告訴前端是否為成員
+            "members": members,  # 🆕 所有成員列表 (用於成員管理)
+            "created_by": created_by,  # 🆕 創建者 ID (用於判斷踢人權限)
             "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
         }
 
@@ -192,6 +199,47 @@ async def get_trip_by_id(
         raise
     except Exception as e:
         print(f"Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/trips/{trip_id}/members/{member_user_id}")
+async def kick_member(
+    trip_id: str,
+    member_user_id: str,
+    x_user_id: Optional[str] = Header(None),
+    supabase=Depends(get_supabase)
+):
+    """🚫 踢出成員 (僅行程創建者可用)"""
+    try:
+        if not x_user_id:
+            raise HTTPException(status_code=401, detail="未提供使用者 ID")
+        
+        # 1. 驗證請求者是創建者
+        trip_res = supabase.table("itineraries").select("created_by").eq("id", trip_id).single().execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到行程")
+        
+        created_by = trip_res.data.get("created_by")
+        if x_user_id != created_by:
+            raise HTTPException(status_code=403, detail="只有行程創建者可以踢出成員")
+        
+        # 2. 不能踢出自己 (創建者)
+        if member_user_id == created_by:
+            raise HTTPException(status_code=400, detail="無法踢出行程創建者")
+        
+        # 3. 從 trip_members 刪除
+        result = supabase.table("trip_members").delete().eq("itinerary_id", trip_id).eq("user_id", member_user_id).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=404, detail="找不到此成員")
+        
+        print(f"🚫 已踢出成員 {member_user_id} from trip {trip_id}")
+        return {"status": "success", "kicked_user_id": member_user_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Kick Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

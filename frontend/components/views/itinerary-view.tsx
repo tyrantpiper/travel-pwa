@@ -38,6 +38,7 @@ const DayMap = dynamic(() => import("@/components/day-map"), { ssr: false, loadi
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
 import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
 import EditableDailyAIReview from "@/components/itinerary/EditableDailyAIReview"
+import { TripMembersSheet } from "@/components/itinerary/TripMembersSheet"
 import { tripsApi, itemsApi, geocodeApi } from "@/lib/api"
 import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
@@ -1401,6 +1402,16 @@ export function ItineraryView() {
                             </button>
                             <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                         </div>
+                        {/* 🆕 成員管理按鈕 */}
+                        {currentTrip && (
+                            <TripMembersSheet
+                                tripId={currentTrip.id}
+                                members={currentTrip.members || []}
+                                createdBy={currentTrip.created_by || ""}
+                                currentUserId={userId || ""}
+                                onMemberKicked={() => reloadTripDetail()}
+                            />
+                        )}
                     </div>
 
                     <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar items-center">

@@ -114,6 +114,7 @@ export interface Trip {
     share_code?: string
     creator_name?: string
     created_by?: string
+    members?: { user_id: string; user_name: string }[]  // 🆕 成員列表
     daily_locations?: Record<number, DailyLocation>
     day_notes?: Record<number, NoteItem[]>
     day_costs?: Record<number, CostItem[]>
