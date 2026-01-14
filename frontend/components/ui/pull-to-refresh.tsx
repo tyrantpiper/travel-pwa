@@ -90,6 +90,7 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     })
 
     const containerRef = useRef<HTMLDivElement>(null)
+    const contentRef = useRef<HTMLDivElement>(null)  // 🆕 Content ref for will-change control
     const startY = useRef(0)
     const startX = useRef(0)
     const isPulling = useRef(false)
@@ -97,6 +98,7 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     const ticking = useRef(false)
     const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
+    const willChangeApplied = useRef(false)  // 🆕 動態 will-change 控制
 
     // 🎯 狀態計算邏輯
     const calculateStatus = (distance: number): PTRStatus => {
@@ -138,6 +140,12 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             startY.current = touch.clientY
             startX.current = touch.clientX
             isPulling.current = true
+
+            // 🆕 動態啟用 will-change（只在拖動時開啟）
+            if (!willChangeApplied.current && contentRef.current) {
+                contentRef.current.style.willChange = 'transform'
+                willChangeApplied.current = true
+            }
         }
 
         const handleNativeTouchMove = (e: TouchEvent) => {
@@ -181,7 +189,8 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             // ⚡ RAF 節流
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
-                    const dampedY = calculateDampedTranslation(diffY)
+                    // 🔥 關鍵：Math.round 消除亞像素抖動
+                    const dampedY = Math.round(calculateDampedTranslation(diffY))
                     const newStatus = calculateStatus(dampedY)
 
                     // 🔔 Haptic: READY 狀態時震動一次
@@ -211,6 +220,14 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                 rafId.current = null
             }
             ticking.current = false
+
+            // 🆕 觸控結束後延遲移除 will-change（等待回彈動畫完成）
+            setTimeout(() => {
+                if (contentRef.current) {
+                    contentRef.current.style.willChange = 'auto'
+                }
+                willChangeApplied.current = false
+            }, 300)
 
             const { status, pullDistance } = ptrState
 
@@ -318,7 +335,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                 className
             )}
             style={{
-                WebkitOverflowScrolling: 'touch'
+                WebkitOverflowScrolling: 'touch',
+                // 🆕 GPU 加速基礎
+                transform: 'translateZ(0)',
+                backfaceVisibility: 'hidden'
             }}
         >
             {/* 🎯 Indicator */}
@@ -381,9 +401,12 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
 
             {/* 📜 Content with transform (GPU 加速) */}
             <div
+                ref={contentRef}
                 className="transition-transform duration-150"
                 style={{
-                    transform: `translateY(${ptrState.pullDistance}px)`
+                    // 🔥 關鍵：translate3d 強制 GPU + Math.round 消除亞像素
+                    transform: `translate3d(0, ${Math.round(ptrState.pullDistance)}px, 0)`,
+                    backfaceVisibility: 'hidden'
                 }}
             >
                 {children}
