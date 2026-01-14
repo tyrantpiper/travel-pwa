@@ -85,7 +85,9 @@ export function ItineraryView() {
     const [isAddMode, setIsAddMode] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
     const [mounted, setMounted] = useState(false)
+    const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(undefined) // 🔧 Virtuoso scroll parent
     useEffect(() => setMounted(true), []) // 🔧 Client-side only rendering for Portal
+
 
     // 🆕 DND State
     const [activeId, setActiveId] = useState<string | null>(null)
@@ -1464,7 +1466,17 @@ export function ItineraryView() {
                     </div>
                 </div>
 
-                <PullToRefresh onRefresh={async () => { await reloadTripDetail() }} className="flex-1">
+                <PullToRefresh
+                    ref={(el) => {
+                        // 🔧 Fix: Ensure Virtuoso gets the scroll parent
+                        // Use callback ref to set state, triggering re-render for Virtuoso
+                        if (el && el !== scrollParent) {
+                            setScrollParent(el)
+                        }
+                    }}
+                    onRefresh={async () => { await reloadTripDetail() }}
+                    className="flex-1"
+                >
                     <div className="py-6 px-6 bg-stone-50/50">
                         <div className="flex items-center justify-between mb-4">
                             {/* 🆕 Smart Clone Confirmation Dialog */}
@@ -2055,7 +2067,9 @@ export function ItineraryView() {
                                         strategy={verticalListSortingStrategy}
                                     >
                                         <Virtuoso
-                                            useWindowScroll
+                                            customScrollParent={scrollParent}
+                                            // 🔧 Fix: Remove useWindowScroll as we act as our own scroll container
+                                            // useWindowScroll  <-- REMOVED
                                             data={currentDayData}
                                             itemContent={(idx, item) => {
                                                 const isHeader = item.category === 'header' || (item.time || item.time_slot || "00:00") === '00:00'

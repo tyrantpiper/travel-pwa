@@ -12,7 +12,7 @@
  * - 10s timeout protection
  */
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     ChevronDown,
@@ -42,6 +42,10 @@ interface PullToRefreshProps {
     onRefresh: () => Promise<void>
     className?: string
     pullThreshold?: number
+}
+
+export interface PullToRefreshHandle {
+    container: HTMLDivElement | null
 }
 
 // 🎯 PTR 物理配置
@@ -80,7 +84,7 @@ function calculateDampedTranslation(rawDiff: number): number {
     }
 }
 
-export function PullToRefresh({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold }: PullToRefreshProps) {
+export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold }, ref) => {
     const haptic = useHaptic()
 
     // 🔑 單一 State Object（避免雙重渲染）
@@ -89,7 +93,11 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
         pullDistance: 0
     })
 
-    const containerRef = useRef<HTMLDivElement>(null)
+    const internalContainerRef = useRef<HTMLDivElement>(null)
+    // Expose internal ref to parent
+    useImperativeHandle(ref, () => internalContainerRef.current!)
+
+    const containerRef = internalContainerRef
     const contentRef = useRef<HTMLDivElement>(null)  // 🆕 Content ref for will-change control
     const startY = useRef(0)
     const startX = useRef(0)
@@ -102,7 +110,10 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
     const willChangeApplied = useRef(false)
 
     // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
-    statusRef.current = ptrState.status
+    // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
+    useEffect(() => {
+        statusRef.current = ptrState.status
+    }, [ptrState.status])
 
     // 🎯 狀態計算邏輯
     const calculateStatus = (distance: number): PTRStatus => {
@@ -192,7 +203,8 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                 return
             }
 
-            e.preventDefault()
+            // 🔧 FIX: 移除 preventDefault 以啟用 passive: true
+            // e.preventDefault() <-- REMOVED
 
             // ⚡ RAF 節流
             if (!ticking.current) {
@@ -464,4 +476,6 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             </button>
         </div >
     )
-}
+})
+
+PullToRefresh.displayName = "PullToRefresh"
