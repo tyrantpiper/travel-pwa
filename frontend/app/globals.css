@@ -125,11 +125,25 @@
   }
 }
 
-/* 🔧 PWA 優化：禁止水平滑動，讓操作更像 App */
+/* 🔧 PWA 優化：禁止滑動回彈，讓操作更像 App */
+/* 🆕 Project Silk Touch: PTR Physics Engine - Phase 1 CSS Lockdown */
 html,
 body {
   overflow-x: hidden;
   overscroll-behavior-x: none;
+  /* 🔒 PTR 關鍵：禁止垂直回彈，讓自定義 PTR 接管 */
+  overscroll-behavior-y: none !important;
+  touch-action: pan-y;  /* 只允許垂直滑動 */
+  height: 100%;
+}
+
+/* 🆕 iOS 15 降級方案（當 overscroll-behavior 不支援時） */
+@supports not (overscroll-behavior: none) {
+  html, body {
+    position: fixed;
+    width: 100%;
+    overflow: hidden;
+  }
 }
 
 /* 🚀 滾動性能優化 */
