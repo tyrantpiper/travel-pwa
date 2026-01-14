@@ -1,21 +1,41 @@
 "use client"
 
 /**
- * 🆕 Project Silk Touch: PTR Physics Engine v2.0
+ * 🆕 Project Silk Touch: PTR Visual Feedback Engine
+ * Phase 4: State Machine + Visual Feedback
  * 
- * 優化內容：
- * - 三階段非線性阻尼（模擬 iOS 橡皮筋）
- * - RAF 節流（60fps，無抖動）
- * - 10 秒 Timeout 安全閥
- * - Haptic 震動回饋
- * - Accessibility 支援
+ * Features:
+ * - 6-state machine (IDLE, PULLING, READY, REFRESHING, SUCCESS, ERROR)
+ * - AnimatePresence icon transitions
+ * - Status text feedback
+ * - Haptic feedback (Android)
+ * - 10s timeout protection
  */
 
-import { useState, useRef, useCallback, useEffect } from "react"
-import { RefreshCw } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+    ChevronDown,
+    ArrowDown,
+    RefreshCcw,
+    Loader2,
+    CheckCircle2,
+    AlertCircle
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
+import { PTRStatus, PTRState, PTR_STATUS_CONFIG, PTRIconName } from "@/types/ptr"
+
+// 🎨 Icon Mapping
+const ICON_MAP: Record<PTRIconName, React.ComponentType<{ className?: string }>> = {
+    'chevron-down': ChevronDown,
+    'arrow-down': ArrowDown,
+    'refresh-ccw': RefreshCcw,
+    'loader-2': Loader2,
+    'check-circle-2': CheckCircle2,
+    'alert-circle': AlertCircle
+}
 
 interface PullToRefreshProps {
     children: React.ReactNode
@@ -26,23 +46,18 @@ interface PullToRefreshProps {
 
 // 🎯 PTR 物理配置
 const PTR_CONFIG = {
-    threshold: 80,      // 觸發刷新的距離
-    maxPull: 150,       // 最大下拉距離
-    timeout: 10000,     // 刷新超時 (10秒)
+    threshold: 80,
+    maxPull: 150,
+    timeout: 10000,
     dampingZones: {
-        light: { max: 60, resistance: 0.8 },     // 0-60px: 輕阻力
-        medium: { max: 120, resistance: 0.5 },   // 60-120px: 中阻力
-        heavy: { max: 200, resistance: 0.25 }    // >120px: 重阻力
+        light: { max: 60, resistance: 0.8 },
+        medium: { max: 120, resistance: 0.5 },
+        heavy: { max: 200, resistance: 0.25 }
     }
 }
 
 /**
  * 🔑 三階段非線性阻尼公式
- * 
- * 模擬真實橡皮筋彈性：
- * - 初期：輕鬆拉伸（高回應性）
- * - 中期：感受到阻力（提供回饋感）
- * - 後期：極難拉動（防止過度拉伸）
  */
 function calculateDampedTranslation(rawDiff: number): number {
     const { dampingZones, maxPull } = PTR_CONFIG
@@ -50,41 +65,56 @@ function calculateDampedTranslation(rawDiff: number): number {
     if (rawDiff <= 0) return 0
 
     if (rawDiff <= dampingZones.light.max) {
-        // 🟢 輕阻力區（0-60px）
         return rawDiff * dampingZones.light.resistance
-
     } else if (rawDiff <= dampingZones.medium.max) {
-        // 🟡 中阻力區（60-120px）
         const lightDistance = dampingZones.light.max * dampingZones.light.resistance
         const excessDiff = rawDiff - dampingZones.light.max
         return lightDistance + (excessDiff * dampingZones.medium.resistance)
-
     } else {
-        // 🔴 重阻力區（>120px）
         const lightDistance = dampingZones.light.max * dampingZones.light.resistance
         const mediumDistance = (dampingZones.medium.max - dampingZones.light.max) * dampingZones.medium.resistance
         const baseDistance = lightDistance + mediumDistance
-
         const excessDiff = rawDiff - dampingZones.medium.max
         const heavyTranslation = excessDiff * dampingZones.heavy.resistance
-
-        // 🔒 硬上限
         return Math.min(baseDistance + heavyTranslation, maxPull)
     }
 }
 
 export function PullToRefresh({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold }: PullToRefreshProps) {
-    const [pullDistance, setPullDistance] = useState(0)
-    const [isRefreshing, setIsRefreshing] = useState(false)
-    const containerRef = useRef<HTMLDivElement>(null)
-    const startY = useRef(0)
-    const startX = useRef(0)  // 🆕 水平滑動檢測
-    const isPulling = useRef(false)
-    const rafId = useRef<number | null>(null)  // 🆕 RAF 節流
-    const ticking = useRef(false)  // 🆕 RAF 鎖
     const haptic = useHaptic()
 
-    // 🆕 使用原生事件監聽器，可控制 passive
+    // 🔑 單一 State Object（避免雙重渲染）
+    const [ptrState, setPtrState] = useState<PTRState>({
+        status: PTRStatus.IDLE,
+        pullDistance: 0
+    })
+
+    const containerRef = useRef<HTMLDivElement>(null)
+    const startY = useRef(0)
+    const startX = useRef(0)
+    const isPulling = useRef(false)
+    const rafId = useRef<number | null>(null)
+    const ticking = useRef(false)
+    const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
+
+    // 🎯 狀態計算邏輯
+    const calculateStatus = (distance: number): PTRStatus => {
+        if (distance < pullThreshold * 0.3) return PTRStatus.IDLE
+        if (distance < pullThreshold) return PTRStatus.PULLING
+        return PTRStatus.READY
+    }
+
+    // 🎬 Reset position
+    const resetPosition = () => {
+        setPtrState({
+            status: PTRStatus.IDLE,
+            pullDistance: 0
+        })
+        prevStatusRef.current = PTRStatus.IDLE
+    }
+
+    // 🆕 使用原生事件監聯器
     useEffect(() => {
         const container = containerRef.current
         if (!container) return
@@ -96,51 +126,76 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                 return
             }
 
+            // 🛡️ Guard: 正在刷新或顯示結果時不允許新的拖曳
+            if (ptrState.status === PTRStatus.REFRESHING ||
+                ptrState.status === PTRStatus.SUCCESS ||
+                ptrState.status === PTRStatus.ERROR) {
+                isPulling.current = false
+                return
+            }
+
             const touch = e.touches[0]
             startY.current = touch.clientY
-            startX.current = touch.clientX  // 🆕 記錄起始 X
+            startX.current = touch.clientX
             isPulling.current = true
         }
 
         const handleNativeTouchMove = (e: TouchEvent) => {
-            // 🛡️ Guard #1: 頁面已捲動，放行給瀏覽器
             if (window.scrollY > 0 || container.scrollTop > 0) {
                 if (isPulling.current) {
                     isPulling.current = false
-                    setPullDistance(0)
+                    resetPosition()
                 }
                 return
             }
 
-            if (!isPulling.current || isRefreshing) return
+            if (!isPulling.current) return
+
+            // 正在刷新時不處理
+            if (ptrState.status === PTRStatus.REFRESHING ||
+                ptrState.status === PTRStatus.SUCCESS ||
+                ptrState.status === PTRStatus.ERROR) {
+                return
+            }
 
             const touch = e.touches[0]
             const diffY = touch.clientY - startY.current
             const diffX = Math.abs(touch.clientX - startX.current)
 
-            // 🛡️ Guard #2: 水平滑動優先（可能是翻頁）
+            // 🛡️ Guard: 水平滑動優先
             if (diffX > Math.abs(diffY) * 1.5) {
                 isPulling.current = false
-                setPullDistance(0)
+                resetPosition()
                 return
             }
 
-            // 🛡️ Guard #3: 只處理下拉
+            // 🛡️ Guard: 只處理下拉
             if (diffY <= 0) {
                 isPulling.current = false
-                setPullDistance(0)
+                resetPosition()
                 return
             }
 
-            // 🚫 阻止原生回彈
             e.preventDefault()
 
-            // ⚡ RAF 節流：避免 Layout Thrashing
+            // ⚡ RAF 節流
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
-                    // 🎯 應用三階段阻尼
                     const dampedY = calculateDampedTranslation(diffY)
-                    setPullDistance(dampedY)
+                    const newStatus = calculateStatus(dampedY)
+
+                    // 🔔 Haptic: READY 狀態時震動一次
+                    if (newStatus === PTRStatus.READY && prevStatusRef.current !== PTRStatus.READY) {
+                        haptic.tap()
+                    }
+
+                    prevStatusRef.current = newStatus
+
+                    setPtrState({
+                        status: newStatus,
+                        pullDistance: dampedY
+                    })
+
                     ticking.current = false
                 })
                 ticking.current = true
@@ -151,102 +206,164 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             if (!isPulling.current) return
             isPulling.current = false
 
-            // 清理 RAF
             if (rafId.current) {
                 cancelAnimationFrame(rafId.current)
                 rafId.current = null
             }
             ticking.current = false
 
-            if (pullDistance >= pullThreshold && !isRefreshing) {
-                setIsRefreshing(true)
-                setPullDistance(50)  // 保持 loading 位置
-                haptic.tap()  // 🆕 震動回饋
+            const { status, pullDistance } = ptrState
+
+            // 🚀 觸發刷新
+            if (status === PTRStatus.READY) {
+                setPtrState({
+                    status: PTRStatus.REFRESHING,
+                    pullDistance: 50  // 保持 loading 位置
+                })
+                prevStatusRef.current = PTRStatus.REFRESHING
 
                 try {
-                    // 🔒 Timeout 安全閥
                     await Promise.race([
                         onRefresh(),
                         new Promise((_, reject) =>
                             setTimeout(() => reject(new Error('timeout')), PTR_CONFIG.timeout)
                         )
                     ])
-                    haptic.success()  // 成功回饋
+
+                    // ✅ Success
+                    setPtrState({
+                        status: PTRStatus.SUCCESS,
+                        pullDistance: 50
+                    })
+                    prevStatusRef.current = PTRStatus.SUCCESS
+                    haptic.success()
+
+                    // 1.5s 後重置
+                    resetTimeoutRef.current = setTimeout(() => {
+                        resetPosition()
+                    }, 1500)
+
                 } catch (error) {
+                    // ❌ Error
+                    setPtrState({
+                        status: PTRStatus.ERROR,
+                        pullDistance: 50
+                    })
+                    prevStatusRef.current = PTRStatus.ERROR
+
                     if (error instanceof Error && error.message === 'timeout') {
                         toast.error('網路逾時，請稍後再試')
                     }
-                    haptic.error()  // 失敗回饋
-                } finally {
-                    // 🔑 無論如何都重置
-                    setIsRefreshing(false)
-                    setPullDistance(0)
+                    haptic.error()
+
+                    // 2s 後重置
+                    resetTimeoutRef.current = setTimeout(() => {
+                        resetPosition()
+                    }, 2000)
                 }
             } else {
-                setPullDistance(0)
+                // 未達閾值，直接重置
+                resetPosition()
             }
         }
 
-        // 🆕 使用 passive: false 讓 preventDefault 生效
         container.addEventListener('touchstart', handleNativeTouchStart, { passive: true })
         container.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
         container.addEventListener('touchend', handleNativeTouchEnd, { passive: true })
 
         return () => {
-            // 🆕 清理 RAF（防止 memory leak）
             if (rafId.current) {
                 cancelAnimationFrame(rafId.current)
+            }
+            if (resetTimeoutRef.current) {
+                clearTimeout(resetTimeoutRef.current)
             }
             container.removeEventListener('touchstart', handleNativeTouchStart)
             container.removeEventListener('touchmove', handleNativeTouchMove)
             container.removeEventListener('touchend', handleNativeTouchEnd)
         }
-    }, [isRefreshing, pullThreshold, onRefresh, haptic])  // 🔧 移除 pullDistance 依賴
+    }, [ptrState.status, pullThreshold, onRefresh, haptic])
 
-    const progress = Math.min(pullDistance / pullThreshold, 1)
+    // 🎨 當前配置
+    const config = PTR_STATUS_CONFIG[ptrState.status]
+    const Icon = ICON_MAP[config.icon]
+    const progress = Math.min(ptrState.pullDistance / pullThreshold, 1)
+    const opacity = Math.min(progress * 2, 1)
 
     return (
         <div
             ref={containerRef}
             className={cn(
                 "relative overflow-auto",
-                "overscroll-y-contain", // 🔒 阻止捲動鍊
-                "touch-pan-y",          // 🔒 讓瀏覽器優先處理垂直捲動
+                "overscroll-y-contain",
+                "touch-pan-y",
                 className
             )}
             style={{
-                WebkitOverflowScrolling: 'touch' // iOS 慣性捲動
+                WebkitOverflowScrolling: 'touch'
             }}
         >
-            {/* Pull indicator */}
+            {/* 🎯 Indicator */}
             <div
-                className="absolute left-1/2 -translate-x-1/2 z-10 flex items-center justify-center transition-all duration-150"
+                className={cn(
+                    "absolute left-1/2 -translate-x-1/2 z-10",
+                    "flex flex-col items-center gap-2",
+                    "pointer-events-none",
+                    "transition-all duration-150"
+                )}
                 style={{
-                    top: pullDistance - 40,
-                    opacity: progress
+                    top: ptrState.pullDistance - 40,
+                    opacity
                 }}
             >
-                <div className={cn(
-                    "bg-white rounded-full p-2 shadow-lg border border-slate-100",
-                    isRefreshing && "animate-pulse"
-                )}>
-                    <RefreshCw
+                {/* 🎨 Icon Container */}
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={ptrState.status}
+                        initial={{ scale: 0.5, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        exit={{ scale: 0.5, rotate: 180 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                         className={cn(
-                            "w-5 h-5 text-slate-600 transition-transform duration-150",
-                            isRefreshing && "animate-spin"
+                            "w-12 h-12 rounded-full bg-white shadow-lg border border-slate-100",
+                            "flex items-center justify-center",
+                            config.color
                         )}
-                        style={{
-                            transform: `rotate(${progress * 360}deg)`
-                        }}
-                    />
-                </div>
+                    >
+                        <Icon
+                            className={cn(
+                                "w-6 h-6",
+                                config.spin && "animate-spin"
+                            )}
+                        />
+                    </motion.div>
+                </AnimatePresence>
+
+                {/* 📝 Text */}
+                <AnimatePresence mode="wait">
+                    {config.text && (
+                        <motion.p
+                            key={ptrState.status}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            className={cn(
+                                "text-sm font-medium whitespace-nowrap",
+                                config.color
+                            )}
+                        >
+                            {config.text}
+                        </motion.p>
+                    )}
+                </AnimatePresence>
             </div>
 
-            {/* Content with transform (GPU 加速) */}
+            {/* 📜 Content with transform (GPU 加速) */}
             <div
                 className="transition-transform duration-150"
                 style={{
-                    transform: `translateY(${pullDistance}px)`
+                    transform: `translateY(${ptrState.pullDistance}px)`
                 }}
             >
                 {children}
@@ -255,12 +372,26 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
             {/* 🆕 Accessibility: Screen Reader 替代操作 */}
             <button
                 onClick={async () => {
-                    if (isRefreshing) return
-                    setIsRefreshing(true)
+                    if (ptrState.status === PTRStatus.REFRESHING) return
+
+                    setPtrState({
+                        status: PTRStatus.REFRESHING,
+                        pullDistance: 0
+                    })
+
                     try {
                         await onRefresh()
-                    } finally {
-                        setIsRefreshing(false)
+                        setPtrState({
+                            status: PTRStatus.SUCCESS,
+                            pullDistance: 0
+                        })
+                        setTimeout(resetPosition, 1500)
+                    } catch {
+                        setPtrState({
+                            status: PTRStatus.ERROR,
+                            pullDistance: 0
+                        })
+                        setTimeout(resetPosition, 2000)
                     }
                 }}
                 aria-label="重新整理頁面"
