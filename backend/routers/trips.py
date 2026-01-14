@@ -12,6 +12,7 @@ Note: This is a large router containing 17 endpoints.
 
 import traceback
 from datetime import datetime, timedelta
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 
 from models.base import (
