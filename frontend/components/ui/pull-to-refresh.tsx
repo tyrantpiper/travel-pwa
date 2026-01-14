@@ -261,7 +261,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             if (status === PTRStatus.READY) {
                 setPtrState({
                     status: PTRStatus.REFRESHING,
-                    pullDistance: 50  // 保持 loading 位置
+                    pullDistance: 80  // 🔧 Fix: Increase to 80 (threshold) to prevent overlap
                 })
                 prevStatusRef.current = PTRStatus.REFRESHING
 
@@ -382,7 +382,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     // PULLING/READY 狀態時置中於下拉空間
                     top: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
                         ? -80  // 隱藏在視窗外
-                        : Math.max(ptrState.pullDistance / 2 - 30, -60),
+                        : Math.max(ptrState.pullDistance / 2 - 40, -80), // 🔧 Fix: -40 to center in 80px gap
                     opacity: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
                         ? 0  // 完全透明
                         : opacity
@@ -451,7 +451,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
                     setPtrState({
                         status: PTRStatus.REFRESHING,
-                        pullDistance: 0
+                        pullDistance: 80  // 🔧 Fix: Increase to 80 (threshold)
                     })
 
                     try {
