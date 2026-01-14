@@ -110,6 +110,7 @@ export function ZoomableImage({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        position: "relative",  // Required for Next.js Image fill
                     }}
                 >
                     <Image

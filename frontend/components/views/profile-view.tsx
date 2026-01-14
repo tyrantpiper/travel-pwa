@@ -105,15 +105,14 @@ export function ProfileView() {
             setShowDonation(false)
         }
 
-        // 從 Supabase 讀取進度（使用獨立連線，不干擾 app.state）
+        // 從 Supabase 讀取進度（使用單例，避免 Multiple GoTrueClient 警告）
         const fetchDonationProgress = async () => {
             try {
-                const { createClient } = await import('@supabase/supabase-js')
-                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-                const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-                if (!supabaseUrl || !supabaseKey) return
+                // 🔧 使用單例模式，避免重複創建 GoTrueClient
+                const { getSupabaseClient } = await import('@/lib/supabase')
+                const supabase = getSupabaseClient()
+                if (!supabase) return
 
-                const supabase = createClient(supabaseUrl, supabaseKey)
                 const { data } = await supabase
                     .from('app_settings')
                     .select('value')
