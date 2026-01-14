@@ -330,7 +330,9 @@ export function PullToRefresh({ children, onRefresh, className, pullThreshold = 
                     "transition-all duration-150"
                 )}
                 style={{
-                    top: ptrState.pullDistance - 40,
+                    // 🔧 FIX: 置中於下拉空間 (pullDistance / 2) 而非固定位置
+                    // 這樣 indicator 永遠在內容上方的空白區域，不會遮擋內容
+                    top: Math.max(ptrState.pullDistance / 2 - 30, -60),
                     opacity
                 }}
             >
