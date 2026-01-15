@@ -14,6 +14,9 @@ The following workflows MUST be triggered based on context:
 | After changes complete | `/push` | Read `.agent/workflows/push.md` |
 | Backend changes | `/regression-check` | Read `.agent/workflows/regression-check.md` |
 | Bug fix work | `/fix` | Read `.agent/workflows/fix.md` |
+| Security concerns | `/security-audit` | Read `.agent/workflows/security-audit.md` |
+| Finding regressions | `/bisect-debug` | Read `.agent/workflows/bisect-debug.md` |
+| Doc maintenance | `/doc-sync` | Read `.agent/workflows/doc-sync.md` |
 
 ## 🎯 Skill Auto-Activation
 
@@ -24,6 +27,7 @@ The following workflows MUST be triggered based on context:
 | "新功能", "full-stack", "建立功能" | `fullstack-builder` |
 | "回歸", "regression", "broken" | `regression-guardian` |
 | "元件", "component", "UI 元件" | `component-generator` |
+| "優化 skill", "refine", "演化" | `skill-refiner` |
 
 ## 📋 Pre-Task Checklist
 
