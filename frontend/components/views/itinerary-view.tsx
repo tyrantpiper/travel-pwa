@@ -1393,8 +1393,8 @@ export function ItineraryView() {
     return (
         // 🔧 Phase 14: View manages its own scrolling
         <div className="h-full overflow-y-auto overscroll-contain">
-            <div className="flex flex-col min-h-screen bg-stone-50 pb-32 overflow-x-hidden">
-                <div className="bg-white pt-12 pb-2 sticky top-0 z-20 border-b border-slate-100 shadow-sm">
+            <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32 overflow-x-hidden">
+                <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="px-6 flex justify-between items-end mb-4">
                         <div>
                             <button onClick={handleBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
@@ -1428,19 +1428,19 @@ export function ItineraryView() {
                         {shouldShowDateSkeleton ? (
                             // Skeleton: avoid showing wrong dates from cached trip
                             [1, 2, 3].map(i => (
-                                <div key={i} className="w-14 h-14 bg-slate-200 rounded-lg animate-pulse flex-shrink-0" />
+                                <div key={i} className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse flex-shrink-0" />
                             ))
                         ) : (
                             dayNumbers.map((d) => {
                                 const { date, week } = getDateInfo(d)
                                 return (
                                     <div key={d} className="relative flex flex-col items-center">
-                                        <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border", day === d ? "text-white" : "bg-white hover:bg-slate-50")}>
+                                        <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border dark:border-slate-700", day === d ? "text-white" : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100")}>
                                             {/* Sliding Indicator */}
                                             {day === d && (
                                                 <motion.div
                                                     layoutId="day-indicator"
-                                                    className="absolute inset-0 bg-slate-900 rounded-lg -z-10"
+                                                    className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
                                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                                 />
                                             )}
@@ -1488,7 +1488,7 @@ export function ItineraryView() {
                     onRefresh={async () => { await reloadTripDetail() }}
                     className="flex-1"
                 >
-                    <div className="py-6 px-6 bg-stone-50/50">
+                    <div className="py-6 px-6 bg-stone-50/50 dark:bg-slate-900/50">
                         <div className="flex items-center justify-between mb-4">
                             {/* 🆕 Smart Clone Confirmation Dialog */}
                             <AlertDialog open={isClonePromptOpen} onOpenChange={setIsClonePromptOpen}>
@@ -1530,18 +1530,18 @@ export function ItineraryView() {
                                 setIsLocEditOpen(open)
                             }}>
                                 <DialogTrigger asChild>
-                                    <button className="flex items-center gap-2 hover:bg-white/50 p-2 -ml-2 rounded-lg transition-colors group">
+                                    <button className="flex items-center gap-2 hover:bg-white/50 dark:hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-colors group">
                                         <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
-                                        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900">
+                                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
                                             {dailyLocs[day]?.name || "Tokyo (Default)"}
                                         </span>
                                         <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
                                     </button>
                                 </DialogTrigger>
                                 {/* 當地時間顯示 */}
-                                <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-lg shadow-sm border border-slate-100">
+                                <div className="flex items-center gap-1.5 bg-white/80 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
                                     <Clock className="w-3.5 h-3.5 text-amber-500" />
-                                    <span className="text-xs font-mono font-medium text-slate-700">
+                                    <span className="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
                                         {getNowInZone(currentTimezone)}
                                     </span>
                                 </div>
@@ -1550,9 +1550,9 @@ export function ItineraryView() {
                                     <div className="space-y-4 py-4">
                                         {/* 當前座標顯示 */}
                                         {dailyLocs[day] && (
-                                            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                                                 <div className="text-xs text-slate-500 mb-1">📍 目前地點</div>
-                                                <div className="font-bold text-slate-800">{dailyLocs[day].name}</div>
+                                                <div className="font-bold text-slate-800 dark:text-slate-200">{dailyLocs[day].name}</div>
                                                 <div className="text-xs text-slate-400 font-mono">
                                                     {dailyLocs[day].lat?.toFixed(4)}, {dailyLocs[day].lng?.toFixed(4)}
                                                 </div>
@@ -1574,7 +1574,7 @@ export function ItineraryView() {
                                                     >
                                                         <div>
                                                             <div className="text-xs text-amber-600 font-bold">⚡ 從活動同步</div>
-                                                            <div className="text-sm text-slate-700">{activityLoc.place}</div>
+                                                            <div className="text-sm text-slate-700 dark:text-slate-300">{activityLoc.place}</div>
                                                             <div className="text-xs text-slate-400 font-mono">{activityLoc.lat?.toFixed(4)}, {activityLoc.lng?.toFixed(4)}</div>
                                                         </div>
                                                     </Button>
@@ -1589,7 +1589,7 @@ export function ItineraryView() {
                                             <div className="flex gap-2">
                                                 <div className="w-1/3 space-y-2">
                                                     <select
-                                                        className="w-full h-9 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950"
+                                                        className="w-full h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-slate-400 dark:text-white"
                                                         value={searchCountry}
                                                         onChange={e => {
                                                             setSearchCountry(e.target.value)
@@ -1621,7 +1621,7 @@ export function ItineraryView() {
 
                                                     {searchCountry && COUNTRY_REGIONS[searchCountry] ? (
                                                         <select
-                                                            className="w-full h-9 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950"
+                                                            className="w-full h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-slate-400 dark:text-white"
                                                             value={dailyLocSearchRegion}
                                                             onChange={e => setDailyLocSearchRegion(e.target.value)}
                                                         >
@@ -1679,11 +1679,11 @@ export function ItineraryView() {
                                                             key={idx}
                                                             onClick={() => handleSelectLocation(loc)}
                                                             disabled={isSelectingLocation}
-                                                            className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            className="w-full text-left p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:border-amber-300 dark:hover:border-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
                                                             <div className="flex items-center gap-2 mb-1">
-                                                                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{typeLabel}</span>
-                                                                <span className="font-bold text-slate-800">{loc.name}</span>
+                                                                <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200">{typeLabel}</span>
+                                                                <span className="font-bold text-slate-800 dark:text-white">{loc.name}</span>
                                                             </div>
                                                             <div className="text-xs text-slate-500 line-clamp-1">
                                                                 {loc.display_name || [loc.admin2, loc.admin1, loc.country].filter(Boolean).join(', ')}
@@ -1784,16 +1784,16 @@ export function ItineraryView() {
 
                         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                             {weatherData.length > 0 ? weatherData.map((w, i) => (
-                                <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0">
+                                <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm shrink-0">
                                     <span className="text-xs text-slate-400 font-mono">{w.time}</span>
                                     {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
-                                    <span className="text-sm font-bold text-slate-700 tabular-nums">{w.temp}°</span>
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 tabular-nums">{w.temp}°</span>
                                 </div>
                             )) : (
                                 // 💀 Skeleton Loading: Prevent Layout Shift & "Distorted" feel
                                 Array.from({ length: 24 }).map((_, i) => (
-                                    <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm shrink-0 animate-pulse">
-                                        <div className="w-8 h-3 bg-slate-200 rounded"></div>
+                                    <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm shrink-0 animate-pulse">
+                                        <div className="w-8 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div>
                                         <div className="w-6 h-6 bg-slate-200 rounded-full"></div>
                                         <div className="w-6 h-4 bg-slate-200 rounded"></div>
                                     </div>
@@ -1805,11 +1805,11 @@ export function ItineraryView() {
                         {weatherData.length > 0 && (
                             <div className="grid grid-cols-2 gap-2 pt-2 pb-4">
                                 {/* Row 1: 穿衣 | 降雨 */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">👕</span>
                                     <div>
-                                        <div className="text-xs text-slate-500">穿衣</div>
-                                        <div className="text-sm font-medium text-slate-700">
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">穿衣</div>
+                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                             {(() => {
                                                 const avgTemp = (Math.max(...weatherData.map(w => w.temp)) + Math.min(...weatherData.map(w => w.temp))) / 2
                                                 if (avgTemp > 28) return '短袖短褲'
@@ -1822,7 +1822,7 @@ export function ItineraryView() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">☔</span>
                                     <div>
                                         <div className="text-xs text-slate-500">
@@ -1849,7 +1849,7 @@ export function ItineraryView() {
                                 </div>
 
                                 {/* Row 2: 濕度 | 體感 */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">💧</span>
                                     <div>
                                         <div className="text-xs text-slate-500">濕度</div>
@@ -1858,7 +1858,7 @@ export function ItineraryView() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">🌡️</span>
                                     <div>
                                         <div className="text-xs text-slate-500">體感溫度</div>
@@ -1881,7 +1881,7 @@ export function ItineraryView() {
                                 </div>
 
                                 {/* Row 3: UV 指數 | 最大風速 */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">☀️</span>
                                     <div>
                                         <div className="text-xs text-slate-500">UV 指數</div>
@@ -1894,7 +1894,7 @@ export function ItineraryView() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">💨</span>
                                     <div>
                                         <div className="text-xs text-slate-500">最大風速</div>
@@ -1909,7 +1909,7 @@ export function ItineraryView() {
                                 </div>
 
                                 {/* Row 4: 能見度 | 海拔 */}
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">👁️</span>
                                     <div>
                                         <div className="text-xs text-slate-500">能見度</div>
@@ -1924,7 +1924,7 @@ export function ItineraryView() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2">
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                                     <span className="text-lg">🏔️</span>
                                     <div>
                                         <div className="text-xs text-slate-500">海拔</div>
@@ -1939,7 +1939,7 @@ export function ItineraryView() {
                                     const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
                                     if (maxAQI > 0) {
                                         return (
-                                            <div className="bg-slate-50 rounded-xl p-3 flex items-center gap-2 col-span-2">
+                                            <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2 col-span-2">
                                                 <span className="text-lg">🌱</span>
                                                 <div className="flex-1">
                                                     <div className="text-xs text-slate-500">空氣品質 (AQI)</div>
@@ -2125,7 +2125,7 @@ export function ItineraryView() {
                         <div className="py-4 text-center">
                             <Button
                                 variant="outline"
-                                className="w-full border-dashed border-slate-300 text-slate-400"
+                                className="w-full border-dashed border-slate-300 dark:border-slate-700 text-slate-400 dark:text-slate-500"
                                 disabled={!isOnline}
                                 onClick={() => {
                                     if (!isOnline) {
@@ -2142,7 +2142,7 @@ export function ItineraryView() {
                         </div>
 
                         <div className="mt-8">
-                            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
+                            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3 pl-1">Daily Route Map</h3>
                             <DayMap
                                 activities={currentDayData}
                                 onAddPOI={handleAddPOI}

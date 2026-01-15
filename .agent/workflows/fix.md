@@ -1,5 +1,11 @@
 ---
 description: Standardized bug fix workflow with verification
+triggers:
+  - "fix"
+  - "修復"
+  - "bug"
+  - "錯誤"
+  - "壞掉"
 ---
 
 ## Step 1: Issue Analysis

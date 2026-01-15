@@ -1,5 +1,11 @@
 ---
 description: Run all code quality checks (TypeScript + ESLint)
+triggers:
+  - "測試"
+  - "test"
+  - "驗證"
+  - "verify"
+  - "檢查"
 ---
 
 ## TypeScript Check

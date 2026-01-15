@@ -1284,42 +1284,71 @@ export function ToolsView() {
                 < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
-                        <div className="space-y-4 py-2">
-                            <div className="flex gap-2 items-center">
-                                {/* 🆕 Currency Selector */}
-                                {/* 🆕 Premium Currency Selector */}
+                        <div className="space-y-5 py-2">
+                            {/* 💰 Section 1: Amount Input (Hero Section) */}
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    💰 金額
+                                </Label>
+
+                                {/* Currency Selector (Full Width) */}
                                 <Select value={inputCurrency} onValueChange={setInputCurrency}>
-                                    <SelectTrigger className="h-10 w-[110px] bg-white border-slate-200 font-bold font-mono">
-                                        <SelectValue />
+                                    <SelectTrigger className="h-11 w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-bold text-base">
+                                        <SelectValue placeholder="選擇幣別" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {CURRENCIES.map(c => (
-                                            <SelectItem key={c.code} value={c.code} className="font-mono">
-                                                <span className="mr-2">{c.flag}</span>
-                                                {c.code}
+                                            <SelectItem key={c.code} value={c.code} className="py-2.5">
+                                                <span className="mr-2 text-lg">{c.flag}</span>
+                                                <span className="font-mono font-bold">{c.code}</span>
+                                                <span className="text-slate-400 ml-2">- {c.name}</span>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
 
-                                <Input placeholder="Amount" type="number" inputMode="numeric" pattern="[0-9]*" className="text-lg font-mono font-bold flex-1" value={amountJPY} onChange={e => setAmountJPY(e.target.value)} />
-                                <div className="flex items-center px-3 bg-slate-100 rounded text-sm text-slate-500 whitespace-nowrap min-w-[6rem] justify-center">~ {Math.round((parseInt(amountJPY) || 0) * inputRate)} TWD</div>
+                                {/* Amount Input + TWD Conversion */}
+                                <div className="flex gap-3 items-stretch">
+                                    <div className="flex-1 relative">
+                                        <Input
+                                            placeholder="0"
+                                            type="number"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            className="text-2xl font-mono font-bold h-12 text-center bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600"
+                                            value={amountJPY}
+                                            onChange={e => setAmountJPY(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-white whitespace-nowrap min-w-[8rem] justify-center font-bold shadow-lg">
+                                        <span className="text-emerald-200 text-xs mr-1">≈</span>
+                                        NT$ {Math.round((parseInt(amountJPY) || 0) * inputRate).toLocaleString()}
+                                    </div>
+                                </div>
                             </div>
-                            <Input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
 
-                            {/* Date picker - 根據行程天數選擇 */}
-                            <div className="space-y-1">
-                                <Label className="text-xs text-slate-500">📅 日期</Label>
+                            {/* 📝 Section 2: Basic Info */}
+                            <div className="space-y-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    📝 明細
+                                </Label>
+                                <Input
+                                    placeholder="消費名稱（例：午餐、交通卡儲值）"
+                                    value={title}
+                                    onChange={e => setTitle(e.target.value)}
+                                    className="h-11 text-base"
+                                />
+
+                                {/* Date picker */}
                                 {activeTrip?.start_date ? (
                                     <select
                                         value={expenseDate}
                                         onChange={e => setExpenseDate(e.target.value)}
-                                        className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
+                                        className="w-full h-11 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium"
                                     >
                                         {(() => {
-                                            // 計算行程天數（從 days array 或 start/end date）
-                                            const trip = activeTrip as Trip // 🔧 FIX #7: Explicit cast
-                                            const startDate = new Date(trip.start_date!) // 🔧 FIX #7: Assert non-null
+                                            const trip = activeTrip as Trip
+                                            const startDate = new Date(trip.start_date!)
                                             const endDate = trip.end_date ? new Date(trip.end_date) : null
                                             const totalDays = trip.days?.length ||
                                                 (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
@@ -1331,28 +1360,94 @@ export function ToolsView() {
                                                 const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
                                                 return (
                                                     <option key={i} value={dateStr}>
-                                                        Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
+                                                        📅 Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
                                                     </option>
                                                 )
                                             })
                                         })()}
                                     </select>
                                 ) : (
-                                    <div className="text-xs text-slate-400 py-2">請先選擇行程</div>
+                                    <div className="text-xs text-slate-400 py-2 text-center bg-slate-50 rounded-lg">⚠️ 請先選擇行程</div>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2">
-                                {Object.entries(CATEGORIES).map(([key, info]) => (
-                                    <button key={key} onClick={() => setCategory(key)} className={cn("flex items-center justify-center gap-1 p-2 rounded-lg border text-xs transition-all", category === key ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
-                                        <info.icon className="w-3 h-3" /> {info.label}
-                                    </button>
-                                ))}
+                            {/* 🏷️ Section 3: Category */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    🏷️ 分類
+                                </Label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {Object.entries(CATEGORIES).map(([key, info]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => setCategory(key)}
+                                            className={cn(
+                                                "flex items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
+                                                category === key
+                                                    ? "border-slate-800 bg-slate-800 text-white shadow-md scale-105"
+                                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            <info.icon className="w-4 h-4" /> {info.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* Receipt Upload */}
-                            <div className="space-y-1">
-                                <Label className="text-xs text-slate-500">收據 / 照片</Label>
+                            {/* 💳 Section 4: Payment Method */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    💳 付款方式
+                                </Label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {PAYMENT_METHODS.map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => setMethod(m.id)}
+                                            className={cn(
+                                                "flex flex-col items-center justify-center p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
+                                                method === m.id
+                                                    ? "border-slate-800 bg-slate-800 text-white shadow-md"
+                                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400"
+                                            )}
+                                        >
+                                            <m.icon className="w-5 h-5 mb-1" />{m.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Credit Card Details (Conditional) */}
+                                {(method === "JCB" || method === "VisaMaster") && (
+                                    <div className="flex gap-2 mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                        <Input placeholder="卡片名稱" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1 bg-white dark:bg-slate-800" />
+                                        <div className="relative w-24">
+                                            <input
+                                                type="text"
+                                                list="cashback-rates"
+                                                placeholder="回饋%"
+                                                value={cashback}
+                                                onChange={e => setCashback(e.target.value)}
+                                                className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono"
+                                            />
+                                            <datalist id="cashback-rates">
+                                                <option value="0.5">0.5%</option>
+                                                <option value="1">1%</option>
+                                                <option value="1.5">1.5%</option>
+                                                <option value="2">2%</option>
+                                                <option value="2.5">2.5%</option>
+                                                <option value="3">3%</option>
+                                                <option value="5">5%</option>
+                                            </datalist>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 📸 Section 5: Receipt */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    📸 收據 / 照片
+                                </Label>
                                 <ImageUpload
                                     value={receiptUrl}
                                     onChange={(url) => setReceiptUrl(url)}
@@ -1361,48 +1456,17 @@ export function ToolsView() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-4 gap-2">
-                                {PAYMENT_METHODS.map(m => (
-                                    <button key={m.id} onClick={() => setMethod(m.id)} className={cn("flex flex-col items-center justify-center p-2 rounded-lg border text-xs transition-all", method === m.id ? "border-slate-800 bg-slate-800 text-white" : "bg-white border-slate-100 text-slate-500")}>
-                                        <m.icon className="w-4 h-4 mb-1" />{m.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {(method === "JCB" || method === "VisaMaster") && (
-                                <div className="flex gap-2">
-                                    <Input placeholder="Card name" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
-                                    <div className="relative w-28">
-                                        <input
-                                            type="text"
-                                            list="cashback-rates"
-                                            placeholder="回饋 %"
-                                            value={cashback}
-                                            onChange={e => setCashback(e.target.value)}
-                                            className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 bg-white"
-                                        />
-                                        <datalist id="cashback-rates">
-                                            <option value="0.5">0.5%</option>
-                                            <option value="1">1%</option>
-                                            <option value="1.5">1.5%</option>
-                                            <option value="2">2%</option>
-                                            <option value="2.5">2.5%</option>
-                                            <option value="3">3%</option>
-                                            <option value="5">5%</option>
-                                        </datalist>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                                <Label className="text-sm flex items-center gap-2">
-                                    {isPublic ? <><Users className="w-4 h-4 text-blue-500" /> {t('shared')}</> : <><User className="w-4 h-4 text-amber-500" /> {t('private')}</>}
+                            {/* 👥 Section 6: Visibility Toggle */}
+                            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                    {isPublic ? <><Users className="w-5 h-5 text-blue-500" /> {t('shared')}</> : <><User className="w-5 h-5 text-amber-500" /> {t('private')}</>}
                                 </Label>
                                 <Switch checked={isPublic} onCheckedChange={setIsPublic} />
                             </div>
 
-                            <Button className="w-full bg-slate-900" onClick={handleSaveExpense} disabled={isSavingExpense}>
-                                {isSavingExpense ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />儲存中...</> : t('save')}
+                            {/* 💾 Save Button */}
+                            <Button className="w-full h-12 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-base font-bold shadow-lg" onClick={handleSaveExpense} disabled={isSavingExpense}>
+                                {isSavingExpense ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />儲存中...</> : <><CheckCircle2 className="w-5 h-5 mr-2" />{t('save')}</>}
                             </Button>
                         </div>
                     </DialogContent>

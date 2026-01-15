@@ -1,5 +1,11 @@
 ---
 description: Deep code audit with architecture analysis
+triggers:
+  - "審核"
+  - "audit"
+  - "分析架構"
+  - "code review"
+  - "深度研究"
 ---
 
 ## Scope Definition

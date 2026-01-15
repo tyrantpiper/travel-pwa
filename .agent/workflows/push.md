@@ -1,5 +1,11 @@
 ---
 description: Smart commit and push with TypeScript quality check
+triggers:
+  - "push"
+  - "推送"
+  - "commit"
+  - "提交"
+  - "git push"
 ---
 
 ## Pre-flight Check

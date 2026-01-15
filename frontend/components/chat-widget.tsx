@@ -520,7 +520,7 @@ export default function ChatWidget() {
                                     </div>
                                     <div className={cn(
                                         "p-3 rounded-2xl text-sm shadow-sm",
-                                        msg.role === "model" ? "bg-white text-slate-700 rounded-tl-none border border-slate-100" : "bg-blue-600 text-white rounded-tr-none"
+                                        msg.role === "model" ? "bg-white text-slate-700 rounded-tl-none border border-slate-200" : "bg-blue-600 text-white rounded-tr-none"
                                     )}>
                                         {msg.role === "model" ? (
                                             <>
@@ -541,7 +541,7 @@ export default function ChatWidget() {
                                                 )}
                                                 {/* 🆕 v3.7.1: 三源引用標籤 */}
                                                 {msg.sources && msg.sources.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-slate-100">
+                                                    <div className="mt-2 pt-2 border-t border-slate-200">
                                                         <p className="text-[10px] text-slate-400 mb-1">📚 資料來源</p>
                                                         <div className="flex flex-wrap gap-1">
                                                             {msg.sources.map((source, sidx) => (
@@ -607,7 +607,7 @@ export default function ChatWidget() {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 bg-white border-t border-slate-100">
+                        <div className="p-3 bg-white border-t border-slate-200">
                             {selectedImage && (
                                 <div className="mb-2 relative inline-block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}

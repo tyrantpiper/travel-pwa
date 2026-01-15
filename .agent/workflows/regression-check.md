@@ -1,5 +1,11 @@
 ---
 description: Automated regression check for backend integrity and frontend build
+triggers:
+  - "regression"
+  - "回歸"
+  - "backend changes"
+  - "後端修改"
+  - "health check"
 ---
 
 This workflow performs a safety check on the codebase to catch common regression issues like missing imports, NameErrors, or build failures.

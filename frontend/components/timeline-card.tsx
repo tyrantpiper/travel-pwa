@@ -116,7 +116,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 )}
 
                 <div className="flex justify-between items-start mb-1 pr-6">
-                    <h3 className={cn("font-bold text-slate-900 leading-tight", isHeader ? "text-xl" : "text-lg")}>
+                    <h3 className={cn("font-bold text-slate-900 dark:text-white leading-tight", isHeader ? "text-xl" : "text-lg")}>
                         {activity.place || "Unknown Place"}
                     </h3>
                 </div>
@@ -146,8 +146,8 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border flex items-center gap-1",
-                        isHeader ? "bg-amber-100 text-amber-600 border-amber-200 font-bold" :
-                            (activity.category === 'transport' ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-white text-slate-500 border-slate-200")
+                        isHeader ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-700 font-bold" :
+                            (activity.category === 'transport' ? "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-600" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600")
                     )}>
                         {getIcon()} {isHeader ? "INFO" : activity.category}
                     </span>
@@ -156,20 +156,20 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                     ))}
                 </div>
 
-                <p className="text-sm text-slate-600 mb-3 leading-relaxed font-light whitespace-pre-wrap line-clamp-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 leading-relaxed font-light whitespace-pre-wrap line-clamp-3">
                     {activity.desc || "點擊新增備忘錄..."}
                 </p>
 
                 {/* 附屬表格 */}
                 {activity.sub_items && activity.sub_items.length > 0 && (
-                    <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 shadow-sm bg-slate-50/50">
+                    <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm bg-slate-50/50 dark:bg-slate-800/50">
                         <Table className="w-full table-fixed min-w-[280px]">
                             <TableBody>
                                 {activity.sub_items.map((item: SubItem, i: number) => (
-                                    <TableRow key={i} className="border-b border-slate-100 last:border-0 hover:bg-white transition-colors">
+                                    <TableRow key={i} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-700 transition-colors">
                                         <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
-                                            <div className="text-xs font-bold text-slate-700 mb-0.5 break-words">{item.name}</div>
-                                            {item.desc && <div className="text-[10px] text-slate-500 leading-tight break-words whitespace-normal">{item.desc}</div>}
+                                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-0.5 break-words">{item.name}</div>
+                                            {item.desc && <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight break-words whitespace-normal">{item.desc}</div>}
                                         </TableCell>
                                         {item.link ? (
                                             <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
@@ -191,13 +191,13 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 {/* 按鈕區 */}
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     {!hideMapBtn && (
-                        <Button variant="outline" size="sm" className="h-8 text-xs bg-white hover:bg-slate-50 border-slate-200 text-slate-600" onClick={openGoogleMap}>
+                        <Button variant="outline" size="sm" className="h-11 min-w-[44px] text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300" onClick={openGoogleMap}>
                             <MapPin className="w-3 h-3 mr-1" /> 導航
                         </Button>
                     )}
 
                     {/* 👇 改成此地備忘錄 */}
-                    <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
+                    <Button variant="ghost" size="sm" className="h-11 min-w-[44px] text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
                         <StickyNote className="w-3 h-3 mr-1" /> 此地備忘錄
                     </Button>
                 </div>
@@ -209,22 +209,22 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         <div className="flex gap-3 relative group">
             {/* 左側：時間 + 序號 */}
             <div className="flex flex-col items-center w-12 shrink-0">
-                {!isHeader && <span className="text-xs font-mono font-bold text-slate-500">{activity.time || activity.time_slot || "00:00"}</span>}
+                {!isHeader && <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">{activity.time || activity.time_slot || "00:00"}</span>}
                 {isHeader ? (
-                    <div className="w-6 h-6 rounded-full mt-1 bg-amber-100 text-amber-600 flex items-center justify-center border-2 border-white shadow-sm z-10">
+                    <div className="w-6 h-6 rounded-full mt-1 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm z-10">
                         <Lightbulb className="w-3 h-3" strokeWidth={3} />
                     </div>
                 ) : activity.is_highlight ? (
-                    <div className="w-5 h-5 rounded-full mt-1 bg-amber-500 ring-4 ring-amber-100 z-10 flex items-center justify-center text-[9px] text-white font-bold">{index}</div>
+                    <div className="w-5 h-5 rounded-full mt-1 bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-900/50 z-10 flex items-center justify-center text-[9px] text-white font-bold">{index}</div>
                 ) : (
-                    <div className="w-5 h-5 rounded-full mt-1 bg-slate-800 text-white flex items-center justify-center text-[9px] font-bold z-10 border-2 border-white shadow-sm">{index}</div>
+                    <div className="w-5 h-5 rounded-full mt-1 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 flex items-center justify-center text-[9px] font-bold z-10 border-2 border-white dark:border-slate-900 shadow-sm">{index}</div>
                 )}
-                {!isLast && <div className="w-px flex-1 bg-slate-200 my-1" />}
+                {!isLast && <div className="w-px flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
             </div>
             {/* 右側：卡片內容 */}
             <div className={cn("timeline-card flex-1 min-w-0 mb-6 relative p-4 rounded-xl border cursor-default overflow-hidden",
-                isHeader ? "bg-amber-50/30 border-amber-200/50" :
-                    activity.is_highlight ? "bg-amber-50/50 border-amber-200" : "bg-white border-transparent hover:border-slate-200 shadow-sm"
+                isHeader ? "bg-amber-50/30 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-700/50" :
+                    activity.is_highlight ? "bg-amber-50/50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700" : "bg-white dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-600 shadow-sm dark:shadow-none"
             )}>
                 {activity.is_highlight && <div className="absolute top-0 left-0 w-1 h-full bg-amber-400 rounded-l-xl" />}
                 {renderContent()}
@@ -329,10 +329,10 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-stone-50 gap-0">
-                <div className="p-6 bg-white border-b border-slate-100">
+            <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-stone-50 dark:bg-slate-900 gap-0">
+                <div className="p-6 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl font-serif font-bold text-slate-900">{activity.place || "Details"}</DialogTitle>
+                        <DialogTitle className="text-2xl font-serif font-bold text-slate-900 dark:text-white">{activity.place || "Details"}</DialogTitle>
                     </DialogHeader>
                 </div>
                 <ScrollArea className="max-h-[60vh]">
@@ -340,10 +340,10 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
 
                         {/* 1. 攻略/簡介 (唯讀) */}
                         <div className="space-y-2">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <Info className="w-3 h-3" /> Info & Guide
                             </h4>
-                            <div className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm whitespace-pre-wrap">
+                            <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm whitespace-pre-wrap">
                                 {activity.desc || "暫無簡介。"}
                             </div>
                         </div>
@@ -351,7 +351,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                         {/* 2. Memo & Links (合併編輯區) */}
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <h4 className="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                                <h4 className="text-xs font-bold text-amber-500 dark:text-amber-400 uppercase tracking-widest flex items-center gap-2">
                                     <StickyNote className="w-3 h-3" /> Memo & Links
                                 </h4>
                                 {!isEditing && (
@@ -362,7 +362,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                             </div>
 
                             {isEditing ? (
-                                <div className="space-y-4 bg-white p-3 rounded-xl border border-amber-200">
+                                <div className="space-y-4 bg-white dark:bg-slate-800 p-3 rounded-xl border border-amber-200 dark:border-amber-700">
                                     {/* Memo 編輯 - 使用 RichTextarea */}
                                     <RichTextarea
                                         value={note}
@@ -376,7 +376,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                     <div className="space-y-2">
                                         <Label className="text-[10px] text-slate-400 uppercase">相關連結 / 預約資訊</Label>
                                         {links.map((link, i) => (
-                                            <div key={i} className="space-y-1 p-2 bg-slate-50 rounded border border-slate-100 relative">
+                                            <div key={i} className="space-y-1 p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700 relative">
                                                 <button onClick={() => removeLink(i)} className="absolute top-1 right-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
                                                 <Input className="h-7 text-xs" placeholder="標題 (e.g. 訂位連結)" value={link.name} onChange={e => updateLink(i, 'name', e.target.value)} />
                                                 <Input className="h-7 text-xs" placeholder="註解 (e.g. 記得先付訂金)" value={link.desc} onChange={e => updateLink(i, 'desc', e.target.value)} />
@@ -386,7 +386,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                         <Button size="sm" variant="outline" onClick={addLink} className="w-full h-7 text-xs">+ 新增連結</Button>
                                     </div>
 
-                                    <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                                    <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
                                         <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving}>取消</Button>
                                         <Button size="sm" onClick={handleSave} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white">
                                             {saving ? "儲存中..." : "儲存變更"}
@@ -398,7 +398,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                 <div className="space-y-3">
                                     {/* Memo 顯示 - 使用 RichDisplay */}
                                     <div
-                                        className="text-sm text-slate-600 leading-relaxed bg-yellow-50/50 p-4 rounded-xl border border-dashed border-amber-200 cursor-text hover:bg-yellow-50 transition-colors"
+                                        className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed bg-yellow-50/50 dark:bg-amber-900/20 p-4 rounded-xl border border-dashed border-amber-200 dark:border-amber-700 cursor-text hover:bg-yellow-50 dark:hover:bg-amber-900/30 transition-colors"
                                         onClick={() => setIsEditing(true)}
                                     >
                                         {note ? <RichDisplay text={note} /> : <span className="text-slate-400 italic flex items-center gap-2"><Plus className="w-3 h-3" /> 新增備忘...</span>}
@@ -406,14 +406,14 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
 
                                     {/* Links 顯示 (如果有) */}
                                     {links.length > 0 && (
-                                        <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm bg-white">
+                                        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
                                             <Table>
                                                 <TableBody>
                                                     {links.map((item: SubItem, i: number) => (
-                                                        <TableRow key={i} className="hover:bg-slate-50">
+                                                        <TableRow key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700">
                                                             <TableCell className="py-2 px-3 align-top">
-                                                                <div className="text-xs font-bold text-slate-700">{item.name}</div>
-                                                                {item.desc && <div className="text-[10px] text-slate-500">{item.desc}</div>}
+                                                                <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{item.name}</div>
+                                                                {item.desc && <div className="text-[10px] text-slate-500 dark:text-slate-400">{item.desc}</div>}
                                                             </TableCell>
                                                             <TableCell className="py-2 px-2 text-right align-middle w-10">
                                                                 {item.link && (
@@ -438,13 +438,13 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                 </ScrollArea>
 
                 {/* 底部按鈕 */}
-                <div className="p-4 bg-white border-t border-slate-100 flex gap-3">
+                <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700 flex gap-3">
                     {!hideMapBtn && (
-                        <Button variant="outline" className="flex-1" onClick={onMap}>
+                        <Button variant="outline" className="flex-1 dark:border-slate-600 dark:text-slate-300" onClick={onMap}>
                             <MapPin className="w-4 h-4 mr-2" /> Google Maps
                         </Button>
                     )}
-                    <Button className={cn("flex-1 bg-slate-900 text-white hover:bg-slate-800", hideMapBtn ? "w-full" : "")} onClick={() => onOpenChange(false)}>
+                    <Button className={cn("flex-1 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100", hideMapBtn ? "w-full" : "")} onClick={() => onOpenChange(false)}>
                         Close
                     </Button>
                 </div>
