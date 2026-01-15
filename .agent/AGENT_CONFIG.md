@@ -65,6 +65,7 @@ Before starting ANY coding task:
 - **Backend**: FastAPI + Supabase
 - **PWA**: Full offline support, service worker enabled
 - **Theme**: User-selectable accent colors via ThemeContext
+- **Telemetry**: Centralized Python Service (`backend/scripts/telemetry.py`) with File Locking
 
 ## 🚨 Critical Rules
 

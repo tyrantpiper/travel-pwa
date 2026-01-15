@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { PTRStatus, PTRState, PTR_STATUS_CONFIG, PTRIconName } from "@/types/ptr"
-import { CircularProgress } from "./circular-progress"  // 🆕 P2
+import { CircularProgress } from "./circular-progress"
 
 // 🎨 Icon Mapping
 const ICON_MAP: Record<PTRIconName, React.ComponentType<{ className?: string }>> = {
@@ -43,6 +43,12 @@ interface PullToRefreshProps {
     onRefresh: () => Promise<void>
     className?: string
     pullThreshold?: number
+    /**
+     * Optional: The element that actually scrolls.
+     * If provided, we check THIS element's scrollTop instead of the direct container.
+     * Supports both RefObject (useRef) and HTMLElement (state-based ref).
+     */
+    scrollableRef?: React.RefObject<HTMLElement | null> | HTMLElement | null | undefined
 }
 
 export interface PullToRefreshHandle {
@@ -85,7 +91,7 @@ function calculateDampedTranslation(rawDiff: number): number {
     }
 }
 
-export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold }, ref) => {
+export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold, scrollableRef }, ref) => {
     const haptic = useHaptic()
 
     // 🔑 單一 State Object（避免雙重渲染）
@@ -99,7 +105,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     useImperativeHandle(ref, () => internalContainerRef.current!)
 
     const containerRef = internalContainerRef
-    const contentRef = useRef<HTMLDivElement>(null)  // 🆕 Content ref for will-change control
+    const contentRef = useRef<HTMLDivElement>(null)
     const startY = useRef(0)
     const startX = useRef(0)
     const isPulling = useRef(false)
@@ -107,10 +113,9 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     const ticking = useRef(false)
     const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
-    const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)  // 🆕 閉包陷阱修復
+    const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const willChangeApplied = useRef(false)
 
-    // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
     // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
     useEffect(() => {
         statusRef.current = ptrState.status
@@ -137,15 +142,25 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
         const container = containerRef.current
         if (!container) return
 
+        // Helper to get the actual scroll element
+        const getScrollElement = () => {
+            if (!scrollableRef) return container
+
+            if ('current' in scrollableRef) {
+                return scrollableRef.current as HTMLElement
+            }
+            return scrollableRef as HTMLElement
+        }
+
         const handleNativeTouchStart = (e: TouchEvent) => {
-            // 🛡️ Guard: 不在頂部時不啟用 PTR
-            if (window.scrollY > 0 || container.scrollTop > 0) {
+            const scrollEl = getScrollElement()
+            const isAtTop = scrollEl ? scrollEl.scrollTop <= 5 : window.scrollY <= 0
+
+            if (!isAtTop) {
                 isPulling.current = false
                 return
             }
 
-            // 🛡️ Guard: 正在刷新或顯示結果時不允許新的拖曳
-            // 🔧 使用 statusRef 避免閉包陷阱
             if (statusRef.current === PTRStatus.REFRESHING ||
                 statusRef.current === PTRStatus.SUCCESS ||
                 statusRef.current === PTRStatus.ERROR) {
@@ -158,17 +173,18 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             startX.current = touch.clientX
             isPulling.current = true
 
-            // 🆕 動態啟用 will-change（只在拖動時開啟）
             if (!willChangeApplied.current && contentRef.current) {
                 contentRef.current.style.willChange = 'transform'
-                // 🔧 P1: 下拉階段禁用 transition
                 contentRef.current.style.transition = 'none'
                 willChangeApplied.current = true
             }
         }
 
         const handleNativeTouchMove = (e: TouchEvent) => {
-            if (window.scrollY > 0 || container.scrollTop > 0) {
+            const scrollEl = getScrollElement()
+            const isAtTop = scrollEl ? scrollEl.scrollTop <= 5 : window.scrollY <= 0
+
+            if (!isAtTop) {
                 if (isPulling.current) {
                     isPulling.current = false
                     resetPosition()
@@ -178,8 +194,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
             if (!isPulling.current) return
 
-            // 正在刷新時不處理
-            // 🔧 使用 statusRef 避免閉包陷阱
             if (statusRef.current === PTRStatus.REFRESHING ||
                 statusRef.current === PTRStatus.SUCCESS ||
                 statusRef.current === PTRStatus.ERROR) {
@@ -190,31 +204,23 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             const diffY = touch.clientY - startY.current
             const diffX = Math.abs(touch.clientX - startX.current)
 
-            // 🛡️ Guard: 水平滑動優先
             if (diffX > Math.abs(diffY) * 1.5) {
                 isPulling.current = false
                 resetPosition()
                 return
             }
 
-            // 🛡️ Guard: 只處理下拉
             if (diffY <= 0) {
                 isPulling.current = false
                 resetPosition()
                 return
             }
 
-            // 🔧 FIX: 移除 preventDefault 以啟用 passive: true
-            // e.preventDefault() <-- REMOVED
-
-            // ⚡ RAF 節流
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
-                    // 🔥 關鍵：Math.round 消除亞像素抖動
                     const dampedY = Math.round(calculateDampedTranslation(diffY))
                     const newStatus = calculateStatus(dampedY)
 
-                    // 🔔 Haptic: READY 狀態時震動一次
                     if (newStatus === PTRStatus.READY && prevStatusRef.current !== PTRStatus.READY) {
                         haptic.tap()
                     }
@@ -242,26 +248,22 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             }
             ticking.current = false
 
-            // 🔧 P1: 釋放時啟用回彈 transition
             if (contentRef.current) {
                 contentRef.current.style.transition = 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
             }
 
-            // 觸控結束後延遲移除 will-change（等待回彈動畫完成）
             setTimeout(() => {
                 if (contentRef.current) {
                     contentRef.current.style.willChange = 'auto'
-                    contentRef.current.style.transition = 'none'  // 回彈後復原
+                    contentRef.current.style.transition = 'none'
                 }
                 willChangeApplied.current = false
             }, 300)
 
-            // 🚀 觸發刷新
-            // 🔧 FIX: Use statusRef to avoid stale closure (was ptrState.status) and remove unused pullDistance
             if (statusRef.current === PTRStatus.READY) {
                 setPtrState({
                     status: PTRStatus.REFRESHING,
-                    pullDistance: 80  // 🔧 Fix: Increase to 80 (threshold) to prevent overlap
+                    pullDistance: 80
                 })
                 prevStatusRef.current = PTRStatus.REFRESHING
 
@@ -273,8 +275,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                         )
                     ])
 
-                    // ✅ Success
-                    // 🔧 P0: pullDistance = 0，讓 content 立即回原位
                     setPtrState({
                         status: PTRStatus.SUCCESS,
                         pullDistance: 0
@@ -282,14 +282,11 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     prevStatusRef.current = PTRStatus.SUCCESS
                     haptic.success()
 
-                    // 1.5s 後重置
                     resetTimeoutRef.current = setTimeout(() => {
                         resetPosition()
                     }, 1500)
 
                 } catch (error) {
-                    // ❌ Error
-                    // 🔧 P0: pullDistance = 0，讓 content 立即回原位
                     setPtrState({
                         status: PTRStatus.ERROR,
                         pullDistance: 0
@@ -301,13 +298,11 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     }
                     haptic.error()
 
-                    // 2s 後重置
                     resetTimeoutRef.current = setTimeout(() => {
                         resetPosition()
                     }, 2000)
                 }
             } else {
-                // 未達閾值，直接重置
                 resetPosition()
             }
         }
@@ -327,7 +322,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             container.removeEventListener('touchmove', handleNativeTouchMove)
             container.removeEventListener('touchend', handleNativeTouchEnd)
         }
-    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef])  // 🔧 FIX: All dependencies included
+    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef, scrollableRef])
 
     // 🆕 獨立的 SUCCESS/ERROR 重置 useEffect
     useEffect(() => {
@@ -349,7 +344,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     const config = PTR_STATUS_CONFIG[ptrState.status]
     const Icon = ICON_MAP[config.icon]
     const progress = Math.min(ptrState.pullDistance / pullThreshold, 1)
-    // 🔧 FIX: IDLE 狀態且 pullDistance 為 0 時完全隱藏
     const isVisible = ptrState.status !== PTRStatus.IDLE || ptrState.pullDistance > 0
     const opacity = isVisible ? Math.min(progress * 2, 1) : 0
 
@@ -364,7 +358,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             )}
             style={{
                 WebkitOverflowScrolling: 'touch',
-                // 🆕 GPU 加速基礎
                 transform: 'translateZ(0)',
                 backfaceVisibility: 'hidden'
             }}
@@ -378,19 +371,16 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     "transition-all duration-150"
                 )}
                 style={{
-                    // 🔧 FIX: SUCCESS/ERROR 狀態時隱藏 indicator（已有 toast 提示）
-                    // PULLING/READY 狀態時置中於下拉空間
                     top: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
-                        ? -80  // 隱藏在視窗外
-                        : Math.max(ptrState.pullDistance / 2 - 40, -80), // 🔧 Fix: -40 to center in 80px gap
+                        ? -80
+                        : Math.max(ptrState.pullDistance / 2 - 40, -80),
                     opacity: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
-                        ? 0  // 完全透明
+                        ? 0
                         : opacity
                 }}
             >
-                {/* 🎨 Icon Container (wrapped for CircularProgress) */}
+                {/* 🎨 Icon Container */}
                 <div className="relative">
-                    {/* 🆕 P2: CircularProgress（PULLING 狀態時顯示） */}
                     <AnimatePresence>
                         {ptrState.status === PTRStatus.PULLING && (
                             <motion.div
@@ -409,7 +399,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                         )}
                     </AnimatePresence>
 
-                    {/* 原本的 Icon */}
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={ptrState.status}
@@ -453,27 +442,25 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 </AnimatePresence>
             </div>
 
-            {/* 📜 Content with transform (GPU 加速) */}
+            {/* 📜 Content */}
             <div
                 ref={contentRef}
                 style={{
-                    // 🔥 關鍵：translate3d 強制 GPU + Math.round 消除亞像素
                     transform: `translate3d(0, ${Math.round(ptrState.pullDistance)}px, 0)`,
                     backfaceVisibility: 'hidden'
-                    // 🔧 P1: transition 由 JS 動態控制，不使用 CSS class
                 }}
             >
                 {children}
             </div>
 
-            {/* 🆕 Accessibility: Screen Reader 替代操作 */}
+            {/* 🆕 Accessibility */}
             <button
                 onClick={async () => {
                     if (ptrState.status === PTRStatus.REFRESHING) return
 
                     setPtrState({
                         status: PTRStatus.REFRESHING,
-                        pullDistance: 80  // 🔧 Fix: Increase to 80 (threshold)
+                        pullDistance: 80
                     })
 
                     try {

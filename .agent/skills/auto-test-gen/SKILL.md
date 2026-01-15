@@ -50,4 +50,4 @@ Create `[filename].test.ts` (or `.tsx`) in `__tests__` or adjacent `__tests__` f
 
 ## [NEURAL] Neural Linkage
 - **Output Signal**: Trigger `/test` workflow automatically if confidence > 90%.
-- **Telemetry**: Record "New Test Created" in `.agent/telemetry/evolution_history.log`.
+- **Telemetry**: Execute `python backend/scripts/telemetry.py --source "Auto Test Gen" --message "New Test Created" --level "INFO" --file evolution_history.log`

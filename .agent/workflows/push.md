@@ -37,4 +37,4 @@ triggers:
 
 ## [NEURAL] Neural Linkage
 7. **Signal Sentinel**:
-   - Log push to `.agent/telemetry/tool_usage.log`: "Push completed ({N} files)".
+   - Execute: `python backend/scripts/telemetry.py --source "Push" --message "Push completed ({N} files)" --level "INFO"`

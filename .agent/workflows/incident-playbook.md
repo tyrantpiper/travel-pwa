@@ -63,7 +63,7 @@ triggers:
 
 ## [NEURAL] Neural Linkage
 7. **Signal Sentinel**:
-   - Log incident to `.agent/telemetry/error_events.log`.
+   - Execute: `python backend/scripts/telemetry.py --source "Incident Playbook" --message "Incident logged" --level "ERROR" --file "error_events.log"`
    - **Evolution**: Sentinel will use this to propose stricter guardrails in next Weekly Report.
 
 ## ⚠️ Critical Rules

@@ -134,7 +134,7 @@ Create artifact: `security_report_{date}.md`
 13. **Trigger Response**:
     - If Critical Vulnerabilities > 0: Trigger `/fix` workflow (ask user first).
     - If React Version Outdated: Trigger `/dep-upgrade` workflow.
-    - Log findings to `.agent/telemetry/tool_usage.log`.
+    - Execute: `python backend/scripts/telemetry.py --source "Security Audit" --message "Audit completed. Critical: {CriticalCount}" --level "INFO"`
 
 ---
 

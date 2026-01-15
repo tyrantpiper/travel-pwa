@@ -46,4 +46,4 @@ This workflow chains multiple skills for comprehensive UI work.
 
 ## [NEURAL] Neural Linkage
 11. **Signal Sentinel**:
-    - Log to `.agent/telemetry/tool_usage.log`: "UI Optimize completed".
+    - Execute: `python backend/scripts/telemetry.py --source "UI Optimize" --message "UI Optimize completed" --level "INFO"`

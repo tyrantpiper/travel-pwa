@@ -107,4 +107,4 @@ Create artifact: `code_review_{date}.md`
 
 ## [NEURAL] Neural Linkage
 8. **Signal Sentinel**:
-   - Log review to `.agent/telemetry/tool_usage.log`: "AI Review completed ({N} issues found)".
+   - Execute: `python backend/scripts/telemetry.py --source "AI Review" --message "Review completed ({N} issues found)" --level "INFO"`

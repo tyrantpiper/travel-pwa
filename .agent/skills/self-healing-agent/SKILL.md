@@ -45,8 +45,8 @@ User provides command to heal (e.g., "fix npm run build").
 - **STOP**: Notify user "Self-healing failed".
 
 ## [NEURAL] Neural Linkage
-- **On Fault**: Log error pattern to `.agent/telemetry/error_events.log`.
-- **On Success**: Log recovery to `.agent/telemetry/tool_usage.log`.
+- **On Fault**: Execute `python backend/scripts/telemetry.py --source "Self Healing" --message "Fault detected" --level "ERROR" --file error_events.log`
+- **On Success**: Execute `python backend/scripts/telemetry.py --source "Self Healing" --message "Recovery successful" --level "INFO"`
 
 ## 📦 Output
 - Artifact `fix_report.md` detailing error, fix applied, and verification result.

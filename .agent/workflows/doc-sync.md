@@ -61,4 +61,4 @@ Present report to user:
 
 ## [NEURAL] Neural Linkage
 6. **Signal Sentinel**:
-   - Log sync to `.agent/telemetry/tool_usage.log`: "Doc Sync completed ({N} discrepancies)".
+   - Execute: `python backend/scripts/telemetry.py --source "Doc Sync" --message "Doc Sync completed ({N} discrepancies)" --level "INFO"`

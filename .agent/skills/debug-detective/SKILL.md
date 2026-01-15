@@ -72,3 +72,7 @@ Return a JSON-like report in Markdown:
 - **Read-Only**: This skill DOES NOT modify code.
 - **Fresh Context**: Always re-read files; do not assume previous context is valid.
 - **Security First**: If `SECURITY` type, flag for human review (Confidence max 0.8).
+
+## [NEURAL] Neural Linkage
+7. **Signal Sentinel**:
+   - Log to `.agent/telemetry/tool_usage.log`: "Debug Detective (Analyzed: {root_cause.type}, Confidence: {confidence_score})".

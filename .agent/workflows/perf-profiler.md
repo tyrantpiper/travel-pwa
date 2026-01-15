@@ -62,7 +62,7 @@ If previous report exists:
 ## [NEURAL] Neural Linkage
 8. **Trigger Optimization**:
    - If Performance < 70: Suggest triggering `/ui-optimize` workflow.
-   - Log score to `.agent/telemetry/tool_usage.log` for trend analysis.
+   - Execute: `python backend/scripts/telemetry.py --source "Perf Profiler" --message "Perf score: {Score}" --level "INFO"`
 
 ## Thresholds
 | Metric | Good | Needs Work | Poor |

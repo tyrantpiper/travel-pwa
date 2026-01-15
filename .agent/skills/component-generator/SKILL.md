@@ -64,4 +64,4 @@ Run `npx tsc --noEmit` to verify TypeScript
 
 ## [NEURAL] Neural Linkage
 6. **Signal Sentinel**:
-   - Log to `.agent/telemetry/tool_usage.log`: "Component generated: {componentName}".
+   - Execute: `python backend/scripts/telemetry.py --source "Component Generator" --message "Component generated: {componentName}" --level "INFO"`

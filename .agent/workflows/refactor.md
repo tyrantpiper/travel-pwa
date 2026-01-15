@@ -60,7 +60,7 @@ triggers:
 ## [NEURAL] Neural Linkage
 10. **Chain Reaction**: Trigger `/test` workflow to run full regression check.
 11. **Signal Sentinel**:
-    - Log event to `.agent/telemetry/tool_usage.log`: "Refactor completed".
+    - Execute: `python backend/scripts/telemetry.py --source "Refactor" --message "Refactor completed" --level "INFO"`
 
 ## ⚠️ Critical Rules
 - **ALWAYS** dry-run first.

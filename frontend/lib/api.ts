@@ -5,6 +5,8 @@
 
 const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
+import { SyncQueue } from './sync-engine';
+
 // === API Endpoints ===
 export const API = {
     TRIPS: `${API_HOST}/api/trips`,
@@ -80,6 +82,8 @@ export interface GeocodeSearchParams {
     region?: string     // 🆕 區域過濾 (如 "Tokyo 東京")
     zoom?: number       // 🆕 P1: 地圖縮放層級 (用於動態 bias)
 }
+
+// 🆕 Export Sync Engine Params
 
 // === API Functions ===
 
@@ -248,6 +252,26 @@ export const tripsApi = {
 }
 
 /**
+ * 🛠️ Offline-Aware Fetch Wrapper
+ */
+async function offlineFetch(url: string, options: RequestInit) {
+    if (typeof window !== 'undefined' && !navigator.onLine && options.method && options.method !== 'GET') {
+        console.warn(`[API] 🔌 Offline: Queuing ${options.method} ${url}`);
+        await SyncQueue.enqueue({
+            url,
+            method: (options.method as 'POST' | 'PUT' | 'PATCH' | 'DELETE'),
+            body: options.body ? JSON.parse(options.body as string) : {}, // Restore object for storage
+            headers: options.headers as Record<string, string>
+        });
+        return {
+            ok: true,
+            json: async () => ({ status: 'queued', offline: true })
+        };
+    }
+    return fetch(url, options);
+}
+
+/**
  * Item (Activity) API Functions
  */
 export const itemsApi = {
@@ -266,7 +290,7 @@ export const itemsApi = {
             image_url: params.image_url,  // 🆕 修復：圖片 URL
             tags: params.tags             // 🆕 修復：標籤陣列
         }
-        const res = await fetch(API.ITEMS, {
+        const res = await offlineFetch(API.ITEMS, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(backendPayload)
@@ -277,7 +301,7 @@ export const itemsApi = {
 
     /** Update an existing item */
     update: async (itemId: string, params: UpdateItemParams) => {
-        const res = await fetch(`${API.ITEMS}/${itemId}`, {
+        const res = await offlineFetch(`${API.ITEMS}/${itemId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(params)
@@ -288,7 +312,7 @@ export const itemsApi = {
 
     /** Delete an item */
     delete: async (itemId: string) => {
-        const res = await fetch(`${API.ITEMS}/${itemId}`, { method: "DELETE" })
+        const res = await offlineFetch(`${API.ITEMS}/${itemId}`, { method: "DELETE" })
         if (!res.ok) throw new Error("Failed to delete item")
         return res.json()
     },
@@ -297,10 +321,18 @@ export const itemsApi = {
 /**
  * Geocode API Functions
  */
+
+
+// ... geocodeApi remains using fetch ...
 export const geocodeApi = {
+    // ...
+
     /** Search for locations with smart translation */
     search: async (params: GeocodeSearchParams & { signal?: AbortSignal }) => {
         const { signal, ...searchParams } = params  // 🆕 P5: 分離 signal
+
+        // ... (rest of search logic) ... 
+        // Geocode is read-only, so we keep using fetch directly, or use offlineFetch if we want to cache queries (Phase 8)
 
         const geminiKey = typeof window !== 'undefined'
             ? localStorage.getItem("user_gemini_key")
@@ -319,7 +351,7 @@ export const geocodeApi = {
             method: "POST",
             headers,
             body: JSON.stringify(searchParams),
-            signal  // 🆕 P5: 傳遞 AbortSignal
+            signal
         })
         if (!res.ok) throw new Error("Search failed")
         return res.json()

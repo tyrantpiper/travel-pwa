@@ -97,5 +97,5 @@ parameters:
 
 ## [NEURAL] Neural Linkage
 7. **Signal Sentinel**:
-   - Log to `.agent/telemetry/evolution_history.log`: "New Skill created: {skillName}".
+   - Execute: `python backend/scripts/telemetry.py --source "Skill Creator" --message "New Skill created: {skillName}" --level "INFO" --file evolution_history.log`
    - Scan `AGENT_CONFIG.md` and propose registration if missing.

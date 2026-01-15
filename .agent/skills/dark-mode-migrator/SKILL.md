@@ -123,4 +123,4 @@ Run `npx tsc --noEmit` to ensure no type errors
 
 ## [NEURAL] Neural Linkage
 6. **Signal Sentinel**:
-   - Log to `.agent/telemetry/tool_usage.log`: "Dark Mode migration: {ComponentName}".
+   - Execute: `python backend/scripts/telemetry.py --source "Dark Mode Migrator" --message "Dark Mode migration: {ComponentName}" --level "INFO"`

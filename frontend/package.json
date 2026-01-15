@@ -39,6 +39,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
     "html2canvas-pro": "^1.6.3",
+    "idb-keyval": "^6.2.2",
     "jspdf": "^4.0.0",
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",

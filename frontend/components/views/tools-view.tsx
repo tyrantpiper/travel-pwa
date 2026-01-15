@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, ComponentType } from "react"
+import { useState, useEffect, useMemo, ComponentType, useRef } from "react"
 import { motion } from "framer-motion"
 import { useSWRConfig } from "swr"
 import {
@@ -148,6 +148,7 @@ export function ToolsView() {
     const { mutate } = useSWRConfig()
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
     const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
+    const scrollRef = useRef<HTMLDivElement>(null)
     const [rate, setRate] = useState(0.22)
 
     // 🆕 Currency State (Input Dialog) - Isolated
@@ -875,7 +876,7 @@ export function ToolsView() {
 
     return (
         // 🔧 Phase 14: View manages its own scrolling
-        <div className="h-full overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
             <div className="min-h-screen bg-stone-50 pb-32">
                 <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                     <div className="space-y-3">
@@ -892,7 +893,7 @@ export function ToolsView() {
                     setRate(r)
                     await Promise.all([fetchExpenses(), tripMutate()])
                     toast.success("資料已更新")
-                }} className="flex-1 px-4 -mt-4">
+                }} className="flex-1 px-4 -mt-4" scrollableRef={scrollRef}>
                     <Tabs value={activeSection} onValueChange={setActiveSection}>
                         {/* Custom Sliding Tab Strip */}
                         <div className="grid grid-cols-3 bg-white dark:bg-slate-800 shadow-md rounded-xl p-1 mb-4">

@@ -67,8 +67,7 @@ Rate your confidence in the fix:
 
 ## Step 6: Neural Linkage
 9. **Signal Sentinel**:
-    - Log completion to `.agent/telemetry/tool_usage.log`
-    - Format: `{timestamp}, fix, {TYPE}, {SEVERITY}, {CONFIDENCE}, {success?}`
+    - Execute: `python backend/scripts/telemetry.py --source "Fix" --message "Fix completed: {TYPE}, {SEVERITY}, {CONFIDENCE}" --level "INFO"`
 
 10. **Suggest (not auto-trigger)**:
     - If LOGIC/SECURITY: "建議執行 `regression-guardian` 檢查"

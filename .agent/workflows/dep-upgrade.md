@@ -129,4 +129,4 @@ npm ci
 9. **Chain Reaction**:
    - If upgrades successful: Trigger `/test` (Regression Check).
    - If security patches applied: Trigger `/security-audit` (Verification).
-   - Log to `.agent/telemetry/tool_usage.log`: "Upgrade Batch Completed".
+   - Execute: `python backend/scripts/telemetry.py --source "Dep Upgrade" --message "Upgrade Batch Completed" --level "INFO"`

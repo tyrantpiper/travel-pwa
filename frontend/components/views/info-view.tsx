@@ -87,6 +87,7 @@ export function InfoView() {
     // 🔧 使用 ref 來追蹤當前索引，解決異步回調的閉包問題
     const currentHotelIdxRef = useRef<number | null>(null)
     currentHotelIdxRef.current = currentHotelIdx
+    const scrollRef = useRef<HTMLDivElement>(null)
 
     // 🏨 飯店地點搜尋狀態
     const [hotelSearchQuery, setHotelSearchQuery] = useState("")
@@ -257,7 +258,7 @@ export function InfoView() {
 
     return (
         // 🔧 Phase 14: View manages its own scrolling
-        <div className="h-full overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
             <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
                 <header className="mb-6 space-y-3">
                     <div>
@@ -276,7 +277,7 @@ export function InfoView() {
                     </Button>
                 </header>
 
-                <PullToRefresh onRefresh={refreshInfo} className="flex-1">
+                <PullToRefresh onRefresh={refreshInfo} className="flex-1" scrollableRef={scrollRef}>
                     <div className="space-y-8">
                         {!activeTripId ? (
                             <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">

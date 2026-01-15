@@ -41,5 +41,5 @@ description: Hybrid Agentic-E2E Logic Verification
    - Database Integrity Check Status
 
 ## [NEURAL] Neural Linkage
-8. **Signal Sentinel**:
-   - Log audit to `.agent/telemetry/tool_usage.log`: "Logic Audit completed (Status: {PASS/FAIL})".
+4. **Signal Sentinel**:
+   - Execute: `python backend/scripts/telemetry.py --source "Logic Audit" --message "Audit completed (Status: {PASS/FAIL})" --level "INFO"`

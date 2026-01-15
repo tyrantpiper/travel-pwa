@@ -52,4 +52,4 @@ For a comprehensive check including frontend:
 
 ## [NEURAL] Neural Linkage
 4. **Signal Sentinel**:
-   - Log to `.agent/telemetry/tool_usage.log`: "Regression Guardian (PASS/FAIL)".
+   - Execute: `python backend/scripts/telemetry.py --source "Regression Guardian" --message "Check Status: {PASS/FAIL}" --level "INFO"`

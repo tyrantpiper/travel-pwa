@@ -40,6 +40,7 @@ import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklis
 import EditableDailyAIReview from "@/components/itinerary/EditableDailyAIReview"
 import { TripMembersSheet } from "@/components/itinerary/TripMembersSheet"
 import { tripsApi, itemsApi, geocodeApi } from "@/lib/api"
+import { useDynamicPolling } from "@/lib/polling-manager" // 🆕 Phase 7.3
 import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
@@ -72,8 +73,11 @@ export function ItineraryView() {
     const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading } = useTripContext()
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
+    // 🆕 Hyper-Heuristics: Dynamic Polling Interval
+    const refreshInterval = useDynamicPolling()
+
     // Use activeTripId from context, pass userId for privacy filtering
-    const { trip: currentTrip, mutate: reloadTripDetail, isValidating } = useTripDetail(activeTripId, userId) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void>, isValidating: boolean }
+    const { trip: currentTrip, mutate: reloadTripDetail, isValidating } = useTripDetail(activeTripId, userId, refreshInterval) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void>, isValidating: boolean }
     const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -1418,7 +1422,7 @@ export function ItineraryView() {
 
     return (
         // 🔧 Phase 14: View manages its own scrolling
-        <div className="h-full overflow-y-auto overscroll-contain">
+        <div ref={(el) => setScrollParent(el || undefined)} className="h-full overflow-y-auto overscroll-contain">
             <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32 overflow-x-hidden">
                 <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="px-6 flex justify-between items-end mb-4">
@@ -1504,13 +1508,7 @@ export function ItineraryView() {
                 </div>
 
                 <PullToRefresh
-                    ref={(el) => {
-                        // 🔧 Fix: Ensure Virtuoso gets the scroll parent
-                        // Use callback ref to set state, triggering re-render for Virtuoso
-                        if (el && el !== scrollParent) {
-                            setScrollParent(el)
-                        }
-                    }}
+                    scrollableRef={scrollParent}
                     onRefresh={async () => { await reloadTripDetail() }}
                     className="flex-1"
                 >

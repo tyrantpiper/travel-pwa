@@ -46,11 +46,7 @@ A recursive capability that allows the agent to inspect, critique, and improve i
 1. Output a diff or summary of what was improved.
 2. Ask user to verify the new logic.
 3. **[NEURAL] Signal Transmission**:
-   - Append log entry to `.agent/telemetry/evolution_history.log`:
-     ```text
-     - [{YYYY-MM-DD}] Refined `{targetSkill}`: {Summary of changes} (User Approved)
-     - [{YYYY-MM-DD}] Refined `{targetSkill}`: {Summary of changes} (User Approved)
-     ```
+   - Execute: `python backend/scripts/telemetry.py --source "Skill Refiner" --message "Refined {targetSkill}: {Summary}" --level "INFO" --file evolution_history.log`
 4. **[NEURAL] Dynamic Discovery**:
     - Scan `.agent/AGENT_CONFIG.md`.
     - IF `{targetSkill}` is missing from "Skill Auto-Activation" table:

@@ -112,4 +112,4 @@ This skill should be chained with:
 
 ## [NEURAL] Neural Linkage
 6. **Signal Sentinel**:
-   - Log to `.agent/telemetry/tool_usage.log`: "PWA Audit completed (Score: {X}%)".
+   - Execute: `python backend/scripts/telemetry.py --source "PWA Auditor" --message "Audit completed (Score: {X}%)" --level "INFO"`

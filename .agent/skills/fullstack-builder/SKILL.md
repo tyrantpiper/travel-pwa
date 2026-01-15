@@ -73,7 +73,7 @@ Analyze the user request to determine the execution path.
 1. **Trigger**: `/doc-sync`
    - Msg: "Updating documentation for new feature: {FeatureName}"
 2. **Telemetry**:
-   - Log success to `.agent/telemetry/tool_usage.log`.
+   - Execute: `python backend/scripts/telemetry.py --source "Fullstack Builder" --message "Feature Built: {FeatureName}" --level "INFO"`
 
 ## Progress Tracking
 ```

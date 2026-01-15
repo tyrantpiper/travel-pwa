@@ -21,7 +21,7 @@ export function useTrips(userId: string | null) {
     }
 }
 
-export function useTripDetail(tripId: string | null, userId?: string | null) {
+export function useTripDetail(tripId: string | null, userId?: string | null, refreshInterval: number = 0) {
     // 🔧 FIX: Include userId in cache key to ensure refetch when userId changes
     // And only make the request when we have a valid userId to prevent unauthenticated fetches
     const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
@@ -34,7 +34,9 @@ export function useTripDetail(tripId: string | null, userId?: string | null) {
             }).then(r => r.json()),
         {
             revalidateOnFocus: false,
-            revalidateOnMount: true
+            revalidateOnMount: true,
+            refreshInterval, // 🆕 Hyper-Heuristics Injection
+            dedupingInterval: 2000 // Prevent spam
         }
     )
 

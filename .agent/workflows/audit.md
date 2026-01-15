@@ -110,4 +110,4 @@ triggers:
 
 ## [NEURAL] Neural Linkage
 18. **Signal Sentinel**:
-    - Log audit to `.agent/telemetry/tool_usage.log`: "Audit completed (Score: {X}%)".
+    - Execute: `python backend/scripts/telemetry.py --source "Audit" --message "Audit completed (Score: {X}%)" --level "INFO"`
