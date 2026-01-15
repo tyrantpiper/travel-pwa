@@ -3,6 +3,7 @@
 import { Trip, Activity } from '@/lib/itinerary-types'
 import { useState } from 'react'
 import { Calendar, MapPin, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import Image from 'next/image'
 
 interface PublicTripViewProps {
     trip: Trip
@@ -30,11 +31,13 @@ export default function PublicTripView({ trip }: PublicTripViewProps) {
             <header className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
                 <div className="max-w-4xl mx-auto px-4 py-6">
                     {trip.cover_image && (
-                        <div className="mb-4 rounded-xl overflow-hidden h-48">
-                            <img
+                        <div className="mb-4 rounded-xl overflow-hidden h-48 relative">
+                            <Image
                                 src={trip.cover_image}
                                 alt={trip.title}
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
+                                unoptimized
                             />
                         </div>
                     )}
@@ -112,6 +115,7 @@ export default function PublicTripView({ trip }: PublicTripViewProps) {
                                                                 href={`https://www.google.com/maps?q=${activity.lat},${activity.lng}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
+                                                                referrerPolicy="no-referrer"
                                                                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 mt-1 hover:underline"
                                                             >
                                                                 <MapPin className="w-3 h-3" />

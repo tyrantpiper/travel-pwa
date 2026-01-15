@@ -10,6 +10,7 @@ Handles all trip-related API endpoints including:
 Note: This is a large router containing 17 endpoints.
 """
 
+import re
 import traceback
 from datetime import datetime, timedelta
 from typing import Optional
@@ -52,9 +53,7 @@ async def get_public_trip_by_share_code(
     
     Rate Limit: 10 requests/minute per IP (防暴力枚舉)
     """
-    # 🛡️ 簡易 Rate Limit Check (無需 slowapi, 用 Supabase 記錄)
-    # 生產環境建議用 Redis 或 slowapi + Redis backend
-    import re
+    # 🛡️ Input Validation (防暴力枚舉)
     if not re.match(r'^[A-Za-z0-9]{4,8}$', share_code):
         raise HTTPException(status_code=400, detail="Invalid share code format")
     try:
@@ -112,8 +111,9 @@ async def get_public_trip_by_share_code(
     except HTTPException:
         raise
     except Exception as e:
+        # 🛡️ 安全日誌：內部記錄細節，但不暴露給客戶端
         print(f"🔥 Public Share Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Unable to retrieve trip data")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
