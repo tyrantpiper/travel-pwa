@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from 'react';
-import { SyncQueue, MAX_RETRIES } from './sync-engine';
+import { SyncQueue, MAX_RETRIES, SyncRequest } from './sync-engine';
 import { toast } from "sonner";
 
 /**
@@ -16,7 +16,7 @@ export function useOfflineMutation() {
             // Offline Mode: Queue it
             await SyncQueue.enqueue({
                 url,
-                method: (options.method as any) || 'POST',
+                method: (options.method as SyncRequest['method']) || 'POST',
                 body: options.body ? JSON.parse(options.body as string) : {},
                 headers: options.headers as Record<string, string>
             });
