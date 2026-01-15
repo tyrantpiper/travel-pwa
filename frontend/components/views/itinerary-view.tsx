@@ -831,18 +831,44 @@ export function ItineraryView() {
 
         try {
             const displayName = loc.admin2 || loc.admin1 ? `${loc.name}, ${loc.admin2 || loc.admin1}` : loc.name
-            await fetch(`${API_BASE}/api/trips/${currentTrip.id}/location`, {
-                method: "PATCH", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ day: day, name: displayName, lat: loc.lat, lng: loc.lng })
+
+            // 🆕 Optimistic Update Pattern (SWR Safe)
+            // 1. Update local state immediately for UI response
+            setDailyLocs(prev => ({ ...prev, [day]: { name: displayName, lat: loc.lat, lng: loc.lng } }))
+
+            // 2. Optimistic update SWR cache to prevent "flash" reversion
+            // Construct the optimistic trip object
+            const optimisticTrip = {
+                ...currentTrip,
+                daily_locations: {
+                    ...(currentTrip.daily_locations || {}),
+                    [day]: { name: displayName, lat: loc.lat, lng: loc.lng }
+                }
+            }
+            // Update cache immediately, do NOT revalidate yet
+            reloadTripDetail(optimisticTrip, false)
+
+            // 3. API Call
+            await tripsApi.updateLocation(currentTrip.id, {
+                day: day,
+                name: displayName,
+                lat: loc.lat,
+                lng: loc.lng
             })
 
-            setDailyLocs({ ...dailyLocs, [day]: { name: displayName, lat: loc.lat, lng: loc.lng } })
             setIsLocEditOpen(false)
             setNewLocName("")
             setLocSearchResults([])
+
+            // 4. Final Revalidation (background)
             reloadTripDetail()
-        } catch {
+            toast.success("地點已更新")
+
+        } catch (e) {
+            console.error(e)
             toast.error("更新失敗")
+            // Rollback on error (optional, usually revalidating is enough)
+            reloadTripDetail()
         } finally {
             setIsSelectingLocation(false)
         }
@@ -1539,7 +1565,7 @@ export function ItineraryView() {
                                     </button>
                                 </DialogTrigger>
                                 {/* 當地時間顯示 */}
-                                <div className="flex items-center gap-1.5 bg-white/80 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                                <div className="flex items-center gap-1.5 bg-white/80 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
                                     <Clock className="w-3.5 h-3.5 text-amber-500" />
                                     <span className="text-xs font-mono font-medium text-slate-700 dark:text-slate-300">
                                         {getNowInZone(currentTimezone)}
@@ -1784,7 +1810,7 @@ export function ItineraryView() {
 
                         <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
                             {weatherData.length > 0 ? weatherData.map((w, i) => (
-                                <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm shrink-0">
+                                <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm shrink-0">
                                     <span className="text-xs text-slate-400 font-mono">{w.time}</span>
                                     {w.code <= 3 ? <Sun className="w-6 h-6 text-amber-400" /> : <CloudRain className="w-6 h-6 text-blue-400" />}
                                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200 tabular-nums">{w.temp}°</span>
@@ -1792,7 +1818,7 @@ export function ItineraryView() {
                             )) : (
                                 // 💀 Skeleton Loading: Prevent Layout Shift & "Distorted" feel
                                 Array.from({ length: 24 }).map((_, i) => (
-                                    <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm shrink-0 animate-pulse">
+                                    <div key={i} className="flex flex-col items-center min-w-[4rem] gap-2 p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 animate-pulse">
                                         <div className="w-8 h-3 bg-slate-200 dark:bg-slate-700 rounded"></div>
                                         <div className="w-6 h-6 bg-slate-200 rounded-full"></div>
                                         <div className="w-6 h-4 bg-slate-200 rounded"></div>

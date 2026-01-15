@@ -161,7 +161,10 @@ export function InfoView() {
             toast.success("Done")
             setIsEditing(false)
             tripMutate() // 🔄 Refresh global context
-        } catch { toast.error("Save failed") }
+        } catch (e) {
+            console.error("Save failed:", e)
+            toast.error("Save failed. Please check your connection.")
+        }
     }
 
     const updateHotel = (index: number, field: string, value: string | number | null | undefined | { title: string; url: string }[]) => {
@@ -276,7 +279,7 @@ export function InfoView() {
                 <PullToRefresh onRefresh={refreshInfo} className="flex-1">
                     <div className="space-y-8">
                         {!activeTripId ? (
-                            <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+                            <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
                                 <Info className="w-12 h-12 mx-auto mb-4 opacity-20" />
                                 <p>No trip selected</p>
                                 <p className="text-sm">Please select or create a trip to view details.</p>
@@ -293,7 +296,7 @@ export function InfoView() {
                                     </h2>
                                     {/* Flight Tabs with Sliding Indicator */}
                                     <div className="w-full">
-                                        <div className="grid grid-cols-2 mb-4 bg-stone-200/50 p-1 rounded-xl relative">
+                                        <div className="grid grid-cols-2 mb-4 bg-stone-200/50 dark:bg-slate-700/50 p-1 rounded-xl relative">
                                             {(['outbound', 'inbound'] as const).map((tab) => (
                                                 <button
                                                     key={tab}
@@ -381,7 +384,7 @@ export function InfoView() {
                                                             <div className="space-y-3">
                                                                 <div className="space-y-1">
                                                                     <Label className="text-[10px] text-slate-400 uppercase">Hotel Name</Label>
-                                                                    <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
+                                                                    <Input disabled={!isEditing} value={item.name} onChange={e => updateHotel(idx, 'name', e.target.value)} className={isEditing ? "bg-white dark:bg-slate-800 h-9" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-800 dark:text-slate-100 shadow-none focus-visible:ring-0"} placeholder="Hotel name..." />
                                                                 </div>
                                                                 {/* Place Search - 全寬顯示 */}
                                                                 <div className="space-y-2">
@@ -437,7 +440,7 @@ export function InfoView() {
                                                                             </div>
                                                                             {/* 搜尋結果 */}
                                                                             {searchingHotelIdx === idx && hotelSearchResults.length > 0 && (
-                                                                                <div className="bg-slate-50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto border border-slate-200">
+                                                                                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-700">
                                                                                     {hotelSearchResults.map((place, pIdx) => (
                                                                                         <button
                                                                                             key={pIdx}
@@ -495,7 +498,7 @@ export function InfoView() {
                                                                     )}
                                                                 </div>
 
-                                                                <div className="pt-2 border-t border-slate-100 mt-2 flex gap-2">
+                                                                <div className="pt-2 border-t border-slate-200 mt-2 flex gap-2">
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="sm"
@@ -540,13 +543,13 @@ export function InfoView() {
                     <DialogContent className="sm:max-w-md h-[85vh] flex flex-col p-0 gap-0">
                         {currentHotelIdx !== null && hotels[currentHotelIdx] && (
                             <>
-                                <div className="p-6 bg-slate-50 border-b border-slate-200">
+                                <div className="p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                                     <DialogHeader>
-                                        <DialogTitle className="text-xl font-bold text-slate-900 line-clamp-1">{hotels[currentHotelIdx].name || "Untitled Hotel"}</DialogTitle>
+                                        <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{hotels[currentHotelIdx].name || "Untitled Hotel"}</DialogTitle>
                                     </DialogHeader>
 
                                     <div className="grid grid-cols-2 gap-3 mt-4">
-                                        <div className="bg-white p-2 rounded border border-slate-200">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                                             <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Clock className="w-3 h-3" /> Check-In / Out</span>
                                             <div className="flex gap-2 mt-1 items-center">
                                                 <Input
@@ -562,7 +565,7 @@ export function InfoView() {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="bg-white p-2 rounded border border-slate-200">
+                                        <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                                             <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Phone className="w-3 h-3" /> Tel</span>
                                             <Input
                                                 className="h-6 text-xs mt-1 px-1 border-0 border-b rounded-none focus-visible:ring-0 font-mono"
@@ -641,7 +644,7 @@ export function InfoView() {
 
                                             <div className="space-y-2">
                                                 {hotels[currentHotelIdx].links?.map((link: { title: string; url: string }, i: number) => (
-                                                    <div key={i} className="flex gap-2 items-center bg-white p-2 rounded border border-slate-100">
+                                                    <div key={i} className="flex gap-2 items-center bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                                                         <Input className="h-7 text-xs w-1/3 border-0 bg-slate-50" placeholder="Title" value={link.title} onChange={e => updateLink(currentHotelIdx, i, 'title', e.target.value)} />
                                                         <Input className="h-7 text-xs flex-1 font-mono text-slate-500 border-0" placeholder="https://..." value={link.url} onChange={e => updateLink(currentHotelIdx, i, 'url', e.target.value)} />
                                                         {link.url && <a href={link.url} target="_blank" rel="noreferrer" className="text-blue-500 hover:bg-blue-50 p-1.5 rounded-full"><ExternalLink className="w-3 h-3" /></a>}
@@ -653,7 +656,7 @@ export function InfoView() {
                                     </div>
                                 </ScrollArea>
 
-                                <div className="p-4 border-t border-slate-100 bg-white">
+                                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                                     <Button className="w-full bg-slate-900 text-white hover:bg-slate-800" onClick={() => { setDetailOpen(false); handleSave(); }}>
                                         {t('save_and_close')}
                                     </Button>
@@ -722,7 +725,7 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden relative">
             {/* 清除按鈕 */}
             {isEditing && onClear && (
                 <button
@@ -734,9 +737,9 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
                 </button>
             )}
 
-            <div className="p-5 bg-gradient-to-br from-slate-50 to-white">
+            <div className="p-5 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
                 {/* 日期區塊 - 出發/到達雙日期（支援跨天）*/}
-                <div className="mb-4 pb-3 border-b border-slate-100">
+                <div className="mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="text-center">
                             <Label className="text-[10px] text-slate-400 uppercase block mb-1">Departure</Label>

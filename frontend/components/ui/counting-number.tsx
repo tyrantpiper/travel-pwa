@@ -10,7 +10,7 @@ interface CountingNumberProps {
     duration?: number
 }
 
-export function CountingNumber({ value, prefix = "", className = "", duration: _duration = 0.5 }: CountingNumberProps) {
+export function CountingNumber({ value, prefix = "", className = "" }: CountingNumberProps) {
     const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 })
     const display = useTransform(spring, (current) => {
         // Smart formatting logic mirroring the chart

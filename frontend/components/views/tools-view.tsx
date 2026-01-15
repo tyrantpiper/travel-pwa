@@ -1008,7 +1008,7 @@ export function ToolsView() {
                             </div>
 
                             {/* Owner Filter */}
-                            <div className="flex gap-1 bg-white p-1 rounded-lg shadow-sm">
+                            <div className="flex gap-1 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm">
                                 {(['all', 'public', 'private'] as const).map(filter => (
                                     <button
                                         key={filter}
@@ -1027,7 +1027,7 @@ export function ToolsView() {
 
                             {/* Daily Mode: Date Navigation */}
                             {expenseView === 'daily' && (
-                                <div className="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm">
+                                <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-3 rounded-xl shadow-sm">
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigateDate('prev')} disabled={allDates.indexOf(selectedDate) === 0}>
                                         <ChevronLeft className="w-4 h-4" />
                                     </Button>
@@ -1543,7 +1543,7 @@ function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
     const finalTWD = Math.round(item.amount * usedRate - cashback)
 
     return (
-        <div className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 shadow-sm group active:scale-[0.98] transition-transform">
+        <div className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-200 shadow-sm group active:scale-[0.98] transition-transform">
             <div className="flex items-center gap-3 overflow-hidden">
                 <div className={cn("p-2 rounded-full shrink-0", catInfo.color)}><CatIcon className="w-4 h-4" /></div>
                 <div className="min-w-0">

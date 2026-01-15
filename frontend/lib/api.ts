@@ -156,7 +156,7 @@ export const tripsApi = {
     /** Update daily location */
     updateLocation: async (tripId: string, location: { day: number; name: string; lat: number; lng: number }) => {
         const res = await fetch(`${API.TRIPS}/${tripId}/location`, {
-            method: "PUT",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(location)
         })

@@ -593,7 +593,7 @@ export function ProfileView() {
                                             </p>
 
                                             {/* 手機收款資訊 */}
-                                            <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
+                                            <div className="text-left bg-slate-50 p-3 rounded-lg border border-slate-200 mb-3">
                                                 <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                                                     <Smartphone className="w-3.5 h-3.5 text-slate-500" />
                                                     手機收款 <span className="text-slate-400 font-normal">(代碼 812)</span>
@@ -756,7 +756,7 @@ export function ProfileView() {
                                             />
                                         </div>
 
-                                        <Accordion type="single" collapsible className="w-full bg-slate-50 rounded-lg px-4 border border-slate-100">
+                                        <Accordion type="single" collapsible className="w-full bg-slate-50 rounded-lg px-4 border border-slate-200">
                                             <AccordionItem value="item-1" className="border-b-0">
                                                 <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-3">
                                                     🤔 如何免費獲取 API Key？

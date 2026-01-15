@@ -57,6 +57,7 @@ function rerankResults(
             return { ...r, reScore }
         })
         .sort((a, b) => (b.reScore ?? 0) - (a.reScore ?? 0))
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         .map(({ reScore: _reScore, ...r }) => r)  // 移除 reScore 欄位
 }
 

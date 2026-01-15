@@ -181,6 +181,7 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
 
         fetchRoute()
         // Note: Only use markersKey (stable string) as dependency, NOT markers array (recreated every render)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [markersKey, mode, optimize])
 
     return { route, routeInfo, loading }
