@@ -26,6 +26,12 @@ A recursive capability that allows the agent to inspect, critique, and improve i
    - **Progressive Disclosure**: Is complex info hidden in `references/`?
    - **Robustness**: Are there error handling or fallback instructions?
    - **Context Efficiency**: Is valid context being loaded?
+   - **Constitutional Alignment**: Does the skill violate `.agent/CONSTITUTION.md`? (e.g., deleting data, skipping checks)
+
+### Step 1.5: Safety Guard (L0)
+- **Constraint**: If an optimization involves removing a verification step:
+  - Check against `Safety First` principle.
+  - If unsafe, **DISCARD** the optimization.
 
 ### Step 2: Critique & Plan
 1. Identification specific weaknesses (e.g., "Step 3 is too vague", "Missing examples").

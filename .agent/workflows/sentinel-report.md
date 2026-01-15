@@ -11,10 +11,14 @@ triggers:
 
 > **Role**: The Meta-Observer.
 > **Metric**: Evidence-Based Evolution.
+> **Constraint**: Must adhere to `.agent/CONSTITUTION.md`.
 
 ---
 
-## Step 1: Telemetry Ingestion
+## Step 0: Constitutional Alignment
+1. **Read**: `.agent/CONSTITUTION.md`
+2. **Verify**: Ensure all optimization proposals align with "Safety First".
+3. **Drift Check**: If any proposal suggests lower security for higher speed -> **AUTO-REJECT**.
 1. Read `.agent/telemetry/tool_usage.log` (if exists)
 2. Read `.agent/telemetry/error_events.log` (if exists)
 3. Analyze for patterns:

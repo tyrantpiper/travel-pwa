@@ -3,6 +3,10 @@
 > **This file is auto-read by the AI agent at the start of EVERY conversation.**
 > It ensures consistent behavior across all sessions.
 
+## 🏛️ L0 Constitution (Supreme Authority)
+> **MUST READ**: `.agent/CONSTITUTION.md`
+> Defines the immutable core principles: Safety First, Human Sovereignty, and Data Integrity.
+
 ## 🔒 Mandatory Workflow Triggers
 
 ### 🧠 Governor Layer (L3)
@@ -19,7 +23,7 @@ The following workflows MUST be triggered based on context:
 | Before any commit | `/test` | Read `.agent/workflows/test.md` |
 | After changes complete | `/push` | Read `.agent/workflows/push.md` |
 | Backend changes | `/regression-check` | Read `.agent/workflows/regression-check.md` |
-| Bug fix work | `/fix` | Read `.agent/workflows/fix.md` |
+| Bug fix work | `/fix` v2.0 | Read `.agent/workflows/fix.md` (w/ 2026 safety) |
 | Security concerns, **React Compiler security**, 資料流失 | `/security-audit` | Read `.agent/workflows/security-audit.md` |
 | Finding regressions | `/bisect-debug` | Read `.agent/workflows/bisect-debug.md` |
 | Doc maintenance | `/doc-sync` | Read `.agent/workflows/doc-sync.md` |
@@ -43,7 +47,9 @@ The following workflows MUST be triggered based on context:
 | "元件", "component", "UI 元件" | `component-generator` |
 | "優化 skill", "refine", "演化" | `skill-refiner` |
 | "生成測試", "auto test" | `auto-test-gen` |
+| "生成測試", "auto test" | `auto-test-gen` |
 | "自動修復", "self heal", "fix build" | `self-healing-agent` |
+| "debug", "root cause", "分析錯誤", "why broken" | `debug-detective` |
 
 ## 📋 Pre-Task Checklist
 

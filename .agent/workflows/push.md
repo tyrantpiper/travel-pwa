@@ -30,6 +30,11 @@ triggers:
 ## Post-Push
 6. Report: "✅ Pushed successfully!"
 
+## 🛡️ Safety Protocol (L1->L1 Mesh)
+7. **Regression Check**: 
+   - Suggest running `regression-guardian` to ensure no hidden features were broken.
+   - Command: "Run regression check"
+
 ## [NEURAL] Neural Linkage
 7. **Signal Sentinel**:
    - Log push to `.agent/telemetry/tool_usage.log`: "Push completed ({N} files)".
