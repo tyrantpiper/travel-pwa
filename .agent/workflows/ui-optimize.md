@@ -43,3 +43,7 @@ This workflow chains multiple skills for comprehensive UI work.
 - [ ] All TypeScript errors resolved
 - [ ] Audit findings addressed
 - [ ] User notified
+
+## [NEURAL] Neural Linkage
+11. **Signal Sentinel**:
+    - Log to `.agent/telemetry/tool_usage.log`: "UI Optimize completed".

@@ -94,3 +94,8 @@ parameters:
     type: enum
     values: [react, vue, svelte]
 ```
+
+## [NEURAL] Neural Linkage
+7. **Signal Sentinel**:
+   - Log to `.agent/telemetry/evolution_history.log`: "New Skill created: {skillName}".
+   - Scan `AGENT_CONFIG.md` and propose registration if missing.

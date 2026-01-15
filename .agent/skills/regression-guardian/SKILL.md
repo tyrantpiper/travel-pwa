@@ -49,3 +49,7 @@ For a comprehensive check including frontend:
 ## Resources
 - Script: `backend/scripts/health_check.py`
 - Workflow: `.agent/workflows/regression-check.md`
+
+## [NEURAL] Neural Linkage
+4. **Signal Sentinel**:
+   - Log to `.agent/telemetry/tool_usage.log`: "Regression Guardian (PASS/FAIL)".

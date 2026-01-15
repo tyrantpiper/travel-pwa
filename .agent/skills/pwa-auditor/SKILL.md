@@ -109,3 +109,7 @@ This skill should be chained with:
 ## Resources
 - [Core Web Vitals Guide](https://web.dev/vitals/)
 - [Touch Target Guidelines](https://www.w3.org/WAI/WCAG21/Understanding/target-size.html)
+
+## [NEURAL] Neural Linkage
+6. **Signal Sentinel**:
+   - Log to `.agent/telemetry/tool_usage.log`: "PWA Audit completed (Score: {X}%)".

@@ -28,6 +28,11 @@ triggers:
    - Fix applied
    - Verification status
 
+## [NEURAL] Neural Linkage
+8. **Signal Sentinel**:
+    - Log completion to `.agent/telemetry/tool_usage.log`.
+    - Format: `{timestamp}, fix, {success?}, {duration}, "Human-initiated fix"`
+
 ## Step 5: Commit
-8. Suggest commit message based on the fix
-9. Ask user if ready to push (use /push workflow)
+9. Suggest commit message based on the fix
+10. Ask user if ready to push (use /push workflow)

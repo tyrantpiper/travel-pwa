@@ -13,7 +13,6 @@
  */
 
 import { useState, useRef, useCallback } from "react"
-import Image from "next/image"
 import { Loader2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"

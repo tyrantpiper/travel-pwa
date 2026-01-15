@@ -69,6 +69,12 @@ Analyze the user request to determine the execution path.
      3. **IF** fails 2 times: **STOP**. Notify user with "Manual Intervention Required".
    - **DO NOT** blind-retry endlessly.
 
+### Step 6: Neural Linkage
+1. **Trigger**: `/doc-sync`
+   - Msg: "Updating documentation for new feature: {FeatureName}"
+2. **Telemetry**:
+   - Log success to `.agent/telemetry/tool_usage.log`.
+
 ## Progress Tracking
 ```
 📦 Feature: {FeatureName}

@@ -5,18 +5,32 @@
 
 ## 🔒 Mandatory Workflow Triggers
 
+### 🧠 Governor Layer (L3)
+| Trigger | Workflow | Role |
+|:---|:---|:---|
+| Weekly / Meta-Analysis | `/sentinel-report` | **Sentinel**: Monitors system health & proposes evolution |
+
+### 🛠️ Execution Layer (L1/L2)
 The following workflows MUST be triggered based on context:
 
 | Trigger Condition | Workflow | Command |
 |-------------------|----------|---------|
-| Any UI/styling work | `/audit` first | Read `.agent/workflows/audit.md` |
+| Any UI/styling work, **React Compiler** issues | `/audit` first | Read `.agent/workflows/audit.md` |
 | Before any commit | `/test` | Read `.agent/workflows/test.md` |
 | After changes complete | `/push` | Read `.agent/workflows/push.md` |
 | Backend changes | `/regression-check` | Read `.agent/workflows/regression-check.md` |
 | Bug fix work | `/fix` | Read `.agent/workflows/fix.md` |
-| Security concerns | `/security-audit` | Read `.agent/workflows/security-audit.md` |
+| Security concerns, **React Compiler security**, 資料流失 | `/security-audit` | Read `.agent/workflows/security-audit.md` |
 | Finding regressions | `/bisect-debug` | Read `.agent/workflows/bisect-debug.md` |
 | Doc maintenance | `/doc-sync` | Read `.agent/workflows/doc-sync.md` |
+| Performance issues | `/perf-profiler` | Read `.agent/workflows/perf-profiler.md` |
+| UI Optimization | `/ui-optimize` | Read `.agent/workflows/ui-optimize.md` |
+| **Code Review** | `/ai-review` | Read `.agent/workflows/ai-review.md` |
+| **Dependency Upgrade** | `/dep-upgrade` | Read `.agent/workflows/dep-upgrade.md` |
+| **Code Refactoring** | `/refactor` | Read `.agent/workflows/refactor.md` |
+| **System Governance (L3)** | `/sentinel-report` | Read `.agent/workflows/sentinel-report.md` |
+| **Migration Wizard** | `/migration-wizard` | Read `.agent/workflows/migration-wizard.md` |
+| **Incident Response** | `/incident-playbook` | Read `.agent/workflows/incident-playbook.md` |
 
 ## 🎯 Skill Auto-Activation
 
@@ -28,6 +42,8 @@ The following workflows MUST be triggered based on context:
 | "回歸", "regression", "broken" | `regression-guardian` |
 | "元件", "component", "UI 元件" | `component-generator` |
 | "優化 skill", "refine", "演化" | `skill-refiner` |
+| "生成測試", "auto test" | `auto-test-gen` |
+| "自動修復", "self heal", "fix build" | `self-healing-agent` |
 
 ## 📋 Pre-Task Checklist
 

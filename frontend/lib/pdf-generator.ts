@@ -1,7 +1,65 @@
 "use client"
 
-import jsPDF from "jspdf"
-import html2canvas from "html2canvas-pro"
+// 🆕 動態載入 PDF 庫 - 減少初始 bundle 約 500KB
+// 使用 Singleton Pattern 確保只載入一次
+
+// 類型定義（從 jspdf 提取核心類型）
+type JsPDFConstructor = new (orientation?: string, unit?: string, format?: string) => {
+    addPage: () => void
+    addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void
+    output: (type: string) => Blob
+}
+
+type Html2CanvasFunction = (element: HTMLElement, options?: {
+    scale?: number
+    useCORS?: boolean
+    allowTaint?: boolean
+    backgroundColor?: string
+    logging?: boolean
+}) => Promise<HTMLCanvasElement>
+
+// Singleton 狀態
+let pdfLibsLoaded = false
+let jsPDFConstructor: JsPDFConstructor | null = null
+let html2canvasFunction: Html2CanvasFunction | null = null
+
+/**
+ * 🆕 預載入 PDF 庫（可在 Tools 頁面進入時呼叫）
+ * 使用 Promise.all 並行載入兩個庫
+ */
+export async function preloadPdfLibraries(): Promise<void> {
+    if (pdfLibsLoaded) return
+
+    try {
+        const [jspdfModule, h2cModule] = await Promise.all([
+            import("jspdf"),
+            import("html2canvas-pro")
+        ])
+        jsPDFConstructor = jspdfModule.default as unknown as JsPDFConstructor
+        html2canvasFunction = h2cModule.default as unknown as Html2CanvasFunction
+        pdfLibsLoaded = true
+    } catch (error) {
+        console.error("Failed to preload PDF libraries:", error)
+        // 重置狀態以允許重試
+        pdfLibsLoaded = false
+        jsPDFConstructor = null
+        html2canvasFunction = null
+        throw error
+    }
+}
+
+/**
+ * 🆕 取得 PDF 庫（內部使用，確保已載入）
+ */
+async function getPdfLibraries() {
+    if (!pdfLibsLoaded) {
+        await preloadPdfLibraries()
+    }
+    if (!jsPDFConstructor || !html2canvasFunction) {
+        throw new Error("無法載入 PDF 產生器，請檢查網路連線後重試。")
+    }
+    return { jsPDF: jsPDFConstructor, html2canvas: html2canvasFunction }
+}
 
 // 類型定義
 export interface TripPDFData {
@@ -174,7 +232,10 @@ function createHotelsContainer(hotels: TripPDFData['hotels']): HTMLDivElement | 
 /**
  * 🆕 將 HTML 容器渲染為 Canvas
  */
-async function renderToCanvas(element: HTMLDivElement): Promise<HTMLCanvasElement> {
+async function renderToCanvas(
+    element: HTMLDivElement,
+    html2canvas: Html2CanvasFunction
+): Promise<HTMLCanvasElement> {
     element.style.position = 'absolute'
     element.style.left = '-9999px'
     element.style.top = '0'
@@ -198,7 +259,7 @@ async function renderToCanvas(element: HTMLDivElement): Promise<HTMLCanvasElemen
  * 🆕 將長圖分頁添加到 PDF（保持原始比例，超過一頁自動分頁）
  */
 function addImageWithPaging(
-    pdf: jsPDF,
+    pdf: { addPage: () => void; addImage: (data: string, format: string, x: number, y: number, w: number, h: number) => void },
     dataUrl: string,
     imgWidth: number,
     imgHeight: number,
@@ -244,6 +305,10 @@ export async function generateTripPDF(
         throw new Error("行程內容為空，無法生成 PDF。")
     }
 
+    // 🆕 動態載入 PDF 庫
+    onProgress?.(0, 1, "載入 PDF 元件...")
+    const { jsPDF, html2canvas } = await getPdfLibraries()
+
     const pdf = new jsPDF("p", "mm", "a4")
     const imgWidth = 210  // A4 寬度 mm
     const imgHeight = 297 // A4 高度 mm
@@ -254,7 +319,7 @@ export async function generateTripPDF(
     // 1. 封面頁
     onProgress?.(++currentPage, totalPages, "生成封面...")
     const coverContainer = createCoverContainer(data)
-    const coverCanvas = await renderToCanvas(coverContainer)
+    const coverCanvas = await renderToCanvas(coverContainer, html2canvas)
     const coverHeight = (coverCanvas.height * imgWidth) / coverCanvas.width
     addImageWithPaging(pdf, coverCanvas.toDataURL("image/jpeg", 0.9), imgWidth, coverHeight, imgHeight, isFirstPage)
     isFirstPage = false
@@ -264,7 +329,7 @@ export async function generateTripPDF(
         onProgress?.(++currentPage, totalPages, `生成 Day ${dayData.day}...`)
 
         const dayContainer = createDayContainer(dayData)
-        const dayCanvas = await renderToCanvas(dayContainer)
+        const dayCanvas = await renderToCanvas(dayContainer, html2canvas)
         const dayHeight = (dayCanvas.height * imgWidth) / dayCanvas.width
 
         // 🆕 保持原始比例，超過一頁自動分頁
@@ -276,7 +341,7 @@ export async function generateTripPDF(
     const hotelsContainer = createHotelsContainer(data.hotels)
     if (hotelsContainer) {
         onProgress?.(++currentPage, totalPages, "生成住宿資訊...")
-        const hotelsCanvas = await renderToCanvas(hotelsContainer)
+        const hotelsCanvas = await renderToCanvas(hotelsContainer, html2canvas)
         const hotelsHeight = (hotelsCanvas.height * imgWidth) / hotelsCanvas.width
         addImageWithPaging(pdf, hotelsCanvas.toDataURL("image/jpeg", 0.9), imgWidth, hotelsHeight, imgHeight, isFirstPage)
     }

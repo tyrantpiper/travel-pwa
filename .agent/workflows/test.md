@@ -20,3 +20,7 @@ triggers:
 3. Summarize:
    - ✅ TypeScript: PASS/FAIL
    - ✅ ESLint: PASS/FAIL (with error count if any)
+
+## [NEURAL] Neural Linkage
+4. **Signal Sentinel**:
+   - Log test to `.agent/telemetry/tool_usage.log`: "Test (TSC: {PASS/FAIL}, ESLint: {PASS/FAIL})".

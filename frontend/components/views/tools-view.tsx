@@ -895,7 +895,7 @@ export function ToolsView() {
                 }} className="flex-1 px-4 -mt-4">
                     <Tabs value={activeSection} onValueChange={setActiveSection}>
                         {/* Custom Sliding Tab Strip */}
-                        <div className="grid grid-cols-3 bg-white shadow-md rounded-xl p-1 mb-4">
+                        <div className="grid grid-cols-3 bg-white dark:bg-slate-800 shadow-md rounded-xl p-1 mb-4">
                             {[
                                 { value: 'cards', label: '💳 卡片' },
                                 { value: 'expense', label: t('expense') },
@@ -904,12 +904,12 @@ export function ToolsView() {
                                 <button
                                     key={tab.value}
                                     onClick={() => setActiveSection(tab.value)}
-                                    className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                                    className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 >
                                     {activeSection === tab.value && (
                                         <motion.div
                                             layoutId="tools-tab-indicator"
-                                            className="absolute inset-0 bg-slate-100 rounded-lg -z-10"
+                                            className="absolute inset-0 bg-slate-100 dark:bg-slate-700 rounded-lg -z-10"
                                             transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                         />
                                     )}

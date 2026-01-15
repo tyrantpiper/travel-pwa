@@ -58,3 +58,7 @@ Present report to user:
 - **DO NOT** auto-edit `walkthrough.md` or any doc.
 - **ONLY** generate reports.
 - Human approves all changes.
+
+## [NEURAL] Neural Linkage
+6. **Signal Sentinel**:
+   - Log sync to `.agent/telemetry/tool_usage.log`: "Doc Sync completed ({N} discrepancies)".

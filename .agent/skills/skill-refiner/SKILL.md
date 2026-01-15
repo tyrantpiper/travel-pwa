@@ -36,9 +36,20 @@ A recursive capability that allows the agent to inspect, critique, and improve i
 2. **Crucially**: Maintain the YAML frontmatter.
 3. Add/Update `version` in frontmatter (increment patch version).
 
-### Step 4: Verification
+### Step 4: Verification & Neural Linkage
 1. Output a diff or summary of what was improved.
 2. Ask user to verify the new logic.
+3. **[NEURAL] Signal Transmission**:
+   - Append log entry to `.agent/telemetry/evolution_history.log`:
+     ```text
+     - [{YYYY-MM-DD}] Refined `{targetSkill}`: {Summary of changes} (User Approved)
+     - [{YYYY-MM-DD}] Refined `{targetSkill}`: {Summary of changes} (User Approved)
+     ```
+4. **[NEURAL] Dynamic Discovery**:
+    - Scan `.agent/AGENT_CONFIG.md`.
+    - IF `{targetSkill}` is missing from "Skill Auto-Activation" table:
+      - **Action**: Propose adding it to the registry.
+      - **Goal**: Prevent "Ghost Skills" (capabilities that exist but the Agent doesn't know about).
 
 ## Optimization Checklist (The "Gold Standard")
 - [ ] **Deterministic**: steps should yield the same result every time.

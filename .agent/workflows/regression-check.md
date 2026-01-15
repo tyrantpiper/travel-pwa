@@ -25,3 +25,7 @@ Run `npm run build` in `frontend/` directory (Note: this runs tsc and build)
 4. Report Results
 - If any step fails, stop and fix the issue.
 - If all steps pass, the codebase is likely stable.
+
+## [NEURAL] Neural Linkage
+5. **Signal Sentinel**:
+   - Log regression-check to `.agent/telemetry/tool_usage.log`: "Regression Check (PASS/FAIL)".

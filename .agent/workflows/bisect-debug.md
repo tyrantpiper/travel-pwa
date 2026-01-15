@@ -54,3 +54,7 @@ Present findings:
 - **NEVER** run bisect on uncommitted changes.
 - **ALWAYS** `git bisect reset` after completion.
 - If user's test is not deterministic, refuse to proceed.
+
+## [NEURAL] Neural Linkage
+6. **Signal Sentinel**:
+   - Log bisect to `.agent/telemetry/tool_usage.log`: "Bisect completed (Culprit: {commit})".

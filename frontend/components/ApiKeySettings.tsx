@@ -31,7 +31,6 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
         // 1. 優先檢查開發者後門
         const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
         if (devKey) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- Init from env
             setKey(devKey)
             onKeySaved(devKey)
             setIsDev(true)

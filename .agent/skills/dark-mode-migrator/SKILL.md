@@ -120,3 +120,7 @@ Run `npx tsc --noEmit` to ensure no type errors
 ✅ Borders migrated (Z classes)
 ✅ TypeScript verified
 ```
+
+## [NEURAL] Neural Linkage
+6. **Signal Sentinel**:
+   - Log to `.agent/telemetry/tool_usage.log`: "Dark Mode migration: {ComponentName}".

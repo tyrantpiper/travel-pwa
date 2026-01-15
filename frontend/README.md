@@ -1,5 +1,23 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Tabidachi 旅立ち - Features
+
+### 🌐 公開行程分享 (ISR)
+分享您的行程給朋友，無需登入即可查看。
+
+**使用方式:**
+```
+https://your-domain.com/share/{share_code}
+```
+
+**技術特點:**
+- ✅ Incremental Static Regeneration (ISR) - 1 小時快取重新驗證
+- ✅ 隱私保護 - 費用、票券等敏感資訊不會顯示
+- ✅ SEO 優化 - 動態 Open Graph metadata
+- ✅ 深色模式支援
+
+---
+
 ## Getting Started
 
 First, run the development server:

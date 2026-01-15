@@ -95,7 +95,9 @@ function normalizeForFuzzy(text: string): string {
 
 /**
  * 簡易模糊匹配分數 (0-100)
+ * @deprecated 保留供未來使用，目前由 MiniSearch 處理
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function fuzzyScore(query: string, target: string): number {
     const q = normalizeForFuzzy(query)
     const t = normalizeForFuzzy(target)

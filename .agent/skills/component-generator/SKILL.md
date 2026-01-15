@@ -61,3 +61,7 @@ Run `npx tsc --noEmit` to verify TypeScript
 - 完整模板程式碼 → `{baseDir}/references/TEMPLATES.md`
 - 樣式指南 → `{baseDir}/references/STYLE_GUIDE.md`
 - 進階用法 → `{baseDir}/references/ADVANCED.md`
+
+## [NEURAL] Neural Linkage
+6. **Signal Sentinel**:
+   - Log to `.agent/telemetry/tool_usage.log`: "Component generated: {componentName}".

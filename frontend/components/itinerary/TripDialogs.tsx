@@ -16,7 +16,7 @@ interface CreateTripModalProps {
     isOpen: boolean
     onOpenChange: (open: boolean) => void
     userId: string
-    onSuccess: (trip?: any) => void
+    onSuccess: (trip?: { id: string; title: string }) => void
 }
 
 export function CreateTripModal({

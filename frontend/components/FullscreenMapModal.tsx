@@ -57,7 +57,7 @@ function rerankResults(
             return { ...r, reScore }
         })
         .sort((a, b) => (b.reScore ?? 0) - (a.reScore ?? 0))
-        .map(({ reScore: _, ...r }) => r)  // 移除 reScore 欄位
+        .map(({ reScore: _reScore, ...r }) => r)  // 移除 reScore 欄位
 }
 
 // 活動類型

@@ -37,6 +37,86 @@ router = APIRouter(prefix="/api", tags=["trips"])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# 🆕 Public Share Endpoint (ISR-enabled, no auth required)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/trips/share/{share_code}")
+async def get_public_trip_by_share_code(
+    share_code: str,
+    supabase=Depends(get_supabase)
+):
+    """🌐 公開行程分享 (無需認證, 支援 ISR)
+    
+    用於 Next.js ISR 頁面的 Server-side fetch。
+    注意：這是公開 API，隱私資料會被過濾。
+    
+    Rate Limit: 10 requests/minute per IP (防暴力枚舉)
+    """
+    # 🛡️ 簡易 Rate Limit Check (無需 slowapi, 用 Supabase 記錄)
+    # 生產環境建議用 Redis 或 slowapi + Redis backend
+    import re
+    if not re.match(r'^[A-Za-z0-9]{4,8}$', share_code):
+        raise HTTPException(status_code=400, detail="Invalid share code format")
+    try:
+        # 1. 透過 share_code 查詢行程
+        trip_res = supabase.table("itineraries").select("*").eq("share_code", share_code).execute()
+        
+        if not trip_res.data or len(trip_res.data) == 0:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        trip = trip_res.data[0]
+        
+        # 2. 抓該行程的所有細項 (公開資料，不過濾)
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
+        
+        # 3. 整理成前端要的格式
+        days_map = {}
+        if items_res.data:
+            for item in items_res.data:
+                d = item["day_number"]
+                if d not in days_map:
+                    days_map[d] = []
+                
+                days_map[d].append({
+                    "id": item["id"],
+                    "time_slot": item["time_slot"][:5] if item["time_slot"] else "00:00",
+                    "time": item["time_slot"][:5] if item["time_slot"] else "00:00",
+                    "place_name": item["place_name"],
+                    "place": item["place_name"],
+                    "category": item["category"] or "sightseeing",
+                    "notes": item["notes"],
+                    "desc": item["notes"],
+                    "lat": item["location_lat"],
+                    "lng": item["location_lng"],
+                    "image_url": item.get("image_url"),
+                    "tags": item.get("tags", []),
+                })
+        
+        content = trip.get("content") or {}
+        
+        # 4. 回傳公開資料 (過濾敏感資訊)
+        return {
+            "id": trip["id"],
+            "title": trip["title"],
+            "start_date": trip["start_date"],
+            "end_date": trip.get("end_date"),
+            "cover_image": trip.get("cover_image"),
+            "share_code": trip.get("share_code", ""),
+            "creator_name": trip.get("creator_name", "Guest"),
+            "daily_locations": content.get("daily_locations", {}),
+            # 不回傳: day_costs, day_tickets (私人財務資訊)
+            # 不回傳: members (隱私)
+            "days": [{"day": d, "activities": days_map[d]} for d in sorted(days_map.keys())] if days_map else []
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Public Share Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Trip CRUD Operations
 # ═══════════════════════════════════════════════════════════════════════════════
 
