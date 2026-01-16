@@ -141,10 +141,9 @@ export function ItineraryView() {
 
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
-    const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')  // 🆕 P3: 天氣模式標籤
-    const [weatherLocationName, setWeatherLocationName] = useState<string>("") // 🆕 追蹤顯示的地點名稱
-    const [weatherCoords, setWeatherCoords] = useState<{ lat: number, lng: number } | null>(null) // 🆕 追蹤顯示的座標
-    const [elevation, setElevation] = useState<number | null>(null)  // 🆕 Phase 10: 海拔 (m)
+    const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')
+    const [resolvedLocation, setResolvedLocation] = useState<{ name: string, lat: number, lng: number } | null>(null) // 🆕 統一位置狀態
+    const [elevation, setElevation] = useState<number | null>(null)
 
     // 🆕 P7: 天氣快取 (避免重複請求)
     const weatherCache = useRef<Map<string, { data: DayWeather[], mode: 'live' | 'forecast' | 'seasonal' | 'trend', timestamp: number }>>(new Map())
@@ -370,46 +369,51 @@ export function ItineraryView() {
                 "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷", timezone: "Asia/Bangkok" },
             }
 
-            let activeLocName = "未知地點"
+            let activeLoc: { name: string, lat: number, lng: number } = { name: "東京", lat: 35.6895, lng: 139.6917 }
+            let found = false
 
-            // Priority 1: Use manually set daily location
+            // Priority 1: Use manually set daily location (search results)
             if (dailyLocs && dailyLocs[day]) {
-                lat = dailyLocs[day].lat
-                lng = dailyLocs[day].lng
-                activeLocName = dailyLocs[day].name || "自定義地點"
-                // 根據地點名稱推測時區
+                activeLoc = {
+                    name: dailyLocs[day].name || "自定義地點",
+                    lat: dailyLocs[day].lat,
+                    lng: dailyLocs[day].lng
+                }
+                found = true
                 for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
-                    if (dailyLocs[day].name?.includes(cityName)) {
+                    if (activeLoc.name.includes(cityName)) {
                         setCurrentTimezone(coords.timezone)
                         break
                     }
                 }
-            } else {
-                // Priority 2: Use first activity with coordinates
+            }
+
+            // Priority 2: Use current day activities
+            if (!found) {
                 const activityLoc = getFirstActivityWithCoords()
                 if (activityLoc) {
-                    lat = activityLoc.lat
-                    lng = activityLoc.lng
-                    activeLocName = activityLoc.name
-                    // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
-                } else if (currentTrip?.title) {
-                    // Priority 3: Parse city from trip title
-                    activeLocName = currentTrip.title // Default fallback name
-                    for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
-                        if (currentTrip.title.includes(cityName)) {
-                            lat = coords.lat
-                            lng = coords.lng
-                            activeLocName = cityName
-                            setCurrentTimezone(coords.timezone)  // 設定時區
-                            // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
-                            break
-                        }
-                    }
+                    activeLoc = { name: activityLoc.name, lat: activityLoc.lat, lng: activityLoc.lng }
+                    found = true
                 }
             }
 
-            setWeatherLocationName(activeLocName)
-            setWeatherCoords({ lat, lng })
+            // Priority 3: Fallback to Trip Title
+            if (!found && currentTrip?.title) {
+                activeLoc.name = currentTrip.title
+                for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
+                    if (currentTrip.title.includes(cityName)) {
+                        activeLoc = { name: cityName, lat: coords.lat, lng: coords.lng }
+                        setCurrentTimezone(coords.timezone)
+                        found = true
+                        break
+                    }
+                }
+                // 如果標題沒城市，預設還是用東京但名字是標題
+            }
+
+            setResolvedLocation(activeLoc)
+            lat = activeLoc.lat
+            lng = activeLoc.lng
 
             // 🆕 P0: 計算行程對應的實際日期 (Timezone Safe Fix)
             let targetDate: string | null = null
@@ -1879,10 +1883,10 @@ export function ItineraryView() {
                                     </div>
                                     <div>
                                         <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                            {weatherLocationName}
-                                            {weatherCoords && (
+                                            {resolvedLocation?.name || "未知地點"}
+                                            {resolvedLocation && (
                                                 <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded">
-                                                    {weatherCoords.lat.toFixed(2)}, {weatherCoords.lng.toFixed(2)}
+                                                    {resolvedLocation.lat.toFixed(2)}, {resolvedLocation.lng.toFixed(2)}
                                                 </span>
                                             )}
                                         </h4>

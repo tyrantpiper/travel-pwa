@@ -275,16 +275,16 @@ export const fetchWeatherWithSDK = async (
             const weatherData = {
                 hourly: {
                     time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
-                        (t) => new Date((t + utcOffsetSeconds) * 1000).toISOString() // 修正時區
+                        (t) => new Date((t + utcOffsetSeconds) * 1000).toISOString()
                     ),
                     temperature_2m: hourly.variables(0)?.valuesArray(),
                     weather_code: hourly.variables(1)?.valuesArray(),
                     relative_humidity_2m: hourly.variables(2)?.valuesArray(),
                     precipitation_probability: hourly.variables(3)?.valuesArray(),
                     apparent_temperature: hourly.variables(4)?.valuesArray(),
-                    uv_index: hourly.variables(5)?.valuesArray(),    // 🆕 UV
-                    wind_speed: hourly.variables(6)?.valuesArray(),  // 🆕 Wind
-                    visibility: hourly.variables(7)?.valuesArray(),  // 🆕 Vis
+                    uv_index: hourly.variables(5)?.valuesArray(),
+                    wind_speed: hourly.variables(6)?.valuesArray(),
+                    visibility: hourly.variables(7)?.valuesArray(),
                 },
             }
 
