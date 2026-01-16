@@ -243,14 +243,7 @@ export const fetchWeatherWithSDK = async (
                 } catch { return undefined }
             })()
 
-            // 🛡️ Fix 400 Error: Stop AQI fetch if > 4 days (CAMS limit)
-            const shouldFetchAQI = aqiPromise && daysFromNow <= 4
-            if (!shouldFetchAQI) {
-                // If out of range, just resolve undefined immediately to prevent 400
-                // Note: we can't easily cancel the promise if it started, but we can avoid awaiting it if we hadn't started it.
-                // Actually, aqiPromise is ALREADY started above.
-                // We should prevent STARTING it.
-            }
+
 
 
             const params = {
