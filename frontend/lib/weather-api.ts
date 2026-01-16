@@ -221,15 +221,19 @@ export const fetchWeatherWithSDK = async (
             })()
 
             // 🆕 Phase 9: Air Quality API (並行請求 + Cache)
+            // 🛡️ Fix 400 Error: CAMS AQI only supports ~4-5 days forecast.
+            const canFetchAQI = daysFromNow <= 4
             const aqiCacheKey = `aqi_${lat.toFixed(2)}_${lng.toFixed(2)}_${targetDate || 'today'}`
             const cachedAQI = typeof localStorage !== 'undefined' ? localStorage.getItem(aqiCacheKey) : null
 
             const aqiPromise = (async () => {
+                if (!canFetchAQI) return undefined
                 if (cachedAQI) {
                     try { return JSON.parse(cachedAQI).data as number[] } catch { /* ignore */ }
                 }
                 try {
                     const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=us_aqi&domain=cams_global&timezone=auto&start_date=${targetDate || new Date().toISOString().split('T')[0]}&end_date=${targetDate || new Date().toISOString().split('T')[0]}`)
+                    if (!res.ok) throw new Error(res.statusText)
                     const data = await res.json()
                     const vals = data.hourly?.us_aqi as number[] | undefined
                     if (vals && typeof localStorage !== 'undefined') {
@@ -239,6 +243,15 @@ export const fetchWeatherWithSDK = async (
                 } catch { return undefined }
             })()
 
+            // 🛡️ Fix 400 Error: Stop AQI fetch if > 4 days (CAMS limit)
+            const shouldFetchAQI = aqiPromise && daysFromNow <= 4
+            if (!shouldFetchAQI) {
+                // If out of range, just resolve undefined immediately to prevent 400
+                // Note: we can't easily cancel the promise if it started, but we can avoid awaiting it if we hadn't started it.
+                // Actually, aqiPromise is ALREADY started above.
+                // We should prevent STARTING it.
+            }
+
 
             const params = {
                 latitude: lat,
@@ -247,7 +260,17 @@ export const fetchWeatherWithSDK = async (
                 hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature', 'uv_index', 'wind_speed_10m', 'visibility'],
                 models: 'ecmwf_ifs' as const,
                 timezone: 'auto',
+                // 🛡️ Fix 400 Error: Ensure start/end date logic is valid.
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })
+            }
+
+            // 🛡️ Safety: If daysFromNow > 14, API might fail or be inaccurate.
+            // Open-Meteo ECMWF IFS has 16 days limit.
+            if (daysFromNow > 14 && targetDate) {
+                // We rely on the API to handle the boundary or return 400?
+                // Ideally we should switch to archive if > 16 days, but 'mode' check should have done that.
+                // If we are here, mode is 'forecast' or 'live'.
+                console.warn("[Weather SDK] Warning: Requesting forecast > 14 days out might fail.")
             }
 
             // P6-2 + P9: 並行執行 (Weather + Elevation + AQI)
