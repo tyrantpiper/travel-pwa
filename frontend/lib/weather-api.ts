@@ -294,6 +294,9 @@ export const fetchWeatherWithSDK = async (
                 return null
             }
 
+            // 🆕 偵錯日誌：追蹤變數映射狀態
+            console.log(`[Weather SDK] Successfully mapped ${hourly.variablesLength()} variables for ${lat.toFixed(2)}, ${lng.toFixed(2)}`)
+
             const forecast: HourlyForecast[] = []
             for (let i = 0; i < weatherData.hourly.time.length; i++) {
                 // 取得小時 (0-23)
