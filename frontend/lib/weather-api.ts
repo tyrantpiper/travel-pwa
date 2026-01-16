@@ -244,7 +244,7 @@ export const fetchWeatherWithSDK = async (
                 latitude: lat,
                 longitude: lng,
                 // 🆕 Phase 6: 加入 UV, 風速, 能見度
-                hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature', 'uv_index_clear_sky', 'wind_speed_10m', 'visibility'],
+                hourly: ['temperature_2m', 'weather_code', 'relative_humidity_2m', 'precipitation_probability', 'apparent_temperature', 'uv_index', 'wind_speed_10m', 'visibility'],
                 models: 'ecmwf_ifs' as const,
                 timezone: 'auto',
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })

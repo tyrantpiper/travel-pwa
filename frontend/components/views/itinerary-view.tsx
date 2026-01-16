@@ -2000,7 +2000,7 @@ export function ItineraryView() {
                                         <div className="text-sm font-medium text-slate-700">
                                             {(() => {
                                                 const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
-                                                if (maxUV === 0) return '無資料'
+                                                if (!isFinite(maxUV)) return '無資料'
                                                 return `${maxUV} (${maxUV > 7 ? '危險' : maxUV > 5 ? '高' : maxUV > 2 ? '中' : '低'})`
                                             })()}
                                         </div>
@@ -2013,7 +2013,7 @@ export function ItineraryView() {
                                         <div className="text-sm font-medium text-slate-700">
                                             {(() => {
                                                 const maxWind = Math.max(...weatherData.map(w => w.windSpeed ?? 0))
-                                                if (maxWind === 0) return '無資料'
+                                                if (!isFinite(maxWind)) return '無資料'
                                                 return `${maxWind} km/h`
                                             })()}
                                         </div>
