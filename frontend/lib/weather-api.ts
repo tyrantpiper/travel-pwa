@@ -277,15 +277,21 @@ export const fetchWeatherWithSDK = async (
                     time: range(Number(hourly.time()), Number(hourly.timeEnd()), hourly.interval()).map(
                         (t) => new Date((t + utcOffsetSeconds) * 1000).toISOString() // 修正時區
                     ),
-                    temperature_2m: hourly.variables(0)!.valuesArray()!,
-                    weather_code: hourly.variables(1)!.valuesArray()!,
-                    relative_humidity_2m: hourly.variables(2)!.valuesArray()!,
-                    precipitation_probability: hourly.variables(3)!.valuesArray()!,
-                    apparent_temperature: hourly.variables(4)!.valuesArray()!,
-                    uv_index: hourly.variables(5)!.valuesArray()!,    // 🆕 UV
-                    wind_speed: hourly.variables(6)!.valuesArray()!,  // 🆕 Wind
-                    visibility: hourly.variables(7)!.valuesArray()!,  // 🆕 Vis
+                    temperature_2m: hourly.variables(0)?.valuesArray(),
+                    weather_code: hourly.variables(1)?.valuesArray(),
+                    relative_humidity_2m: hourly.variables(2)?.valuesArray(),
+                    precipitation_probability: hourly.variables(3)?.valuesArray(),
+                    apparent_temperature: hourly.variables(4)?.valuesArray(),
+                    uv_index: hourly.variables(5)?.valuesArray(),    // 🆕 UV
+                    wind_speed: hourly.variables(6)?.valuesArray(),  // 🆕 Wind
+                    visibility: hourly.variables(7)?.valuesArray(),  // 🆕 Vis
                 },
+            }
+
+            // 🛡️ 數據完整性檢查：如果核心溫度數據缺失，返回 null 觸發 JSON Fallback
+            if (!weatherData.hourly.temperature_2m) {
+                console.warn("SDK Mapping: Missing core temperature data")
+                return null
             }
 
             const forecast: HourlyForecast[] = []
@@ -296,10 +302,10 @@ export const fetchWeatherWithSDK = async (
                 forecast.push({
                     time: `${hour}:00`,
                     temp: Math.round(weatherData.hourly.temperature_2m[i]),
-                    code: weatherData.hourly.weather_code[i],
-                    humidity: Math.round(weatherData.hourly.relative_humidity_2m[i]),
-                    precipitation_probability: Math.round(weatherData.hourly.precipitation_probability[i]),
-                    apparent_temperature: Math.round(weatherData.hourly.apparent_temperature[i]),
+                    code: weatherData.hourly.weather_code ? weatherData.hourly.weather_code[i] : 0,
+                    humidity: weatherData.hourly.relative_humidity_2m ? Math.round(weatherData.hourly.relative_humidity_2m[i]) : undefined,
+                    precipitation_probability: weatherData.hourly.precipitation_probability ? Math.round(weatherData.hourly.precipitation_probability[i]) : undefined,
+                    apparent_temperature: weatherData.hourly.apparent_temperature ? Math.round(weatherData.hourly.apparent_temperature[i]) : undefined,
                     uvIndex: weatherData.hourly.uv_index ? Number(weatherData.hourly.uv_index[i].toFixed(1)) : 0,
                     windSpeed: weatherData.hourly.wind_speed ? Math.round(weatherData.hourly.wind_speed[i]) : 0,
                     visibility: weatherData.hourly.visibility ? weatherData.hourly.visibility[i] : 10000,

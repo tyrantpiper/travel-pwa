@@ -142,6 +142,8 @@ export function ItineraryView() {
     const [day, setDay] = useState(1)
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')  // 🆕 P3: 天氣模式標籤
+    const [weatherLocationName, setWeatherLocationName] = useState<string>("") // 🆕 追蹤顯示的地點名稱
+    const [weatherCoords, setWeatherCoords] = useState<{ lat: number, lng: number } | null>(null) // 🆕 追蹤顯示的座標
     const [elevation, setElevation] = useState<number | null>(null)  // 🆕 Phase 10: 海拔 (m)
 
     // 🆕 P7: 天氣快取 (避免重複請求)
@@ -314,12 +316,24 @@ export function ItineraryView() {
 
     useEffect(() => {
         const getFirstActivityWithCoords = () => {
-            if (currentTrip?.days) {
-                const dayData = currentTrip.days?.find((d) => d.day === day)
-                if (dayData?.activities) {
-                    for (const activity of dayData.activities) {
+            if (!currentTrip?.days) return null
+
+            // Priority 1: Search current day
+            const currentDayData = currentTrip.days.find((d) => d.day === day)
+            if (currentDayData?.activities) {
+                for (const activity of currentDayData.activities) {
+                    if (activity.lat && activity.lng) {
+                        return { lat: activity.lat, lng: activity.lng, name: activity.place || "當前行程地點" }
+                    }
+                }
+            }
+
+            // Priority 2: Search any day in the trip (for context)
+            for (const d of currentTrip.days) {
+                if (d.activities) {
+                    for (const activity of d.activities) {
                         if (activity.lat && activity.lng) {
-                            return { lat: activity.lat, lng: activity.lng, name: activity.place || "Current Location" }
+                            return { lat: activity.lat, lng: activity.lng, name: `行程參考地點: ${activity.place || ""}` }
                         }
                     }
                 }
@@ -356,10 +370,13 @@ export function ItineraryView() {
                 "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷", timezone: "Asia/Bangkok" },
             }
 
+            let activeLocName = "未知地點"
+
             // Priority 1: Use manually set daily location
             if (dailyLocs && dailyLocs[day]) {
                 lat = dailyLocs[day].lat
                 lng = dailyLocs[day].lng
+                activeLocName = dailyLocs[day].name || "自定義地點"
                 // 根據地點名稱推測時區
                 for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
                     if (dailyLocs[day].name?.includes(cityName)) {
@@ -373,13 +390,16 @@ export function ItineraryView() {
                 if (activityLoc) {
                     lat = activityLoc.lat
                     lng = activityLoc.lng
+                    activeLocName = activityLoc.name
                     // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                 } else if (currentTrip?.title) {
                     // Priority 3: Parse city from trip title
+                    activeLocName = currentTrip.title // Default fallback name
                     for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
                         if (currentTrip.title.includes(cityName)) {
                             lat = coords.lat
                             lng = coords.lng
+                            activeLocName = cityName
                             setCurrentTimezone(coords.timezone)  // 設定時區
                             // Note: Don't auto-update dailyLocs here - let the sync useEffect handle it
                             break
@@ -387,6 +407,9 @@ export function ItineraryView() {
                     }
                 }
             }
+
+            setWeatherLocationName(activeLocName)
+            setWeatherCoords({ lat, lng })
 
             // 🆕 P0: 計算行程對應的實際日期 (Timezone Safe Fix)
             let targetDate: string | null = null
@@ -1816,6 +1839,13 @@ export function ItineraryView() {
                                                 return advice + '！'
                                             })()}
                                         </p>
+                                        {weatherMode === 'forecast' && (
+                                            <div className="mt-2 flex items-center">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                                    🛰️ ECMWF 精準預報 (9km)
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1841,6 +1871,45 @@ export function ItineraryView() {
                         </div>
 
                         {/* 📊 今日指數 (2x4 Grid 布局) */}
+                        {weatherData.length > 0 && (
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
+                                        {weatherData[0].code <= 3 ? <Sun className="w-5 h-5 text-amber-500" /> : <CloudRain className="w-5 h-5 text-blue-500" />}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                            {weatherLocationName}
+                                            {weatherCoords && (
+                                                <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded">
+                                                    {weatherCoords.lat.toFixed(2)}, {weatherCoords.lng.toFixed(2)}
+                                                </span>
+                                            )}
+                                        </h4>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            {Math.min(...weatherData.map(w => w.temp))}°C ~ {Math.max(...weatherData.map(w => w.temp))}°C
+                                        </p>
+                                    </div>
+                                </div>
+                                {/* 🆕 P3: 動態天氣模式標籤 */}
+                                <span className={`text-xs flex items-center gap-1 ml-2 shrink-0 ${weatherMode === 'live' ? 'text-green-500' :
+                                    weatherMode === 'forecast' ? 'text-blue-500' :
+                                        weatherMode === 'seasonal' ? 'text-purple-500' :
+                                            'text-amber-500'
+                                    }`}>
+                                    <span className={`w-2 h-2 rounded-full ${weatherMode === 'live' ? 'bg-green-500 animate-pulse' :
+                                        weatherMode === 'forecast' ? 'bg-blue-500' :
+                                            weatherMode === 'seasonal' ? 'bg-purple-500' :
+                                                'bg-amber-500'
+                                        }`} />
+                                    {weatherMode === 'live' && '即時天氣'}
+                                    {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
+                                    {weatherMode === 'seasonal' && '季節預報'}
+                                    {weatherMode === 'trend' && '歷史同期參考'}
+                                </span>
+                            </div>
+                        )}
+
                         {weatherData.length > 0 && (
                             <div className="grid grid-cols-2 gap-2 pt-2 pb-4">
                                 {/* Row 1: 穿衣 | 降雨 */}
@@ -1975,8 +2044,11 @@ export function ItineraryView() {
 
                                 {/* Row 5 (Optional): AQI - 僅在有數據時顯示 */}
                                 {(() => {
+                                    // 🔧 Fix: AQI may be 0 (good air), should not hide. Use undefined check instead.
+                                    const aqisPresent = weatherData.some(w => w.airQuality !== undefined)
                                     const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
-                                    if (maxAQI > 0) {
+
+                                    if (aqisPresent) {
                                         return (
                                             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2 col-span-2">
                                                 <span className="text-lg">🌱</span>
