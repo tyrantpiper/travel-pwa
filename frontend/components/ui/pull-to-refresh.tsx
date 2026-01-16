@@ -216,6 +216,11 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 return
             }
 
+            // 🛡️ Prevent native scrolling/rubberbanding when pulling
+            if (e.cancelable) {
+                e.preventDefault()
+            }
+
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
                     const dampedY = Math.round(calculateDampedTranslation(diffY))
