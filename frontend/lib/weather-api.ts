@@ -288,14 +288,8 @@ export const fetchWeatherWithSDK = async (
                 },
             }
 
-            // 🛡️ 數據完整性檢查：如果核心溫度數據缺失，返回 null 觸發 JSON Fallback
-            if (!weatherData.hourly.temperature_2m) {
-                console.warn("SDK Mapping: Missing core temperature data")
-                return null
-            }
-
             // 🆕 偵錯日誌：追蹤變數映射狀態
-            console.log(`[Weather SDK] Successfully mapped ${hourly.variablesLength()} variables for ${lat.toFixed(2)}, ${lng.toFixed(2)}`)
+            console.log(`[Weather SDK] Mapped ${weatherData.hourly.time.length} hours. Cores: T:${!!weatherData.hourly.temperature_2m}, UV:${!!weatherData.hourly.uv_index}, Vis:${!!weatherData.hourly.visibility}`)
 
             const forecast: HourlyForecast[] = []
             for (let i = 0; i < weatherData.hourly.time.length; i++) {
@@ -304,14 +298,14 @@ export const fetchWeatherWithSDK = async (
 
                 forecast.push({
                     time: `${hour}:00`,
-                    temp: Math.round(weatherData.hourly.temperature_2m[i]),
+                    temp: weatherData.hourly.temperature_2m ? Math.round(weatherData.hourly.temperature_2m[i]) : 0,
                     code: weatherData.hourly.weather_code ? weatherData.hourly.weather_code[i] : 0,
                     humidity: weatherData.hourly.relative_humidity_2m ? Math.round(weatherData.hourly.relative_humidity_2m[i]) : undefined,
                     precipitation_probability: weatherData.hourly.precipitation_probability ? Math.round(weatherData.hourly.precipitation_probability[i]) : undefined,
                     apparent_temperature: weatherData.hourly.apparent_temperature ? Math.round(weatherData.hourly.apparent_temperature[i]) : undefined,
                     uvIndex: weatherData.hourly.uv_index ? Number(weatherData.hourly.uv_index[i].toFixed(1)) : 0,
                     windSpeed: weatherData.hourly.wind_speed ? Math.round(weatherData.hourly.wind_speed[i]) : 0,
-                    visibility: weatherData.hourly.visibility ? weatherData.hourly.visibility[i] : 10000,
+                    visibility: (weatherData.hourly.visibility && weatherData.hourly.visibility[i] !== undefined) ? weatherData.hourly.visibility[i] : 10000,
                     airQuality: aqiData ? aqiData[i] : undefined // 🆕 Phase 9: AQI
                 })
             }
@@ -320,14 +314,14 @@ export const fetchWeatherWithSDK = async (
                 forecast,
                 mode,
                 source: 'sdk',
-                elevation
+                elevation: elevation ?? 0
             }
         }
 
         return null // 其他模式暫時返回 null (由外部 fallback 處理)
 
-    } catch (e) {
-        console.error("SDK Error:", e)
+    } catch (error) {
+        console.error("[Weather SDK] Fatal Error:", error)
         return null
     }
 }

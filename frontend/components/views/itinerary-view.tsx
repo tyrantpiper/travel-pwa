@@ -2028,7 +2028,7 @@ export function ItineraryView() {
                                         <div className="text-sm font-medium text-slate-700">
                                             {(() => {
                                                 const avgVis = weatherData[Math.floor(weatherData.length / 2)]?.visibility
-                                                if (!avgVis) return '無資料'
+                                                if (avgVis === undefined || avgVis === null) return '無資料'
                                                 if (avgVis >= 10000) return `${(avgVis / 1000).toFixed(0)} km (良好)`
                                                 if (avgVis >= 5000) return `${(avgVis / 1000).toFixed(1)} km (普通)`
                                                 return `${(avgVis / 1000).toFixed(1)} km (差)`
