@@ -332,11 +332,24 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     if not itinerary:
         return ""
     
+    itinerary_title = itinerary.get("title", "未命名")
+    start_date = itinerary.get("start_date", "?")
+    end_date = itinerary.get("end_date", "?")
+    total_days = itinerary.get("total_days", 0)
+    focused_day = focused_day or itinerary.get("focused_day")
+    weather_context = itinerary.get("weather_context")
+    
+    # 🆕 2026 Temporal Anchor: 取得當前時間提供給 AI
+    from datetime import datetime
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     lines = [
-        "\n\n📅 **[用戶當前行程]**",
-        f"行程名稱: {itinerary.get('title', '未命名')}",
-        f"日期: {itinerary.get('start_date', '?')} ~ {itinerary.get('end_date', '?')}",
-        f"總天數: {itinerary.get('total_days', 0)} 天",
+        "\n--- SYSTEM CONTEXT: NEURAL ITINERARY CONNECTION ---",
+        f"當前系統時間: {now_str}",
+        "以下是使用者目前的行程資訊，請根據此脈絡回答。如果資訊不全，請以現有資料為準。",
+        f"行程標題: {itinerary_title}",
+        f"起訖日期: {start_date} ~ {end_date}",
+        f"總覽: 共 {total_days} 天",
         ""
     ]
     
@@ -344,7 +357,8 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     for day in days:
         day_num = day.get("day_number", 0)
         date_str = day.get("date", "")
-        prefix = "👉 " if day_num == focused_day else ""
+        is_focused = (day_num == focused_day)
+        prefix = "👉 " if is_focused else ""
         lines.append(f"{prefix}**Day {day_num}** ({date_str}):")
         
         items = day.get("items", [])
@@ -352,6 +366,8 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
             time = item.get("time", "?")
             place = item.get("place", "?")
             category = item.get("category", "")
+            is_highlight = item.get("is_highlight", False)
+            
             icon = {
                 "transport": "🚃",
                 "food": "🍽️",
@@ -359,10 +375,73 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
                 "shopping": "🛍️",
                 "sightseeing": "📸"
             }.get(category, "📍")
-            lines.append(f"  {time} {icon} {place}")
+            
+            highlight = "⭐ " if is_highlight else ""
+            lines.append(f"  {time} {icon} {highlight}{place}")
+            
+            # 🧠 2026 Adaptive Resolution: Only expand details for the focused day
+            if is_focused:
+                # Notes/Guide
+                notes = item.get("notes")
+                if notes:
+                    lines.append(f"    [Guide] {notes.replace('\n', ' ')}")
+                
+                # Memo (with Privacy Shield)
+                memo = item.get("memo")
+                if memo:
+                    safe_memo_lines = [l for l in memo.split('\n') if "[PRIVATE]" not in l]
+                    if safe_memo_lines:
+                        safe_memo = " ".join(safe_memo_lines).strip()
+                        if safe_memo:
+                            lines.append(f"    [User Note] {safe_memo}")
+                
+                # Sub-items
+                sub_items = item.get("sub_items")
+                if sub_items:
+                    for sub in sub_items:
+                        name = sub.get("name", "")
+                        desc = sub.get("desc")
+                        lines.append(f"    - {name}{': ' + desc if desc else ''}")
+        
+        # Day additions (notes, costs, checklists, tickets) - Only for focused day
+        if is_focused:
+            # Notes
+            day_notes = itinerary.get("day_notes", {}).get(str(day_num))
+            if day_notes:
+                lines.append("  ⚠️ **重點提醒:**")
+                for note in day_notes:
+                    lines.append(f"    {note.get('icon', '•')} **{note.get('title')}**: {note.get('content')}")
+            
+            # Costs
+            day_costs = itinerary.get("day_costs", {}).get(str(day_num))
+            if day_costs:
+                lines.append("  💰 **預估花費:**")
+                for cost in day_costs:
+                    lines.append(f"    - {cost.get('item')}: {cost.get('amount')}{' (' + cost.get('note') + ')' if cost.get('note') else ''}")
+            
+            # Checklists
+            day_checklists = itinerary.get("day_checklists", {}).get(str(day_num))
+            if day_checklists:
+                lines.append("  ✅ **當日清單:**")
+                for task in day_checklists:
+                    lines.append(f"    [{'x' if task.get('checked') else ' '}] {task.get('text')}")
+            
+            # Tickets
+            day_tickets = itinerary.get("day_tickets", {}).get(str(day_num))
+            if day_tickets:
+                lines.append("  🎟️ **門票/預約資訊:**")
+                for ticket in day_tickets:
+                    lines.append(f"    - {ticket.get('name')}: {ticket.get('price')} ({ticket.get('note', '無備註')})")
+        
         lines.append("")
     
-    lines.append("請參考以上行程回答用戶問題。\n")
+    # Weather Context
+    if weather_context:
+        lines.append("🌡️ **實時天氣脈絡:**")
+        lines.append(weather_context)
+        lines.append("")
+        
+    lines.append("--- END OF SYSTEM CONTEXT ---\n")
     return "\n".join(lines)
 
 # ChatRequest 已移至 models/base.py
@@ -385,7 +464,9 @@ SYSTEM_PROMPT = """
 4.  **健康與醫療顧問**：提供當地等效藥物建議，精準翻譯醫療需求。
 5.  **購物與精算專家**：判斷價格，解析規格，提供退稅建議。
 6.  **交通與物流大腦**：解決非結構化交通問題，提供雨備或替代方案。
-7.  **🆕 行程分析師**：當用戶提到行程時，善用系統提供的「重點提醒 (day_notes)」和「預估花費 (day_costs)」資訊，主動引用這些資料回答問題。
+7.  **🆕 行程神經連結 (Itinerary Awareness)**：你已接入系統的「神經連結」，能實時感知用戶在介面上看到的行程（透過標記為 `👉` 的 Focused Day）。
+    *   **重要禁令**：當系統提供 `[用戶當前行程]` 資料時，**嚴禁**回答「我不知道你的行程」或「請給我你的計畫」。你必須從現有資料中尋找答案。
+    *   **任務**：主動從備忘錄 (Memo)、清單 (Checklist) 和天氣資訊中提取答案，並根據當前日期與時間判斷用戶所處的天數。
 
 ### 回覆規範 (Response Guidelines)
 1.  **排版精美**：使用 Markdown 語法，善用 **粗體** 強調重點，使用條列式清單讓資訊易於掃描（考量手機螢幕閱讀）。
@@ -771,11 +852,25 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     except Exception as e:
         print(f"⚠️ 三源資料注入失敗 (不影響主流程): {e}")
     
+    # 🆕 v3.8: 智慧神經夾擊 (Neural Sandwich)
+    # 將上下文放在最前面，確保模型在看到問題前已具備背景知識
+    itinerary_context = ""
+    if request.current_itinerary:
+        itinerary_context = format_itinerary_context(
+            request.current_itinerary, 
+            request.focused_day
+        )
+        print(f"📅 串流注入行程上下文: {request.current_itinerary.get('title', '?')}")
+    
+    # 處理最終訊息: 上下文 -> 原始消息
+    # 🔧 FIX: enriched_message 已經包含了 POI 資料或原始訊息
+    final_message = f"{itinerary_context}\n\n{enriched_message}"
+    
     return StreamingResponse(
         stream_chat_generator(
             api_key=api_key,
             history=full_history,
-            message=enriched_message,
+            message=final_message,
             thought_signatures=request.thought_signatures,
             sources=poi_sources  # 🆕 v3.7.1: 傳遞來源
         ),
@@ -798,3 +893,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
 # - GET /api/wikivoyage/search
 # Import from: routers.poi (registered at app startup)
 # 
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

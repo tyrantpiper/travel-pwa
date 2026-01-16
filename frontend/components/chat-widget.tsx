@@ -8,13 +8,16 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
+import { useFocusedDay } from "@/lib/stores/tripStore"
 import { useTripDetail } from "@/lib/hooks"
+import { useDynamicPolling } from "@/lib/polling-manager"
 import { getLeanItinerary, LeanItinerary } from "@/lib/getLeanItinerary"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
 import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
+import { useWeatherStore } from "@/lib/stores/weatherStore"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
@@ -86,10 +89,14 @@ export default function ChatWidget() {
     // 🔒 登錄狀態 - 在 JSX 中使用此變數決定是否渲染
 
     // ✅ 直接使用 TripContext（現在 ChatWidget 在 TripProvider 內）
-    const { activeTrip, activeTripId } = useTripContext()
+    const { activeTrip, activeTripId, userId: contextUserId } = useTripContext()
 
     // 🆕 取得行程詳細資料 (包含 items)
-    const { trip: tripDetail } = useTripDetail(activeTripId)
+    // 🔧 FIX: 傳入 contextUserId 確保 SWR 鍵值完整
+    // 🔧 FIX 2: 加入 useDynamicPolling 的 refreshInterval，對齊 ItineraryView 的 SWR Key 實現快取共用
+    const refreshInterval = useDynamicPolling()
+    const { trip: tripDetail } = useTripDetail(activeTripId, contextUserId, refreshInterval)
+    const weatherStore = useWeatherStore()
 
     // 從行程標題解析位置（即時更新）
     const tripLocation = useMemo(() => {
@@ -103,16 +110,67 @@ export default function ChatWidget() {
         return null
     }, [activeTrip])
 
-    // 🆕 產生精簡版行程供 AI 使用 (含 day_notes/costs)
+    const focusedDay = useFocusedDay()
+    // 🆕 產生精簡版行程供 AI 使用 (含 day_notes/costs/checklists/tickets)
     const leanItinerary: LeanItinerary | null = useMemo(() => {
-        if (!activeTrip || !tripDetail?.items) return null
-        return getLeanItinerary(
+        if (!activeTrip || !tripDetail) return null // 🔧 FIX: Don't check for .items yet
+
+        // 🔧 2026 FIX: Flatten API 'days' structure to 'items' & map keys
+        let items = tripDetail.items
+        if (!items && tripDetail.days && Array.isArray(tripDetail.days)) {
+            items = (tripDetail.days as Array<{ day: number; activities: Array<Record<string, unknown> & { time: string; place: string }> }>).flatMap((d) =>
+                d.activities.map((act) => ({
+                    ...act,
+                    day_number: d.day,
+                    time_slot: act.time,      // Map API 'time' to 'time_slot'
+                    place_name: act.place     // Map API 'place' to 'place_name'
+                }))
+            )
+        }
+
+        // Return null ONLY if we truly have no items after flattening
+        if (!items || items.length === 0) return null
+
+        const lean = getLeanItinerary(
             activeTrip,
-            tripDetail.items,
-            tripDetail.day_notes,  // 🆕 每日注意事項
-            tripDetail.day_costs   // 🆕 每日預估花費
+            items,
+            tripDetail.day_notes,   // 🆕 每日注意事項
+            tripDetail.day_costs,   // 🆕 每日預估花費
+            tripDetail.day_checklists, // 🆕 2026 Checklist
+            tripDetail.day_tickets,    // 🆕 2026 Tickets
+            focusedDay               // 🆕 2026 Adaptive Focus
         )
-    }, [activeTrip, tripDetail])
+
+        // 🔗 🆕 2026 Neural Connection: 注入天氣數據
+        if (lean && tripLocation) {
+            const today = new Date().toISOString().split('T')[0]
+            const cached = weatherStore.getWeatherData(tripLocation.lat, tripLocation.lng, today)
+            if (cached) {
+                const isStale = Date.now() - cached.timestamp > 3 * 60 * 60 * 1000 // 3小時過期
+                const avgTemp = cached.forecast.length > 0
+                    ? Math.round(cached.forecast.reduce((a, b) => a + b.temp, 0) / cached.forecast.length)
+                    : '--'
+
+                lean.weather_context = `[2026 Neural Weather] 
+- 當前位置: ${tripLocation.name}
+- 預測均溫: ${avgTemp}°C
+- 信心度: ${cached.confidenceScore ?? '--'}%
+- WBGT 風險: ${(cached.confidenceScore ?? 100) < 50 ? '高 (預報不穩)' : '正常'}
+${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。' : ''}`
+            }
+        }
+
+        if (lean) {
+            console.log("🧠 Neural Connection Active: Itinerary context generated", {
+                title: lean.title,
+                days: lean.total_days,
+                focused: lean.focused_day,
+                hasWeather: !!lean.weather_context
+            })
+        }
+
+        return lean
+    }, [activeTrip, tripDetail, tripLocation, weatherStore, focusedDay])
 
     const [isOpen, setIsOpen] = useState(false)
     // 🆕 向後相容：將舊格式訊息遷移到新格式
@@ -414,7 +472,8 @@ export default function ChatWidget() {
                         }
                     },
                     abortControllerRef.current?.signal,  // 🆕 傳入 AbortSignal
-                    leanItinerary  // 🆕 行程上下文
+                    leanItinerary,  // 🆕 行程上下文
+                    focusedDay   // 🆕 v3.8: 傳入當前焦點天數
                 )
             } catch (streamError) {
                 console.error("⚠️ Streaming 失敗，使用 fallback:", streamError)

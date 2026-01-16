@@ -10,11 +10,13 @@ interface TripState {
     activeTripId: string | null
     userId: string | null
     activeTripTitle: string | null
+    focusedDay: number // 🆕 2026: The day currently being viewed in the UI
 
     // Actions
     setActiveTripId: (id: string | null) => void
     setUserId: (id: string | null) => void
     setActiveTripTitle: (title: string | null) => void
+    setFocusedDay: (day: number) => void // 🆕 2026
     initializeFromStorage: () => void
 }
 
@@ -49,11 +51,13 @@ export const useTripStore = create<TripState>()(
             activeTripId: null,
             userId: getInitialUserId(),
             activeTripTitle: null,
+            focusedDay: 1, // Default to Day 1
 
             // Actions
             setActiveTripId: (id) => set({ activeTripId: id }),
             setUserId: (id) => set({ userId: id }),
             setActiveTripTitle: (title) => set({ activeTripTitle: title }),
+            setFocusedDay: (day) => set({ focusedDay: day }),
 
             // Initialize from legacy localStorage (for migration)
             initializeFromStorage: () => {
@@ -98,3 +102,4 @@ export const useTripStore = create<TripState>()(
 export const useActiveTripId = () => useTripStore((s) => s.activeTripId)
 export const useUserId = () => useTripStore((s) => s.userId)
 export const useActiveTripTitle = () => useTripStore((s) => s.activeTripTitle)
+export const useFocusedDay = () => useTripStore((s) => s.focusedDay)

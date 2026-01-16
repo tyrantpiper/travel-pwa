@@ -18,6 +18,7 @@ export interface HourlyForecast {
     windSpeed?: number              // 🆕 Phase 6: 風速 (km/h)
     visibility?: number             // 🆕 Phase 6: 能見度 (m)
     airQuality?: number             // 🆕 Phase 9: AQI (US AQI)
+    confidence?: number             // 🆕 2026: 預報信心指數 (0-100%)
 }
 
 export type WeatherMode = 'live' | 'forecast' | 'seasonal' | 'trend'
@@ -27,6 +28,7 @@ export interface WeatherResult {
     mode: WeatherMode
     source: 'sdk' | 'fallback'
     elevation?: number // 🆕 Phase 6: 海拔 (m)
+    confidenceScore?: number // 🆕 2026: 整體預報信心度 (0-100)
 }
 
 /**
@@ -182,6 +184,18 @@ export const generateHourlyCurve = (
 }
 
 /**
+ * 🆕 2026: 計算預報信心指數
+ * 基於系集預報成員的標準差 (Standard Deviation)
+ * SD 越小，信心越高。
+ */
+const calculateConfidence = (stdDev: number, range: number): number => {
+    if (range === 0) return 100
+    // 一般來說，SD < 1.0 為極高信心，SD > 3.0 為低信心
+    const normalized = Math.max(0, 1 - (stdDev / 4.0))
+    return Math.round(normalized * 100)
+}
+
+/**
  * 使用 Open-Meteo SDK 取得天氣 (FlatBuffers 優化)
  */
 export const fetchWeatherWithSDK = async (
@@ -195,8 +209,8 @@ export const fetchWeatherWithSDK = async (
         let mode: WeatherMode = 'live'
         if (daysFromNow < 0) mode = 'trend'
         else if (daysFromNow === 0) mode = 'live'  // 今天 = 即時
-        else if (daysFromNow <= 16) mode = 'forecast'
-        else if (daysFromNow <= 46) mode = 'seasonal'
+        else if (daysFromNow <= 14) mode = 'forecast' // 🛡️ Fix 400: Limit forecast to 14 days (API limit is ~15)
+        else if (daysFromNow <= 45) mode = 'seasonal' // 🛡️ Fix 400: Adjust seasonal range
         else mode = 'trend'
 
         // Forecast API (0-16 天) - live 和 forecast 都用這個
@@ -204,7 +218,7 @@ export const fetchWeatherWithSDK = async (
             // 🆕 Phase 6: 並行請求海拔與天氣數據
             // P6-1: 請求 Elevation API (需手動 fetch 因為 SDK 只支援 weather)
             // 🔧 Fix: Unify cache precision to toFixed(2) (~1.1km) to match Weather. 
-            const elevCacheKey = `elev_${lat.toFixed(2)}_${lng.toFixed(2)}`
+            const elevCacheKey = `elev_${lat.toFixed(3)}_${lng.toFixed(3)}`
             const cachedElev = typeof localStorage !== 'undefined' ? localStorage.getItem(elevCacheKey) : null
 
             const elevationPromise = (async () => {
@@ -243,6 +257,20 @@ export const fetchWeatherWithSDK = async (
                 } catch { return undefined }
             })()
 
+            // 🆕 2026: Ensemble Confidence API
+            const ensemblePromise = (async () => {
+                // 系集預報通常支援 10-15 天
+                if (daysFromNow < 0 || daysFromNow > 14) return undefined
+                try {
+                    // 僅抓取溫度系集成員來計算信心度
+                    const url = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lng}&hourly=temperature_2m&models=icon_seamless&timezone=auto${targetDate ? `&start_date=${targetDate}&end_date=${targetDate}` : ''}`
+                    const res = await fetch(url)
+                    if (!res.ok) return undefined
+                    const data = await res.json()
+                    return data.hourly
+                } catch { return undefined }
+            })()
+
 
 
 
@@ -256,6 +284,8 @@ export const fetchWeatherWithSDK = async (
                 ...(targetDate ? { start_date: targetDate, end_date: targetDate } : { forecast_days: 1 })
             }
 
+            console.log("[Weather SDK] Requesting:", params) // 🔍 Debug Log
+
             // 🛡️ Safety: If daysFromNow > 14, API might fail or be inaccurate.
             // Open-Meteo ECMWF IFS has 16 days limit.
             if (daysFromNow > 14 && targetDate) {
@@ -265,20 +295,32 @@ export const fetchWeatherWithSDK = async (
                 console.warn("[Weather SDK] Warning: Requesting forecast > 14 days out might fail.")
             }
 
-            // P6-2 + P9: 並行執行 (Weather + Elevation + AQI)
+            // P6-2 + P9 + 2026: 並行執行 (Weather + Elevation + AQI + Ensemble)
             // 🔧 Fix: Use allSettled to prevent failures
-            const [weatherResult, elevResult, aqiResult] = await Promise.allSettled([
+            const [weatherResult, elevResult, aqiResult, ensembleResult] = await Promise.allSettled([
                 fetchWeatherApi('https://api.open-meteo.com/v1/forecast', params),
                 elevationPromise,
-                aqiPromise
+                aqiPromise,
+                ensemblePromise
             ])
 
             // P6-3 & P9: 解析數據
             const response = weatherResult.status === 'fulfilled' ? weatherResult.value[0] : null
+
+            console.log("[Weather SDK] Weather Response Status:", weatherResult.status) // 🔍 Debug Log
+            if (weatherResult.status === 'fulfilled') {
+                console.log("[Weather SDK] UTC Offset:", weatherResult.value[0]?.utcOffsetSeconds())
+            } else {
+                console.error("[Weather SDK] Weather Fetch Failed:", weatherResult.reason)
+            }
+
             if (!response) return null
 
             const elevation = elevResult.status === 'fulfilled' ? elevResult.value : undefined
-            const aqiData = aqiResult.status === 'fulfilled' ? aqiResult.value : undefined
+            console.log("[Weather SDK] Elevation Data:", elevation) // 🔍 Debug Log
+
+            const aqiData = aqiResult.status === 'fulfilled' ? aqiResult.value : undefined // 🆕 Phase 9: AQI
+            const ensembleData = ensembleResult.status === 'fulfilled' ? ensembleResult.value : undefined // 🆕 2026: Ensemble
 
             const utcOffsetSeconds = response.utcOffsetSeconds()
             const hourly = response.hourly()!
@@ -321,15 +363,34 @@ export const fetchWeatherWithSDK = async (
                     uvIndex: weatherData.hourly.uv_index ? Number(weatherData.hourly.uv_index[i].toFixed(1)) : 0,
                     windSpeed: weatherData.hourly.wind_speed ? Math.round(weatherData.hourly.wind_speed[i]) : 0,
                     visibility: (weatherData.hourly.visibility && weatherData.hourly.visibility[i] !== undefined) ? weatherData.hourly.visibility[i] : 10000,
-                    airQuality: aqiData ? aqiData[i] : undefined // 🆕 Phase 9: AQI
+                    airQuality: aqiData ? aqiData[i] : undefined, // 🆕 Phase 9: AQI
+                    confidence: (() => {
+                        if (!ensembleData) return undefined
+                        // 提取該小時的所有系集成員數值
+                        const members = Object.keys(ensembleData).filter(k => k.startsWith('temperature_2m_member'))
+                        const values = members.map(m => ensembleData[m][i]).filter(v => v !== undefined && v !== null)
+                        if (values.length < 2) return undefined
+
+                        const mean = values.reduce((a, b) => a + b, 0) / values.length
+                        const stdDev = Math.sqrt(values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length)
+                        const range = Math.max(...values) - Math.min(...values)
+                        return calculateConfidence(stdDev, range)
+                    })()
                 })
             }
+
+            // 計算整體平均信心度
+            const validConfidences = forecast.map(f => f.confidence).filter((c): c is number => c !== undefined)
+            const avgConfidence = validConfidences.length > 0
+                ? Math.round(validConfidences.reduce((a, b) => a + b, 0) / validConfidences.length)
+                : undefined
 
             return {
                 forecast,
                 mode,
                 source: 'sdk',
-                elevation: elevation ?? 0
+                elevation: elevation ?? 0,
+                confidenceScore: avgConfidence
             }
         }
 

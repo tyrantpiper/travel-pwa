@@ -129,7 +129,8 @@ export async function streamChat(
     handlers: SSEHandlers,
     signal?: AbortSignal,
     // 🆕 新增行程上下文參數
-    itinerary?: unknown
+    itinerary?: unknown,
+    focused_day?: number
 ): Promise<void> {
     const response = await fetch(`${apiUrl}/api/chat/stream`, {
         method: "POST",
@@ -145,8 +146,9 @@ export async function streamChat(
                 displayContent: msg.displayContent
             })),
             thought_signatures: [],  // Round-trip signatures if needed
-            // 🆕 帶入行程上下文
-            current_itinerary: itinerary
+            // 🆕 帶入行程上下文與焦點天數
+            current_itinerary: itinerary,
+            focused_day: focused_day
         }),
         signal
     })
