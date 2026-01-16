@@ -203,56 +203,41 @@ export const fetchWeatherWithSDK = async (
         if (mode === 'forecast' || mode === 'live') {
             // 🆕 Phase 6: 並行請求海拔與天氣數據
             // P6-1: 請求 Elevation API (需手動 fetch 因為 SDK 只支援 weather)
-            // 🆕 Phase 8: Elevation Cache - 永久快取避免 API 限制 (10k/day)
-            const elevCacheKey = `elev_${lat.toFixed(3)}_${lng.toFixed(3)}`
+            // 🔧 Fix: Unify cache precision to toFixed(2) (~1.1km) to match Weather. 
+            const elevCacheKey = `elev_${lat.toFixed(2)}_${lng.toFixed(2)}`
             const cachedElev = typeof localStorage !== 'undefined' ? localStorage.getItem(elevCacheKey) : null
 
-            let elevationPromise: Promise<number | undefined>
-
-            if (cachedElev) {
-                // 快取命中：直接返回 Promise.resolve
-                console.log(`🏔️ Elevation Cache HIT: ${cachedElev}m for ${lat},${lng}`)
-                elevationPromise = Promise.resolve(parseFloat(cachedElev))
-            } else {
-                // 快取未命中：發起請求並寫入快取
-                elevationPromise = fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        const val = data.elevation?.[0] as number | undefined
-                        if (val !== undefined && typeof localStorage !== 'undefined') {
-                            localStorage.setItem(elevCacheKey, val.toString())
-                            console.log(`🏔️ Elevation Cache STORE: ${val}m`)
-                        }
-                        return val
-                    })
-                    .catch(() => undefined)
-            }
+            const elevationPromise = (async () => {
+                if (cachedElev) return parseFloat(cachedElev)
+                try {
+                    const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`)
+                    const data = await res.json()
+                    const val = data.elevation?.[0] as number | undefined
+                    if (val !== undefined && typeof localStorage !== 'undefined') {
+                        localStorage.setItem(elevCacheKey, val.toString())
+                    }
+                    return val
+                } catch { return undefined }
+            })()
 
             // 🆕 Phase 9: Air Quality API (並行請求 + Cache)
             const aqiCacheKey = `aqi_${lat.toFixed(2)}_${lng.toFixed(2)}_${targetDate || 'today'}`
-            // AQI 快取設為 1 小時 (localStorage 不足時可改用 sessionStorage)
             const cachedAQI = typeof localStorage !== 'undefined' ? localStorage.getItem(aqiCacheKey) : null
 
-            let aqiPromise: Promise<number[] | undefined>
-
-            if (cachedAQI) {
-                const parsed = JSON.parse(cachedAQI)
-                // 簡單檢查快取是否過期 (這裡假設 cachedAQI 結構包含 timestamp)
-                // 但為了簡化，目前假設當日有效
-                aqiPromise = Promise.resolve(parsed.data)
-            } else {
-                aqiPromise = fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=us_aqi&domain=cams_global&timezone=auto&start_date=${targetDate || new Date().toISOString().split('T')[0]}&end_date=${targetDate || new Date().toISOString().split('T')[0]}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        const vals = data.hourly?.us_aqi as number[] | undefined
-                        if (vals && typeof localStorage !== 'undefined') {
-                            // 存入快取 (簡易版，不存 timestamp，由外部 LRU 控制或每日覆蓋)
-                            localStorage.setItem(aqiCacheKey, JSON.stringify({ data: vals, ts: Date.now() }))
-                        }
-                        return vals
-                    })
-                    .catch(() => undefined)
-            }
+            const aqiPromise = (async () => {
+                if (cachedAQI) {
+                    try { return JSON.parse(cachedAQI).data as number[] } catch { /* ignore */ }
+                }
+                try {
+                    const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=us_aqi&domain=cams_global&timezone=auto&start_date=${targetDate || new Date().toISOString().split('T')[0]}&end_date=${targetDate || new Date().toISOString().split('T')[0]}`)
+                    const data = await res.json()
+                    const vals = data.hourly?.us_aqi as number[] | undefined
+                    if (vals && typeof localStorage !== 'undefined') {
+                        localStorage.setItem(aqiCacheKey, JSON.stringify({ data: vals, ts: Date.now() }))
+                    }
+                    return vals
+                } catch { return undefined }
+            })()
 
 
             const params = {
@@ -266,15 +251,19 @@ export const fetchWeatherWithSDK = async (
             }
 
             // P6-2 + P9: 並行執行 (Weather + Elevation + AQI)
-            const [weatherResponses, elevation, aqiData] = await Promise.all([
+            // 🔧 Fix: Use allSettled to prevent failures
+            const [weatherResult, elevResult, aqiResult] = await Promise.allSettled([
                 fetchWeatherApi('https://api.open-meteo.com/v1/forecast', params),
                 elevationPromise,
                 aqiPromise
             ])
 
             // P6-3 & P9: 解析數據
-            const response = weatherResponses[0]
+            const response = weatherResult.status === 'fulfilled' ? weatherResult.value[0] : null
             if (!response) return null
+
+            const elevation = elevResult.status === 'fulfilled' ? elevResult.value : undefined
+            const aqiData = aqiResult.status === 'fulfilled' ? aqiResult.value : undefined
 
             const utcOffsetSeconds = response.utcOffsetSeconds()
             const hourly = response.hourly()!

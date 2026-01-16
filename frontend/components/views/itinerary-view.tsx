@@ -413,6 +413,21 @@ export function ItineraryView() {
                 }
             }
 
+            // 🛡️ Anti-Jitter: Coordinate Stability Check
+            // 避免因來源切換 (如: Title -> Activity) 導致的微小座標差異 (Jitter) 觸發重新抓取
+            // 閾值: 0.005 度 (~500m)
+            const lastCoords = activeReqRef.current ? JSON.parse(sessionStorage.getItem('last_weather_coords') || '{}') : {}
+            if (activeReqRef.current &&
+                Math.abs(lat - (lastCoords.lat || 0)) < 0.005 &&
+                Math.abs(lng - (lastCoords.lng || 0)) < 0.005 &&
+                targetDate === lastCoords.date) {
+                // Use stable coords
+                lat = lastCoords.lat
+                lng = lastCoords.lng
+            } else {
+                sessionStorage.setItem('last_weather_coords', JSON.stringify({ lat, lng, date: targetDate }))
+            }
+
             // 🆕 P8: Active Flag (防止競態條件 - Race Condition Protection)
             // 確保只有最後一次請求的結果會被寫入 State
             const currentReqId = Math.random().toString(36).substring(7)
