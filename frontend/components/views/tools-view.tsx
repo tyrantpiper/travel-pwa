@@ -24,12 +24,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
-import { ImageUpload } from "@/components/ui/image-upload"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+import { Virtuoso } from "react-virtuoso"
 import { useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
+import { ExpenseDialog } from "@/components/expense-dialog"
 
 // Type definitions
 interface Expense {
@@ -151,9 +152,6 @@ export function ToolsView() {
 
     const [rate, setRate] = useState(0.22)
 
-    // 🆕 Currency State (Input Dialog) - Isolated
-    const [inputCurrency, setInputCurrency] = useState("JPY")
-    const [inputRate, setInputRate] = useState(0.22)
 
     // 🆕 Currency State
     const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null) // null = TWD only
@@ -173,14 +171,6 @@ export function ToolsView() {
         initRate()
     }, [selectedCurrency])
 
-    // 🆕 Input Rate Effect
-    useEffect(() => {
-        const updateInputRate = async () => {
-            const r = await getExchangeRate(inputCurrency)
-            setInputRate(r)
-        }
-        updateInputRate()
-    }, [inputCurrency])
 
     // View controls
     const [expenseView, setExpenseView] = useState<'summary' | 'daily'>('summary')
@@ -192,16 +182,6 @@ export function ToolsView() {
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editItem, setEditItem] = useState<Expense | null>(null)
-    const [title, setTitle] = useState("")
-    const [amountJPY, setAmountJPY] = useState("")
-    const [method, setMethod] = useState("Cash")
-    const [category, setCategory] = useState("general")
-    const [isPublic, setIsPublic] = useState(true)
-    const [cardName, setCardName] = useState("")
-    const [cashback, setCashback] = useState("")
-    const [expenseDate, setExpenseDate] = useState("")
-    const [receiptUrl, setReceiptUrl] = useState("")
-    const [isSavingExpense, setIsSavingExpense] = useState(false)
     const haptic = useHaptic()
 
     // AI Tools state
@@ -500,54 +480,6 @@ export function ToolsView() {
             }
         } catch (e) { console.error(e) }
     }
-
-    const handleSaveExpense = async () => {
-        if (isSavingExpense) return // 防止重複點擊
-        haptic.tap() // 觸覺回饋
-
-        const userId = localStorage.getItem("user_uuid")
-        const userName = localStorage.getItem("user_nickname")
-        if (!amountJPY || !title) { toast.error("Please fill in amount and title"); haptic.error(); return }
-
-        if (!activeTripId) return
-        setIsSavingExpense(true)
-
-        const rateNum = parseFloat(cashback) || 0
-        const payload = {
-            itinerary_id: activeTripId, title, amount_jpy: parseInt(amountJPY), exchange_rate: inputRate, // 🆕 Isolated rate
-            currency: inputCurrency, // 🆕 Isolated currency
-            payment_method: method, category: category, is_public: isPublic,
-            created_by: userId, creator_name: userName,
-            card_name: method === "JCB" || method === "VisaMaster" ? cardName : "",
-            cashback_rate: method === "JCB" || method === "VisaMaster" ? rateNum : 0,
-            image_url: receiptUrl || null,
-            expense_date: expenseDate || formatLocalDate(new Date())
-        }
-
-        const url = editItem ? `${API_BASE}/api/expenses/${editItem.id}` : `${API_BASE}/api/expenses`
-        const methodType = editItem ? "PATCH" : "POST"
-
-        try {
-            const res = await fetch(url, { method: methodType, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-            if (res.ok) {
-                haptic.success()
-                toast.success(editItem ? "Updated" : "Saved")
-                closeDialog()
-                setReceiptUrl("")
-
-                // 🆕 Phase 11: Auto-navigate to the added expense date
-                const targetDate = expenseDate || formatLocalDate(new Date())
-                setSelectedDate(targetDate)
-                setExpenseView('daily') // Auto switch to daily view to show the result
-
-                fetchExpenses() // This will refresh the list, and now selectedDate is already set
-            } else {
-                throw new Error("API Error")
-            }
-        } catch { haptic.error(); toast.error("Save failed") }
-        finally { setIsSavingExpense(false) }
-    }
-
     const handleDeleteExpense = async (id: string) => {
         if (!confirm(t('confirm_delete'))) return
         try {
@@ -557,18 +489,13 @@ export function ToolsView() {
     }
 
     const openAddDialog = () => {
-        setEditItem(null); setTitle(""); setAmountJPY(""); setMethod("Cash"); setCategory("general"); setIsPublic(true); setReceiptUrl("")
-        setExpenseDate(selectedDate || new Date().toISOString().split('T')[0])
-        setInputCurrency(selectedCurrency || "JPY") // 🆕 Init with view currency
+        setEditItem(null)
         setIsDialogOpen(true)
     }
     const openEditDialog = (item: Expense) => {
-        setEditItem(item); setTitle(item.title); setAmountJPY(item.amount.toString()); setMethod(item.payment_method || "Cash"); setCategory(item.category || "general"); setIsPublic(item.is_public); setReceiptUrl(item.image_url || "")
-        setExpenseDate(item.expense_date || item.created_at?.split('T')[0] || "")
-        setInputCurrency(item.currency || "JPY") // 🆕 Load existing currency
+        setEditItem(item)
         setIsDialogOpen(true)
     }
-    const closeDialog = () => { setIsDialogOpen(false); setEditItem(null); setReceiptUrl("") }
 
     // Re-fetch when active trip changes (already handled by useEffect)
     // But verify on mount if needed
@@ -1100,26 +1027,32 @@ export function ToolsView() {
                                     <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
                                 </Button>
 
-                                {/* Expense List */}
-                                <div className="space-y-2">
-                                    {filteredExpenses.filter(item => !activeCategory || item.category === activeCategory).map((item: Expense) => (
-                                        <ExpenseItem key={item.id} item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
-                                    ))}
-                                    {filteredExpenses.length === 0 && (
-                                        <div className="text-center py-10 text-slate-400">
-                                            <div className="text-3xl mb-2">📭</div>
-                                            <p className="text-sm mb-3">
-                                                {expenseView === 'daily'
-                                                    ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
-                                                    : '暫無記錄'
-                                                }
-                                            </p>
-                                            <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
-                                                <Plus className="w-4 h-4 mr-1" /> 新增支出
-                                            </Button>
-                                        </div>
-                                    )}
+                                {/* Expense List (Virtualized) */}
+                                <div className="space-y-2 h-[50vh]">
+                                    <Virtuoso
+                                        style={{ height: '100%' }}
+                                        data={filteredExpenses.filter(item => !activeCategory || item.category === activeCategory)}
+                                        itemContent={(_, item) => (
+                                            <div className="pb-2">
+                                                <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
+                                            </div>
+                                        )}
+                                    />
                                 </div>
+                                {filteredExpenses.length === 0 && (
+                                    <div className="text-center py-10 text-slate-400">
+                                        <div className="text-3xl mb-2">📭</div>
+                                        <p className="text-sm mb-3">
+                                            {expenseView === 'daily'
+                                                ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
+                                                : '暫無記錄'
+                                            }
+                                        </p>
+                                        <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
+                                            <Plus className="w-4 h-4 mr-1" /> 新增支出
+                                        </Button>
+                                    </div>
+                                )}
                             </TabsContent>
 
                             <TabsContent value="ai" className="mt-4 space-y-4">
@@ -1262,7 +1195,7 @@ export function ToolsView() {
                         </Tabs>
                     </div>
                 </div>
-            </PullToRefresh>
+            </PullToRefresh >
             < AlertDialog open={!!deletingCardId
             } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
                 <AlertDialogContent>
@@ -1286,197 +1219,19 @@ export function ToolsView() {
                 </AlertDialogContent>
             </AlertDialog >
 
-            {/* Expense Dialog */}
-            < Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
-                    <div className="space-y-5 py-2">
-                        {/* 💰 Section 1: Amount Input (Hero Section) */}
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                💰 金額
-                            </Label>
-
-                            {/* Currency Selector (Full Width) */}
-                            <Select value={inputCurrency} onValueChange={setInputCurrency}>
-                                <SelectTrigger className="h-11 w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-bold text-base">
-                                    <SelectValue placeholder="選擇幣別" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {CURRENCIES.map(c => (
-                                        <SelectItem key={c.code} value={c.code} className="py-2.5">
-                                            <span className="mr-2 text-lg">{c.flag}</span>
-                                            <span className="font-mono font-bold">{c.code}</span>
-                                            <span className="text-slate-400 ml-2">- {c.name}</span>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Amount Input + TWD Conversion */}
-                            <div className="flex gap-3 items-stretch">
-                                <div className="flex-1 relative">
-                                    <Input
-                                        placeholder="0"
-                                        type="number"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        className="text-2xl font-mono font-bold h-12 text-center bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600"
-                                        value={amountJPY}
-                                        onChange={e => setAmountJPY(e.target.value)}
-                                    />
-                                </div>
-                                <div className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-white whitespace-nowrap min-w-[8rem] justify-center font-bold shadow-lg">
-                                    <span className="text-emerald-200 text-xs mr-1">≈</span>
-                                    NT$ {Math.round((parseInt(amountJPY) || 0) * inputRate).toLocaleString()}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 📝 Section 2: Basic Info */}
-                        <div className="space-y-3">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                📝 明細
-                            </Label>
-                            <Input
-                                placeholder="消費名稱（例：午餐、交通卡儲值）"
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                                className="h-11 text-base"
-                            />
-
-                            {/* Date picker */}
-                            {activeTrip?.start_date ? (
-                                <select
-                                    value={expenseDate}
-                                    onChange={e => setExpenseDate(e.target.value)}
-                                    className="w-full h-11 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium"
-                                >
-                                    {(() => {
-                                        const trip = activeTrip as Trip
-                                        const startDate = new Date(trip.start_date!)
-                                        const endDate = trip.end_date ? new Date(trip.end_date) : null
-                                        const totalDays = trip.days?.length ||
-                                            (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
-
-                                        return Array.from({ length: totalDays }, (_, i) => {
-                                            const date = new Date(startDate)
-                                            date.setDate(date.getDate() + i)
-                                            const dateStr = formatLocalDate(date)
-                                            const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
-                                            return (
-                                                <option key={i} value={dateStr}>
-                                                    📅 Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
-                                                </option>
-                                            )
-                                        })
-                                    })()}
-                                </select>
-                            ) : (
-                                <div className="text-xs text-slate-400 py-2 text-center bg-slate-50 rounded-lg">⚠️ 請先選擇行程</div>
-                            )}
-                        </div>
-
-                        {/* 🏷️ Section 3: Category */}
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                🏷️ 分類
-                            </Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {Object.entries(CATEGORIES).map(([key, info]) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => setCategory(key)}
-                                        className={cn(
-                                            "flex items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
-                                            category === key
-                                                ? "border-slate-800 bg-slate-800 text-white shadow-md scale-105"
-                                                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400 hover:bg-slate-50"
-                                        )}
-                                    >
-                                        <info.icon className="w-4 h-4" /> {info.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 💳 Section 4: Payment Method */}
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                💳 付款方式
-                            </Label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {PAYMENT_METHODS.map(m => (
-                                    <button
-                                        key={m.id}
-                                        onClick={() => setMethod(m.id)}
-                                        className={cn(
-                                            "flex flex-col items-center justify-center p-2.5 rounded-xl border-2 text-xs font-medium transition-all",
-                                            method === m.id
-                                                ? "border-slate-800 bg-slate-800 text-white shadow-md"
-                                                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400"
-                                        )}
-                                    >
-                                        <m.icon className="w-5 h-5 mb-1" />{m.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Credit Card Details (Conditional) */}
-                            {(method === "JCB" || method === "VisaMaster") && (
-                                <div className="flex gap-2 mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                    <Input placeholder="卡片名稱" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1 bg-white dark:bg-slate-800" />
-                                    <div className="relative w-24">
-                                        <input
-                                            type="text"
-                                            list="cashback-rates"
-                                            placeholder="回饋%"
-                                            value={cashback}
-                                            onChange={e => setCashback(e.target.value)}
-                                            className="w-full h-9 px-3 text-sm rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono"
-                                        />
-                                        <datalist id="cashback-rates">
-                                            <option value="0.5">0.5%</option>
-                                            <option value="1">1%</option>
-                                            <option value="1.5">1.5%</option>
-                                            <option value="2">2%</option>
-                                            <option value="2.5">2.5%</option>
-                                            <option value="3">3%</option>
-                                            <option value="5">5%</option>
-                                        </datalist>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* 📸 Section 5: Receipt */}
-                        <div className="space-y-2">
-                            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                📸 收據 / 照片
-                            </Label>
-                            <ImageUpload
-                                value={receiptUrl}
-                                onChange={(url) => setReceiptUrl(url)}
-                                onRemove={() => setReceiptUrl("")}
-                                folder="ryan_travel/receipts"
-                            />
-                        </div>
-
-                        {/* 👥 Section 6: Visibility Toggle */}
-                        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                                {isPublic ? <><Users className="w-5 h-5 text-blue-500" /> {t('shared')}</> : <><User className="w-5 h-5 text-amber-500" /> {t('private')}</>}
-                            </Label>
-                            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                        </div>
-
-                        {/* 💾 Save Button */}
-                        <Button className="w-full h-12 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-base font-bold shadow-lg" onClick={handleSaveExpense} disabled={isSavingExpense}>
-                            {isSavingExpense ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />儲存中...</> : <><CheckCircle2 className="w-5 h-5 mr-2" />{t('save')}</>}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog >
+            <ExpenseDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                editItem={editItem}
+                activeTripId={activeTripId}
+                activeTrip={activeTrip}
+                selectedCurrency={selectedCurrency}
+                onSaveSuccess={(targetDate) => {
+                    setSelectedDate(targetDate)
+                    setExpenseView('daily')
+                    fetchExpenses()
+                }}
+            />
 
             {/* 🆕 v3.8: 信用卡編輯 Dialog */}
             < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >
@@ -1548,11 +1303,11 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: 
     const finalTWD = Math.round(item.amount * usedRate - cashback)
 
     return (
-        <div className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-200 shadow-sm group active:scale-[0.98] transition-transform">
+        <div className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
             <div className="flex items-center gap-3 overflow-hidden">
                 <div className={cn("p-2 rounded-full shrink-0", catInfo.color)}><CatIcon className="w-4 h-4" /></div>
                 <div className="min-w-0">
-                    <div className="font-bold text-slate-800 truncate text-sm flex items-center gap-2">
+                    <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm flex items-center gap-2">
                         {item.title}
                         {item.image_url && (
                             <a href={item.image_url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-500">
@@ -1560,9 +1315,9 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: 
                             </a>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                        {item.card_name ? <span className="bg-indigo-50 text-indigo-600 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 text-stone-500 px-1.5 rounded">{methodInfo.label}</span>}
-                        <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 text-blue-500" : "bg-amber-50 text-amber-500")}>{item.is_public ? "公帳" : "私帳"}</span>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {item.card_name ? <span className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400 px-1.5 rounded">{methodInfo.label}</span>}
+                        <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400")}>{item.is_public ? "公帳" : "私帳"}</span>
                         <span>{item.creator_name}</span>
                     </div>
                 </div>
@@ -1581,12 +1336,12 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: 
                             </div>
                         </div>
                     ) : (
-                        <div className="font-mono font-bold text-slate-900 text-sm">NT${item.amount.toLocaleString()}</div>
+                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">NT${item.amount.toLocaleString()}</div>
                     )}
                     {(item.cashback_rate ?? 0) > 0 && <span className="text-[10px] text-green-500 block text-right">(-{Math.round(cashback)})</span>}
                 </div>
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-slate-600 hover:bg-slate-100 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-red-400 hover:text-red-600 hover:bg-red-50 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-11 w-11 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-11 w-11 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
             </div>
         </div>
     )

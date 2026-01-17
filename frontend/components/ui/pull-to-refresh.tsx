@@ -91,6 +91,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const willChangeApplied = useRef(false)
+    const isGestureCaptured = useRef(false) // 🆕 Track if we've hijacked the gesture
 
     // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
     useEffect(() => {
@@ -115,10 +116,12 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             containerRef.current.style.setProperty('--ptr-progress', '0')
             containerRef.current.style.setProperty('--ptr-distance', '0px')
             containerRef.current.style.setProperty('--ptr-opacity', '0')
+            containerRef.current.style.touchAction = 'pan-y' // 🆕 Restore native scrollability
         }
 
         currentDistanceRef.current = 0
         isPulling.current = false
+        isGestureCaptured.current = false
 
         setPtrState({
             status: PTRStatus.IDLE,
@@ -156,14 +159,10 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 return
             }
 
-            // Capture pointer needed for some browsers/devices
-            if (container.setPointerCapture) {
-                try { container.setPointerCapture(e.pointerId) } catch { /** ignore */ }
-            }
-
             startY.current = e.clientY
             startX.current = e.clientX
             isPulling.current = true
+            isGestureCaptured.current = false
 
             if (!willChangeApplied.current && contentRef.current) {
                 contentRef.current.style.willChange = 'transform'
@@ -193,21 +192,23 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             const diffY = e.clientY - startY.current
             const diffX = Math.abs(e.clientX - startX.current)
 
-            // Horizontal guard
-            if (diffX > Math.abs(diffY) * 1.5 && currentDistanceRef.current < 5) {
-                isPulling.current = false
-                resetPosition()
-                return
+            // 🚀 Silk Engine v2.1: Ultra-tight 2px threshold + Active Hijacking
+            if (!isGestureCaptured.current) {
+                if (diffY > 2 && diffY > diffX) {
+                    if (container.setPointerCapture) {
+                        try { container.setPointerCapture(e.pointerId) } catch { }
+                    }
+                    isGestureCaptured.current = true
+                    container.style.touchAction = 'none' // ⚡ Lock browser scroll immediately
+                } else if (diffX > 5 || diffY < -5) {
+                    isPulling.current = false
+                    return
+                } else {
+                    return
+                }
             }
 
-            // Upward scroll abort
-            if (diffY <= 0) {
-                isPulling.current = false
-                resetPosition()
-                return
-            }
-
-            // 🛡️ Prevent native behaviors
+            // 🛡️ Prevent native behaviors ONLY once we've captured the gesture
             if (e.cancelable) e.preventDefault()
 
             if (!ticking.current) {
@@ -258,11 +259,16 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
         const handlePointerUp = async (e: PointerEvent) => {
             if (!isPulling.current) return
 
-            if (container.releasePointerCapture) {
-                try { container.releasePointerCapture(e.pointerId) } catch { /** ignore */ }
+            if (isGestureCaptured.current && container.releasePointerCapture) {
+                try {
+                    container.releasePointerCapture(e.pointerId)
+                    container.style.touchAction = 'pan-y' // 🆕 Restore
+                } catch { /** ignore */ }
             }
 
+            const captured = isGestureCaptured.current
             isPulling.current = false
+            isGestureCaptured.current = false
             if (rafId.current) {
                 cancelAnimationFrame(rafId.current)
                 rafId.current = null
@@ -282,7 +288,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 willChangeApplied.current = false
             }, 300)
 
-            if (statusRef.current === PTRStatus.READY) {
+            if (captured && statusRef.current === PTRStatus.READY) {
                 // LOCK state
                 statusRef.current = PTRStatus.REFRESHING
                 setPtrState({ status: PTRStatus.REFRESHING, pullDistance: 80 })
@@ -305,28 +311,31 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     statusRef.current = PTRStatus.SUCCESS
                     setPtrState({ status: PTRStatus.SUCCESS, pullDistance: 0 })
                     haptic.success()
-
-                    // Auto reset handled by useEffect
-
-                } catch (error) {
+                } catch (err) {
                     statusRef.current = PTRStatus.ERROR
                     setPtrState({ status: PTRStatus.ERROR, pullDistance: 0 })
 
-                    if (error instanceof Error && error.message === 'timeout') {
+                    if (err instanceof Error && err.message === 'timeout') {
                         toast.error('網路逾時，請稍後再試')
                     }
                     haptic.error()
                 }
-            } else {
+            } else if (currentDistanceRef.current > 0) {
+                // 🚀 Zero-Overhead: Only reset if we actually pulled.
                 resetPosition()
+            } else {
+                // Pure tap: Just clear refs quietly without React state update
+                isPulling.current = false
+                isGestureCaptured.current = false
+                ticking.current = false
             }
         }
 
-        container.addEventListener('pointerdown', handlePointerDown)
-        container.addEventListener('pointermove', handlePointerMove)
-        container.addEventListener('pointerup', handlePointerUp)
-        container.addEventListener('pointercancel', handlePointerUp)
-        container.addEventListener('pointerleave', handlePointerUp)
+        container.addEventListener('pointerdown', handlePointerDown, { passive: true })
+        container.addEventListener('pointermove', handlePointerMove, { passive: false })
+        container.addEventListener('pointerup', handlePointerUp, { passive: true })
+        container.addEventListener('pointercancel', handlePointerUp, { passive: true })
+        container.addEventListener('pointerleave', handlePointerUp, { passive: true })
 
         return () => {
             const currentRaf = rafId.current
@@ -422,7 +431,9 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                             exit={{ scale: 0.5, rotate: 180 }}
                             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                             className={cn(
-                                "w-12 h-12 rounded-full bg-white shadow-lg border border-slate-100",
+                                "w-12 h-12 rounded-full shadow-lg border",
+                                "bg-white border-slate-100",
+                                "dark:bg-slate-800 dark:border-slate-700",
                                 "flex items-center justify-center",
                                 config.color
                             )}
@@ -494,7 +505,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     }
                 }}
                 aria-label="重新整理頁面"
-                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-1/2 focus:-translate-x-1/2 focus:z-20 focus:bg-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-1/2 focus:-translate-x-1/2 focus:z-20 focus:bg-white dark:focus:bg-slate-800 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:text-slate-900 dark:focus:text-slate-100"
             >
                 重新整理
             </button>
