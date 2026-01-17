@@ -12,7 +12,7 @@
  * - 10s timeout protection
  */
 
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react"
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback, startTransition } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     ChevronDown,
@@ -55,46 +55,22 @@ export interface PullToRefreshHandle {
     container: HTMLDivElement | null
 }
 
-// 🎯 PTR 物理配置
+// 🎯 PTR 物理配置 (Silk Engine v2.0)
 const PTR_CONFIG = {
     threshold: 80,
     maxPull: 150,
     timeout: 10000,
-    dampingZones: {
-        light: { max: 60, resistance: 0.8 },
-        medium: { max: 120, resistance: 0.5 },
-        heavy: { max: 200, resistance: 0.25 }
-    }
-}
-
-/**
- * 🔑 三階段非線性阻尼公式
- */
-function calculateDampedTranslation(rawDiff: number): number {
-    const { dampingZones, maxPull } = PTR_CONFIG
-
-    if (rawDiff <= 0) return 0
-
-    if (rawDiff <= dampingZones.light.max) {
-        return rawDiff * dampingZones.light.resistance
-    } else if (rawDiff <= dampingZones.medium.max) {
-        const lightDistance = dampingZones.light.max * dampingZones.light.resistance
-        const excessDiff = rawDiff - dampingZones.light.max
-        return lightDistance + (excessDiff * dampingZones.medium.resistance)
-    } else {
-        const lightDistance = dampingZones.light.max * dampingZones.light.resistance
-        const mediumDistance = (dampingZones.medium.max - dampingZones.light.max) * dampingZones.medium.resistance
-        const baseDistance = lightDistance + mediumDistance
-        const excessDiff = rawDiff - dampingZones.medium.max
-        const heavyTranslation = excessDiff * dampingZones.heavy.resistance
-        return Math.min(baseDistance + heavyTranslation, maxPull)
+    // 🆕 Logarithmic Damping Constants
+    damping: {
+        k: 60, // Scale factor
+        s: 40  // Stretch factor
     }
 }
 
 export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold, scrollableRef }, ref) => {
     const haptic = useHaptic()
 
-    // 🔑 單一 State Object（避免雙重渲染）
+    // 🔑 單一 State Object（僅用於邏輯狀態，不驅動動畫）
     const [ptrState, setPtrState] = useState<PTRState>({
         status: PTRStatus.IDLE,
         pullDistance: 0
@@ -106,12 +82,12 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
     const containerRef = internalContainerRef
     const contentRef = useRef<HTMLDivElement>(null)
+    const currentDistanceRef = useRef(0) // 🆕 Direct DOM source of truth
     const startY = useRef(0)
     const startX = useRef(0)
     const isPulling = useRef(false)
     const rafId = useRef<number | null>(null)
     const ticking = useRef(false)
-    const resetTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const prevStatusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const willChangeApplied = useRef(false)
@@ -129,30 +105,42 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     }, [pullThreshold])
 
     // 🎬 Reset position
-    const resetPosition = () => {
+    const resetPosition = useCallback(() => {
+        // Stop any pending animations
+        if (rafId.current) cancelAnimationFrame(rafId.current)
+
+        // Reset DOM state
+        if (contentRef.current && containerRef.current) {
+            contentRef.current.style.transform = ''
+            containerRef.current.style.setProperty('--ptr-progress', '0')
+            containerRef.current.style.setProperty('--ptr-distance', '0px')
+            containerRef.current.style.setProperty('--ptr-opacity', '0')
+        }
+
+        currentDistanceRef.current = 0
+        isPulling.current = false
+
         setPtrState({
             status: PTRStatus.IDLE,
             pullDistance: 0
         })
-        prevStatusRef.current = PTRStatus.IDLE
-    }
+    }, [containerRef])
 
-    // 🆕 使用原生事件監聯器
+    // 🆕 Silk Engine v2.0: Pointer Events + Direct DOM
     useEffect(() => {
         const container = containerRef.current
         if (!container) return
 
-        // Helper to get the actual scroll element
         const getScrollElement = () => {
             if (!scrollableRef) return container
-
-            if ('current' in scrollableRef) {
-                return scrollableRef.current as HTMLElement
-            }
+            if ('current' in scrollableRef) return scrollableRef.current as HTMLElement
             return scrollableRef as HTMLElement
         }
 
-        const handleNativeTouchStart = (e: TouchEvent) => {
+        const handlePointerDown = (e: PointerEvent) => {
+            // Only handle primary button
+            if (e.button !== 0) return
+
             const scrollEl = getScrollElement()
             const isAtTop = scrollEl ? scrollEl.scrollTop <= 5 : window.scrollY <= 0
 
@@ -168,9 +156,13 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 return
             }
 
-            const touch = e.touches[0]
-            startY.current = touch.clientY
-            startX.current = touch.clientX
+            // Capture pointer needed for some browsers/devices
+            if (container.setPointerCapture) {
+                try { container.setPointerCapture(e.pointerId) } catch { /** ignore */ }
+            }
+
+            startY.current = e.clientY
+            startX.current = e.clientX
             isPulling.current = true
 
             if (!willChangeApplied.current && contentRef.current) {
@@ -180,19 +172,17 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             }
         }
 
-        const handleNativeTouchMove = (e: TouchEvent) => {
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!isPulling.current) return
+
             const scrollEl = getScrollElement()
             const isAtTop = scrollEl ? scrollEl.scrollTop <= 5 : window.scrollY <= 0
 
-            if (!isAtTop) {
-                if (isPulling.current) {
-                    isPulling.current = false
-                    resetPosition()
-                }
+            // If user scrolled down during pull, abort
+            if (!isAtTop && currentDistanceRef.current === 0) {
+                isPulling.current = false
                 return
             }
-
-            if (!isPulling.current) return
 
             if (statusRef.current === PTRStatus.REFRESHING ||
                 statusRef.current === PTRStatus.SUCCESS ||
@@ -200,42 +190,64 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 return
             }
 
-            const touch = e.touches[0]
-            const diffY = touch.clientY - startY.current
-            const diffX = Math.abs(touch.clientX - startX.current)
+            const diffY = e.clientY - startY.current
+            const diffX = Math.abs(e.clientX - startX.current)
 
-            if (diffX > Math.abs(diffY) * 1.5) {
+            // Horizontal guard
+            if (diffX > Math.abs(diffY) * 1.5 && currentDistanceRef.current < 5) {
                 isPulling.current = false
                 resetPosition()
                 return
             }
 
+            // Upward scroll abort
             if (diffY <= 0) {
                 isPulling.current = false
                 resetPosition()
                 return
             }
 
-            // 🛡️ Prevent native scrolling/rubberbanding when pulling
-            if (e.cancelable) {
-                e.preventDefault()
-            }
+            // 🛡️ Prevent native behaviors
+            if (e.cancelable) e.preventDefault()
 
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
-                    const dampedY = Math.round(calculateDampedTranslation(diffY))
-                    const newStatus = calculateStatus(dampedY)
+                    // 🆕 Logarithmic Damping: f(x) = k * ln(1 + x/s)
+                    const { k, s } = PTR_CONFIG.damping
+                    const dampedY = Math.max(0, k * Math.log(1 + diffY / s))
 
-                    if (newStatus === PTRStatus.READY && prevStatusRef.current !== PTRStatus.READY) {
-                        haptic.tap()
+                    // Update Refs (Source of Truth)
+                    currentDistanceRef.current = dampedY
+
+                    // 🚀 Direct DOM Updates (Main Thread Unblocked)
+                    if (contentRef.current && containerRef.current) {
+                        contentRef.current.style.transform = `translate3d(0, ${dampedY}px, 0)`
+
+                        const progress = Math.min(dampedY / pullThreshold, 1)
+                        const opacity = Math.min(progress * 2, 1)
+
+                        // Update CSS Variables for Indicator
+                        containerRef.current.style.setProperty('--ptr-progress', progress.toString())
+                        containerRef.current.style.setProperty('--ptr-distance', `${dampedY}px`)
+                        containerRef.current.style.setProperty('--ptr-opacity', opacity.toString())
                     }
 
-                    prevStatusRef.current = newStatus
+                    const newStatus = calculateStatus(dampedY)
 
-                    setPtrState({
-                        status: newStatus,
-                        pullDistance: dampedY
-                    })
+                    // ⚡ Status Change Debounce & Concurrent Update
+                    if (newStatus !== statusRef.current) {
+                        if (newStatus === PTRStatus.READY && statusRef.current !== PTRStatus.READY) {
+                            haptic.tap()
+                        }
+
+                        prevStatusRef.current = statusRef.current // Update prev status before setting new one locally
+                        statusRef.current = newStatus // Update local ref immediately
+
+                        // Wrap state update in Transition to keep UI responsive
+                        startTransition(() => {
+                            setPtrState(prev => ({ ...prev, status: newStatus }))
+                        })
+                    }
 
                     ticking.current = false
                 })
@@ -243,16 +255,21 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             }
         }
 
-        const handleNativeTouchEnd = async () => {
+        const handlePointerUp = async (e: PointerEvent) => {
             if (!isPulling.current) return
-            isPulling.current = false
 
+            if (container.releasePointerCapture) {
+                try { container.releasePointerCapture(e.pointerId) } catch { /** ignore */ }
+            }
+
+            isPulling.current = false
             if (rafId.current) {
                 cancelAnimationFrame(rafId.current)
                 rafId.current = null
             }
             ticking.current = false
 
+            // Restore transitions for smooth snap-back
             if (contentRef.current) {
                 contentRef.current.style.transition = 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
             }
@@ -266,108 +283,100 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             }, 300)
 
             if (statusRef.current === PTRStatus.READY) {
-                setPtrState({
-                    status: PTRStatus.REFRESHING,
-                    pullDistance: 80
-                })
-                prevStatusRef.current = PTRStatus.REFRESHING
+                // LOCK state
+                statusRef.current = PTRStatus.REFRESHING
+                setPtrState({ status: PTRStatus.REFRESHING, pullDistance: 80 })
+
+                // Set CSS for Refreshing state
+                if (containerRef.current) {
+                    containerRef.current.style.setProperty('--ptr-distance', '80px')
+                    containerRef.current.style.setProperty('--ptr-opacity', '1')
+                }
+                if (contentRef.current) {
+                    contentRef.current.style.transform = `translate3d(0, 80px, 0)`
+                }
 
                 try {
                     await Promise.race([
                         onRefresh(),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('timeout')), PTR_CONFIG.timeout)
-                        )
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), PTR_CONFIG.timeout))
                     ])
 
-                    setPtrState({
-                        status: PTRStatus.SUCCESS,
-                        pullDistance: 0
-                    })
-                    prevStatusRef.current = PTRStatus.SUCCESS
+                    statusRef.current = PTRStatus.SUCCESS
+                    setPtrState({ status: PTRStatus.SUCCESS, pullDistance: 0 })
                     haptic.success()
 
-                    resetTimeoutRef.current = setTimeout(() => {
-                        resetPosition()
-                    }, 1500)
+                    // Auto reset handled by useEffect
 
                 } catch (error) {
-                    setPtrState({
-                        status: PTRStatus.ERROR,
-                        pullDistance: 0
-                    })
-                    prevStatusRef.current = PTRStatus.ERROR
+                    statusRef.current = PTRStatus.ERROR
+                    setPtrState({ status: PTRStatus.ERROR, pullDistance: 0 })
 
                     if (error instanceof Error && error.message === 'timeout') {
                         toast.error('網路逾時，請稍後再試')
                     }
                     haptic.error()
-
-                    resetTimeoutRef.current = setTimeout(() => {
-                        resetPosition()
-                    }, 2000)
                 }
             } else {
                 resetPosition()
             }
         }
 
-        container.addEventListener('touchstart', handleNativeTouchStart, { passive: true })
-        container.addEventListener('touchmove', handleNativeTouchMove, { passive: false })
-        container.addEventListener('touchend', handleNativeTouchEnd, { passive: true })
+        container.addEventListener('pointerdown', handlePointerDown)
+        container.addEventListener('pointermove', handlePointerMove)
+        container.addEventListener('pointerup', handlePointerUp)
+        container.addEventListener('pointercancel', handlePointerUp)
+        container.addEventListener('pointerleave', handlePointerUp)
 
         return () => {
-            if (rafId.current) {
-                cancelAnimationFrame(rafId.current)
-            }
-            if (resetTimeoutRef.current) {
-                clearTimeout(resetTimeoutRef.current)
-            }
-            container.removeEventListener('touchstart', handleNativeTouchStart)
-            container.removeEventListener('touchmove', handleNativeTouchMove)
-            container.removeEventListener('touchend', handleNativeTouchEnd)
-        }
-    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef, scrollableRef])
+            const currentRaf = rafId.current
+            if (currentRaf) cancelAnimationFrame(currentRaf)
 
-    // 🆕 獨立的 SUCCESS/ERROR 重置 useEffect
+            container.removeEventListener('pointerdown', handlePointerDown)
+            container.removeEventListener('pointermove', handlePointerMove)
+            container.removeEventListener('pointerup', handlePointerUp)
+            container.removeEventListener('pointercancel', handlePointerUp)
+            container.removeEventListener('pointerleave', handlePointerUp)
+        }
+    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef, scrollableRef, resetPosition])
+
+    // ... existing cleanup useEffect ...
     useEffect(() => {
         if (ptrState.status === PTRStatus.SUCCESS) {
-            const timer = setTimeout(() => {
-                resetPosition()
-            }, 1500)
+            const timer = setTimeout(() => resetPosition(), 1500)
             return () => clearTimeout(timer)
         }
         if (ptrState.status === PTRStatus.ERROR) {
-            const timer = setTimeout(() => {
-                resetPosition()
-            }, 2000)
+            const timer = setTimeout(() => resetPosition(), 2000)
             return () => clearTimeout(timer)
         }
-    }, [ptrState.status])
+    }, [ptrState.status, resetPosition])
 
     // 🎨 當前配置
     const config = PTR_STATUS_CONFIG[ptrState.status]
     const Icon = ICON_MAP[config.icon]
     const progress = Math.min(ptrState.pullDistance / pullThreshold, 1)
-    const isVisible = ptrState.status !== PTRStatus.IDLE || ptrState.pullDistance > 0
-    const opacity = isVisible ? Math.min(progress * 2, 1) : 0
 
     return (
         <div
             ref={containerRef}
             className={cn(
                 "relative overflow-auto",
-                "overscroll-y-contain",
+                "overscroll-y-contain", // 🆕 Overscroll Locking
                 "touch-pan-y",
                 className
             )}
             style={{
                 WebkitOverflowScrolling: 'touch',
                 transform: 'translateZ(0)',
-                backfaceVisibility: 'hidden'
-            }}
+                backfaceVisibility: 'hidden',
+                // 🆕 Initialize CSS Variables
+                ['--ptr-progress' as string]: 0,
+                ['--ptr-distance' as string]: '0px',
+                ['--ptr-opacity' as string]: 0
+            } as React.CSSProperties}
         >
-            {/* 🎯 Indicator */}
+            {/* 🎯 Indicator (CSS Variables Driver) */}
             <div
                 className={cn(
                     "absolute left-1/2 -translate-x-1/2 z-10",
@@ -376,12 +385,13 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                     "transition-all duration-150"
                 )}
                 style={{
+                    // 🆕 Hybrid Positioning: Use CSS var for pulling, State for static/success states
                     top: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
                         ? -80
-                        : Math.max(ptrState.pullDistance / 2 - 40, -80),
+                        : 'calc(var(--ptr-distance) / 2 - 40px)',
                     opacity: (ptrState.status === PTRStatus.SUCCESS || ptrState.status === PTRStatus.ERROR)
                         ? 0
-                        : opacity
+                        : 'var(--ptr-opacity)'
                 }}
             >
                 {/* 🎨 Icon Container */}
@@ -396,7 +406,7 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                                 className="absolute inset-0 flex items-center justify-center"
                             >
                                 <CircularProgress
-                                    progress={progress}
+                                    progress={progress} // ⚠️ Partial Limitation: CircularProgress still needs props, but it's small.
                                     size={56}
                                     strokeWidth={2.5}
                                 />
@@ -447,11 +457,12 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 </AnimatePresence>
             </div>
 
-            {/* 📜 Content */}
+            {/* 📜 Content (Ref-based, not State-based for transform) */}
             <div
                 ref={contentRef}
                 style={{
-                    transform: `translate3d(0, ${Math.round(ptrState.pullDistance)}px, 0)`,
+                    // 🆕 Remove state-based transform binding here!
+                    // It is now handled purely by Direct DOM in pointermove
                     backfaceVisibility: 'hidden'
                 }}
             >
@@ -474,13 +485,12 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                             status: PTRStatus.SUCCESS,
                             pullDistance: 0
                         })
-                        setTimeout(resetPosition, 1500)
+                        // Auto reset by useEffect
                     } catch {
                         setPtrState({
                             status: PTRStatus.ERROR,
                             pullDistance: 0
                         })
-                        setTimeout(resetPosition, 2000)
                     }
                 }}
                 aria-label="重新整理頁面"

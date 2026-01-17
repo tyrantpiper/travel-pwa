@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, ComponentType } from "react"
+import { useState, useEffect, useMemo, memo, ComponentType } from "react"
 import { motion } from "framer-motion"
 import { useSWRConfig } from "swr"
 import {
@@ -1539,7 +1539,7 @@ export function ToolsView() {
     )
 }
 
-function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
+const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
     const CatIcon = catInfo.icon
@@ -1590,4 +1590,4 @@ function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
             </div>
         </div>
     )
-}
+})
