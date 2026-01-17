@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import { ArrowLeft, Calendar, Plus, Hash, Trash2, MapPin, Edit3, Sun, CloudRain, AlertCircle, LogOut, Download } from "lucide-react"
-import { Virtuoso } from "react-virtuoso"
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso"
 // 🆕 DND-Kit imports
 import {
     DndContext,
@@ -93,7 +93,6 @@ export function ItineraryView() {
     const [isAddMode, setIsAddMode] = useState(false)
     const [isSavingActivity, setIsSavingActivity] = useState(false)
     const [mounted, setMounted] = useState(false)
-    const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(undefined) // 🔧 Virtuoso scroll parent
     useEffect(() => setMounted(true), []) // 🔧 Client-side only rendering for Portal
 
 
@@ -109,6 +108,11 @@ export function ItineraryView() {
     const [isReordering, setIsReordering] = useState(false)
     const [leavingTripId, setLeavingTripId] = useState<string | null>(null)
     const [isSelectingLocation, setIsSelectingLocation] = useState(false)
+    const itnVirtuosoRef = useRef<VirtuosoHandle>(null)
+    // 🔧 v2.5: Use State callback to ensure ref propagation to Virtuoso
+    const [scrollerEl, setScrollerEl] = useState<HTMLElement | null>(null)
+    const itnScrollerRef = useRef<HTMLElement | null>(null) // Keep for fallbacks/imperative usage if needed
+    const lastItnSwitch = useRef<number>(0)
 
     // 🆕 DND Sensors (同多圖拖曳)
     const dndSensors = useSensors(
@@ -1250,7 +1254,11 @@ export function ItineraryView() {
         }
     }
 
-    const handleBack = () => { setActiveTripId(null); setViewMode('list') }
+    const handleBack = () => {
+        lastItnSwitch.current = performance.now()
+        setActiveTripId(null);
+        setViewMode('list')
+    }
 
     // Calculate total days from start_date and end_date, with fallback
     const totalDays = (() => {
@@ -1292,6 +1300,7 @@ export function ItineraryView() {
                 <div className="flex flex-col h-[100dvh] bg-stone-50 overflow-hidden">
                     <PullToRefresh
                         className="flex-1 px-6 py-12 pb-32"
+                        lastInteractionTime={lastItnSwitch}
                         onRefresh={async () => {
                             try {
                                 await reloadTrips()
@@ -1373,7 +1382,11 @@ export function ItineraryView() {
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="cursor-pointer active:opacity-90" onClick={() => { setActiveTripId(trip.id); setViewMode('detail'); }}>
+                                    <div className="cursor-pointer active:opacity-90" onClick={() => {
+                                        lastItnSwitch.current = performance.now()
+                                        setActiveTripId(trip.id);
+                                        setViewMode('detail');
+                                    }}>
                                         <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                                             {trip.cover_image ? (
                                                 <div className="relative w-full h-full">
@@ -1479,7 +1492,16 @@ export function ItineraryView() {
 
     return (
         // 🔧 Phase 14: View manages its own scrolling
-        <div ref={(el) => setScrollParent(el || undefined)} className="h-full overflow-y-auto overscroll-contain">
+        // 🔧 Phase 14: View manages its own scrolling - Refactored for v2.5 Inverted Control
+        <div
+            ref={(ref) => {
+                if (ref) {
+                    setScrollerEl(ref) // 🔧 v2.5: State update triggers re-render for children
+                    itnScrollerRef.current = ref // Keep refs synced just in case
+                }
+            }}
+            className="h-full overflow-y-auto overscroll-contain"
+        >
             <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32 overflow-x-hidden">
                 <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="px-6 flex justify-between items-end mb-4">
@@ -1502,6 +1524,9 @@ export function ItineraryView() {
                     </div>
 
                     <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar items-center">
+                        {/* 👻 Ghost Anchor Target for PullToRefresh - v2.5 Moved to Root Scroller */}
+                        <div id="ptr-ghost-anchor" className="h-0 w-full" />
+
                         {/* 🆕 新增天數按鈕 (開頭) */}
                         <button
                             onClick={() => handleAddDay("before")}
@@ -1565,9 +1590,12 @@ export function ItineraryView() {
                 </div>
 
                 <PullToRefresh
-                    scrollableRef={scrollParent}
-                    onRefresh={async () => { await reloadTripDetail() }}
                     className="flex-1"
+                    scrollableRef={scrollerEl} // 🔧 v2.5: Pass state-based ref
+                    lastInteractionTime={lastItnSwitch}
+                    onRefresh={async () => {
+                        await reloadTripDetail()
+                    }}
                 >
                     <div className="py-6 px-6 bg-stone-50/50 dark:bg-slate-900/50">
                         <div className="flex items-center justify-between mb-4">
@@ -1596,7 +1624,7 @@ export function ItineraryView() {
                                             onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, true)}
                                             className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400"
                                         >
-                                            {isAddingDay ? <><Loader2 className="w-4 h-4 animate-spin mr-1" />處理中...</> : "✨ 是，移植內容"}
+                                            {isAddingDay ? <><Loader2 className="w-4 h-4 mr-1" />處理中...</> : "✨ 是，移植內容"}
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
@@ -2274,10 +2302,11 @@ export function ItineraryView() {
                                         strategy={verticalListSortingStrategy}
                                     >
                                         <Virtuoso
-                                            customScrollParent={scrollParent}
-                                            // 🔧 Fix: Remove useWindowScroll as we act as our own scroll container
-                                            // useWindowScroll  <-- REMOVED
+                                            ref={itnVirtuosoRef}
+                                            customScrollParent={scrollerEl || undefined} // 🔧 v2.5: Inverted Control (State-based) - Fix type mismatch
+                                            useWindowScroll={false}
                                             data={currentDayData}
+                                            // 🔧 v2.5: Remove components.Header (Ghost Anchor moved to root)
                                             itemContent={(idx, item) => {
                                                 const isHeader = item.category === 'header' || (item.time || item.time_slot || "00:00") === '00:00'
                                                 return (

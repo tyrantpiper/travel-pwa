@@ -97,6 +97,7 @@ export function InfoView() {
     const [isHotelSearching, setIsHotelSearching] = useState(false)
     const [searchingHotelIdx, setSearchingHotelIdx] = useState<number | null>(null)
     const [flightTab, setFlightTab] = useState<'outbound' | 'inbound'>('outbound')
+    const lastInfoSwitch = useRef<number>(0) // 🆕 Mechanical Guard (200ms)
 
     useEffect(() => {
         const fetchInfo = async () => {
@@ -257,8 +258,9 @@ export function InfoView() {
     }
 
     return (
-        // 🔧 Phase 14: View manages its own scrolling
-        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
+        // 🔧 Phase 14: View manages its own
+        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain px-6 py-6 pb-20">
+            <div id="ptr-ghost-anchor" className="h-0" />
             <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
                 <header className="mb-6 space-y-3">
                     <div>
@@ -277,7 +279,12 @@ export function InfoView() {
                     </Button>
                 </header>
 
-                <PullToRefresh onRefresh={refreshInfo} className="flex-1" scrollableRef={scrollRef}>
+                <PullToRefresh
+                    onRefresh={refreshInfo}
+                    className="flex-1"
+                    scrollableRef={scrollRef}
+                    lastInteractionTime={lastInfoSwitch}
+                >
                     <div className="space-y-8">
                         {!activeTripId ? (
                             <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">

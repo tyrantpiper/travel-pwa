@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, memo, ComponentType } from "react"
+import { useState, useEffect, useMemo, memo, ComponentType, useRef } from "react"
 import { motion } from "framer-motion"
 import { useSWRConfig } from "swr"
 import {
@@ -221,6 +221,8 @@ export function ToolsView() {
     const [newCardNotes, setNewCardNotes] = useState("")
     const [newCardIsPublic, setNewCardIsPublic] = useState(false) // 🆕
     const [isSavingCard, setIsSavingCard] = useState(false) // 🆕 Prevent double-click
+    const scrollerRef = useRef<HTMLElement | null>(null) // 🆕 Ref for the actual scroller element
+    const lastTabSwitch = useRef<number>(0) // 🆕 Mechanical Guard (200ms)
 
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
@@ -804,9 +806,11 @@ export function ToolsView() {
     return (
         <>
             {/* 🔧 Phase 14: View manages its own scrolling */}
-            {/* 🆕 Refactor: PTR acts as main scroller */}
+            {/* 🆕 Refactor: PTR acts as main scroller with Momentum Awareness */}
             <PullToRefresh
                 className="h-full bg-stone-50"
+                scrollableRef={activeSection === 'expense' ? scrollerRef : null}
+                lastInteractionTime={lastTabSwitch}
                 onRefresh={async () => {
                     const r = await getExchangeRate(selectedCurrency || 'JPY')
                     setRate(r)
@@ -836,7 +840,12 @@ export function ToolsView() {
                                 ].map((tab) => (
                                     <button
                                         key={tab.value}
-                                        onClick={() => setActiveSection(tab.value)}
+                                        onClick={() => {
+                                            if (activeSection !== tab.value) {
+                                                lastTabSwitch.current = performance.now()
+                                                setActiveSection(tab.value)
+                                            }
+                                        }}
                                         className={`relative z-10 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${activeSection === tab.value ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                     >
                                         {activeSection === tab.value && (
@@ -1031,7 +1040,13 @@ export function ToolsView() {
                                 <div className="space-y-2 h-[50vh]">
                                     <Virtuoso
                                         style={{ height: '100%' }}
+                                        scrollerRef={(ref) => {
+                                            if (ref instanceof HTMLElement) scrollerRef.current = ref
+                                        }}
                                         data={filteredExpenses.filter(item => !activeCategory || item.category === activeCategory)}
+                                        components={{
+                                            Header: () => <div id="ptr-ghost-anchor" className="h-0" />
+                                        }}
                                         itemContent={(_, item) => (
                                             <div className="pb-2">
                                                 <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />

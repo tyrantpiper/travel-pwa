@@ -43,12 +43,12 @@ interface PullToRefreshProps {
     onRefresh: () => Promise<void>
     className?: string
     pullThreshold?: number
-    /**
-     * Optional: The element that actually scrolls.
-     * If provided, we check THIS element's scrollTop instead of the direct container.
-     * Supports both RefObject (useRef) and HTMLElement (state-based ref).
-     */
     scrollableRef?: React.RefObject<HTMLElement | null> | HTMLElement | null | undefined
+    /**
+     * 🆕 Mechanical Guard: Reference to a timestamp (performance.now()).
+     * If recently updated (last 200ms), PTR will be ignored.
+     */
+    lastInteractionTime?: React.RefObject<number>
 }
 
 export interface PullToRefreshHandle {
@@ -67,7 +67,7 @@ const PTR_CONFIG = {
     }
 }
 
-export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold, scrollableRef }, ref) => {
+export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ children, onRefresh, className, pullThreshold = PTR_CONFIG.threshold, scrollableRef, lastInteractionTime }, ref) => {
     const haptic = useHaptic()
 
     // 🔑 單一 State Object（僅用於邏輯狀態，不驅動動畫）
@@ -92,6 +92,10 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
     const statusRef = useRef<PTRStatus>(PTRStatus.IDLE)
     const willChangeApplied = useRef(false)
     const isGestureCaptured = useRef(false) // 🆕 Track if we've hijacked the gesture
+    const isAtTopRef = useRef(true) // 🆕 Ghost Anchor Ref (Zero-Polling)
+    const velocityRef = useRef(0) // 🆕 Tracking momentum
+    const lastTimeRef = useRef(0)
+    const lastYRef = useRef(0)
 
     // 🔧 每次 render 同步 status 到 ref（避免閉包陳舊）
     useEffect(() => {
@@ -140,6 +144,18 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             return scrollableRef as HTMLElement
         }
 
+        // 👻 Ghost Anchor: Zero-Polling At-Top Detection
+        const observer = new IntersectionObserver(([entry]) => {
+            isAtTopRef.current = entry.isIntersecting
+        }, { threshold: 0.1 })
+
+        const setupObserver = () => {
+            const scrollEl = getScrollElement()
+            const anchor = scrollEl?.querySelector('#ptr-ghost-anchor') || scrollEl?.firstElementChild
+            if (anchor) observer.observe(anchor)
+        }
+        setupObserver()
+
         const handlePointerDown = (e: PointerEvent) => {
             // Only handle primary button
             if (e.button !== 0) return
@@ -161,6 +177,8 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
             startY.current = e.clientY
             startX.current = e.clientX
+            lastYRef.current = e.clientY
+            lastTimeRef.current = performance.now()
             isPulling.current = true
             isGestureCaptured.current = false
 
@@ -189,18 +207,33 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
                 return
             }
 
+            const now = performance.now()
+            const dt = now - lastTimeRef.current
+            const dy = e.clientY - lastYRef.current
+            if (dt > 0) velocityRef.current = dy / dt
+            lastTimeRef.current = now
+            lastYRef.current = e.clientY
+
             const diffY = e.clientY - startY.current
             const diffX = Math.abs(e.clientX - startX.current)
 
-            // 🚀 Silk Engine v2.1: Ultra-tight 2px threshold + Active Hijacking
             if (!isGestureCaptured.current) {
-                if (diffY > 2 && diffY > diffX) {
+                // 🆕 Mechanical Guard check
+                if (lastInteractionTime?.current && performance.now() - lastInteractionTime.current < 200) {
+                    return
+                }
+
+                // Only capture if at top AND moving down significantly
+                if (isAtTopRef.current && diffY > 10 && diffY > diffX * 2) {
+                    // Momentum check: if moving up too fast, ignore
+                    if (velocityRef.current < -0.5) return
+
                     if (container.setPointerCapture) {
                         try { container.setPointerCapture(e.pointerId) } catch { }
                     }
                     isGestureCaptured.current = true
-                    container.style.touchAction = 'none' // ⚡ Lock browser scroll immediately
-                } else if (diffX > 5 || diffY < -5) {
+                    container.style.touchAction = 'none'
+                } else if (diffX > 15 || diffY < -10) {
                     isPulling.current = false
                     return
                 } else {
@@ -213,9 +246,16 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
             if (!ticking.current) {
                 rafId.current = requestAnimationFrame(() => {
-                    // 🆕 Logarithmic Damping: f(x) = k * ln(1 + x/s)
+                    // 🆕 Spring Tension Damping: Stage 1 (Normal) vs Stage 2 (Tight)
                     const { k, s } = PTR_CONFIG.damping
-                    const dampedY = Math.max(0, k * Math.log(1 + diffY / s))
+                    let dampedY = k * Math.log(1 + diffY / s)
+
+                    if (dampedY > pullThreshold) {
+                        const overflow = dampedY - pullThreshold
+                        dampedY = pullThreshold + (overflow * 0.4) // Secondary tension
+                    }
+
+                    dampedY = Math.max(0, dampedY)
 
                     // Update Refs (Source of Truth)
                     currentDistanceRef.current = dampedY
@@ -235,9 +275,14 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
 
                     const newStatus = calculateStatus(dampedY)
 
-                    // ⚡ Status Change Debounce & Concurrent Update
+                    // ⚡ Status Change Debounce & Proprioceptive Haptics
                     if (newStatus !== statusRef.current) {
+                        // Stage 1: Threshold Crossing (Medium Vibration)
                         if (newStatus === PTRStatus.READY && statusRef.current !== PTRStatus.READY) {
+                            haptic.success()
+                        }
+                        // Stage 2: Returning to Idle from Ready (Subtle Tap)
+                        else if (newStatus === PTRStatus.PULLING && statusRef.current === PTRStatus.READY) {
                             haptic.tap()
                         }
 
@@ -346,8 +391,9 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(({ c
             container.removeEventListener('pointerup', handlePointerUp)
             container.removeEventListener('pointercancel', handlePointerUp)
             container.removeEventListener('pointerleave', handlePointerUp)
+            observer.disconnect()
         }
-    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef, scrollableRef, resetPosition])
+    }, [pullThreshold, onRefresh, haptic, calculateStatus, containerRef, scrollableRef, resetPosition, lastInteractionTime])
 
     // ... existing cleanup useEffect ...
     useEffect(() => {
