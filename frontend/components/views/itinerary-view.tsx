@@ -111,7 +111,7 @@ export function ItineraryView() {
     const itnVirtuosoRef = useRef<VirtuosoHandle>(null)
     // 🔧 v2.5: Use State callback to ensure ref propagation to Virtuoso
     const [scrollerEl, setScrollerEl] = useState<HTMLElement | null>(null)
-    const itnScrollerRef = useRef<HTMLElement | null>(null) // Keep for fallbacks/imperative usage if needed
+
     const lastItnSwitch = useRef<number>(0)
 
     // 🆕 DND Sensors (同多圖拖曳)
@@ -1494,109 +1494,107 @@ export function ItineraryView() {
         // 🔧 Phase 14: View manages its own scrolling
         // 🔧 Phase 14: View manages its own scrolling - Refactored for v2.5 Inverted Control
         <div
-            ref={(ref) => {
-                if (ref) {
-                    setScrollerEl(ref) // 🔧 v2.5: State update triggers re-render for children
-                    itnScrollerRef.current = ref // Keep refs synced just in case
-                }
-            }}
-            className="h-full overflow-y-auto overscroll-contain"
+            className="h-full flex flex-col overflow-hidden" // 🔧 v2.5.3: Remove overflow here, let PTR handle it
         >
-            <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32 overflow-x-hidden">
-                <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="px-6 flex justify-between items-end mb-4">
-                        <div>
-                            <button onClick={handleBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
-                                <ArrowLeft className="w-3 h-3" /> BACK
-                            </button>
-                            <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
-                        </div>
-                        {/* 🆕 成員管理按鈕 */}
-                        {currentTrip && (
-                            <TripMembersSheet
-                                tripId={currentTrip.id}
-                                members={currentTrip.members || []}
-                                createdBy={currentTrip.created_by || ""}
-                                currentUserId={userId || ""}
-                                onMemberKicked={() => reloadTripDetail()}
-                            />
-                        )}
-                    </div>
-
-                    <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar items-center">
-                        {/* 👻 Ghost Anchor Target for PullToRefresh - v2.5 Moved to Root Scroller */}
-                        <div id="ptr-ghost-anchor" className="h-0 w-full" />
-
-                        {/* 🆕 新增天數按鈕 (開頭) */}
-                        <button
-                            onClick={() => handleAddDay("before")}
-                            className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                            title="在開頭新增一天"
-                        >
-                            +
-                        </button>
-
-                        {/* 🔧 FIX: Show skeleton when trip data is stale to prevent wrong dates */}
-                        {shouldShowDateSkeleton ? (
-                            // Skeleton: avoid showing wrong dates from cached trip
-                            [1, 2, 3].map(i => (
-                                <div key={i} className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse flex-shrink-0" />
-                            ))
-                        ) : (
-                            dayNumbers.map((d) => {
-                                const { date, week } = getDateInfo(d)
-                                return (
-                                    <div key={d} className="relative flex flex-col items-center">
-                                        <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border dark:border-slate-700", day === d ? "text-white" : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100")}>
-                                            {/* Sliding Indicator */}
-                                            {day === d && (
-                                                <motion.div
-                                                    layoutId="day-indicator"
-                                                    className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
-                                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                                />
-                                            )}
-                                            <span className="text-[10px] opacity-70">{week}</span>
-                                            <span className="font-bold">{date}</span>
-                                        </button>
-                                        {/* 📱 手機友善刪除按鈕 - 長按當前選中的日期才顯示 */}
-                                        {totalDays > 1 && day === d && (
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
-                                                className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
-                                                       text-red-400 bg-red-50/80 backdrop-blur-sm
-                                                       border border-red-200/60 rounded-full shadow-sm 
-                                                       active:scale-95 active:bg-red-100
-                                                       transition-transform duration-100"
-                                            >
-                                                移除此天
-                                            </button>
-                                        )}
-                                    </div>
-                                )
-                            })
-                        )}
-
-                        {/* 🆕 新增天數按鈕 (結尾) */}
-                        <button
-                            onClick={() => handleAddDay("end")}
-                            className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                            title="在結尾新增一天"
-                            aria-label="在結尾新增一天"
-                        >
-                            +
-                        </button>
-                    </div>
-                </div>
-
+            <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
                 <PullToRefresh
+                    ref={setScrollerEl} // 🔧 v2.5.3: Capture PTR as the true scroller
                     className="flex-1"
-                    scrollableRef={scrollerEl} // 🔧 v2.5: Pass state-based ref
+                    // scrollableRef removed: defaults to self (correct behavior)
                     lastInteractionTime={lastItnSwitch}
                     onRefresh={async () => {
                         await reloadTripDetail()
                     }}
                 >
+                    {/* 👻 Ghost Anchor Target for PullToRefresh - v2.5.2 Relocated to Absolute Top */}
+                    <div id="ptr-ghost-anchor" className="h-0" />
+
+                    <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
+                        <div className="px-6 flex justify-between items-end mb-4">
+                            <div>
+                                <button onClick={handleBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
+                                    <ArrowLeft className="w-3 h-3" /> BACK
+                                </button>
+                                <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
+                            </div>
+                            {/* 🆕 成員管理按鈕 */}
+                            {currentTrip && (
+                                <TripMembersSheet
+                                    tripId={currentTrip.id}
+                                    members={currentTrip.members || []}
+                                    createdBy={currentTrip.created_by || ""}
+                                    currentUserId={userId || ""}
+                                    onMemberKicked={() => reloadTripDetail()}
+                                />
+                            )}
+                        </div>
+
+                        <div className="flex gap-3 overflow-x-auto px-6 pb-2 no-scrollbar items-center">
+                            {/* 🆕 新增天數按鈕 (開頭) */}
+                            <button
+                                onClick={() => handleAddDay("before")}
+                                className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
+                                title="在開頭新增一天"
+                            >
+                                +
+                            </button>
+
+                            {/* 🔧 FIX: Show skeleton when trip data is stale to prevent wrong dates */}
+                            {shouldShowDateSkeleton ? (
+                                // Skeleton: avoid showing wrong dates from cached trip
+                                [1, 2, 3].map(i => (
+                                    <div key={i} className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse flex-shrink-0" />
+                                ))
+                            ) : (
+                                dayNumbers.map((d) => {
+                                    const { date, week } = getDateInfo(d)
+                                    return (
+                                        <div key={d} className="relative flex flex-col items-center">
+                                            <button onClick={() => setDay(d)} className={cn("day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border dark:border-slate-700", day === d ? "text-white" : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100")}>
+                                                {/* Sliding Indicator */}
+                                                {day === d && (
+                                                    <motion.div
+                                                        layoutId="day-indicator"
+                                                        className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
+                                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                                    />
+                                                )}
+                                                <span className="text-[10px] opacity-70">{week}</span>
+                                                <span className="font-bold">{date}</span>
+                                            </button>
+                                            {/* 📱 手機友善刪除按鈕 - 長按當前選中的日期才顯示 */}
+                                            {totalDays > 1 && day === d && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteDay(d) }}
+                                                    className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
+                                                       text-red-400 bg-red-50/80 backdrop-blur-sm
+                                                       border border-red-200/60 rounded-full shadow-sm 
+                                                       active:scale-95 active:bg-red-100
+                                                       transition-transform duration-100"
+                                                >
+                                                    移除此天
+                                                </button>
+                                            )}
+                                        </div>
+                                    )
+                                })
+                            )}
+
+                            {/* 🆕 新增天數按鈕 (結尾) */}
+                            <button
+                                onClick={() => handleAddDay("end")}
+                                className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
+                                title="在結尾新增一天"
+                                aria-label="在結尾新增一天"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 👻 Ghost Anchor Target for PullToRefresh - v2.5.1 Relocated to Content Top */}
+                    <div id="ptr-ghost-anchor" className="h-0" />
+
                     <div className="py-6 px-6 bg-stone-50/50 dark:bg-slate-900/50">
                         <div className="flex items-center justify-between mb-4">
                             {/* 🆕 Smart Clone Confirmation Dialog */}
