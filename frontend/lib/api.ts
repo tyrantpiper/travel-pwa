@@ -23,6 +23,7 @@ export const API = {
     CHAT: `${API_HOST}/api/chat`,
     ROUTE: `${API_HOST}/api/route`,
     USERS: `${API_HOST}/api/users`,
+    APP: `${API_HOST}/api/app`,
 }
 
 export { API_HOST }
@@ -421,6 +422,18 @@ export const usersApi = {
             body: JSON.stringify(data)
         })
         if (!res.ok) throw new Error("Failed to update profile")
+        return res.json()
+    },
+}
+
+/**
+ * App Settings API Functions
+ */
+export const appApi = {
+    /** Get donation progress from backend */
+    getDonationProgress: async () => {
+        const res = await fetch(`${API.APP}/donation-progress`)
+        if (!res.ok) throw new Error("Failed to fetch donation progress")
         return res.json()
     },
 }

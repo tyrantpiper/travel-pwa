@@ -31,7 +31,7 @@ from models.base import (
     ReorderRequest  # 🆕 拖曳排序
 )
 from utils.deps import get_supabase
-from utils.helpers import generate_room_code
+from utils.helpers import generate_room_code, generate_public_id
 from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
 router = APIRouter(prefix="/api", tags=["trips"])
@@ -41,9 +41,9 @@ router = APIRouter(prefix="/api", tags=["trips"])
 # 🆕 Public Share Endpoint (ISR-enabled, no auth required)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/trips/share/{share_code}")
-async def get_public_trip_by_share_code(
-    share_code: str,
+@router.get("/trips/share/{public_id}")
+async def get_public_trip_by_public_id(
+    public_id: str,
     supabase=Depends(get_supabase)
 ):
     """🌐 公開行程分享 (無需認證, 支援 ISR)
@@ -53,12 +53,12 @@ async def get_public_trip_by_share_code(
     
     Rate Limit: 10 requests/minute per IP (防暴力枚舉)
     """
-    # 🛡️ Input Validation (防暴力枚舉)
-    if not re.match(r'^[A-Za-z0-9]{4,8}$', share_code):
-        raise HTTPException(status_code=400, detail="Invalid share code format")
+    # 🛡️ Input Validation
+    if not re.match(r'^pub_[a-z0-9]{8}$', public_id):
+        raise HTTPException(status_code=400, detail="Invalid public ID format")
     try:
-        # 1. 透過 share_code 查詢行程
-        trip_res = supabase.table("itineraries").select("*").eq("share_code", share_code).execute()
+        # 1. 透過 public_id 查詢行程
+        trip_res = supabase.table("itineraries").select("*").eq("public_id", public_id).execute()
         
         if not trip_res.data or len(trip_res.data) == 0:
             raise HTTPException(status_code=404, detail="Trip not found")
@@ -211,6 +211,18 @@ async def get_trip_by_id(
             
         trip = trip_res.data[0]
         
+        # 🆕 Auto-Migration: If public_id is missing, generate and save it
+        if not trip.get("public_id"):
+            from utils.helpers import generate_public_id
+            new_public_id = generate_public_id()
+            try:
+                # 僅在此處嘗試更新，若 column 不存在會失敗但會被 catch
+                supabase.table("itineraries").update({"public_id": new_public_id}).eq("id", trip_id).execute()
+                trip["public_id"] = new_public_id
+                print(f"🪄 Auto-Migrated Legacy Trip: Generated public_id={new_public_id}")
+            except Exception as e:
+                print(f"⚠️ Failed to auto-migrate public_id: {e} (Maybe column missing?)")
+
         # 🆕 判斷是否為成員 (擁有者或透過 Share Code 加入)
         is_member = False
         if user_id:
@@ -284,6 +296,7 @@ async def get_trip_by_id(
             "start_date": trip["start_date"],
             "end_date": trip.get("end_date"),
             "share_code": trip.get("share_code", ""),
+            "public_id": trip.get("public_id", ""),
             "cover_image": trip.get("cover_image"),
             "daily_locations": content.get("daily_locations", {}),
             "day_notes": content.get("day_notes", {}),
@@ -403,12 +416,14 @@ async def create_manual_trip(
             )
         
         room_code = generate_room_code()
+        pub_id = generate_public_id()
         
         trip_data = {
             "title": request.title,
             "creator_name": request.creator_name,
             "created_by": request.user_id,
             "share_code": room_code,
+            "public_id": pub_id,
             "start_date": request.start_date,
             "end_date": request.end_date,
             "status": "active",
@@ -428,7 +443,7 @@ async def create_manual_trip(
             "user_name": request.creator_name
         }).execute()
 
-        return {"status": "success", "trip_id": trip_id, "share_code": room_code}
+        return {"status": "success", "trip_id": trip_id, "share_code": room_code, "public_id": pub_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -595,8 +610,9 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
                 detail="行程數量已達上限 (最多 3 個)，請先下載 PDF 後刪除舊行程"
             )
         
-        # 1. 產生房間號
+        # 1. 產生房間號與公開 ID
         room_code = generate_room_code()
+        pub_id = generate_public_id()
         
         # 🆕 自動計算 end_date (如果未提供)
         start_date = request.start_date or "2026-01-01"
@@ -618,6 +634,7 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
             "creator_name": request.creator_name,
             "created_by": request.user_id,
             "share_code": room_code,
+            "public_id": pub_id,
             "start_date": start_date,
             "end_date": end_date,
             "status": "active",
@@ -688,7 +705,7 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
                         print(f"         Data: {item}")
                 raise item_err
             
-        return {"status": "success", "trip_id": trip_id, "share_code": room_code}
+        return {"status": "success", "trip_id": trip_id, "share_code": room_code, "public_id": pub_id}
 
     except Exception as e:
         print(f"🔥 Save Error: {e}")

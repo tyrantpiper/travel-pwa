@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch"
 import { TaskCard } from "@/components/onboarding/TaskCard"
 import { debugLog } from "@/lib/debug"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
-import { usersApi } from "@/lib/api"
+import { usersApi, appApi } from "@/lib/api"
 
 
 
@@ -124,28 +124,19 @@ export function ProfileView() {
             setShowDonation(false)
         }
 
-        // 從 Supabase 讀取進度（使用單例，避免 Multiple GoTrueClient 警告）
+        // 改從後端 API 讀取進度，避免前端直連 Supabase 造成網路錯誤 (Phase 20 Fix)
         const fetchDonationProgress = async () => {
             try {
-                // 🔧 使用單例模式，避免重複創建 GoTrueClient
-                const { getSupabaseClient } = await import('@/lib/supabase')
-                const supabase = getSupabaseClient()
-                if (!supabase) return
+                const data = await appApi.getDonationProgress()
 
-                const { data } = await supabase
-                    .from('app_settings')
-                    .select('value')
-                    .eq('key', 'donation_progress')
-                    .single()
-
-                if (data?.value) {
+                if (data) {
                     // 自動月份重置：如果是新的月份，current 顯示為 0
-                    const storedMonth = data.value.month
+                    const storedMonth = data.month
                     const nowMonth = new Date().toISOString().slice(0, 7)
                     if (storedMonth && storedMonth !== nowMonth) {
-                        setDonationProgress({ current: 0, goal: data.value.goal || 2000 })
+                        setDonationProgress({ current: 0, goal: data.goal || 2000 })
                     } else {
-                        setDonationProgress(data.value)
+                        setDonationProgress(data)
                     }
                 }
             } catch (err) {

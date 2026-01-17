@@ -112,6 +112,7 @@ export interface Trip {
     days: TripDay[]
     cover_image?: string
     share_code?: string
+    public_id?: string // 🆕 隨機公開 ID (URL 使用)
     creator_name?: string
     created_by?: string
     members?: { user_id: string; user_name: string }[]  // 🆕 成員列表

@@ -12,9 +12,9 @@ interface PageProps {
 }
 
 // Fetch trip data on server
-async function getTripByShareCode(shareCode: string): Promise<Trip | null> {
+async function getTripByPublicId(publicId: string): Promise<Trip | null> {
     try {
-        const res = await fetch(`${API_HOST}/api/trips/share/${shareCode}`, {
+        const res = await fetch(`${API_HOST}/api/trips/share/${publicId}`, {
             next: { revalidate: 3600 }
         })
         if (!res.ok) return null
@@ -26,8 +26,8 @@ async function getTripByShareCode(shareCode: string): Promise<Trip | null> {
 
 // Dynamic metadata for SEO
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-    const { shareCode } = await params
-    const trip = await getTripByShareCode(shareCode)
+    const { shareCode: publicId } = await params
+    const trip = await getTripByPublicId(publicId)
 
     if (!trip) {
         return {
@@ -47,8 +47,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function SharePage({ params }: PageProps) {
-    const { shareCode } = await params
-    const trip = await getTripByShareCode(shareCode)
+    const { shareCode: publicId } = await params
+    const trip = await getTripByPublicId(publicId)
 
     if (!trip) {
         notFound()

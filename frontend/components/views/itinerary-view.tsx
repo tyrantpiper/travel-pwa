@@ -39,6 +39,7 @@ import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
 import EditableDailyChecklist from "@/components/itinerary/EditableDailyChecklist"
 import EditableDailyAIReview from "@/components/itinerary/EditableDailyAIReview"
 import { TripMembersSheet } from "@/components/itinerary/TripMembersSheet"
+import { ShareButton } from "@/components/itinerary/ShareButton"
 import { tripsApi, itemsApi, geocodeApi } from "@/lib/api"
 import { useDynamicPolling } from "@/lib/polling-manager" // 🆕 Phase 7.3
 import { POIBasicData } from "@/components/POIDetailDrawer"
@@ -1493,6 +1494,12 @@ export function ItineraryView() {
                             <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                         </div>
                         <div className="flex items-center gap-2">
+                            {currentTrip?.public_id && (
+                                <ShareButton
+                                    publicId={currentTrip.public_id}
+                                    tripTitle={currentTrip.title}
+                                />
+                            )}
                             <ZenRenew onRefresh={async () => { await reloadTripDetail() }} successMessage={t('update_success') || "已更新"} />
                             {/* 🆕 成員管理按鈕 */}
                             {currentTrip && (

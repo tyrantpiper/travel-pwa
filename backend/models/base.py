@@ -89,6 +89,7 @@ class SaveItineraryRequest(BaseModel):
     day_tickets: Optional[dict] = {}
     day_checklists: Optional[dict] = {}
     ai_review: Optional[str] = None
+    public_id: Optional[str] = None  # 🆕 隨機公開 ID (取代 share_code 出現在 URL)
 
 
 class JoinTripRequest(BaseModel):
