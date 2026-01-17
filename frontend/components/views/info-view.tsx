@@ -259,9 +259,9 @@ export function InfoView() {
 
     return (
         // 🔧 Phase 14: View manages its own
-        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain px-6 py-6 pb-20">
+        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain px-4 py-6 pb-20">
             <div id="ptr-ghost-anchor" className="h-0" />
-            <div className="min-h-screen bg-stone-50 px-4 py-12 pb-32">
+            <div className="min-h-screen bg-stone-50 py-12 pb-32">
                 <header className="mb-6 space-y-3">
                     <div>
                         <h1 className="text-3xl font-serif text-slate-900">{t('trip_info')}</h1>
@@ -772,16 +772,16 @@ function FlightCard({ data, isEditing, onChange, onClear }: { data: FlightData, 
                     </div>
                 </div>
 
-                {/* 出發/到達 機場 + 時間 */}
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex-1">
-                        <Input disabled={!isEditing} value={data.dep_airport} onChange={e => onChange('dep_airport', e.target.value.toUpperCase())} className={isEditing ? "bg-white h-10 w-20 text-center font-bold" : "bg-transparent border-0 p-0 h-auto text-4xl font-black text-slate-800 w-24"} maxLength={3} />
-                        <Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.dep_time} onChange={e => onChange('dep_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1"} placeholder="出發" />
+                {/* 出發/到達 機場 + 時間 (Grid for perfect symmetry) */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center mb-4">
+                    <div className="justify-self-start text-left">
+                        <Input disabled={!isEditing} value={data.dep_airport} onChange={e => onChange('dep_airport', e.target.value.toUpperCase())} className={isEditing ? "bg-white h-10 w-20 text-center font-bold" : "bg-transparent border-0 p-0 h-auto text-4xl font-black text-slate-800 w-24 text-left"} maxLength={3} />
+                        <Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.dep_time} onChange={e => onChange('dep_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1 text-left"} placeholder="出發" />
                     </div>
-                    <div className="flex flex-col items-center justify-center px-4 opacity-50">
+                    <div className="flex flex-col items-center justify-center px-2 opacity-50">
                         <Plane className="w-6 h-6 text-slate-400 rotate-90 mb-1" /><div className="w-16 h-px border-t-2 border-dashed border-slate-300"></div>
                     </div>
-                    <div className="flex-1 text-right">
+                    <div className="justify-self-end text-right">
                         <div className="flex justify-end"><Input disabled={!isEditing} value={data.arr_airport} onChange={e => onChange('arr_airport', e.target.value.toUpperCase())} className={isEditing ? "bg-white h-10 w-20 text-center font-bold" : "bg-transparent border-0 p-0 h-auto text-4xl font-black text-slate-800 w-24 text-right"} maxLength={3} /></div>
                         <div className="flex justify-end"><Input type={isEditing ? "time" : "text"} disabled={!isEditing} value={data.arr_time} onChange={e => onChange('arr_time', e.target.value)} className={isEditing ? "mt-2 h-8 text-xs w-24" : "bg-transparent border-0 p-0 h-auto text-lg font-bold text-slate-600 mt-1 text-right"} placeholder="到達" /></div>
                     </div>
