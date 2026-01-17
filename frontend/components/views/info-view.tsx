@@ -17,7 +17,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
-import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+import { ZenRenew } from "@/components/ui/zen-renew"
 import { toast } from "sonner"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { geocodeApi } from "@/lib/api"
@@ -97,7 +97,6 @@ export function InfoView() {
     const [isHotelSearching, setIsHotelSearching] = useState(false)
     const [searchingHotelIdx, setSearchingHotelIdx] = useState<number | null>(null)
     const [flightTab, setFlightTab] = useState<'outbound' | 'inbound'>('outbound')
-    const lastInfoSwitch = useRef<number>(0) // 🆕 Mechanical Guard (200ms)
 
     useEffect(() => {
         const fetchInfo = async () => {
@@ -128,11 +127,12 @@ export function InfoView() {
         fetchInfo()
     }, [activeTripId])
 
-    // 獨立的刷新函數供 PullToRefresh 使用
+    // 獨立的刷新函數供 ZenRenew 使用
     const refreshInfo = async () => {
         if (!activeTripId) return
         try {
             const res = await fetch(`${API_BASE}/api/trips/${activeTripId}`)
+            if (!res.ok) throw new Error("Fetch failed")
             const data = await res.json()
             if (data) {
                 if (data.flight_info?.outbound) {
@@ -145,10 +145,12 @@ export function InfoView() {
                 const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
                     .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
                 setHotels(parsedHotels)
-                toast.success("資料已更新")
-                tripMutate() // 🔄 Refresh global context
+                await tripMutate() // 🔄 Refresh global context
             }
-        } catch (e) { console.error(e) }
+        } catch (e) {
+            console.error(e)
+            throw e // 🆕 Re-throw for ZenRenew state machine
+        }
     }
 
     const handleSave = async () => {
@@ -260,7 +262,6 @@ export function InfoView() {
     return (
         // 🔧 Phase 14: View manages its own
         <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain px-4 py-6 pb-20">
-            <div id="ptr-ghost-anchor" className="h-0" />
             <div className="min-h-screen bg-stone-50 py-12 pb-32">
                 <header className="mb-6 space-y-3">
                     <div>
@@ -268,23 +269,20 @@ export function InfoView() {
                         <p className="text-slate-500 text-sm">{t('trip_details')}</p>
                     </div>
                     <TripSwitcher />
-                    <Button
-                        variant={isEditing ? "default" : "outline"}
-                        size="sm"
-                        disabled={!activeTripId}
-                        onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                        className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
-                    >
-                        {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <ZenRenew onRefresh={refreshInfo} />
+                        <Button
+                            variant={isEditing ? "default" : "outline"}
+                            size="sm"
+                            disabled={!activeTripId}
+                            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                            className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
+                        >
+                            {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
+                        </Button>
+                    </div>
                 </header>
-
-                <PullToRefresh
-                    onRefresh={refreshInfo}
-                    className="flex-1"
-                    scrollableRef={scrollRef}
-                    lastInteractionTime={lastInfoSwitch}
-                >
+                <div className="flex-1">
                     <div className="space-y-8">
                         {!activeTripId ? (
                             <div className="text-center py-20 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
@@ -545,7 +543,7 @@ export function InfoView() {
                             </>
                         )}
                     </div>
-                </PullToRefresh>
+                </div>
 
                 <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
                     <DialogContent className="sm:max-w-md h-[85vh] flex flex-col p-0 gap-0">

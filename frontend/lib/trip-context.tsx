@@ -12,7 +12,7 @@ interface TripContextType {
     isLoading: boolean
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     activeTrip: any | null
-    mutate: () => void
+    mutate: () => Promise<unknown>
     userId: string | null
 }
 

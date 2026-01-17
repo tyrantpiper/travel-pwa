@@ -26,7 +26,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
-import { PullToRefresh } from "@/components/ui/pull-to-refresh"
+import { ZenRenew } from "@/components/ui/zen-renew"
 import { Virtuoso } from "react-virtuoso"
 import { useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
@@ -222,7 +222,6 @@ export function ToolsView() {
     const [newCardIsPublic, setNewCardIsPublic] = useState(false) // 🆕
     const [isSavingCard, setIsSavingCard] = useState(false) // 🆕 Prevent double-click
     const scrollerRef = useRef<HTMLElement | null>(null) // 🆕 Ref for the actual scroller element
-    const lastTabSwitch = useRef<number>(0) // 🆕 Mechanical Guard (200ms)
 
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
@@ -805,25 +804,24 @@ export function ToolsView() {
 
     return (
         <>
-            {/* 🔧 Phase 14: View manages its own scrolling */}
-            {/* 🆕 Refactor: PTR acts as main scroller with Momentum Awareness */}
-            <PullToRefresh
-                className="h-full bg-stone-50"
-                scrollableRef={activeSection === 'expense' ? scrollerRef : null}
-                lastInteractionTime={lastTabSwitch}
-                onRefresh={async () => {
-                    const r = await getExchangeRate(selectedCurrency || 'JPY')
-                    setRate(r)
-                    await Promise.all([fetchExpenses(), tripMutate()])
-                    toast.success("資料已更新")
-                }}
-            >
+            <div className="h-full bg-stone-50 overflow-y-auto overscroll-contain">
                 <div className="min-h-screen pb-32">
                     <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                         <div className="space-y-3">
-                            <div>
-                                <h1 className="text-3xl font-serif mb-2">{t('tools')}</h1>
-                                <p className="text-slate-300 text-sm">{t('expense_ai')}</p>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-serif mb-2">{t('tools')}</h1>
+                                    <p className="text-slate-300 text-sm">{t('expense_ai')}</p>
+                                </div>
+                                <ZenRenew
+                                    onRefresh={async () => {
+                                        const r = await getExchangeRate(selectedCurrency || 'JPY')
+                                        setRate(r)
+                                        await Promise.all([fetchExpenses(), tripMutate()])
+                                    }}
+                                    successMessage="資料與匯率已更新"
+                                    className="text-white/80 hover:text-white"
+                                />
                             </div>
                             <TripSwitcher className="bg-white/10 text-white border-white/20 hover:bg-white/20" />
                         </div>
@@ -842,7 +840,6 @@ export function ToolsView() {
                                         key={tab.value}
                                         onClick={() => {
                                             if (activeSection !== tab.value) {
-                                                lastTabSwitch.current = performance.now()
                                                 setActiveSection(tab.value)
                                             }
                                         }}
@@ -1210,7 +1207,7 @@ export function ToolsView() {
                         </Tabs>
                     </div>
                 </div>
-            </PullToRefresh >
+            </div>
             < AlertDialog open={!!deletingCardId
             } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
                 <AlertDialogContent>
