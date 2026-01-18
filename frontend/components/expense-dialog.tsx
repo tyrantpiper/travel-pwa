@@ -125,7 +125,9 @@ export function ExpenseDialog({
                 setCardName(editItem.card_name || "")
                 setCashback(editItem.cashback_rate?.toString() || "")
                 setReceiptUrl(editItem.image_url || "")
-                setExpenseDate(editItem.expense_date || editItem.created_at?.split('T')[0] || "")
+                // 🆕 Safe date parsing
+                const dbDate = editItem.expense_date || editItem.created_at?.split('T')[0]
+                setExpenseDate(dbDate || formatLocalDate(new Date()))
                 setInputCurrency(editItem.currency || "JPY")
             } else {
                 setTitle("")
@@ -136,11 +138,28 @@ export function ExpenseDialog({
                 setCardName("")
                 setCashback("")
                 setReceiptUrl("")
-                setExpenseDate(new Date().toISOString().split('T')[0])
+
+                // 🆕 Smart Initialization for Date Drift Fix
+                const todayStr = formatLocalDate(new Date())
+                if (activeTrip?.start_date) {
+                    const start = activeTrip.start_date
+                    const end = activeTrip.end_date || start
+
+                    // If today is before trip or after trip, default to Trip Start
+                    if (todayStr < start || todayStr > end) {
+                        console.log(`[Expense] Today (${todayStr}) is outside trip range (${start} to ${end}). Defaulting to ${start}`)
+                        setExpenseDate(start)
+                    } else {
+                        setExpenseDate(todayStr)
+                    }
+                } else {
+                    setExpenseDate(todayStr)
+                }
+
                 setInputCurrency(selectedCurrency || "JPY")
             }
         }
-    }, [open, editItem, selectedCurrency])
+    }, [open, editItem, selectedCurrency, activeTrip])
 
     // Update rate when inputCurrency changes
     useEffect(() => {
@@ -197,7 +216,10 @@ export function ExpenseDialog({
         try {
             const res = await fetch(url, {
                 method: methodType,
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-User-ID": userId || "" // 🆕 Phase 8: Add Identity Header
+                },
                 body: JSON.stringify(payload)
             })
             if (res.ok) {
@@ -280,8 +302,9 @@ export function ExpenseDialog({
                                 className="w-full h-11 px-3 text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium"
                             >
                                 {(() => {
-                                    const startDate = new Date(activeTrip.start_date!)
-                                    const endDate = activeTrip.end_date ? new Date(activeTrip.end_date) : null
+                                    // 🆕 Caution: Use '/' replacement to force local timezone parsing (Fixes Phase 8 weekday drift)
+                                    const startDate = new Date(activeTrip.start_date!.replace(/-/g, '/'))
+                                    const endDate = activeTrip.end_date ? new Date(activeTrip.end_date.replace(/-/g, '/')) : null
                                     const totalDays = activeTrip.days?.length ||
                                         (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
 

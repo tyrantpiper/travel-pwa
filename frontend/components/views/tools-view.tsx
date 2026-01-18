@@ -31,6 +31,7 @@ import { Virtuoso } from "react-virtuoso"
 import { useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
+import { expensesApi } from "@/lib/api"
 
 // Type definitions
 interface Expense {
@@ -274,10 +275,8 @@ export function ToolsView() {
         const fetchExpenses = async () => {
             try {
                 if (activeTripId) {
-                    const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/expenses`, {
-                        headers: { "X-User-ID": localStorage.getItem("user_uuid") || "" }
-                    })
-                    const data = await res.json()
+                    const userId = localStorage.getItem("user_uuid") || ""
+                    const data = await expensesApi.getByTrip(activeTripId, userId)
                     setExpenses(data || [])
                 } else {
                     setExpenses([])
@@ -471,10 +470,8 @@ export function ToolsView() {
     const fetchExpenses = async () => {
         try {
             if (activeTripId) {
-                const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/expenses`, {
-                    headers: { "X-User-ID": localStorage.getItem("user_uuid") || "" }
-                })
-                const data = await res.json()
+                const userId = localStorage.getItem("user_uuid") || ""
+                const data = await expensesApi.getByTrip(activeTripId, userId)
                 setExpenses(data || [])
             } else {
                 setExpenses([])
@@ -484,7 +481,8 @@ export function ToolsView() {
     const handleDeleteExpense = async (id: string) => {
         if (!confirm(t('confirm_delete'))) return
         try {
-            await fetch(`${API_BASE}/api/expenses/${id}`, { method: "DELETE" })
+            const userId = localStorage.getItem("user_uuid") || ""
+            await expensesApi.delete(id, userId)
             fetchExpenses()
         } catch (e) { console.error(e) }
     }

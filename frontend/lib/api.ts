@@ -364,17 +364,23 @@ export const geocodeApi = {
  */
 export const expensesApi = {
     /** Get expenses for a trip */
-    getByTrip: async (tripId: string) => {
-        const res = await fetch(`${API.TRIPS}/${tripId}/expenses`)
+    getByTrip: async (tripId: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API.TRIPS}/${tripId}/expenses`, { headers })
         if (!res.ok) throw new Error("Failed to fetch expenses")
         return res.json()
     },
 
     /** Create a new expense */
-    create: async (data: Record<string, unknown>) => {
-        const res = await fetch(API.EXPENSES, {
+    create: async (data: Record<string, unknown>, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await offlineFetch(API.EXPENSES, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(data)
         })
         if (!res.ok) throw new Error("Failed to create expense")
@@ -382,10 +388,13 @@ export const expensesApi = {
     },
 
     /** Update an expense */
-    update: async (expenseId: string, data: Record<string, unknown>) => {
-        const res = await fetch(`${API.EXPENSES}/${expenseId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
+    update: async (expenseId: string, data: Record<string, unknown>, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await offlineFetch(`${API.EXPENSES}/${expenseId}`, {
+            method: "PATCH", // Backend specifies PATCH/PUT in different places, but it's typically PATCH for updates
+            headers,
             body: JSON.stringify(data)
         })
         if (!res.ok) throw new Error("Failed to update expense")
@@ -393,8 +402,14 @@ export const expensesApi = {
     },
 
     /** Delete an expense */
-    delete: async (expenseId: string) => {
-        const res = await fetch(`${API.EXPENSES}/${expenseId}`, { method: "DELETE" })
+    delete: async (expenseId: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await offlineFetch(`${API.EXPENSES}/${expenseId}`, {
+            method: "DELETE",
+            headers
+        })
         if (!res.ok) throw new Error("Failed to delete expense")
         return res.json()
     },
