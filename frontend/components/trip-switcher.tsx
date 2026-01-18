@@ -19,7 +19,13 @@ import { toast } from "sonner"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
-export function TripSwitcher({ className }: { className?: string }) {
+export function TripSwitcher({
+    className,
+    pencilPosition = "right"
+}: {
+    className?: string,
+    pencilPosition?: "left" | "right"
+}) {
     const { trips, activeTripId, setActiveTripId, mutate } = useTripContext()
     const activeTrip = trips.find((t) => t.id === activeTripId)
 
@@ -133,8 +139,20 @@ export function TripSwitcher({ className }: { className?: string }) {
         )
     }
 
+    const pencilButton = activeTrip && (
+        <button
+            onClick={startEdit}
+            className="p-1.5 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+            title="編輯行程名稱"
+        >
+            <Edit3 className="w-4 h-4" />
+        </button>
+    )
+
     return (
         <div className="flex items-center gap-2 flex-wrap max-w-full">
+            {pencilPosition === "left" && pencilButton}
+
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -173,16 +191,7 @@ export function TripSwitcher({ className }: { className?: string }) {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* 編輯按鈕 - 只在有選中行程時顯示 */}
-            {activeTrip && (
-                <button
-                    onClick={startEdit}
-                    className="p-1.5 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                    title="編輯行程名稱"
-                >
-                    <Edit3 className="w-4 h-4" />
-                </button>
-            )}
+            {pencilPosition === "right" && pencilButton}
         </div>
     )
 }

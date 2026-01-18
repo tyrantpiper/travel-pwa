@@ -7,10 +7,22 @@ Now interacts with the dedicated `public.users` table (Phase 27).
 
 from fastapi import APIRouter, HTTPException, Depends, Header
 from typing import Optional
+import uuid
+from datetime import datetime, timezone
 from utils.deps import get_supabase
 from models.base import UpdateProfileRequest
 
 router = APIRouter(prefix="/api", tags=["users"])
+
+def is_valid_uuid(val: str):
+    """🩺 驗證是否為有效的 UUID 格式，防止字串如 'null' 觸發 DB 錯誤"""
+    if not val or val.lower() == "null" or val.lower() == "undefined":
+        return False
+    try:
+        uuid.UUID(str(val))
+        return True
+    except ValueError:
+        return False
 
 @router.get("/users/{user_id}/profile")
 async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
@@ -19,6 +31,16 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
     
     從 `public.users` 表取資料 (Single Source of Truth)
     """
+    # 🛡️ Defensive Check: UUID 格式預檢
+    if not is_valid_uuid(user_id):
+        print(f"🚫 無效的 User ID 格式: {user_id}")
+        return {
+            "id": user_id,
+            "nickname": "Traveler",
+            "avatar_url": None,
+            "error": "Invalid ID format"
+        }
+
     try:
         print(f"🔍 正在尋找使用者 {user_id} 的資料...")
         
@@ -88,6 +110,11 @@ async def update_user_profile(
     """
     if not user_id:
         raise HTTPException(status_code=401, detail="Missing X-User-ID")
+    
+    # 🛡️ Defensive Check: UUID 格式預檢
+    if not is_valid_uuid(user_id):
+        print(f"🚫 無效的 User ID 格式: {user_id} (update attempt)")
+        raise HTTPException(status_code=400, detail=f"Invalid User ID format: {user_id}")
         
     print(f"✏️ 更新使用者 {user_id} 資料: {request}")
     
@@ -101,7 +128,10 @@ async def update_user_profile(
         if not updates:
             return {"status": "no_change"}
             
-        updates["updated_at"] = "now()"
+        # 🆕 使用標準 ISO 8601 格式
+        # now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # updates["updated_at"] = now_ts
+        # 移除 updated_at，改由 DB Default 或 Trigger 處理，避免格式轉型問題
         
         # 更新 public.users
         # 1. 嘗試 Update
@@ -112,10 +142,11 @@ async def update_user_profile(
             print("⚠️ Update 失敗 (無資料)，嘗試 Upsert...")
             # 必須包含 ID 才能 Insert
             updates["id"] = user_id
+            # updates["created_at"] = now_ts # Let DB handle defaults
             res = supabase.table("users").upsert(updates).execute()
         
-        if not res.data:
-             raise HTTPException(status_code=500, detail="Update failed")
+        if not res.data or len(res.data) == 0:
+             raise HTTPException(status_code=500, detail="Update/Upsert failed to return data")
              
         print(f"✅ 使用者資料更新成功: {res.data}")
         return {"status": "success", "data": res.data[0]}

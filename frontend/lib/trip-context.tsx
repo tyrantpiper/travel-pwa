@@ -18,6 +18,13 @@ interface TripContextType {
 
 const TripContext = createContext<TripContextType | undefined>(undefined)
 
+// 🛡️ Safe UUID Validation
+const isValidUUID = (id: string | null): id is string => {
+    if (!id || id === "null" || id === "undefined" || id.length < 10) return false
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    return uuidRegex.test(id)
+}
+
 export function TripProvider({ children }: { children: ReactNode }) {
     // Use Zustand store for state management
     const activeTripId = useTripStore((s) => s.activeTripId)
@@ -30,13 +37,28 @@ export function TripProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (typeof window !== "undefined") {
             const storedUserId = localStorage.getItem("user_uuid")
-            if (storedUserId && storedUserId !== userId) {
-                setUserId(storedUserId)
+
+            // 🛡️ Data Sanitization: 防止 "null" 字串傳遞
+            if (storedUserId) {
+                if (isValidUUID(storedUserId)) {
+                    if (storedUserId !== userId) {
+                        setUserId(storedUserId)
+                    }
+                } else {
+                    console.warn("🛡️ Detected invalid user_uuid in localStorage, clearing...", storedUserId)
+                    localStorage.removeItem("user_uuid")
+                    setUserId(null)
+                }
             }
+
             // 如果 store 沒有 activeTripId，嘗試從舊的 localStorage 恢復
             const savedTripId = localStorage.getItem("active_trip_id")
             if (savedTripId && !activeTripId) {
-                setActiveTripId(savedTripId)
+                if (isValidUUID(savedTripId)) {
+                    setActiveTripId(savedTripId)
+                } else {
+                    localStorage.removeItem("active_trip_id")
+                }
             }
         }
     }, [activeTripId, userId, setActiveTripId, setUserId])

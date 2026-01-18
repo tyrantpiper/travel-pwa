@@ -67,8 +67,12 @@ export function LandingPage() {
     }
 
     const handleRecover = async () => {
-        if (!recoverCode.trim()) { toast.warning("Please enter recovery code"); return }
-        if (recoverCode.length < 10) { toast.error("Invalid code format"); return }
+        const cleanCode = recoverCode.trim()
+        if (!cleanCode || cleanCode === "null" || cleanCode === "undefined") {
+            toast.warning("Please enter a valid recovery code")
+            return
+        }
+        if (cleanCode.length < 10) { toast.error("Invalid code format"); return }
 
         // 🆕 Async fetch profile
         const toastId = toast.loading("Verifying identity...")

@@ -267,9 +267,8 @@ export function ProfileView() {
     }
 
     return (
-        // 🔧 Phase 14: View manages its own scrolling
-        <div className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
-            <div className="min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
+        <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
+            <div className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900">
 
                 <div className={cn("h-48 relative overflow-hidden bg-gradient-to-br", currentTheme.gradient)}>
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
@@ -337,26 +336,35 @@ export function ProfileView() {
 
                         <div className="mt-4 text-center space-y-1 w-full flex flex-col items-center">
                             {isEditing ? (
-                                <div className="flex flex-col items-center gap-2">
+                                <div className="flex flex-col items-center gap-3 w-full max-w-[280px]">
                                     <Input
                                         value={profile.nickname}
                                         onChange={e => setProfile({ ...profile, nickname: e.target.value })}
-                                        className="text-center font-bold text-xl h-10 w-48 bg-white border-slate-300"
+                                        className="text-center font-bold text-xl h-12 bg-white dark:bg-slate-800 border-stone-200 dark:border-slate-700 rounded-2xl shadow-sm focus-visible:ring-slate-900"
                                         placeholder="Enter nickname"
                                     />
-                                    <Button size="sm" className="h-8 bg-slate-900 text-white" onClick={handleSaveProfile}>
-                                        <Save className="w-3 h-3 mr-1" /> Save
-                                    </Button>
+                                    <div className="flex gap-2 w-full">
+                                        <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl border-stone-200" onClick={() => setIsEditing(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button size="sm" className="flex-1 h-9 bg-slate-900 text-white rounded-xl shadow-lg" onClick={handleSaveProfile}>
+                                            <Save className="w-3.5 h-3.5 mr-1.5" /> Save
+                                        </Button>
+                                    </div>
                                 </div>
                             ) : (
                                 <>
-                                    <h2 className="text-2xl font-bold text-slate-800 flex items-center justify-center gap-2">
+                                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center justify-center gap-2 group">
                                         {profile.nickname}
-                                        <button onClick={() => setIsEditing(true)} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
+                                        <button
+                                            onClick={() => setIsEditing(true)}
+                                            className="p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-all shadow-sm border border-transparent hover:border-stone-100 opacity-0 group-hover:opacity-100 -mr-8"
+                                            title="Edit Profile"
+                                        >
                                             <Edit3 className="w-4 h-4 text-slate-400" />
                                         </button>
                                     </h2>
-                                    <p className="text-sm text-slate-500 font-medium">Explorer</p>
+                                    <p className="text-sm text-slate-400 font-medium tracking-wide uppercase">Explorer</p>
                                 </>
                             )}
                         </div>

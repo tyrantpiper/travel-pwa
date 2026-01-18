@@ -1481,9 +1481,9 @@ export function ItineraryView() {
     return (
         <div
             ref={setScrollerEl}
-            className="h-full flex flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none max-w-full"
+            className="h-full flex flex-col bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none max-w-full"
         >
-            <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
+            <div className="flex flex-col min-h-screen pb-32">
 
                 <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
                     <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4 sm:gap-2">
@@ -1493,24 +1493,26 @@ export function ItineraryView() {
                             </button>
                             <TripSwitcher className="w-full sm:w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                         </div>
-                        <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
-                            {currentTrip?.public_id && (
-                                <ShareButton
-                                    publicId={currentTrip.public_id}
-                                    tripTitle={currentTrip.title}
-                                />
-                            )}
+                        <div className="flex items-center justify-between w-full sm:w-auto sm:gap-4">
+                            <div className="flex items-center gap-2">
+                                {currentTrip?.public_id && (
+                                    <ShareButton
+                                        publicId={currentTrip.public_id}
+                                        tripTitle={currentTrip.title}
+                                    />
+                                )}
+                                {/* 🆕 成員管理按鈕 */}
+                                {currentTrip && (
+                                    <TripMembersSheet
+                                        tripId={currentTrip.id}
+                                        members={currentTrip.members || []}
+                                        createdBy={currentTrip.created_by || ""}
+                                        currentUserId={userId || ""}
+                                        onMemberKicked={() => reloadTripDetail()}
+                                    />
+                                )}
+                            </div>
                             <ZenRenew onRefresh={async () => { await reloadTripDetail() }} successMessage={t('update_success') || "已更新"} />
-                            {/* 🆕 成員管理按鈕 */}
-                            {currentTrip && (
-                                <TripMembersSheet
-                                    tripId={currentTrip.id}
-                                    members={currentTrip.members || []}
-                                    createdBy={currentTrip.created_by || ""}
-                                    currentUserId={userId || ""}
-                                    onMemberKicked={() => reloadTripDetail()}
-                                />
-                            )}
                         </div>
                     </div>
 

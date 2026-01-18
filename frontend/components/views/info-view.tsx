@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
+import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
@@ -261,22 +262,29 @@ export function InfoView() {
 
     return (
         // 🔧 Phase 14: View manages its own
-        <div ref={scrollRef} className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none px-4 py-6 pb-20">
-            <div className="min-h-screen bg-stone-50 py-12 pb-32">
-                <header className="mb-6 space-y-3">
+        <div ref={scrollRef} className="h-full bg-stone-50 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none px-4 py-8 pb-20">
+            <div className="min-h-screen pb-32">
+                <header className="mb-8 space-y-4">
                     <div>
                         <h1 className="text-3xl font-serif text-slate-900">{t('trip_info')}</h1>
                         <p className="text-slate-500 text-sm">{t('trip_details')}</p>
                     </div>
-                    <TripSwitcher />
-                    <div className="flex items-center gap-2">
+
+                    <div className="flex items-center justify-between w-full">
+                        <TripSwitcher pencilPosition="left" />
                         <ZenRenew onRefresh={refreshInfo} />
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         <Button
                             variant={isEditing ? "default" : "outline"}
                             size="sm"
                             disabled={!activeTripId}
                             onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                            className={isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600"}
+                            className={cn(
+                                "flex-1 sm:flex-none",
+                                isEditing ? "bg-slate-900 text-white" : "border-slate-300 text-slate-600 bg-white"
+                            )}
                         >
                             {isEditing ? <><Save className="w-4 h-4 mr-1" /> {t('save')}</> : <><Edit3 className="w-4 h-4 mr-1" /> {t('edit')}</>}
                         </Button>
