@@ -1296,7 +1296,7 @@ export function ItineraryView() {
         return (
             // 🔧 Phase 14: View manages its own scrolling
             <div className="h-full overflow-y-auto overscroll-y-contain overscroll-x-none">
-                <div className="flex flex-col h-[100dvh] bg-stone-50 overflow-hidden">
+                <div className="flex flex-col min-h-full bg-stone-50">
                     <div className="flex-1 px-6 py-12 pb-32">
                         <header className="mb-8 flex justify-between items-start">
                             <div>

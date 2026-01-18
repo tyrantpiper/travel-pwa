@@ -233,7 +233,7 @@ async def get_trip_by_id(
             print(f"🔍 [DEBUG] No user_id provided, treating as non-member")
         
         # 🆕 取得所有成員 (用於成員列表功能)
-        all_members_res = supabase.table("trip_members").select("user_id, user_name").eq("itinerary_id", trip_id).execute()
+        all_members_res = supabase.table("trip_members").select("user_id, user_name, user_avatar").eq("itinerary_id", trip_id).execute()
         members = all_members_res.data or []
         created_by = trip.get("created_by", "")
         

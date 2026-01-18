@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Users, Crown, UserX, Loader2 } from "lucide-react"
 import { tripsApi } from "@/lib/api"
@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 interface TripMember {
     user_id: string
     user_name: string
+    user_avatar?: string | null // 🆕 新增頭像欄位
 }
 
 interface TripMembersSheetProps {
@@ -99,7 +100,11 @@ export function TripMembersSheet({
                                     )}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10">
+                                        <Avatar className="h-10 w-10 border border-slate-200 bg-white">
+                                            {/* 🆕 顯示頭像圖片 */}
+                                            {member.user_avatar && (
+                                                <AvatarImage src={member.user_avatar} className="object-cover" />
+                                            )}
                                             <AvatarFallback className={cn(
                                                 "text-sm font-medium",
                                                 isThisCreator ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-600"

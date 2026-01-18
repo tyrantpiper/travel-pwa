@@ -16,9 +16,10 @@ interface ImageUploadProps {
     folder?: string
     className?: string
     icon?: React.ReactNode
+    showPreview?: boolean
 }
 
-export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon, showPreview = true }: ImageUploadProps) {
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [previewOpen, setPreviewOpen] = useState(false)
@@ -123,8 +124,11 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                 {value && (
                     <div className="flex flex-col items-center gap-1">
                         <div
-                            className="relative h-16 w-16 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
-                            onClick={() => setPreviewOpen(true)}
+                            className={cn(
+                                "relative h-16 w-16 rounded-lg overflow-hidden border border-slate-200 transition-all",
+                                showPreview ? "cursor-pointer hover:ring-2 hover:ring-blue-500" : "cursor-default"
+                            )}
+                            onClick={() => showPreview && setPreviewOpen(true)}
                         >
                             <Image src={value} alt="Upload" fill className="object-cover" unoptimized />
                         </div>
@@ -141,7 +145,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                 )}
 
                 {/* 上傳按鈕 - 永遠顯示（可以上傳/替換圖片）*/}
-                {icon && className?.includes("rounded-full") ? (
+                {icon ? (
                     <div
                         onClick={() => fileInputRef.current?.click()}
                         className={cn("flex items-center justify-center cursor-pointer", className)}
