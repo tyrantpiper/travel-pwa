@@ -261,7 +261,7 @@ export function InfoView() {
 
     return (
         // 🔧 Phase 14: View manages its own
-        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain px-4 py-6 pb-20">
+        <div ref={scrollRef} className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none px-4 py-6 pb-20">
             <div className="min-h-screen bg-stone-50 py-12 pb-32">
                 <header className="mb-6 space-y-3">
                     <div>

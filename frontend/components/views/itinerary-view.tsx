@@ -1295,7 +1295,7 @@ export function ItineraryView() {
     if (viewMode === 'list') {
         return (
             // 🔧 Phase 14: View manages its own scrolling
-            <div className="h-full overflow-y-auto overscroll-contain">
+            <div className="h-full overflow-y-auto overscroll-y-contain overscroll-x-none">
                 <div className="flex flex-col h-[100dvh] bg-stone-50 overflow-hidden">
                     <div className="flex-1 px-6 py-12 pb-32">
                         <header className="mb-8 flex justify-between items-start">
@@ -1481,19 +1481,19 @@ export function ItineraryView() {
     return (
         <div
             ref={setScrollerEl}
-            className="h-full flex flex-col overflow-y-auto overscroll-contain"
+            className="h-full flex flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none max-w-full"
         >
             <div className="flex flex-col min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
 
                 <div className="bg-white dark:bg-slate-800 pt-12 pb-2 sticky top-0 z-20 border-b border-slate-200 dark:border-slate-700 shadow-sm">
-                    <div className="px-6 flex justify-between items-end mb-4">
-                        <div>
+                    <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4 sm:gap-2">
+                        <div className="w-full sm:w-auto">
                             <button onClick={handleBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
                                 <ArrowLeft className="w-3 h-3" /> BACK
                             </button>
-                            <TripSwitcher className="w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
+                            <TripSwitcher className="w-full sm:w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-start sm:justify-end">
                             {currentTrip?.public_id && (
                                 <ShareButton
                                     publicId={currentTrip.public_id}

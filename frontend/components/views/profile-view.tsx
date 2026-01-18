@@ -268,7 +268,7 @@ export function ProfileView() {
 
     return (
         // 🔧 Phase 14: View manages its own scrolling
-        <div className="h-full overflow-y-auto overscroll-contain">
+        <div className="h-full overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
             <div className="min-h-screen bg-stone-50 dark:bg-slate-900 pb-32">
 
                 <div className={cn("h-48 relative overflow-hidden bg-gradient-to-br", currentTheme.gradient)}>

@@ -804,7 +804,7 @@ export function ToolsView() {
 
     return (
         <>
-            <div className="h-full bg-stone-50 overflow-y-auto overscroll-contain">
+            <div className="h-full bg-stone-50 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
                 <div className="min-h-screen pb-32">
                     <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                         <div className="space-y-3">
