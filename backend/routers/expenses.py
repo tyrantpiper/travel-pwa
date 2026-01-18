@@ -7,6 +7,7 @@ Handles all expense-related API endpoints.
 from fastapi import APIRouter, Header, HTTPException, Depends
 from models.base import ExpenseRequest, UpdateExpenseRequest
 from utils.deps import get_supabase
+from utils.helpers import ensure_user_exists
 
 router = APIRouter(prefix="/api", tags=["expenses"])
 
@@ -16,6 +17,10 @@ async def add_expense(request: ExpenseRequest, supabase=Depends(get_supabase)):
     """創建新費用記錄"""
     try:
         print(f"📝 [Expense] Creating expense: {request.title}, amount: {request.amount_jpy}, user: {request.created_by}")
+        
+        # 🆕 Phase 7: Ensure user exists before adding expense (FK defense)
+        await ensure_user_exists(supabase, request.created_by, request.creator_name)
+        
         payload = {
             "itinerary_id": request.itinerary_id,
             "title": request.title,
@@ -24,6 +29,7 @@ async def add_expense(request: ExpenseRequest, supabase=Depends(get_supabase)):
             "category": request.category,
             "is_public": request.is_public,
             "created_by": request.created_by,
+            "creator_name": request.creator_name,  # 🆕 Cache creator name for sync
             "payment_method": request.payment_method,
             "exchange_rate": request.exchange_rate,
             "card_name": request.card_name,

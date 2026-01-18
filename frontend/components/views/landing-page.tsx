@@ -80,17 +80,22 @@ export function LandingPage() {
             // Default nickname fallback
             const fallbackName = nickname || "Traveler"
             let fetchedName = fallbackName
+            let fetchedAvatar = ""
 
             // Call API via usersApi (Unified)
             try {
                 const data = await usersApi.getProfile(recoverCode)
                 if (data.nickname) fetchedName = data.nickname
+                if (data.avatar_url) fetchedAvatar = data.avatar_url
             } catch (err) {
                 console.warn("Profile fetch failed, using fallback", err)
             }
 
             localStorage.setItem("user_uuid", recoverCode)
             localStorage.setItem("user_nickname", fetchedName)
+            if (fetchedAvatar) {
+                localStorage.setItem("user_avatar", fetchedAvatar)
+            }
 
             toast.dismiss(toastId)
             toast.success(`Welcome back, ${fetchedName}!`)

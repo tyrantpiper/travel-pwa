@@ -31,10 +31,12 @@ from models.base import (
     ReorderRequest  # 🆕 拖曳排序
 )
 from utils.deps import get_supabase
-from utils.helpers import generate_room_code, generate_public_id
+from utils.helpers import generate_room_code, generate_public_id, ensure_user_exists
 from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
 router = APIRouter(prefix="/api", tags=["trips"])
+
+# ensure_user_exists moved to utils.helpers
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -433,6 +435,10 @@ async def create_manual_trip(
             "cover_image": request.cover_image
         }
         
+        
+        # 🆕 Phase 3.1: 確保使用者存在 (滿足外鍵約束)
+        await ensure_user_exists(supabase, request.user_id, request.creator_name)
+        
         trip_res = supabase.table("itineraries").insert(trip_data).execute()
         trip_id = trip_res.data[0]['id']
 
@@ -478,8 +484,12 @@ async def join_trip(request: JoinTripRequest, supabase=Depends(get_supabase)):
         if not trip_res.data:
             raise HTTPException(status_code=404, detail="找不到此行程代碼")
             
+            
         trip = trip_res.data[0]
         print(f"✅ 找到行程: {trip['title']}")
+        
+        # 🆕 Phase 3.1: 確保加入者也存在於 users 表 (滿足外鍵約束)
+        await ensure_user_exists(supabase, request.user_id, request.user_name)
         
         # 2. 加入成員 (如果已加入會報錯，我們用 try 接住忽略)
         try:
@@ -648,6 +658,9 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
                 "ai_review": request.ai_review
             }
         }
+        
+        # 🆕 Phase 3.1: 確保使用者存在 (滿足外鍵約束)
+        await ensure_user_exists(supabase, request.user_id, request.creator_name)
         
         trip_res = supabase.table("itineraries").insert(trip_data).execute()
         
