@@ -7,6 +7,21 @@ const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 console.log("🚀 [API] Connected to:", API_HOST)
 
 import { SyncQueue } from './sync-engine';
+import { z } from "zod";
+
+// === Zod Schemas for Data Robustness ===
+export const SearchResultSchema = z.object({
+    lat: z.coerce.number(), // Handle potential string coordinates from some APIs
+    lng: z.coerce.number(),
+    name: z.string().default("Unknown Place"),
+    address: z.string().optional().nullable(),
+    type: z.string().optional().nullable(),
+    source: z.string().optional().nullable(),
+})
+
+export const GeocodeResponseSchema = z.object({
+    results: z.array(SearchResultSchema).default([])
+})
 
 // === API Endpoints ===
 export const API = {
@@ -356,7 +371,15 @@ export const geocodeApi = {
             signal
         })
         if (!res.ok) throw new Error("Search failed")
-        return res.json()
+        const data = await res.json()
+
+        // 🛡️ Data Robustness: Validate with Zod
+        const parsed = GeocodeResponseSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Geocode validation failed, using raw data:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 }
 

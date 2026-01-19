@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -77,7 +77,12 @@ export function CreateTripModal({
                 </Button>
             </DialogTrigger>
             <DialogContent>
-                <DialogHeader><DialogTitle>{t('create_trip')}</DialogTitle></DialogHeader>
+                <DialogHeader>
+                    <DialogTitle>{t('create_trip')}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        建立一個新的旅遊行程並設定基本資訊
+                    </DialogDescription>
+                </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="flex justify-center">
                         <ImageUpload
@@ -158,7 +163,12 @@ export function JoinTripDialog({
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-xs">
-                <DialogHeader><DialogTitle>{t('enter_trip_code')}</DialogTitle></DialogHeader>
+                <DialogHeader>
+                    <DialogTitle>{t('enter_trip_code')}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        輸入 4 位數共享代碼加入現有行程
+                    </DialogDescription>
+                </DialogHeader>
                 <div className="space-y-4 py-4">
                     <Input
                         placeholder="8821"

@@ -25,7 +25,7 @@ import { TimelineCardOverlay } from "@/components/itinerary/TimelineCardOverlay"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useTripDetail, useOnlineStatus } from "@/lib/hooks"
@@ -1326,6 +1326,9 @@ export function ItineraryView() {
                                         <AlertCircle className="w-5 h-5" />
                                         {t('confirm_delete')}
                                     </DialogTitle>
+                                    <DialogDescription className="sr-only">
+                                        確認是否要永久刪除此行程。
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <div className="py-4">
                                     <p className="text-slate-600">
@@ -1638,7 +1641,12 @@ export function ItineraryView() {
                                 </span>
                             </div>
                             <DialogContent className="sm:max-w-md">
-                                <DialogHeader><DialogTitle>修改第 {day} 天的天氣地點</DialogTitle></DialogHeader>
+                                <DialogHeader>
+                                    <DialogTitle>修改第 {day} 天的天氣地點</DialogTitle>
+                                    <DialogDescription className="sr-only">
+                                        設定此日期對應的地理位置以獲取準確的天氣資訊。
+                                    </DialogDescription>
+                                </DialogHeader>
                                 <div className="space-y-4 py-4">
                                     {/* 當前座標顯示 */}
                                     {dailyLocs[day] && (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -116,6 +116,9 @@ export function ActivityEditModal({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{isAddMode ? "Add Activity" : "Edit Activity"}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {isAddMode ? "Fill in the details to add a new activity to your itinerary." : "Update the details of this itinerary activity."}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     {/* Spot Photo Upload - 多圖片 */}

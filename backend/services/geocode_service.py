@@ -9,39 +9,15 @@ Extracted from main.py for modularization
 """
 
 import os
-import json
+import orjson
 import httpx
+import asyncio
 from google import genai
 from google.genai import types
 from pathlib import Path
 
-# 🆕 模糊搜尋 (Replace rapidfuzz with difflib for Cloudflare Workers compatibility)
-import difflib
-
-# Compatibility wrapper for rapidfuzz.process.extractOne
-class FuzzyProcess:
-    def extractOne(self, query, choices, scorer=None, score_cutoff=0):
-        best_match = None
-        best_score = -1
-        
-        for choice in choices:
-            # difflib.SequenceMatcher.ratio() returns 0.0-1.0, map to 0-100
-            score = difflib.SequenceMatcher(None, query, choice).ratio() * 100
-            if score >= score_cutoff and score > best_score:
-                best_score = score
-                best_match = choice
-        
-        if best_match:
-            return (best_match, best_score, None)
-        return None
-
-# Compatibility wrapper for rapidfuzz.fuzz
-class FuzzyScorer:
-    def ratio(self, s1, s2):
-        return difflib.SequenceMatcher(None, s1, s2).ratio() * 100
-
-process = FuzzyProcess()
-fuzz = FuzzyScorer()
+# 🆕 模糊搜尋 (Restore rapidfuzz for Cloud Run optimization)
+from rapidfuzz import fuzz, process
 
 # Import AI model config
 from utils.ai_config import WORKHORSE_MODEL
@@ -49,13 +25,25 @@ from utils.ai_config import WORKHORSE_MODEL
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 
-# 🆕 載入連鎖店品牌庫 (Cloudflare Compatible)
-try:
-    from data.static_db import BRANDS_DB
-    print(f"[OK] Loaded static BRANDS_DB: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
-except ImportError:
-    print("⚠️ Could not import static_db.BRANDS_DB")
-    BRANDS_DB = {}
+# 🆕 2026 Connection Pooling: Global AsyncClient
+# 🔧 Optimizing for long-running Cloud Run instances
+HTTPX_CLIENT = httpx.AsyncClient(
+    timeout=5.0,
+    limits=httpx.Limits(max_keepalive_connections=20, max_connections=50)
+)
+
+# 🆕 載入連鎖店品牌庫
+BRANDS_PATH = Path(__file__).parent.parent / "data" / "brands.json"
+BRANDS_DB = {}
+if BRANDS_PATH.exists():
+    try:
+        # 🆕 Use orjson for 5x-10x faster loading
+        BRANDS_DB = orjson.loads(BRANDS_PATH.read_bytes())
+        print(f"[OK] Loaded brands.json: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
+    except Exception as e:
+        print(f"⚠️ Error loading brands.json: {e}")
+else:
+    print(f"⚠️ brands.json not found at {BRANDS_PATH}")
 
 
 # 🆕 繁簡日漢字對照表（用於模糊搜尋標準化）
@@ -102,22 +90,22 @@ async def geocode_with_arcgis(place_name: str):
     if not ARCGIS_API_KEY:
         return None
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.get(
-                "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
-                params={
-                    "SingleLine": place_name,
-                    "f": "json",
-                    "outFields": "PlaceName,Place_addr",
-                    "maxLocations": 1,
-                    "token": ARCGIS_API_KEY
-                }
-            )
-            data = res.json()
-            if data.get("candidates"):
-                loc = data["candidates"][0]["location"]
-                print(f"🗺️ ArcGIS: {place_name} → ({loc['y']:.4f}, {loc['x']:.4f})")
-                return {"lat": loc["y"], "lng": loc["x"]}
+        res = await HTTPX_CLIENT.get(
+            "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+            params={
+                "SingleLine": place_name,
+                "f": "json",
+                "outFields": "PlaceName,Place_addr",
+                "maxLocations": 1,
+                "token": ARCGIS_API_KEY
+            }
+        )
+        # 🆕 Use orjson for faster response parsing
+        data = orjson.loads(res.content)
+        if data.get("candidates"):
+            loc = data["candidates"][0]["location"]
+            print(f"🗺️ ArcGIS: {place_name} → ({loc['y']:.4f}, {loc['x']:.4f})")
+            return {"lat": loc["y"], "lng": loc["x"]}
     except Exception as e:
         print(f"⚠️ ArcGIS error for '{place_name}': {e}")
     return None
@@ -133,27 +121,26 @@ async def geocode_with_nominatim(place_name: str):
     如需重新啟用，將 geocode_place 中的 Photon 改回 Nominatim 即可
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={
-                    "q": place_name, 
-                    "format": "json", 
-                    "limit": 1,
-                    "accept-language": "zh-TW,zh,en"
-                },
-                headers={"User-Agent": "RyanTravelApp/1.0"}
-            )
-            data = res.json()
-            if data and len(data) > 0:
-                result = data[0]
-                print(f"🌍 Nominatim: {place_name} → ({result['lat']}, {result['lon']})")
-                return {
-                    "lat": float(result["lat"]), 
-                    "lng": float(result["lon"]),
-                    "name": result.get("display_name", place_name).split(",")[0],
-                    "address": result.get("display_name", "")
-                }
+        res = await HTTPX_CLIENT.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={
+                "q": place_name, 
+                "format": "json", 
+                "limit": 1,
+                "accept-language": "zh-TW,zh,en"
+            },
+            headers={"User-Agent": "RyanTravelApp/1.0"}
+        )
+        data = orjson.loads(res.content)
+        if data and len(data) > 0:
+            result = data[0]
+            print(f"🌍 Nominatim: {place_name} → ({result['lat']}, {result['lon']})")
+            return {
+                "lat": float(result["lat"]), 
+                "lng": float(result["lon"]),
+                "name": result.get("display_name", place_name).split(",")[0],
+                "address": result.get("display_name", "")
+            }
     except Exception as e:
         print(f"🌍 Nominatim error for '{place_name}': {e}")
     return None
@@ -208,11 +195,11 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                 else:
                     params["location_bias_scale"] = 0.2
 
-            res = await client.get(
+            res = await HTTPX_CLIENT.get(
                 "https://photon.komoot.io/api/",
                 params=params
             )
-            data = res.json()
+            data = orjson.loads(res.content)
             if data.get("features") and len(data["features"]) > 0:
                 results = []
                 for feature in data["features"]:
@@ -244,23 +231,22 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
 async def reverse_geocode_with_photon(lat: float, lng: float):
     """Photon 反向地理編碼（座標 → 地名）"""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.get(
-                "https://photon.komoot.io/reverse",
-                params={"lat": lat, "lon": lng, "lang": "zh"}
-            )
-            data = res.json()
-            if data.get("features") and len(data["features"]) > 0:
-                props = data["features"][0].get("properties", {})
-                address_parts = []
-                for key in ["country", "state", "city", "district", "street", "housenumber"]:
-                    if props.get(key):
-                        address_parts.append(props[key])
-                
-                return {
-                    "name": props.get("name", "Unknown"),
-                    "address": ", ".join(address_parts) if address_parts else "Unknown"
-                }
+        res = await HTTPX_CLIENT.get(
+            "https://photon.komoot.io/reverse",
+            params={"lat": lat, "lon": lng, "lang": "zh"}
+        )
+        data = orjson.loads(res.content)
+        if data.get("features") and len(data["features"]) > 0:
+            props = data["features"][0].get("properties", {})
+            address_parts = []
+            for key in ["country", "state", "city", "district", "street", "housenumber"]:
+                if props.get(key):
+                    address_parts.append(props[key])
+            
+            return {
+                "name": props.get("name", "Unknown"),
+                "address": ", ".join(address_parts) if address_parts else "Unknown"
+            }
     except Exception as e:
         print(f"🔍 Photon reverse error: {e}")
     return None
@@ -326,7 +312,8 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
             if text.startswith("json"):
                 text = text[4:]
         
-        enhanced = json.loads(text)
+        # 🆕 Use orjson for faster AI response parsing
+        enhanced = orjson.loads(text)
         
         result = {
             **base_result,
@@ -650,13 +637,47 @@ LANDMARKS_DB = {
     "香港機場": {"aliases": ["hong kong airport", "hkg", "赤鱲角"], "search": "Hong Kong International Airport", "display": "香港國際機場", "country": "HK"},
 }
 
-# 🆕 Load Static Landmarks (Cloudflare Compatible)
+# 🆕 Load External JSON for Massive Expansion
 try:
-    from data.static_db import EXTERNAL_LANDMARKS
-    LANDMARKS_DB.update(EXTERNAL_LANDMARKS)
-    print(f"📦 Loaded {len(EXTERNAL_LANDMARKS)} static landmarks from static_db")
-except ImportError:
-    print("⚠️ Could not import static_db.EXTERNAL_LANDMARKS")
+    data_path = Path(__file__).parent.parent / "data" / "landmarks.json"
+    if data_path.exists():
+        # 🆕 Use orjson.loads for 10x faster startup speed
+        external_data = orjson.loads(data_path.read_bytes())
+        # Filter: Skip metadata keys (starting with _) and non-dict entries
+        valid_entries = {
+            k: v for k, v in external_data.items()
+            if isinstance(v, dict) and not k.startswith("_")
+        }
+        LANDMARKS_DB.update(valid_entries)
+        print(f"📦 Loaded {len(valid_entries)} external landmarks from landmarks.json")
+except Exception as e:
+    print(f"⚠️ Failed to load external landmarks: {e}")
+
+# 🆕 Load Country-Separated Data (Phase 5: Modular Architecture)
+try:
+    countries_dir = Path(__file__).parent.parent / "data" / "countries"
+    if countries_dir.exists():
+        total_country_entries = 0
+        for country_path in countries_dir.iterdir():
+            if country_path.is_dir():
+                country_code = country_path.name.upper()
+                for json_file in country_path.glob("*.json"):
+                    try:
+                        # 🆕 Use orjson for modular shards
+                        country_data = orjson.loads(json_file.read_bytes())
+                        # Filter: Skip __meta and non-dict entries
+                        valid_entries = {
+                            k: v for k, v in country_data.items()
+                            if isinstance(v, dict) and not k.startswith("_")
+                        }
+                        LANDMARKS_DB.update(valid_entries)
+                        total_country_entries += len(valid_entries)
+                        print(f"  🌏 {country_code}/{json_file.name}: {len(valid_entries)} entries")
+                    except Exception as fe:
+                        print(f"  ⚠️ Error loading {json_file}: {fe}")
+        print(f"📦 Loaded {total_country_entries} entries from countries/ directory")
+except Exception as e:
+    print(f"⚠️ Failed to load country data: {e}")
 
 
 # 預先計算排序後的鍵（最長優先匹配）

@@ -6,6 +6,10 @@ httpx
 supabase
 google-genai
 python-dotenv
+rapidfuzz==3.14.3
+slowapi>=0.1.9
+aiofiles>=25.1.0
+orjson>=3.10.0
 
 # Production Server
 gunicorn

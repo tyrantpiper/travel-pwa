@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle,
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -246,6 +246,9 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
                         <DialogTitle>圖片預覽</DialogTitle>
+                        <DialogDescription>
+                            全螢幕預覽活動圖片
+                        </DialogDescription>
                     </DialogHeader>
                     {(() => {
                         const images = activity.image_urls?.length
@@ -333,6 +336,9 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                 <div className="p-6 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-serif font-bold text-slate-900 dark:text-white">{activity.place || "Details"}</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            活動詳細資訊與個人備忘錄
+                        </DialogDescription>
                     </DialogHeader>
                 </div>
                 <ScrollArea className="max-h-[60vh]">

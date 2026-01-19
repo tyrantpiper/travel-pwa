@@ -16,7 +16,7 @@ import { useState, useRef, useCallback } from "react"
 import { Loader2, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
 
 // 🆕 DND-Kit imports
@@ -249,6 +249,7 @@ export function MultiImageUpload({
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
                         <DialogTitle>圖片預覽</DialogTitle>
+                        <DialogDescription>全螢幕預覽多張上傳的小徑照片，支援左右切換與縮放。</DialogDescription>
                     </DialogHeader>
                     {previewIndex !== null && values[previewIndex] && (
                         <div className="relative w-full h-[80vh]">

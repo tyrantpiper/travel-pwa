@@ -12,13 +12,18 @@ if sys.stdout and hasattr(sys.stdout, 'buffer'):
         pass  # Ignore if stdout is not a standard stream
 
 import os
-import json
+import orjson
 import random
 import string
 from fastapi import FastAPI, HTTPException, Header, Depends
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from utils.limiter import limiter
+from fastapi import Request
+from fastapi.middleware.cors import CORSMiddleware
 
 # 🆕 模組化：從 models.base 導入所有 Pydantic 模型
 # （原有的 class 定義暫時保留，確認無誤後再移除）
@@ -86,10 +91,26 @@ from dotenv import load_dotenv
 # 1. 載入環境變數 (只讀 Supabase)
 load_dotenv()
 
-app = FastAPI(title="Ryan's AI Travel Tool (BYOK Edition)")
+from fastapi.responses import ORJSONResponse
+
+# 0. Initialize App
+# 🆕 v4.0: 使用 ORJSONResponse 提高 2026 版序列化效能 (Cloud Run Optimized)
+app = FastAPI(
+    title="Ryan's AI Travel Tool (BYOK Edition)",
+    default_response_class=ORJSONResponse
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # 🆕 Phase 4: 註冊 Routers
 from routers.geocode import router as geocode_router
+from services.geocode_service import HTTPX_CLIENT
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("[Shutdown] Closing global HTTPX connection pool...")
+    await HTTPX_CLIENT.aclose()
 from routers.expenses import router as expenses_router
 from routers.ai import router as ai_router
 from routers.trips import router as trips_router
@@ -231,7 +252,9 @@ def health_check():
     return {"status": "Alive", "mode": "BYOK"}
 
 @app.post("/api/plan")
+@limiter.limit("5/minute")
 async def generate_itinerary(
+    request: Request,
     prefs: UserPreferences, 
     api_key: str = Depends(get_gemini_key) # 自動從 Header 抓 Key
 ):
@@ -507,22 +530,23 @@ SYSTEM_PROMPT = """
 """
 
 @app.post("/api/chat")
-async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
+@limiter.limit("20/minute")
+async def chat_with_ryan(request: Request, body: ChatRequest, api_key: str = Depends(get_gemini_key)):
     try:
         # 🆕 使用 Model Manager (Gemini 3 優先 + 自動降級)
         from services.model_manager import call_with_fallback, call_verifier
         from services.poi_service import detect_poi_query, search_poi_combined, format_pois_for_ai
         
         # 🆕 偵測是否為 POI 相關查詢
-        poi_detection = detect_poi_query(request.message)
+        poi_detection = detect_poi_query(body.message)
         poi_context = ""
         
-        if poi_detection and request.location:
+        if poi_detection and body.location:
             # 自動查詢 POI 資料
             try:
-                lat = request.location.get("lat", 35.6895)  # 預設東京
-                lng = request.location.get("lng", 139.6917)
-                location_name = request.location.get("name", "當前位置")
+                lat = body.location.get("lat", 35.6895)  # 預設東京
+                lng = body.location.get("lng", 139.6917)
+                location_name = body.location.get("name", "當前位置")
                 category = poi_detection["category"]
                 
                 print(f"🗺️ POI 查詢觸發: {category} @ ({lat}, {lng})")
@@ -550,7 +574,7 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         
         # 處理對話歷史 (向後相容)
         processed_history = []
-        for msg in request.history:
+        for msg in body.history:
             role = "user" if msg.get("role") == "user" else "model"
             
             # 🆕 優先使用 rawParts (含思想簽名)
@@ -569,27 +593,27 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         
         # 🆕 v3.5: 注入行程上下文
         itinerary_context = ""
-        if request.current_itinerary:
+        if body.current_itinerary:
             itinerary_context = format_itinerary_context(
-                request.current_itinerary, 
-                request.focused_day
+                body.current_itinerary, 
+                body.focused_day
             )
-            print(f"📅 注入行程上下文: {request.current_itinerary.get('title', '?')}")
+            print(f"📅 注入行程上下文: {body.current_itinerary.get('title', '?')}")
         
         # 處理當前訊息 (包含圖片 + POI 上下文 + 行程上下文)
-        enhanced_message = request.message + poi_context + itinerary_context
+        enhanced_message = body.message + poi_context + itinerary_context
         
         # 🆕 處理圖片 (如果有)
-        if request.image:
+        if body.image:
             import base64
             from io import BytesIO
             from PIL import Image
             
             try:
-                if "base64," in request.image:
-                    image_data = base64.b64decode(request.image.split("base64,")[1])
+                if "base64," in body.image:
+                    image_data = base64.b64decode(body.image.split("base64,")[1])
                 else:
-                    image_data = base64.b64decode(request.image)
+                    image_data = base64.b64decode(body.image)
                     
                 image = Image.open(BytesIO(image_data))
                 enhanced_message = f"[使用者上傳了一張圖片]\n{enhanced_message}"
@@ -601,7 +625,7 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
         from services.model_manager import detect_diagnosis_intent
         
         intent_type = "PLANNING"  # 預設
-        if detect_diagnosis_intent(request.message):
+        if detect_diagnosis_intent(body.message):
             intent_type = "DIAGNOSIS"
             print("🩺 診斷意圖偵測：切換到 DIAGNOSIS 模式")
             # 注入診斷專用 System Prompt
@@ -624,7 +648,7 @@ async def chat_with_ryan(request: ChatRequest, api_key: str = Depends(get_gemini
             api_key=api_key,
             history=full_history,
             message=enhanced_message,
-            thought_signatures=request.thought_signatures,
+            thought_signatures=body.thought_signatures,
             intent_type=intent_type  # 🆕 動態意圖
         )
         
@@ -812,10 +836,11 @@ async def summarize_history(request: SummarizeRequest, api_key: str = Depends(ge
 # 
 
 @app.post("/api/chat/stream")
-async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_key)):
+@limiter.limit("20/minute")
+async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depends(get_gemini_key)):
     """
     SSE Streaming Chat Endpoint
-    用於繞過 Vercel 10 秒 Timeout 限制
+    針對 Vercel 10 秒 Timeout 優化
     """
     # 建構對話歷史 (加入 System Prompt)
     system_history = [
@@ -825,7 +850,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     
     # 處理對話歷史
     processed_history = []
-    for msg in request.history:
+    for msg in body.history:
         role = "user" if msg.get("role") == "user" else "model"
         if "rawParts" in msg and msg["rawParts"]:
             parts = msg["rawParts"]
@@ -839,23 +864,23 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     full_history = system_history + processed_history
     
     # 🆕 v3.7: 景點偵測 + 三源資料注入
-    enriched_message = request.message
+    enriched_message = body.message
     poi_sources = []  # 🆕 v3.7.1: 收集來源 URLs
     try:
         # 偵測景點相關關鍵字 (簡單方法: 檢查是否包含景點名稱模式)
         poi_keywords = ["怎麼樣", "推薦", "介紹", "告訴我", "什麼", "好玩", "好吃", "值得"]
         place_indicators = ["寺", "神社", "城", "塔", "公園", "站", "車站", "廟", "宮", "殿", "館", "園"]
         
-        message_lower = request.message.lower()
-        has_poi_question = any(kw in request.message for kw in poi_keywords)
-        has_place = any(ind in request.message for ind in place_indicators)
+        message_lower = body.message.lower()
+        has_poi_question = any(kw in body.message for kw in poi_keywords)
+        has_place = any(ind in body.message for ind in place_indicators)
         
         if has_poi_question and has_place:
             # 嘗試提取景點名稱 (簡單方法: 找到包含指示詞的詞)
             import re
             # 尋找景點名稱: 2-10 個中文字符，後面跟著指示詞
             place_pattern = r'([\u4e00-\u9fa5]{2,10}(?:寺|神社|城|塔|公園|站|車站|廟|宮|殿|館|園))'
-            matches = re.findall(place_pattern, request.message)
+            matches = re.findall(place_pattern, body.message)
             
             if matches:
                 place_name = matches[0]
@@ -877,7 +902,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
 📚 以下是來自維基百科/維基導遊的參考資料：
 {formatted_info}
 
-用戶原始問題：{request.message}
+用戶原始問題：{body.message}
 
 請根據以上資料回答用戶問題，使用你的 Ryan 旅遊達人風格！"""
                     print(f"✅ 三源資料已注入 ({len(formatted_info)} 字), 來源數: {len(poi_sources)}")
@@ -887,12 +912,12 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
     # 🆕 v3.8: 智慧神經夾擊 (Neural Sandwich)
     # 將上下文放在最前面，確保模型在看到問題前已具備背景知識
     itinerary_context = ""
-    if request.current_itinerary:
+    if body.current_itinerary:
         itinerary_context = format_itinerary_context(
-            request.current_itinerary, 
-            request.focused_day
+            body.current_itinerary, 
+            body.focused_day
         )
-        print(f"📅 串流注入行程上下文: {request.current_itinerary.get('title', '?')}")
+        print(f"📅 串流注入行程上下文: {body.current_itinerary.get('title', '?')}")
     
     # 處理最終訊息: 上下文 -> 原始消息
     # 🔧 FIX: enriched_message 已經包含了 POI 資料或原始訊息
@@ -903,7 +928,7 @@ async def chat_stream(request: ChatRequest, api_key: str = Depends(get_gemini_ke
             api_key=api_key,
             history=full_history,
             message=final_message,
-            thought_signatures=request.thought_signatures,
+            thought_signatures=body.thought_signatures,
             sources=poi_sources  # 🆕 v3.7.1: 傳遞來源
         ),
         media_type="text/event-stream",

@@ -1,5 +1,5 @@
-# 1. Base Image: 使用 Slim 版本 (更小、更安全)
-FROM python:3.11-slim
+# 1. Base Image: 使用 Python 3.14 Slim 版本 (2026 最強效能)
+FROM python:3.14-slim
 
 # 2. 設定工作目錄
 WORKDIR /app

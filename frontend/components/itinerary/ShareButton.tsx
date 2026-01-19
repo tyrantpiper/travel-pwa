@@ -14,36 +14,43 @@ interface ShareButtonProps {
 
 export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps) {
     const [isCopied, setIsCopied] = useState(false)
+    const [isSharing, setIsSharing] = useState(false)
 
     const handleShare = async () => {
+        if (isSharing) return
+
+        setIsSharing(true)
         const shareUrl = `${window.location.origin}/share/${publicId}`
 
-        // 1. Try Web Share API (Mobile native share)
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: `${tripTitle} | Tabidachi`,
-                    text: `查看我的行程規劃：${tripTitle}`,
-                    url: shareUrl,
-                })
-                return
-            } catch (err) {
-                if ((err as Error).name !== 'AbortError') {
-                    console.error("Share failed:", err)
-                } else {
-                    return // User cancelled
+        try {
+            // 1. Try Web Share API (Mobile native share)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: `${tripTitle} | Tabidachi`,
+                        text: `查看我的行程規劃：${tripTitle}`,
+                        url: shareUrl,
+                    })
+                    return
+                } catch (err) {
+                    const error = err as Error
+                    // AbortError is normal (user cancelled)
+                    // InvalidStateError means another share is active
+                    if (error.name !== 'AbortError' && error.name !== 'InvalidStateError') {
+                        console.error("Share failed:", err)
+                    }
                 }
             }
-        }
 
-        // 2. Fallback: Clipboard Copy
-        try {
+            // 2. Fallback: Clipboard Copy (or if navigator.share failed/unsupported)
             await navigator.clipboard.writeText(shareUrl)
             setIsCopied(true)
             toast.success("連結已複製到剪貼簿")
             setTimeout(() => setIsCopied(false), 2000)
         } catch (err) {
-            toast.error("無法複製連結")
+            toast.error("無法分享或複製連結")
+        } finally {
+            setIsSharing(false)
         }
     }
 

@@ -8,6 +8,7 @@ Gemini 3 Flash Preview 優先策略 + 自動降級機制
 🆕 v3.5: 新增 DIAGNOSIS 和 EXTRACTION 意圖
 """
 
+import orjson
 from google import genai
 from google.genai import types
 from typing import Optional, List, Dict, Any

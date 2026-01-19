@@ -6,7 +6,7 @@ import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { Camera, Loader2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 interface ImageUploadProps {
@@ -182,6 +182,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <VisuallyHidden>
                         <DialogTitle>圖片預覽</DialogTitle>
+                        <DialogDescription>全螢幕預覽上傳的圖片內容</DialogDescription>
                     </VisuallyHidden>
                     {value && (
                         <div className="relative w-full h-[80vh]">

@@ -6,9 +6,10 @@ Note: Chat endpoints remain in main.py due to complex dependencies.
 """
 
 import json
-from fastapi import APIRouter, Depends, HTTPException
 from google import genai
 from google.genai import types
+from fastapi import APIRouter, Depends, HTTPException, Request
+from utils.limiter import limiter
 
 from models.base import (
     MarkdownImportRequest, 
@@ -50,8 +51,10 @@ router = APIRouter(prefix="/api", tags=["ai"])
 
 
 @router.post("/parse-md")
+@limiter.limit("5/minute")
 async def parse_markdown(
-    request: MarkdownImportRequest,
+    request: Request,
+    body: MarkdownImportRequest,
     api_key: str = Depends(get_gemini_key)
 ):
     """📝 解析 Markdown 行程表
@@ -72,7 +75,7 @@ async def parse_markdown(
         - 如果擔心太長，仍然全部輸出，絕不刪減
         
         Markdown 內容：
-        {request.markdown_text}
+        {body.markdown_text}
 
         任務：
         1. **解析詳細行程 (items)**
@@ -281,21 +284,23 @@ async def parse_markdown(
 
 
 @router.post("/generate-trip")
+@limiter.limit("3/minute")
 async def generate_trip(
-    request: GenerateTripRequest,
+    request: Request,
+    body: GenerateTripRequest,
     api_key: str = Depends(get_gemini_key)
 ):
     """🤖 AI 生成行程
     
     根據用戶指定的目的地、天數、興趣生成行程規劃。
     """
-    print(f"🤖 AI 生成請求: {request.destination} ({request.days}天)")
+    print(f"🤖 AI 生成請求: {body.destination} ({body.days}天)")
     
     try:
         prompt = f"""
-        你是專業導遊。請為我規劃一個從 {request.origin} 出發，前往 {request.destination} 的 {request.days} 天行程。
+        你是專業導遊。請為我規劃一個從 {body.origin} 出發，前往 {body.destination} 的 {body.days} 天行程。
         
-        我的興趣重點：{request.interests}
+        我的興趣重點：{body.interests}
         
         任務：
         1. 規劃每日行程 (09:00 - 21:00)，路線要順暢。
@@ -332,21 +337,23 @@ async def generate_trip(
 
 
 @router.post("/ai-generate")
+@limiter.limit("3/minute")
 async def ai_generate(
-    request: SimplePromptRequest,
+    request: Request,
+    body: SimplePromptRequest,
     api_key: str = Depends(get_gemini_key)
 ):
     """🤖 簡化版 AI 生成 (接受自由 prompt)
     
     用戶可以自由輸入 prompt，AI 會規劃一個驚艷的行程。
     """
-    print(f"🤖 AI 簡易生成請求: {request.prompt[:50]}...")
+    print(f"🤖 AI 簡易生成請求: {body.prompt[:50]}...")
     
     try:
         prompt = f"""
         你是「Ryan 旅遊達人」👋 一位熱愛探索當地美食和秘境的資深玩家！
         
-        用戶跟你說：{request.prompt}
+        用戶跟你說：{body.prompt}
         
         請發揮你的專業，規劃一個讓用戶驚艷的行程！
         每個地點的 desc 請寫得有溫度，像跟朋友分享私房景點一樣 ❤️
@@ -416,9 +423,11 @@ from services.model_manager import call_extraction
 
 
 @router.post("/trips/{trip_id}/days/{day}/ai-review")
+@limiter.limit("10/minute")
 async def generate_day_review(
     trip_id: str,
     day: int,
+    request: Request,
     api_key: str = Depends(get_gemini_key),
     supabase=Depends(get_supabase)
 ):

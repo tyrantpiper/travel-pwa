@@ -343,6 +343,7 @@ export function ProfileView() {
                         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 bg-black/90 border-0 flex items-center justify-center">
                             <VisuallyHidden>
                                 <DialogTitle>頭像預覽</DialogTitle>
+                                <DialogDescription>全螢幕預覽用戶頭像圖片</DialogDescription>
                             </VisuallyHidden>
                             {profile.avatarUrl && (
                                 <div className="relative w-full h-[80vh]">

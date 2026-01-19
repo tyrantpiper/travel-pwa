@@ -539,21 +539,29 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 minzoom: MAP_STYLES.BUILDING_3D.MIN_ZOOM,
                 paint: {
                     'fill-extrusion-color': MAP_STYLES.BUILDING_3D.COLOR,
+                    // 🆕 Terra-Cognita v3: PLOD Rendering (Progressive Level of Detail)
+                    // Fix: Expected value to be of type number, but found null instead.
                     'fill-extrusion-height': [
                         'interpolate',
                         ['linear'],
                         ['zoom'],
-                        15, 0,
-                        15.05, ['get', 'render_height']
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM, 0,
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM + 0.5, ['coalesce', ['get', 'render_height'], 0]
                     ],
                     'fill-extrusion-base': [
                         'interpolate',
                         ['linear'],
                         ['zoom'],
-                        15, 0,
-                        15.05, ['get', 'render_min_height']
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM, 0,
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM + 0.5, ['coalesce', ['get', 'render_min_height'], 0]
                     ],
-                    'fill-extrusion-opacity': MAP_STYLES.BUILDING_3D.OPACITY
+                    'fill-extrusion-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM, 0,
+                        MAP_STYLES.BUILDING_3D.MIN_ZOOM + 0.5, MAP_STYLES.BUILDING_3D.OPACITY
+                    ]
                 }
             }, labelLayerId)
         }

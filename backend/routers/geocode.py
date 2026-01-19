@@ -4,7 +4,7 @@ Geocode Router
 Handles all geocoding-related API endpoints.
 """
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, Request
 from models.base import GeocodeSearchRequest, GeocodeReverseRequest
 from services.geocode_service import (
     smart_geocode_logic,
@@ -12,13 +12,16 @@ from services.geocode_service import (
     reverse_geocode_with_ai_enhancement,  # 🆕 AI 增強版
     log_debug
 )
+from utils.limiter import limiter
 
 router = APIRouter(prefix="/api/geocode", tags=["geocode"])
 
 
 @router.post("/search")
+@limiter.limit("30/minute")
 async def geocode_search(
-    request: GeocodeSearchRequest,
+    request: Request,
+    body: GeocodeSearchRequest,
     x_gemini_key: str = Header(None, alias="X-Gemini-Key")
 ):
     """🔍 智能地理編碼搜尋（四層架構）
@@ -31,30 +34,31 @@ async def geocode_search(
     
     🆕 支援結構化過濾參數 (country/region)
     """
-    log_debug(f"REQ: q='{request.query}', trip='{request.tripTitle}', country={request.country}, region={request.region}, zoom={request.zoom}, bias={request.lat},{request.lng}")
+    log_debug(f"REQ: q='{body.query}', trip='{body.tripTitle}', country={body.country}, region={body.region}, zoom={body.zoom}, bias={body.lat},{body.lng}")
     return await smart_geocode_logic(
-        request.query, 
-        request.limit, 
-        request.tripTitle, 
+        body.query, 
+        body.limit, 
+        body.tripTitle, 
         x_gemini_key, 
-        request.lat, 
-        request.lng,
-        request.country,    # 🆕 傳遞國家過濾
-        request.region,     # 🆕 傳遞區域過濾
-        request.zoom        # 🆕 P1: 傳遞縮放層級
+        body.lat, 
+        body.lng,
+        body.country,    # 🆕 傳遞國家過濾
+        body.region,     # 🆕 傳遞區域過濾
+        body.zoom        # 🆕 P1: 傳遞縮放層級
     )
 
 
 @router.post("/reverse")
-async def geocode_reverse(request: GeocodeReverseRequest):
+@limiter.limit("30/minute")
+async def geocode_reverse(request: Request, body: GeocodeReverseRequest):
     """反向地理編碼：座標 → 地名
     
     使用 Photon（免費無限制）
     """
-    print(f"🔍 Reverse geocode: ({request.lat}, {request.lng})")
+    print(f"🔍 Reverse geocode: ({body.lat}, {body.lng})")
     
     # 使用 Photon 反向地理編碼
-    result = await reverse_geocode_with_photon(request.lat, request.lng)
+    result = await reverse_geocode_with_photon(body.lat, body.lng)
     if result:
         return {"success": True, **result}
     

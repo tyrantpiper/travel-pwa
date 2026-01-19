@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { cn } from "@/lib/utils"
@@ -241,7 +241,12 @@ export function ExpenseDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
-                <DialogHeader><DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle></DialogHeader>
+                <DialogHeader>
+                    <DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        填寫消費資訊，包括金額、幣別、分類與付款方式。
+                    </DialogDescription>
+                </DialogHeader>
                 <div className="space-y-5 py-2">
                     {/* 💰 Section 1: Amount Input (Hero Section) */}
                     <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3">

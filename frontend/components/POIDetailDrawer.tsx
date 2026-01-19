@@ -52,6 +52,7 @@ export default function POIDetailDrawer({
     const [aiLoading, setAiLoading] = useState(false)
     const [aiError, setAiError] = useState<string | null>(null)
     const [selectedTime, setSelectedTime] = useState(suggestedTime)
+    const [isSharing, setIsSharing] = useState(false)
     const [isMinimized, setIsMinimized] = useState(false)  // 🆕 最小化狀態
 
     // 🛡️ 狀態重置：當 POI 變更或關閉時清除舊資料
@@ -106,16 +107,24 @@ export default function POIDetailDrawer({
 
     // Web Share API
     const handleShare = async () => {
+        if (isSharing) return
         haptic.tap()
+
         if (navigator.share) {
+            setIsSharing(true)
             try {
                 await navigator.share({
                     title: poi.name,
                     text: `${poi.name} - ${poi.type}`,
                     url: `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`
                 })
-            } catch {
-                // 用戶取消分享
+            } catch (err) {
+                const error = err as Error
+                if (error.name !== 'AbortError' && error.name !== 'InvalidStateError') {
+                    console.error("POI Share failed:", err)
+                }
+            } finally {
+                setIsSharing(false)
             }
         }
     }

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
@@ -560,6 +560,9 @@ export function InfoView() {
                                 <div className="p-6 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                                     <DialogHeader>
                                         <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{hotels[currentHotelIdx].name || "Untitled Hotel"}</DialogTitle>
+                                        <DialogDescription className="sr-only">
+                                            檢視與編輯飯店的詳細資訊，包含入住時間、聯絡電話、備忘錄及訂房明細。
+                                        </DialogDescription>
                                     </DialogHeader>
 
                                     <div className="grid grid-cols-2 gap-3 mt-4">
