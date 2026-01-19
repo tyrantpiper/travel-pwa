@@ -136,14 +136,12 @@ print(f"[CORS] Configured strict origins: {ALLOWED_ORIGINS}")
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 # 只允許來自 Cloud Run 或 Localhost 的 Host header
+# 允許所有 Host (由 Cloud Run 的外部防火牆過濾，中間件層保持彈性)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=[
-        "antigravity-backend-589255638719.us-central1.run.app", 
-        "localhost", 
-        "127.0.0.1"
-    ]
+    allowed_hosts=["*"]
 )
+
 
 @app.middleware("http")
 async def add_security_headers(request, call_next):
@@ -418,7 +416,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
                 # Notes/Guide
                 notes = item.get("notes")
                 if notes:
-                    lines.append(f"    [Guide] {notes.replace('\n', ' ')}")
+                    lines.append("    [Guide] {}".format(notes.replace('\n', ' ')))
                 
                 # Memo (with Privacy Shield)
                 memo = item.get("memo")
