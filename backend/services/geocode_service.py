@@ -15,8 +15,33 @@ from google import genai
 from google.genai import types
 from pathlib import Path
 
-# 🆕 模糊搜尋
-from rapidfuzz import fuzz, process
+# 🆕 模糊搜尋 (Replace rapidfuzz with difflib for Cloudflare Workers compatibility)
+import difflib
+
+# Compatibility wrapper for rapidfuzz.process.extractOne
+class FuzzyProcess:
+    def extractOne(self, query, choices, scorer=None, score_cutoff=0):
+        best_match = None
+        best_score = -1
+        
+        for choice in choices:
+            # difflib.SequenceMatcher.ratio() returns 0.0-1.0, map to 0-100
+            score = difflib.SequenceMatcher(None, query, choice).ratio() * 100
+            if score >= score_cutoff and score > best_score:
+                best_score = score
+                best_match = choice
+        
+        if best_match:
+            return (best_match, best_score, None)
+        return None
+
+# Compatibility wrapper for rapidfuzz.fuzz
+class FuzzyScorer:
+    def ratio(self, s1, s2):
+        return difflib.SequenceMatcher(None, s1, s2).ratio() * 100
+
+process = FuzzyProcess()
+fuzz = FuzzyScorer()
 
 # Import AI model config
 from utils.ai_config import WORKHORSE_MODEL
@@ -24,13 +49,13 @@ from utils.ai_config import WORKHORSE_MODEL
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 
-# 🆕 載入連鎖店品牌庫
-BRANDS_PATH = Path(__file__).parent.parent / "data" / "brands.json"
-BRANDS_DB = {}
-if BRANDS_PATH.exists():
-    with open(BRANDS_PATH, "r", encoding="utf-8") as f:
-        BRANDS_DB = json.load(f)
-    print(f"[OK] Loaded brands.json: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
+# 🆕 載入連鎖店品牌庫 (Cloudflare Compatible)
+try:
+    from data.static_db import BRANDS_DB
+    print(f"[OK] Loaded static BRANDS_DB: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
+except ImportError:
+    print("⚠️ Could not import static_db.BRANDS_DB")
+    BRANDS_DB = {}
 
 
 # 🆕 繁簡日漢字對照表（用於模糊搜尋標準化）
@@ -625,44 +650,13 @@ LANDMARKS_DB = {
     "香港機場": {"aliases": ["hong kong airport", "hkg", "赤鱲角"], "search": "Hong Kong International Airport", "display": "香港國際機場", "country": "HK"},
 }
 
-# 🆕 Load External JSON for Massive Expansion
+# 🆕 Load Static Landmarks (Cloudflare Compatible)
 try:
-    data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "landmarks.json")
-    if os.path.exists(data_path):
-        with open(data_path, "r", encoding="utf-8") as f:
-            external_data = json.load(f)
-            # 🔧 Filter: Skip metadata keys (starting with _) and non-dict entries
-            valid_entries = {
-                k: v for k, v in external_data.items()
-                if isinstance(v, dict) and not k.startswith("_")
-            }
-            LANDMARKS_DB.update(valid_entries)
-            print(f"📦 Loaded {len(valid_entries)} external landmarks from landmarks.json")
-except Exception as e:
-    print(f"⚠️ Failed to load external landmarks: {e}")
-
-# 🆕 Load Country-Separated Data (Phase 5: Modular Architecture)
-try:
-    countries_dir = Path(__file__).parent.parent / "data" / "countries"
-    if countries_dir.exists():
-        total_country_entries = 0
-        for country_path in countries_dir.iterdir():
-            if country_path.is_dir():
-                country_code = country_path.name.upper()
-                for json_file in country_path.glob("*.json"):
-                    with open(json_file, "r", encoding="utf-8") as f:
-                        country_data = json.load(f)
-                        # Filter: Skip __meta and non-dict entries
-                        valid_entries = {
-                            k: v for k, v in country_data.items()
-                            if isinstance(v, dict) and not k.startswith("_")
-                        }
-                        LANDMARKS_DB.update(valid_entries)
-                        total_country_entries += len(valid_entries)
-                        print(f"  📂 {country_code}/{json_file.name}: {len(valid_entries)} entries")
-        print(f"📦 Loaded {total_country_entries} entries from countries/ directory")
-except Exception as e:
-    print(f"⚠️ Failed to load country data: {e}")
+    from data.static_db import EXTERNAL_LANDMARKS
+    LANDMARKS_DB.update(EXTERNAL_LANDMARKS)
+    print(f"📦 Loaded {len(EXTERNAL_LANDMARKS)} static landmarks from static_db")
+except ImportError:
+    print("⚠️ Could not import static_db.EXTERNAL_LANDMARKS")
 
 
 # 預先計算排序後的鍵（最長優先匹配）

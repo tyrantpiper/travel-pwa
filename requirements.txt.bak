@@ -1,0 +1,9 @@
+fastapi
+pydantic
+python-multipart
+requests
+httpx
+supabase
+google-genai
+# python-dotenv is technically not needed if we use Cloudflare Secrets, but keeping for safety
+python-dotenv

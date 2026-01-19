@@ -4,6 +4,7 @@
  */
 
 const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+console.log("🚀 [API] Connected to:", API_HOST)
 
 import { SyncQueue } from './sync-engine';
 

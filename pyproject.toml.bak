@@ -1,0 +1,13 @@
+[project]
+name = "antigravity-backend"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "python-multipart",
+    "requests",
+    "httpx",
+    "supabase",
+    "google-genai",
+    "python-dotenv"
+]

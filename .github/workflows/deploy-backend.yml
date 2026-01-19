@@ -1,0 +1,46 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        # Using Mixed Secrets Strategy:
+        # 1. SUPABASE_KEY: Pulled from Google Secret Manager (Best Practice)
+        # 2. Others: Passed via GitHub Secrets -> Env Vars (Easier setup for now)
+        run: |
+          gcloud run deploy antigravity-backend \
+            --source ./backend \
+            --platform managed \
+            --region us-central1 \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --cpu 1 \
+            --timeout 60s \
+            --max-instances 10 \
+            --min-instances 0 \
+            --set-env-vars "SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co,API_VERSION=v1,NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu,CLOUDINARY_API_KEY=996197457174111,ARCGIS_API_KEY=${{ secrets.ARCGIS_API_KEY }},CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}" \
+            --set-secrets "SUPABASE_KEY=supabase-key:latest" \
+            --project antigravity-prod-2026

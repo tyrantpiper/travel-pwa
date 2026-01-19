@@ -1,0 +1,27 @@
+# Production Dockerfile for Oracle Cloud / Generic Docker
+
+# 1. Base Image - Lightweight Python
+FROM python:3.13-slim
+
+# 2. Set Workdir
+WORKDIR /app
+
+# 3. Dependencies
+# Install system dependencies if needed (e.g., for psycopg2 native build)
+# RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 4. App Code
+COPY . .
+
+# 5. Build arguments & Env Vars
+ENV PORT=8000
+
+# 6. Expose Port
+EXPOSE 8000
+
+# 7. Start Command (Production Worker Settings)
+# Using generic settings suitable for most VPS
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: ryan_travel_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      # These will be read from .env file on the server
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - ARCGIS_API_KEY=${ARCGIS_API_KEY}
+      - CORS_ORIGINS=*
+    volumes:
+      # Optional: Persist logs
+      - ./logs:/app/logs

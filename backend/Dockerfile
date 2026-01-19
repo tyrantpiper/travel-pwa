@@ -1,24 +1,36 @@
-# 使用官方 Python 輕量版 (3.13 = 最穩定，套件相容性最佳)
-FROM python:3.13-slim
+# 1. Base Image: 使用 Slim 版本 (更小、更安全)
+FROM python:3.11-slim
 
-# 設定工作目錄
+# 2. 設定工作目錄
 WORKDIR /app
 
-# 1. 複製依賴清單並安裝
+# 3. 安裝系統依賴 (如果需要的話，例如 GCC)
+# RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
+
+# 4. 安裝 Python 依賴
+# 使用 --no-cache-dir 減少映像大小
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn uvicorn
 
-# 2. 複製所有程式碼 (排除 .env, __pycache__ 等)
+# 5. 複製程式碼
 COPY . .
 
-# 3. 建立非 root 用戶 (Hugging Face 安全要求)
-RUN useradd -m -u 1000 user
-USER user
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH
+# 6. 建構非 root 用戶 (安全性)
+RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
+USER appuser
 
-# 4. 開放 Hugging Face 預設端口
-EXPOSE 7860
+# 7. 設定 Cloud Run 端口 (預設 8080)
+ENV PORT=8080
+EXPOSE 8080
 
-# 5. 啟動指令 (Host 必須是 0.0.0.0, Port 必須是 7860)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# 8. 啟動指令 (使用 Gunicorn + Uvicorn Workers 獲得最佳效能)
+# --workers 1: Cloud Run 實例通常只有 1 vCPU，所以 1 worker 足夠 (避免 context switch overhead)
+# --threads 8: 增加併發處理能力 (對於 I/O bound 任務如 API call 很有效)
+# --timeout 0: 讓 Cloud Run 自行管理 timeout
+CMD exec gunicorn main:app \
+    --workers 1 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --threads 8 \
+    --timeout 0 \
+    --bind 0.0.0.0:${PORT}

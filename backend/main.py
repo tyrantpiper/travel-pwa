@@ -109,18 +109,50 @@ app.include_router(users_router)  # 🆕 Users Router
 app.include_router(app_router)    # 🆕 App Router
 print("[Routers] ✅ Registered: geocode, expenses, ai, trips, gdpr, route, poi, users, app")
 
-# 2. CORS 設定 (預設允許所有來源，可透過環境變數限制)
-# 🚨 生產環境建議設定 CORS_ORIGINS 限制來源
-CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "*")
-CORS_ORIGINS = ["*"] if CORS_ORIGINS_RAW == "*" else CORS_ORIGINS_RAW.split(",")
+# 2. CORS 設定 (嚴格模式)
+# 🚨 生產環境：只允許特定來源
+ALLOWED_ORIGINS = [
+    "https://travel-pwa-five.vercel.app",   # Production Frontend
+    "http://localhost:3000",                # Local Next.js dev
+    "http://localhost:5173",                # Local Vite dev
+    "https://antigravity-backend-589255638719.us-central1.run.app" # Self
+]
+
+# 允許 Vercel Preview Deployments (如果有的話)
+if os.getenv("VERCEL_PREVIEW_DOMAINS"):
+    ALLOWED_ORIGINS.extend(os.getenv("VERCEL_PREVIEW_DOMAINS").split(","))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Gemini-API-Key", "X-Requested-With", "X-User-ID"],
+    max_age=3600, # Cache preflight requests for 1 hour
 )
-print(f"[CORS] Allowed origins: {CORS_ORIGINS}")
+print(f"[CORS] Configured strict origins: {ALLOWED_ORIGINS}")
+
+# 3. 安全 Headers 中介軟體 (Security Headers)
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
+# 只允許來自 Cloud Run 或 Localhost 的 Host header
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=[
+        "antigravity-backend-589255638719.us-central1.run.app", 
+        "localhost", 
+        "127.0.0.1"
+    ]
+)
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # 3. 初始化 Supabase
 try:
