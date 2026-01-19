@@ -239,8 +239,8 @@ async def get_trip_by_id(
         members = all_members_res.data or []
         created_by = trip.get("created_by", "")
         
-        # 2. 抓該行程的所有細項 (按 sort_order 排序，支援拖曳)
-        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
+        # 2. 抓該行程的所有細項 (按 time_slot 排序，確保符合時間軸)
+        items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").order("sort_order").execute()
         
         # 3. 整理成前端要的格式
         days_map = {}

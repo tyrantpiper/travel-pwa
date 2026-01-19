@@ -127,7 +127,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Gemini-API-Key", "X-Requested-With", "X-User-ID"],
+    allow_headers=["Content-Type", "Authorization", "X-Gemini-Key", "X-Gemini-API-Key", "X-Requested-With", "X-User-ID"],
     max_age=3600, # Cache preflight requests for 1 hour
 )
 print(f"[CORS] Configured strict origins: {ALLOWED_ORIGINS}")
