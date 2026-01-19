@@ -7,4 +7,6 @@ supabase
 google-genai
 python-dotenv
 
+# Production Server
+gunicorn
 uvicorn
