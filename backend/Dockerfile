@@ -4,14 +4,15 @@ FROM python:3.14-slim
 # 2. 設定工作目錄
 WORKDIR /app
 
-# 3. 安裝系統依賴 (如果需要的話，例如 GCC)
-# RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
+# 3. 安裝系統依賴 (需要編譯 C extensions 如 rapidfuzz/orjson)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # 4. 安裝 Python 依賴
-# 使用 --no-cache-dir 減少映像大小
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install gunicorn uvicorn
 
 # 5. 複製程式碼
 COPY . .

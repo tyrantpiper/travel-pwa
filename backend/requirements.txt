@@ -6,7 +6,7 @@ httpx
 supabase
 google-genai
 python-dotenv
-rapidfuzz==3.14.3
+rapidfuzz>=3.6.0
 slowapi>=0.1.9
 aiofiles>=25.1.0
 orjson>=3.10.0
