@@ -193,7 +193,7 @@ async def initialize_supabase():
 
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
-@app.route("/health", methods=["GET", "HEAD"])
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
     """
     健康檢查端點 - UptimeRobot 每 5 分鐘戳一次
