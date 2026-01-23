@@ -69,7 +69,7 @@ export interface CreateItemParams {
     memo?: string
     link_url?: string
     reservation_code?: string
-    cost?: number
+    cost?: number | null
     sub_items?: SubItem[]
     hide_navigation?: boolean
 }
@@ -88,7 +88,7 @@ export interface UpdateItemParams {
     sub_items?: SubItem[]
     link_url?: string
     reservation_code?: string
-    cost?: number
+    cost?: number | null
     sort_order?: number
     hide_navigation?: boolean
 }

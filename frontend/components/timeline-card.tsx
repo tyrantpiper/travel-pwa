@@ -5,7 +5,7 @@ import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -363,10 +363,10 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                         <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{activity.reservation_code}</div>
                                     </div>
                                 )}
-                                {activity.cost !== undefined && (
+                                {activity.cost !== undefined && activity.cost !== null && (
                                     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
                                         <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">預估花費</div>
-                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">¥{activity.cost.toLocaleString()}</div>
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">¥{formatCurrency(activity.cost)}</div>
                                     </div>
                                 )}
                             </div>

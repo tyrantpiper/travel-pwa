@@ -30,7 +30,7 @@ export interface ItineraryItemState {
     memo?: string
     link_url?: string
     reservation_code?: string
-    cost?: number
+    cost?: number | null
     hide_navigation?: boolean
 }
 
@@ -81,7 +81,7 @@ export interface Activity {
     sub_items?: SubItem[]
     link_url?: string // External link for the place itself
     reservation_code?: string
-    cost?: number
+    cost?: number | null
     hide_navigation?: boolean
     is_highlight?: boolean
     sort_order?: number  // 🆕 拖曳排序

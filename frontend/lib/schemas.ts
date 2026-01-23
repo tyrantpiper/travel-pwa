@@ -44,7 +44,7 @@ export const ItineraryItemSchema = z.object({
     sub_items: z.array(SubItemSchema).default([]),
     link_url: z.string().optional().nullable(),
     reservation_code: z.string().optional().nullable(),
-    cost_amount: z.number().default(0),
+    cost_amount: z.number().nullable().default(0).transform(v => v ?? 0),
     sort_order: z.number().default(0),
     hide_navigation: z.boolean().default(false),
 });
