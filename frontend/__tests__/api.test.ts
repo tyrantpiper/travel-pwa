@@ -48,18 +48,21 @@ describe('tripsApi', () => {
                     headers: { 'Content-Type': 'application/json' },
                 })
             )
-            expect(result).toEqual({ id: 'trip-123', title: 'Test Trip' })
+            expect(result).toMatchObject({ id: 'trip-123', title: 'Test Trip' })
         })
 
         it('should throw error when request fails', async () => {
-            mockFetch.mockResolvedValueOnce({ ok: false })
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                json: async () => ({ detail: "建立行程失敗" })
+            })
 
             await expect(tripsApi.create({
                 title: 'Test',
                 start_date: '2026-01-01',
                 end_date: '2026-01-07',
                 user_id: 'user-123'
-            })).rejects.toThrow('Failed to create trip')
+            })).rejects.toThrow('建立行程失敗')
         })
     })
 
@@ -79,7 +82,7 @@ describe('tripsApi', () => {
                 expect.stringContaining('/api/join-trip'),
                 expect.anything()
             )
-            expect(result).toEqual({ success: true })
+            expect(result).toMatchObject({ success: true })
         })
     })
 
@@ -103,6 +106,11 @@ describe('tripsApi', () => {
 describe('itemsApi', () => {
     beforeEach(() => {
         mockFetch.mockReset()
+        // Mock onLine status
+        Object.defineProperty(navigator, 'onLine', {
+            configurable: true,
+            value: true,
+        });
     })
 
     describe('create', () => {
@@ -131,15 +139,21 @@ describe('itemsApi', () => {
         it('should update item by ID', async () => {
             mockFetch.mockResolvedValueOnce({
                 ok: true,
-                json: async () => ({ updated: true })
+                json: async () => ({
+                    id: 'item-123',
+                    itinerary_id: 'trip-123',
+                    day_number: 1,
+                    place_name: 'Updated Place'
+                })
             })
 
-            await itemsApi.update('item-123', { place: 'Updated Place' })
+            const result = await itemsApi.update('item-123', { place: 'Updated Place' })
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/items/item-123'),
                 expect.objectContaining({ method: 'PUT' })
             )
+            expect(result.place_name).toBe('Updated Place')
         })
     })
 

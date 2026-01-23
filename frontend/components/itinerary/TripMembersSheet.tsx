@@ -77,15 +77,15 @@ export function TripMembersSheet({
                     </Button>
                 </SheetTrigger>
 
-                <SheetContent side="bottom" className="h-[60vh] rounded-t-3xl">
-                    <SheetHeader className="pb-4 border-b">
+                <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-3xl flex flex-col p-0 overflow-hidden">
+                    <SheetHeader className="p-6 pb-4 border-b shrink-0">
                         <SheetTitle className="flex items-center gap-2">
                             <Users className="w-5 h-5" />
                             行程成員 ({members.length})
                         </SheetTitle>
                     </SheetHeader>
 
-                    <div className="py-4 space-y-2 overflow-y-auto max-h-[calc(60vh-100px)]">
+                    <div className="flex-1 py-4 px-6 space-y-2 overflow-y-auto">
                         {members.map((member) => {
                             const isThisCreator = member.user_id === createdBy
                             const isMe = member.user_id === currentUserId

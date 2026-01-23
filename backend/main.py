@@ -15,7 +15,7 @@ import os
 import orjson
 import random
 import string
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 from slowapi import _rate_limit_exceeded_handler
@@ -136,6 +136,8 @@ ALLOWED_ORIGINS = [
     "https://travel-pwa-five.vercel.app",   # Production Frontend
     "http://localhost:3000",                # Local Next.js dev
     "http://localhost:5173",                # Local Vite dev
+    "http://127.0.0.1:3000",                # Local dev (IP)
+    "http://172.20.10.4:3000",              # Mobile Hotspot Network IP
     "https://antigravity-backend-589255638719.us-central1.run.app" # Self
 ]
 
@@ -173,33 +175,42 @@ async def add_security_headers(request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# 3. 初始化 Supabase
-try:
-    SUPABASE_URL = os.getenv("SUPABASE_URL")
-    SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("[Supabase] Connected successfully")
-except Exception as e:
-    print(f"⚠️ Supabase Warning: {e}")
-    supabase = None  # Will cause errors but at least won't crash on import
-
-# 🆕 Phase 4: 將 supabase 放入 app.state 供 routers 使用
-app.state.supabase = supabase
+# 3. 初始化 Supabase (Managed in Startup)
+@app.on_event("startup")
+async def initialize_supabase():
+    try:
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        if url and key:
+            app.state.supabase = create_client(url, key)
+            print("[Supabase] Connected successfully")
+        else:
+            print("⚠️ Supabase Warning: Missing credentials")
+            app.state.supabase = None
+    except Exception as e:
+        print(f"⚠️ Supabase Startup Error: {e}")
+        app.state.supabase = None
 
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
     """
     健康檢查端點 - UptimeRobot 每 5 分鐘戳一次
     防止 Supabase 免費版 7 天無請求後暫停
     """
     from datetime import datetime
     
+    db_status = "unknown"
     try:
-        # 簡單的 DB 查詢來觸發 Supabase 連線
-        result = supabase.table("itineraries").select("id").limit(1).execute()
-        db_status = "connected" if result else "no_data"
+        # 從 app.state 獲取單例客戶端
+        supabase_client = request.app.state.supabase
+        if supabase_client:
+            # 簡單的 DB 查詢來觸發 Supabase 連線
+            result = supabase_client.table("itineraries").select("id").limit(1).execute()
+            db_status = "connected" if result else "no_data"
+        else:
+            db_status = "not_initialized"
     except Exception as e:
         db_status = f"error: {str(e)[:50]}"
     
@@ -375,14 +386,9 @@ async def startup_test():
 # 🆕 v3.5: 行程上下文格式化函數
 def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     """
-    將精簡版行程轉為 AI 可理解的 Markdown 格式
-    
-    Args:
-        itinerary: getLeanItinerary 產生的精簡版行程
-        focused_day: 用戶正在查看的天數 (用 👉 標記)
-    
-    Returns:
-        str: Markdown 格式的行程摘要
+    🧠 2026 Sliding Window Context Injection
+    將精簡版行程轉為 AI 可理解的 Markdown 格式，並優化長行程 Token 消耗。
+    核心邏輯：完整顯示 Focused Day 的細節，其餘天數僅保留標題與地點。
     """
     if not itinerary:
         return ""
@@ -391,20 +397,19 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     start_date = itinerary.get("start_date", "?")
     end_date = itinerary.get("end_date", "?")
     total_days = itinerary.get("total_days", 0)
-    focused_day = focused_day or itinerary.get("focused_day")
+    # 優先使用傳入的 focused_day，否則使用 itinerary 內的（通常是前端當前視窗）
+    actual_focused_day = focused_day or itinerary.get("focused_day") or 1
     weather_context = itinerary.get("weather_context")
     
-    # 🆕 2026 Temporal Anchor: 取得當前時間提供給 AI
     from datetime import datetime
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     lines = [
-        "\n--- SYSTEM CONTEXT: NEURAL ITINERARY CONNECTION ---",
+        "\n--- SYSTEM CONTEXT: NEURAL ITINERARY CONNECTION (SLIDING WINDOW) ---",
         f"當前系統時間: {now_str}",
-        "以下是使用者目前的行程資訊，請根據此脈絡回答。如果資訊不全，請以現有資料為準。",
+        "以下是使用者目前的行程摘要。為了保持效能，我將重點展示你「目前正在查看」的天數細節（以 👉 標記）。",
         f"行程標題: {itinerary_title}",
-        f"起訖日期: {start_date} ~ {end_date}",
-        f"總覽: 共 {total_days} 天",
+        f"起訖日期: {start_date} ~ {end_date} (共 {total_days} 天)",
         ""
     ]
     
@@ -412,89 +417,52 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     for day in days:
         day_num = day.get("day_number", 0)
         date_str = day.get("date", "")
-        is_focused = (day_num == focused_day)
-        prefix = "👉 " if is_focused else ""
+        is_focused = (day_num == actual_focused_day)
+        
+        # 🛡️ Sliding Window Logic
+        # 如果是正在查看的天數，或是行程較短（< 4天），顯示完整細節
+        # 否則只顯示簡略地點，大幅節省 Token
+        show_full_detail = is_focused or total_days <= 3
+        
+        prefix = "👉 " if is_focused else "• "
         lines.append(f"{prefix}**Day {day_num}** ({date_str}):")
         
         items = day.get("items", [])
-        for item in items:
-            time = item.get("time", "?")
-            place = item.get("place", "?")
-            category = item.get("category", "")
-            is_highlight = item.get("is_highlight", False)
-            
-            icon = {
-                "transport": "🚃",
-                "food": "🍽️",
-                "hotel": "🏨",
-                "shopping": "🛍️",
-                "sightseeing": "📸"
-            }.get(category, "📍")
-            
-            highlight = "⭐ " if is_highlight else ""
-            lines.append(f"  {time} {icon} {highlight}{place}")
-            
-            # 🧠 2026 Adaptive Resolution: Only expand details for the focused day
-            if is_focused:
-                # Notes/Guide
+        if not items:
+            lines.append("  (此日尚未規劃活動)")
+            continue
+
+        if show_full_detail:
+            # 完整細節模式
+            for item in items:
+                time = item.get("time", "?")
+                place = item.get("place", "?")
+                category = item.get("category", "")
+                icon = {
+                    "transport": "🚃", "food": "🍽️", "hotel": "🏨", "shopping": "🛍️", "sightseeing": "📸"
+                }.get(category, "📍")
+                
+                highlight = "⭐ " if item.get("is_highlight") else ""
+                lines.append(f"  {time} {icon} {highlight}{place}")
+                
+                # Notes/Guide/Memo (僅限 Focused Day)
                 notes = item.get("notes")
                 if notes:
-                    lines.append("    [Guide] {}".format(notes.replace('\n', ' ')))
+                    lines.append(f"    [Guide] {notes.replace('\n', ' ')}")
                 
-                # Memo (with Privacy Shield)
                 memo = item.get("memo")
                 if memo:
                     safe_memo_lines = [l for l in memo.split('\n') if "[PRIVATE]" not in l]
                     if safe_memo_lines:
-                        safe_memo = " ".join(safe_memo_lines).strip()
-                        if safe_memo:
-                            lines.append(f"    [User Note] {safe_memo}")
-                
-                # Sub-items
-                sub_items = item.get("sub_items")
-                if sub_items:
-                    for sub in sub_items:
-                        name = sub.get("name", "")
-                        desc = sub.get("desc")
-                        lines.append(f"    - {name}{': ' + desc if desc else ''}")
+                        lines.append(f"    [Memo] {' '.join(safe_memo_lines)}")
+        else:
+            # 精簡模式：只顯示地點名稱，幫助 AI 維持上下文
+            places = [item.get("place", "?") for item in items]
+            lines.append(f"  📍 亮點: {', '.join(places[:5])}{' ...' if len(places) > 5 else ''}")
         
-        # Day additions (notes, costs, checklists, tickets) - Only for focused day
-        if is_focused:
-            # Notes
-            day_notes = itinerary.get("day_notes", {}).get(str(day_num))
-            if day_notes:
-                lines.append("  ⚠️ **重點提醒:**")
-                for note in day_notes:
-                    lines.append(f"    {note.get('icon', '•')} **{note.get('title')}**: {note.get('content')}")
-            
-            # Costs
-            day_costs = itinerary.get("day_costs", {}).get(str(day_num))
-            if day_costs:
-                lines.append("  💰 **預估花費:**")
-                for cost in day_costs:
-                    lines.append(f"    - {cost.get('item')}: {cost.get('amount')}{' (' + cost.get('note') + ')' if cost.get('note') else ''}")
-            
-            # Checklists
-            day_checklists = itinerary.get("day_checklists", {}).get(str(day_num))
-            if day_checklists:
-                lines.append("  ✅ **當日清單:**")
-                for task in day_checklists:
-                    lines.append(f"    [{'x' if task.get('checked') else ' '}] {task.get('text')}")
-            
-            # Tickets
-            day_tickets = itinerary.get("day_tickets", {}).get(str(day_num))
-            if day_tickets:
-                lines.append("  🎟️ **門票/預約資訊:**")
-                for ticket in day_tickets:
-                    lines.append(f"    - {ticket.get('name')}: {ticket.get('price')} ({ticket.get('note', '無備註')})")
-        
-        lines.append("")
-    
-    # Weather Context
+    lines.append("")
     if weather_context:
-        lines.append("🌡️ **實時天氣脈絡:**")
-        lines.append(weather_context)
-        lines.append("")
+        lines.append(f"🌡️ **實時天氣脈絡:**\n{weather_context}\n")
         
     lines.append("--- END OF SYSTEM CONTEXT ---\n")
     return "\n".join(lines)
@@ -531,11 +499,25 @@ SYSTEM_PROMPT = """
 
 @app.post("/api/chat")
 @limiter.limit("20/minute")
-async def chat_with_ryan(request: Request, body: ChatRequest, api_key: str = Depends(get_gemini_key)):
+async def chat_with_ryan(
+    request: Request, 
+    body: ChatRequest, 
+    background_tasks: BackgroundTasks,
+    user_id: str = Header(None, alias="X-User-ID"),
+    api_key: str = Depends(get_gemini_key)
+):
     try:
         # 🆕 使用 Model Manager (Gemini 3 優先 + 自動降級)
         from services.model_manager import call_with_fallback, call_verifier
         from services.poi_service import detect_poi_query, search_poi_combined, format_pois_for_ai
+        from services.memory_service import MemoryService
+        
+        # 🆕 v3.8: 獲取使用者記憶偏好
+        memory_context = ""
+        if user_id:
+            memory_context = await MemoryService.get_preferences_context(user_id, app.state.supabase)
+            if memory_context:
+                print(f"🧠 [Memory] 注入使用者偏好脈絡 (User: {user_id})")
         
         # 🆕 偵測是否為 POI 相關查詢
         poi_detection = detect_poi_query(body.message)
@@ -600,8 +582,8 @@ async def chat_with_ryan(request: Request, body: ChatRequest, api_key: str = Dep
             )
             print(f"📅 注入行程上下文: {body.current_itinerary.get('title', '?')}")
         
-        # 處理當前訊息 (包含圖片 + POI 上下文 + 行程上下文)
-        enhanced_message = body.message + poi_context + itinerary_context
+        # 處理當前訊息 (包含圖片 + POI 上下文 + 行程上下文 + 記憶上下文)
+        enhanced_message = body.message + poi_context + itinerary_context + memory_context
         
         # 🆕 處理圖片 (如果有)
         if body.image:
@@ -651,6 +633,17 @@ async def chat_with_ryan(request: Request, body: ChatRequest, api_key: str = Dep
             thought_signatures=body.thought_signatures,
             intent_type=intent_type  # 🆕 動態意圖
         )
+        
+        # 🆕 v3.8: 非同步學習使用者偏好 (Adaptive Memory)
+        if user_id and result.get("text"):
+            background_tasks.add_task(
+                MemoryService.extract_preferences,
+                user_id,
+                body.message,
+                result["text"],
+                api_key,
+                app.state.supabase
+            )
         
         return {
             "response": result["text"],

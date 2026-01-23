@@ -46,7 +46,7 @@ export function LandingPage() {
         /* eslint-enable */
     }, [])
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         if (!nickname.trim()) { toast.warning("Please enter nickname"); return }
         let uuid = localStorage.getItem("user_uuid")
         if (!uuid) {
@@ -54,6 +54,15 @@ export function LandingPage() {
             localStorage.setItem("user_uuid", uuid)
         }
         localStorage.setItem("user_nickname", nickname)
+
+        // 🆕 Sync nickname to backend database (Nickname <-> RecoveryKey Binding)
+        try {
+            await usersApi.updateProfile(uuid, { name: nickname })
+            console.log("✅ [Profile] Nickname synced to backend:", nickname)
+        } catch (err) {
+            // Non-blocking: sync failure shouldn't block login
+            console.warn("⚠️ [Profile] Failed to sync nickname to backend:", err)
+        }
 
         // 🆕 通知 ChatWidget 用戶已登入
         window.dispatchEvent(new CustomEvent('user-login-state-changed'))

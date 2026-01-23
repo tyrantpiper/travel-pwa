@@ -1055,21 +1055,37 @@ async def smart_geocode_logic(
             log_debug(f"   🔑 Keyword Match → {country_code}")
 
     
-    # 第二優先級：AI 判斷（需要 API Key）
+    # 第二優先級：AI 判斷（需要 API Key）- 🆕 並行運算優化
     if not country_code and api_key:
-        # 嘗試從標題判斷
+        log_debug("   🚀 Parallelizing AI country detection...")
+        tasks = []
         if trip_title:
-            log_debug("   🧠 invoking detect_country_from_trip_title...")
-            country_code = await detect_country_from_trip_title(trip_title, api_key)
-            log_debug(f"   🧠 Detected Country (Title): {country_code}")
+            tasks.append(detect_country_from_trip_title(trip_title, api_key))
+        tasks.append(detect_country_from_query(query, api_key))
         
-        # 若標題失敗，嘗試從 Query 判斷
-        if not country_code:
-            log_debug("   🧠 Title detection failed/skipped. Trying query detection...")
-            country_code = await detect_country_from_query(query, api_key)
-            log_debug(f"   🧠 Detected Country (Query): {country_code}")
+        # 使用 asyncio.gather 同時啟動多個 AI 任務，將延遲從相加轉為取最大值
+        ai_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 解析結果（優先級：標題 > 查詢）
+        res_list = [r for r in ai_results if isinstance(r, str) and r]
+        if res_list:
+            country_code = res_list[0]
+            log_debug(f"   🧠 Detected Country (Parallel): {country_code}")
 
-    # 🆕 Step 1: 先嘗試確定性著名景點翻譯（無需 API Key）
+
+    # 🆕 Step 1.1: 快速路徑 - 如果查詢是坐標，直接跳過所有 AI 邏輯
+    if "," in query:
+        parts = query.split(",")
+        if len(parts) == 2:
+            try:
+                lat_val, lng_val = float(parts[0]), float(parts[1])
+                log_debug(f"   ⚡ FAST PATH: Coordinates detected ({lat_val}, {lng_val})")
+                return {"results": [{
+                    "lat": lat_val, "lng": lng_val, "name": query, "address": query, "type": "coordinate", "source": "direct"
+                }], "source": "direct"}
+            except: pass
+
+    # 🆕 Step 1.2: 先嘗試確定性著名景點翻譯（無需 API Key）
     landmark_result = translate_famous_landmark(query, country_code)
     search_terms, display_name, landmark_data = landmark_result
     
@@ -1087,34 +1103,73 @@ async def smart_geocode_logic(
         log_debug(f"   ⚡ INSTANT RETURN: {display_name} ({landmark_data['lat']}, {landmark_data['lng']})")
         return {"results": [instant_result], "source": "landmarks_db"}
     
-    if display_name:  # 匹配到著名景點（但沒有座標，需要搜索）
+    # 🆕 Step 2: 投機性並行搜尋 (Speculative Parallelism)
+    # 我們開啟三個任務：AI 翻譯、原始名稱搜尋、以及（如果有）景點搜尋
+    search_queries = []
+    chinese_display = None
+    
+    tasks = []
+    # 任務 A: AI 翻譯 (如果需要)
+    translation_task = None
+    if not display_name and country_code and api_key:
+        translation_task = asyncio.create_task(translate_place_name(query, country_code, api_key))
+        tasks.append(translation_task)
+    
+    # 任務 B: 原始名稱初步搜尋 (Speculative Photon)
+    speculative_task = asyncio.create_task(geocode_with_photon(query, limit, lat, lng, zoom))
+    tasks.append(speculative_task)
+
+    log_debug(f"   🚀 Starting Speculative Searches for '{query}'...")
+    
+    # 等待初步結果或翻譯完成（設置一個小的超時或併行等待）
+    # 為了保持簡單，我們等待所有任務完成，但此時已是「並行」而非「順位」
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+    # 彙整搜尋關鍵字
+    if display_name:
         search_queries = search_terms
         chinese_display = display_name
-        log_debug(f"   🏰 Landmark Translated: {search_queries} → Display: {chinese_display}")
-    # Step 2: 若著名景點沒匹配，嘗試 AI 翻譯
-    elif country_code and api_key:
-        translated = await translate_place_name(query, country_code, api_key)
-        search_queries = translated
-        log_debug(f"   🔤 AI Translated: {translated}")
-    elif not country_code:
+    elif translation_task and not translation_task.exception():
+        search_queries = translation_task.result()
+        log_debug(f"   🔤 AI Translated: {search_queries}")
+    
+    # 如果搜尋關鍵字中還沒有原始名稱，加進去作為保險
+    if query not in search_queries:
+        search_queries.append(query)
+
+    if not country_code:
         log_debug("   ⚠️ No country detected, using broad search")
+
     
 
     
     all_results = []
     found_source = "none"
     
+    # 🆕 整合投機性搜尋結果
+    if speculative_task and not speculative_task.exception():
+        photon_spec = speculative_task.result()
+        if photon_spec:
+            for r in photon_spec: r["source"] = "photon_speculative"
+            all_results.extend(photon_spec)
+            found_source = "photon"
+            log_debug(f"   ⚡ Using {len(photon_spec)} speculative results")
+    
     for q in search_queries:
         if len(all_results) >= limit:
             break
             
+        # 如果 speculative 已經查過了這個 query，跳過
+        if q == query and found_source != "none":
+            continue
+
         # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
         photon = await geocode_with_photon(q, limit, lat, lng, zoom)
         if photon:
             for r in photon: r["source"] = "photon"
             all_results.extend(photon)
             found_source = "photon"
-            continue
+
         
         # Nominatim
         try:

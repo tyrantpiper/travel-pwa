@@ -13,18 +13,27 @@ export function useOfflineMutation() {
 
     const mutate = useCallback(async (url: string, options: RequestInit) => {
         if (typeof window !== 'undefined' && !navigator.onLine) {
-            // Offline Mode: Queue it
+            // 🆕 v2.6: Safe body handling (consistency with api.ts)
+            let body: Record<string, unknown> = {};
+            if (options.body instanceof FormData) {
+                body = { _offline_type: 'formData' };
+            } else {
+                try {
+                    body = options.body ? JSON.parse(options.body as string) : {};
+                } catch {
+                    body = { _raw: options.body as string };
+                }
+            }
+
             await SyncQueue.enqueue({
                 url,
                 method: (options.method as SyncRequest['method']) || 'POST',
-                body: options.body ? JSON.parse(options.body as string) : {},
+                body,
                 headers: options.headers as Record<string, string>
             });
             setIsQueued(true);
-            // Simulate 'success' to UI for optimistic updates
             return { ok: true, json: async () => ({ status: 'queued' }) };
         } else {
-            // Online Mode: Direct fetch
             return fetch(url, options);
         }
     }, []);
@@ -32,54 +41,91 @@ export function useOfflineMutation() {
     return { mutate, isQueued };
 }
 
+// 🆕 Simple lock for processQueue
+let isProcessing = false;
+
 /**
  * ⚙️ Background Worker (Simulated)
- * In a real PWA this would be a Service Worker, but for now we run it in the main thread
- * when the app is open (Client-side Intelligence).
  */
 export function useBackgroundSync() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
         const processQueue = async () => {
-            if (!navigator.onLine) return;
+            if (!navigator.onLine || isProcessing) return;
+            isProcessing = true;
 
-            const queue = await SyncQueue.peek();
-            if (queue.length === 0) return;
+            try {
+                const queue = await SyncQueue.peek();
+                if (queue.length === 0) return;
 
-            console.log(`[SyncEngine] 🔄 Processing ${queue.length} offline requests...`);
+                console.log(`[SyncEngine] 🔄 Processing ${queue.length} offline requests...`);
 
-            for (const req of queue) {
-                try {
-                    console.log(`[SyncEngine] ▶️ Replaying: ${req.url}`);
-                    const res = await fetch(req.url, {
-                        method: req.method,
-                        headers: req.headers,
-                        body: JSON.stringify(req.body)
-                    });
+                // 🆕 優化：依據行程 ID 分組以實現並行重播 (橫向並行，縱向序列)
+                const groups: Record<string, SyncRequest[]> = {};
+                const general: SyncRequest[] = [];
 
-                    if (res.ok) {
-                        await SyncQueue.dequeue(req.id);
-                        console.log(`[SyncEngine] ✅ Sync Success: ${req.url}`);
-
-                        // Visual Feedback
-                        toast.success(`☁️ 已自動同步相關操作`);
+                queue.forEach(req => {
+                    // 嘗試從 URL 提取行程 ID (例如: /api/trips/UUID/...)
+                    const match = req.url.match(/\/api\/trips\/([a-f0-9-]{36})\//i);
+                    const id = match ? match[1] : null;
+                    if (id) {
+                        if (!groups[id]) groups[id] = [];
+                        groups[id].push(req);
                     } else {
-                        console.error(`[SyncEngine] ❌ Sync Failed: ${req.url} (${res.status})`);
-                        if (req.retryCount >= MAX_RETRIES) {
-                            console.warn(`[SyncEngine] 💀 Dropping request after ${MAX_RETRIES} retries`);
-                            await SyncQueue.dequeue(req.id); // Give up to prevent jamming
-                        } else {
-                            await SyncQueue.incrementRetry(req.id);
+                        general.push(req);
+                    }
+                });
+
+                const processGroup = async (requests: SyncRequest[]) => {
+                    for (const req of requests) {
+                        try {
+                            // 🆕 安全加固：Warn user about skipped FormData
+                            if (req.body?._offline_type === 'formData') {
+                                console.warn(`[SyncEngine] ⏭️ Skipping FormData: ${req.url}`);
+                                toast.error("⚠️ 部分照片上傳在離線時被略過，請手動重新上傳。", {
+                                    description: `路徑: ${req.url}`,
+                                    duration: 5000
+                                });
+                                await SyncQueue.dequeue(req.id);
+                                continue;
+                            }
+
+                            console.log(`[SyncEngine] ▶️ Replaying: ${req.url}`);
+                            const res = await fetch(req.url, {
+                                method: req.method,
+                                headers: req.headers,
+                                body: JSON.stringify(req.body)
+                            });
+
+                            if (res.ok) {
+                                await SyncQueue.dequeue(req.id);
+                                toast.success(`☁️ 已自動同步: ${req.method} ${req.url.split('/').pop()}`);
+                            } else {
+                                if (req.retryCount >= MAX_RETRIES) {
+                                    await SyncQueue.dequeue(req.id);
+                                } else {
+                                    await SyncQueue.incrementRetry(req.id);
+                                }
+                                break; // ❌ 如果失敗，停止該分組後續操作以保證順序性
+                            }
+                        } catch (e) {
+                            console.error(`[SyncEngine] 💥 Network Error in group sync:`, e);
+                            break;
                         }
                     }
-                } catch (e) {
-                    console.error(`[SyncEngine] 💥 Network Error during sync:`, e);
-                }
+                };
+
+                // 並行處理不同分組，但通用請求保持序列
+                const groupTasks = Object.values(groups).map(processGroup);
+                await Promise.allSettled([...groupTasks, processGroup(general)]);
+
+            } finally {
+                isProcessing = false;
             }
         };
 
-        const interval = setInterval(processQueue, 30000); // Check every 30s
+        const interval = setInterval(processQueue, 30000);
         window.addEventListener('online', processQueue);
 
         return () => {
@@ -88,3 +134,5 @@ export function useBackgroundSync() {
         };
     }, []);
 }
+
+

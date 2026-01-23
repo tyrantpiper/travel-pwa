@@ -21,7 +21,10 @@ ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -> dict:
     """使用 ArcGIS Routing API 計算路線"""
     if not ARCGIS_API_KEY:
+        print("   ❌ ArcGIS API Key is MISSING")
         raise Exception("ArcGIS API Key 未設定")
+    
+    print(f"   🔍 Using ArcGIS API Key: {ARCGIS_API_KEY[:6]}...{ARCGIS_API_KEY[-4:]}")
     
     # ArcGIS stops 格式: lng,lat;lng,lat
     stops_str = ";".join([f"{s.lng},{s.lat}" for s in stops])
@@ -45,7 +48,14 @@ async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -
         data = res.json()
         
         if "error" in data:
-            raise Exception(f"ArcGIS Error: {data['error'].get('message', 'Unknown error')}")
+            err_msg = data['error'].get('message', 'Unknown error')
+            print(f"   ❌ ArcGIS API Error: {err_msg}")
+            # 🆕 寫入偵錯日誌
+            with open("route_error_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"--- ArcGIS ERROR ---\n")
+                f.write(f"Stops: {stops_str}\n")
+                f.write(f"Error: {err_msg}\n\n")
+            raise Exception(f"ArcGIS Error: {err_msg}")
         
         if not data.get("routes") or not data["routes"].get("features"):
             raise Exception("No route found")
@@ -125,6 +135,11 @@ async def route_with_osrm(stops: List[RouteStop], mode: str) -> dict:
             raise Exception("OSRM timeout")
         except Exception as e:
             print(f"   ❌ OSRM Exception: {type(e).__name__}: {e}")
+            # 🆕 寫入偵錯日誌
+            with open("route_error_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"--- OSRM ERROR ---\n")
+                f.write(f"URL: {url}\n")
+                f.write(f"Error: {str(e)}\n\n")
             raise
 
 
@@ -145,11 +160,34 @@ async def calculate_route(request: RouteRequest):
         except Exception as e:
             print(f"   ⚠️ ArcGIS 失敗: {e}, 切換到 OSRM")
     
-    # 2. 備援到 OSRM
+    # 2. 嘗試 OSRM
     try:
         result = await route_with_osrm(request.stops, request.mode)
         print(f"   ✅ OSRM 路線成功: {result['distance']}, {result['duration']}")
         return result
     except Exception as e:
-        print(f"   ❌ OSRM 也失敗: {e}")
-        raise HTTPException(status_code=500, detail="無法計算路線")
+        print(f"   ⚠️ OSRM 也失敗: {e}, 使用直線連接作為最終備援")
+        
+        # 3. 最終備援：直線連接 (防止前端 500 崩潰)
+        # 計算簡單的歐幾里得距離作為估計 (不精確但比崩潰好)
+        total_dist = 0
+        for i in range(len(request.stops) - 1):
+            s1 = request.stops[i]
+            s2 = request.stops[i+1]
+            # 粗略估算: 1度約 111km
+            d = ((s1.lat - s2.lat)**2 + (s1.lng - s2.lng)**2)**0.5 * 111
+            total_dist += d
+        
+        return {
+            "source": "fallback-straight",
+            "route": {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[s.lng, s.lat] for s in request.stops]
+                }
+            },
+            "distance": f"{round(total_dist, 1)} km (估計)",
+            "duration": "未知 (跨區)"
+        }

@@ -137,58 +137,52 @@ async def get_trips(
         raise HTTPException(status_code=401, detail="需要提供 X-User-ID Header")
     
     try:
-        # 1. 找出我參與的行程 (trip_members)
-        res_member = supabase.table("trip_members")\
-            .select("itinerary_id, itineraries(*)")\
-            .eq("user_id", user_id)\
-            .execute()
+        # 🆕 Phase 3: 使用 user_trips_view 一次性取得所有相關行程 (Dashboard Optimization)
+        # 這取代了原本需要兩次查詢 (trip_members + itineraries) 的邏輯
+        try:
+            res = supabase.table("user_trips_view")\
+                .select("*")\
+                .eq("user_id", user_id)\
+                .execute()
+            trips_data = res.data or []
+            print(f"📊 Dashboard: Using optimized user_trips_view")
+        except Exception as view_err:
+            print(f"⚠️ [Fallback] user_trips_view missing or error: {view_err}")
+            # 🔄 Fallback Logic: 同時抓取成員表與創立表
+            members_res = supabase.table("trip_members").select("itinerary_id").eq("user_id", user_id).execute()
+            member_ids = [m['itinerary_id'] for m in members_res.data] if members_res.data else []
             
-        # 2. 找出我建立的行程 (itineraries created_by) - 針對舊資料或建檔不完全的情況
-        res_created = supabase.table("itineraries")\
-            .select("*")\
-            .eq("created_by", user_id)\
-            .execute()
+            owned_res = supabase.table("itineraries").select("id").eq("created_by", user_id).execute()
+            owned_ids = [i['id'] for i in owned_res.data] if owned_res.data else []
             
-        # 3. 合併並去重
-        trip_map = {}
-        
-        # 處理參與的行程
-        for item in res_member.data:
-            if item.get('itineraries'):
-                trip = item['itineraries']
-                trip_map[trip['id']] = trip
+            all_ids = list(set(member_ids + owned_ids))
+            if not all_ids:
+                return []
+                
+            res = supabase.table("itineraries").select("*").in_("id", all_ids).order("created_at", desc=True).execute()
+            trips_data = res.data or []
 
-        # 處理自己建立的行程
-        for trip in res_created.data:
-            if trip['id'] not in trip_map:
-                trip_map[trip['id']] = trip
-                # 🚑 Self-Healing (Optional): 如果是創建者但不在成員名單，可以在這裡補發，暫時先不自動補，避免副作用
-                print(f"⚠️ User {user_id} is creator of {trip['id']} but not in trip_members")
-        
-        trips_data = list(trip_map.values())
-            
         # 整理資料結構 - 🔧 FIX: 解析 content 欄位，將 daily_locations 提升到頂層
         trips = []
         for trip in trips_data:
             content = trip.get('content') or {}
             # 🆕 將 content 內的欄位提升到頂層，與 get_trip_by_id 格式一致
-            trip['daily_locations'] = content.get('daily_locations', {})
-            trip['day_notes'] = content.get('day_notes', {})
-            trip['day_costs'] = content.get('day_costs', {})
-            trip['day_tickets'] = content.get('day_tickets', {})
-            trip['day_checklists'] = content.get('day_checklists', {})
-            trip['ai_review'] = content.get('ai_review', "")
-            trip['credit_cards'] = content.get('credit_cards', [])
+            # 如果欄位已在頂層 (從 View 來的)，則保留原值
+            trip['daily_locations'] = trip.get('daily_locations') or content.get('daily_locations', {})
+            trip['day_notes'] = trip.get('day_notes') or content.get('day_notes', {})
+            trip['day_costs'] = trip.get('day_costs') or content.get('day_costs', {})
+            trip['day_tickets'] = trip.get('day_tickets') or content.get('day_tickets', {})
+            trip['day_checklists'] = trip.get('day_checklists') or content.get('day_checklists', {})
+            trip['ai_review'] = trip.get('ai_review') or content.get('ai_review', "")
+            trip['credit_cards'] = trip.get('credit_cards') or content.get('credit_cards', [])
             trips.append(trip)
-        
-        print(f"✅ 找到 {len(trips)} 個行程")
-        return trips
         
         print(f"✅ 找到 {len(trips)} 個行程")
         return trips
         
     except Exception as e:
         print(f"🔥 Get Trips Error: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -284,6 +278,14 @@ async def get_trip_by_id(
                 else:
                     filtered[day_key] = items_list
             return filtered
+
+        def filter_private_cards(cards: list) -> list:
+            """過濾私人信用卡：只有建立者本人可見"""
+            if not cards: return []
+            return [
+                card for card in cards
+                if card.get("is_public") or card.get("creator_id") == user_id
+            ]
         
         # 取得 content 並過濾
         content = trip.get("content") or {}
@@ -307,9 +309,9 @@ async def get_trip_by_id(
             "day_checklists": day_checklists,
             "ai_review": content.get("ai_review", ""),
             "day_ai_reviews": content.get("day_ai_reviews", {}),  # 🆕 每日 AI 審核報告
-            "flight_info": trip.get("flight_info") or {},
-            "hotel_info": trip.get("hotel_info") or {},
-            "credit_cards": content.get("credit_cards", []),
+            "flight_info": content.get("flight_info") or trip.get("flight_info") or {},
+            "hotel_info": content.get("hotel_info") or trip.get("hotel_info") or {},
+            "credit_cards": filter_private_cards(content.get("credit_cards", [])),
             "is_member": is_member,  # 🆕 告訴前端是否為成員
             "members": members,  # 🆕 所有成員列表 (用於成員管理)
             "created_by": created_by,  # 🆕 創建者 ID (用於判斷踢人權限)
@@ -319,7 +321,9 @@ async def get_trip_by_id(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Fetch Error: {e}")
+        print(f"❌ Fetch Error for Trip {trip_id}: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -607,18 +611,20 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
     print(f"   項目數量: {len(request.items)}")
     
     try:
-        # 🆕 Phase 2: 行程數量限制（最多 3 個自建行程）
+        # 🆕 Phase 2: 行程數量限制 (最多 3 個自建行程)
+        # 🛡️ 競態防禦：在此進行最終檢查。注意：最高強度的防禦建議在資料庫端建立 Trigger
+        # SQL範例: CREATE TRIGGER check_trip_limit BEFORE INSERT ON itineraries ...
         count_res = supabase.table("itineraries")\
             .select("id", count="exact")\
             .eq("created_by", request.user_id)\
             .execute()
         
-        owned_count = count_res.count or 0
-        if owned_count >= 3:
+        if (count_res.count or 0) >= 3:
             raise HTTPException(
                 status_code=403, 
                 detail="行程數量已達上限 (最多 3 個)，請先下載 PDF 後刪除舊行程"
             )
+
         
         # 1. 產生房間號與公開 ID
         room_code = generate_room_code()
@@ -692,12 +698,14 @@ async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_sup
                 "location_lat": item.lat,
                 "location_lng": item.lng,
                 "cost_amount": item.cost_amount,
-                "reservation_code": item.reservation_code,  # 新增
-                "tags": item.tags,  # 新增：需要 DB 有 tags (text[]) 欄位
-                # 👇 新增：儲存附屬表格
+                "reservation_code": item.reservation_code,
+                "tags": item.tags,
                 "sub_items": item.sub_items,
-                # 👇 新增：儲存使用者連結
-                "link_url": item.link_url
+                "link_url": item.link_url,
+                "memo": item.memo,
+                "image_url": item.image_url,
+                "image_urls": item.image_urls or ([item.image_url] if item.image_url else []),
+                "hide_navigation": item.hide_navigation
             })
             
         # 批次寫入
@@ -807,7 +815,11 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
                 "reservation_code": item.reservation_code,
                 "tags": item.tags,
                 "sub_items": item.sub_items,
-                "link_url": item.link_url
+                "link_url": item.link_url,
+                "memo": item.memo,
+                "image_url": item.image_url,
+                "image_urls": item.image_urls or ([item.image_url] if item.image_url else []),
+                "hide_navigation": item.hide_navigation
             })
             
         if items_data:
@@ -823,9 +835,24 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
 
 
 @router.put("/trips/{trip_id}/day-data")
-async def update_day_data(trip_id: str, request: UpdateDayDataRequest, supabase=Depends(get_supabase)):
+async def update_day_data(
+    trip_id: str, 
+    request: UpdateDayDataRequest, 
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
     """📝 更新特定天的注意事項、預估花費、交通票券"""
     try:
+        # 🛡️ 權限檢查 (Cautious Authorization Check)
+        if x_user_id:
+            member_check = supabase.table("trip_members")\
+                .select("user_id")\
+                .eq("itinerary_id", trip_id)\
+                .eq("user_id", x_user_id)\
+                .execute()
+            
+            if not member_check.data:
+                raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
         print(f"📝 更新 Day {request.day} 資訊 for Trip {trip_id}")
         
         # 1. 取得現有行程
@@ -948,40 +975,63 @@ async def leave_trip(
 
 
 @router.patch("/trips/{trip_id}/info")
-async def update_trip_info(trip_id: str, request: UpdateInfoRequest, supabase=Depends(get_supabase)):
+async def update_trip_info(
+    trip_id: str, 
+    request: UpdateInfoRequest, 
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
     """✈️ 更新行程資訊 (航班、住宿、信用卡)"""
     try:
-        # 1. 如果有更新信用卡，執行 Safe Merge
-        if request.credit_cards is not None:
-            # A. 抓取現有資料
-            res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
-            content = res.data['content'] or {}
-            existing_cards = content.get("credit_cards", [])
+        # 🛡️ 權限檢查 (Cautious Authorization Check)
+        if x_user_id:
+            # 驗證使用者是否為該行程的成員
+            member_check = supabase.table("trip_members")\
+                .select("user_id")\
+                .eq("itinerary_id", trip_id)\
+                .eq("user_id", x_user_id)\
+                .execute()
             
-            # 修正策略：採用 "Full Sync" (完全同步)
-            # 
-            # 之前的 "Safe Merge" 邏輯 (保留沒傳過來的 ID) 導致前端刪除操作無效，
-            # 因為刪除就是 "不傳送該 ID"，但後端卻把它救回來了。
-            # 
-            # 為了支援刪除，我們必須信任前端傳來的清單是 "最新的完整狀態"。
-            # 雖然這在多人同時編輯時可能有 Race Condition (覆蓋別人剛加的卡片)，
-            # 但相比 "無法刪除"，這個 Trade-off 是必要的，直到我們有更複雜的鎖定機制 (OT/CRDT)。
-            
-            content["credit_cards"] = request.credit_cards
-            
-            # 更新 content
-            supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+            if not member_check.data:
+                # 🔒 安全防線：拒絕非成員修改行程資訊
+                print(f"🔒 [Auth Denied] User {x_user_id} tried to update Trip {trip_id}")
+                raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
 
-        # 2. 更新 Flight/Hotel (Legacy columns)
-        # 注意：這兩個欄位在 DB 是獨立 column，不是在 content 裡 (根據 models 定義)
-        # 不需要 Safe Merge，直接覆蓋即可 (因為通常是一個人在編輯)
-        data = {
-            "flight_info": request.flight_info,
-            "hotel_info": request.hotel_info
-        }
-        supabase.table("itineraries").update(data).eq("id", trip_id).execute()
+        # 1. 如果有更新信用卡，執行原子化 RPC 更新 (🛡️ Cautious Fix: 原子化更新，防止併發覆蓋)
+        if request.credit_cards is not None:
+            supabase.rpc("update_trip_credit_cards", {
+                "target_trip_id": trip_id,
+                "new_cards": request.credit_cards
+            }).execute()
+
+        # 2. 更新 Flight/Hotel (Hybrid Store: Columns + JSONB Content)
+        # 🛡️ 謹慎更新：僅在有資料時更新，避免覆蓋為 NULL
+        data = {}
+        patch_content = {}
+        
+        if request.flight_info is not None:
+            data["flight_info"] = request.flight_info
+            patch_content["flight_info"] = request.flight_info
+        if request.hotel_info is not None:
+            data["hotel_info"] = request.hotel_info
+            patch_content["hotel_info"] = request.hotel_info
+            
+        if data:
+            # A. 更新獨立欄位 (Legacy Columns)
+            supabase.table("itineraries").update(data).eq("id", trip_id).execute()
+            
+            # B. 同步更新 content (JSONB) 以確保 PWA 生態系一致性
+            # 🧠 v4.2: 採用 Fetch-Merge-Save 策略 (因為無法建立 generic RPC)
+            trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+            if trip_res.data:
+                current_content = trip_res.data.get("content") or {}
+                # 僅合併本次更新的欄位，保留其他欄位 (如 day_notes)
+                new_content = {**current_content, **patch_content}
+                supabase.table("itineraries").update({"content": new_content}).eq("id", trip_id).execute()
         
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Update Info Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1004,9 +1054,15 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
             "notes": request.notes,
             "location_lat": request.lat,
             "location_lng": request.lng,
-            "image_url": request.image_url,      # 向後相容
-            "image_urls": request.image_urls or ([request.image_url] if request.image_url else []),  # 🆕 多圖片
-            "tags": request.tags
+            "image_url": request.image_url,
+            "image_urls": request.image_urls or ([request.image_url] if request.image_url else []),
+            "tags": request.tags,
+            "memo": request.memo,
+            "sub_items": request.sub_items,
+            "link_url": request.link_url,
+            "reservation_code": request.reservation_code,
+            "cost_amount": request.cost_amount,
+            "hide_navigation": request.hide_navigation
         }
         
         res = supabase.table("itinerary_items").insert(data).execute()
@@ -1063,6 +1119,9 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         if request.lng is not None: data["location_lng"] = request.lng
         # 👇 新增：處理備忘錄
         if request.memo is not None: data["memo"] = request.memo
+        # 🆕 新增：處理預約資訊
+        if request.link_url is not None: data["link_url"] = request.link_url
+        if request.reservation_code is not None: data["reservation_code"] = request.reservation_code
         # 👇 新增：處理 sub_items (連結列表)
         if request.sub_items is not None: data["sub_items"] = request.sub_items
         # 👇 新增：處理分類與標籤
@@ -1074,6 +1133,8 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         if request.image_urls is not None: data["image_urls"] = request.image_urls
         # 🆕 新增：處理排序順序 (拖曳排序)
         if request.sort_order is not None: data["sort_order"] = request.sort_order
+        # 🆕 新增：手動隱藏導航
+        if request.hide_navigation is not None: data["hide_navigation"] = request.hide_navigation
         
         if not data:
             print("⚠️ 沒有資料需要更新")

@@ -28,6 +28,10 @@ export interface ItineraryItemState {
     image_urls?: string[]  // 🆕 多圖片 URLs
     sub_items?: SubItem[]
     memo?: string
+    link_url?: string
+    reservation_code?: string
+    cost?: number
+    hide_navigation?: boolean
 }
 
 export interface DailyLocation {
@@ -76,6 +80,9 @@ export interface Activity {
     memo?: string // User's private memo
     sub_items?: SubItem[]
     link_url?: string // External link for the place itself
+    reservation_code?: string
+    cost?: number
+    hide_navigation?: boolean
     is_highlight?: boolean
     sort_order?: number  // 🆕 拖曳排序
 }
@@ -127,10 +134,14 @@ export interface Trip {
 
 export interface GeocodeResult {
     name: string
+    display_name?: string
     address?: string
     lat: number
     lng: number
     type?: string
+    country?: string
+    admin1?: string
+    admin2?: string
     source?: string
     results?: GeocodeResult[]
 }

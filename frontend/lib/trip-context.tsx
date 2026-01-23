@@ -18,11 +18,15 @@ interface TripContextType {
 
 const TripContext = createContext<TripContextType | undefined>(undefined)
 
-// 🛡️ Safe UUID Validation
-const isValidUUID = (id: string | null): id is string => {
-    if (!id || id === "null" || id === "undefined" || id.length < 10) return false
+// 🛡️ Identity Validation (Support legacy & modern UUID)
+const isValidUserId = (id: string | null): id is string => {
+    if (!id || id === "null" || id === "undefined") return false
+    // UUID format check
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    return uuidRegex.test(id)
+    if (uuidRegex.test(id)) return true
+    // Legacy support: Alphanumeric username-style IDs (3-64 characters)
+    const legacyRegex = /^[a-zA-Z0-9_\-.]{3,64}$/
+    return legacyRegex.test(id)
 }
 
 export function TripProvider({ children }: { children: ReactNode }) {
@@ -40,7 +44,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
             // 🛡️ Data Sanitization: 防止 "null" 字串傳遞
             if (storedUserId) {
-                if (isValidUUID(storedUserId)) {
+                if (isValidUserId(storedUserId)) {
                     if (storedUserId !== userId) {
                         setUserId(storedUserId)
                     }
@@ -54,7 +58,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
             // 如果 store 沒有 activeTripId，嘗試從舊的 localStorage 恢復
             const savedTripId = localStorage.getItem("active_trip_id")
             if (savedTripId && !activeTripId) {
-                if (isValidUUID(savedTripId)) {
+                if (isValidUserId(savedTripId)) {
                     setActiveTripId(savedTripId)
                 } else {
                     localStorage.removeItem("active_trip_id")

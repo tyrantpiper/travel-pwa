@@ -7,21 +7,15 @@ const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 console.log("🚀 [API] Connected to:", API_HOST)
 
 import { SyncQueue } from './sync-engine';
+import {
+    TripSchema,
+    ItineraryItemSchema,
+    ExpenseSchema,
+    UserProfileSchema,
+    GeocodeResponseSchema
+} from './schemas';
+import { SubItem } from './itinerary-types';
 import { z } from "zod";
-
-// === Zod Schemas for Data Robustness ===
-export const SearchResultSchema = z.object({
-    lat: z.coerce.number(), // Handle potential string coordinates from some APIs
-    lng: z.coerce.number(),
-    name: z.string().default("Unknown Place"),
-    address: z.string().optional().nullable(),
-    type: z.string().optional().nullable(),
-    source: z.string().optional().nullable(),
-})
-
-export const GeocodeResponseSchema = z.object({
-    results: z.array(SearchResultSchema).default([])
-})
 
 // === API Endpoints ===
 export const API = {
@@ -71,7 +65,13 @@ export interface CreateItemParams {
     lng?: number | string | null
     tags?: string[]
     image_url?: string
-    image_urls?: string[]  // 🆕 多圖片
+    image_urls?: string[]
+    memo?: string
+    link_url?: string
+    reservation_code?: string
+    cost?: number
+    sub_items?: SubItem[]
+    hide_navigation?: boolean
 }
 
 export interface UpdateItemParams {
@@ -83,10 +83,14 @@ export interface UpdateItemParams {
     lng?: number | string | null
     tags?: string[]
     image_url?: string
-    image_urls?: string[]  // 🆕 多圖片
+    image_urls?: string[]
     memo?: string
-    sub_items?: { name: string; checked: boolean }[]
-    sort_order?: number  // 🆕 拖曳排序
+    sub_items?: SubItem[]
+    link_url?: string
+    reservation_code?: string
+    cost?: number
+    sort_order?: number
+    hide_navigation?: boolean
 }
 
 export interface GeocodeSearchParams {
@@ -120,7 +124,13 @@ export const tripsApi = {
             const error = await res.json().catch(() => ({ detail: "建立行程失敗" }))
             throw new Error(error.detail || "建立行程失敗")
         }
-        return res.json()
+        const data = await res.json()
+        const parsed = TripSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Trip creation validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 
     /** Join an existing trip via share code */
@@ -149,14 +159,23 @@ export const tripsApi = {
         }
         const res = await fetch(`${API.TRIPS}/${tripId}`, { headers })
         if (!res.ok) throw new Error("Failed to fetch trip")
-        return res.json()
+        const data = await res.json()
+        const parsed = TripSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Trip fetch validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 
     /** Update trip title */
-    updateTitle: async (tripId: string, title: string) => {
+    updateTitle: async (tripId: string, title: string, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/title`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            method: "PATCH",
+            headers,
             body: JSON.stringify({ title })
         })
         if (!res.ok) throw new Error("Failed to update title")
@@ -164,10 +183,13 @@ export const tripsApi = {
     },
 
     /** Update trip info (flight, accommodation, etc.) */
-    updateInfo: async (tripId: string, info: Record<string, unknown>) => {
+    updateInfo: async (tripId: string, info: Record<string, unknown>, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/info`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            method: "PATCH", // 🔧 Standardized to PATCH
+            headers,
             body: JSON.stringify(info)
         })
         if (!res.ok) throw new Error("Failed to update info")
@@ -209,10 +231,13 @@ export const tripsApi = {
         day_costs?: Record<number, { item: string; amount: string; note?: string }[]>
         day_tickets?: Record<number, { name: string; price: string; note?: string }[]>
         day_checklists?: Record<number, { id: string; text: string; checked: boolean }[]>
-    }) => {
+    }, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({ day, ...data })
         })
         if (!res.ok) throw new Error("Failed to update day data")
@@ -274,15 +299,33 @@ export const tripsApi = {
 async function offlineFetch(url: string, options: RequestInit) {
     if (typeof window !== 'undefined' && !navigator.onLine && options.method && options.method !== 'GET') {
         console.warn(`[API] 🔌 Offline: Queuing ${options.method} ${url}`);
+
+        let body: Record<string, unknown> = {};
+        const isFormData = options.body instanceof FormData;
+
+        if (isFormData) {
+            // 🆕 v2.6: FormData (images) cannot be serialized to IndexedDB directly
+            // We store a placeholder to prevent crash and notify the user
+            body = { _offline_type: 'formData', note: 'Image uploads are paused in offline mode' };
+        } else {
+            try {
+                body = options.body ? JSON.parse(options.body as string) : {};
+            } catch (e) {
+                console.error("[API] Failed to parse offline body:", e);
+                body = { _raw_body: options.body }; // Store raw if parse fails
+            }
+        }
+
         await SyncQueue.enqueue({
             url,
             method: (options.method as 'POST' | 'PUT' | 'PATCH' | 'DELETE'),
-            body: options.body ? JSON.parse(options.body as string) : {}, // Restore object for storage
+            body,
             headers: options.headers as Record<string, string>
         });
+
         return {
             ok: true,
-            json: async () => ({ status: 'queued', offline: true })
+            json: async () => ({ status: 'queued', offline: true, type: isFormData ? 'formData' : 'json' })
         };
     }
     return fetch(url, options);
@@ -304,8 +347,15 @@ export const itemsApi = {
             notes: params.desc,
             lat: typeof params.lat === "string" ? parseFloat(params.lat) : params.lat,
             lng: typeof params.lng === "string" ? parseFloat(params.lng) : params.lng,
-            image_url: params.image_url,  // 🆕 修復：圖片 URL
-            tags: params.tags             // 🆕 修復：標籤陣列
+            image_url: params.image_url,
+            image_urls: params.image_urls,
+            tags: params.tags,
+            memo: params.memo,
+            sub_items: params.sub_items,
+            link_url: params.link_url,
+            reservation_code: params.reservation_code,
+            cost_amount: params.cost,
+            hide_navigation: params.hide_navigation
         }
         const res = await offlineFetch(API.ITEMS, {
             method: "POST",
@@ -318,13 +368,38 @@ export const itemsApi = {
 
     /** Update an existing item */
     update: async (itemId: string, params: UpdateItemParams) => {
+        // 🔄 Map frontend params to backend expected payload
+        const payload: Record<string, unknown> = {}
+        if (params.time !== undefined) payload.time_slot = params.time
+        if (params.place !== undefined) payload.place_name = params.place
+        if (params.desc !== undefined) payload.notes = params.desc
+        if (params.category !== undefined) payload.category = params.category
+        if (params.lat !== undefined) payload.lat = params.lat ? Number(params.lat) : null
+        if (params.lng !== undefined) payload.lng = params.lng ? Number(params.lng) : null
+        if (params.image_url !== undefined) payload.image_url = params.image_url
+        if (params.image_urls !== undefined) payload.image_urls = params.image_urls
+        if (params.tags !== undefined) payload.tags = params.tags
+        if (params.memo !== undefined) payload.memo = params.memo
+        if (params.sub_items !== undefined) payload.sub_items = params.sub_items
+        if (params.link_url !== undefined) payload.link_url = params.link_url
+        if (params.reservation_code !== undefined) payload.reservation_code = params.reservation_code
+        if (params.cost !== undefined) payload.cost_amount = params.cost
+        if (params.sort_order !== undefined) payload.sort_order = params.sort_order
+        if (params.hide_navigation !== undefined) payload.hide_navigation = params.hide_navigation
+
         const res = await offlineFetch(`${API.ITEMS}/${itemId}`, {
-            method: "PUT",
+            method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(params)
+            body: JSON.stringify(payload)
         })
         if (!res.ok) throw new Error("Failed to update item")
-        return res.json()
+        const data = await res.json()
+        const parsed = ItineraryItemSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Item update validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 
     /** Delete an item */
@@ -394,7 +469,13 @@ export const expensesApi = {
 
         const res = await fetch(`${API.TRIPS}/${tripId}/expenses`, { headers })
         if (!res.ok) throw new Error("Failed to fetch expenses")
-        return res.json()
+        const data = await res.json()
+        const parsed = z.array(ExpenseSchema).safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Expense list validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 
     /** Create a new expense */
@@ -447,7 +528,13 @@ export const usersApi = {
     getProfile: async (userId: string) => {
         const res = await fetch(`${API.USERS}/${userId}/profile`)
         if (!res.ok) throw new Error("Failed to fetch profile")
-        return res.json()
+        const data = await res.json()
+        const parsed = UserProfileSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] Profile fetch validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
     },
 
     /** Update user profile */

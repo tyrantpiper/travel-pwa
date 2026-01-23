@@ -33,13 +33,14 @@ interface TimelineCardProps {
     index: number
     onEdit: (item: Activity) => void
     onDelete: (id: string) => void
-    onUpdateMemo: (id: string, memo: string) => Promise<boolean>
-    onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean> // 新增：更新連結列表
+    onUpdateActivity: (id: string, updates: Partial<Activity>) => Promise<boolean> // 整合更新
 }
 
-export const TimelineCard = memo(function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateMemo, onUpdateSubItems }: TimelineCardProps) {
+export const TimelineCard = memo(function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateActivity }: TimelineCardProps) {
     const [showDetail, setShowDetail] = useState(false)
     const [showPhotoPreview, setShowPhotoPreview] = useState(false)  // 🆕 圖片預覽狀態
+
+    if (!activity) return null;
 
     // 判斷是否為 Header 卡片
     const isHeader = activity.category === 'header' || (activity.time || activity.time_slot || "00:00") === '00:00'
@@ -51,6 +52,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
     // 3. 是 Header 卡片
     // 🆕 移除：有 sub_items 就隱藏（這是錯誤的互斥邏輯）
     const hideMapBtn =
+        activity.hide_navigation ||
         ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => (activity.place || "").includes(k)) ||
         (activity.category === 'transport' && !activity.link_url && !activity.lat) ||
         isHeader;
@@ -95,22 +97,39 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 {/* Spot Photo - 可點擊預覽 */}
                 {images.length > 0 && (
                     <div
-                        className="mb-3 rounded-lg overflow-hidden h-40 w-full relative cursor-pointer hover:opacity-90 transition-opacity bg-slate-100"
+                        className="mb-3 rounded-lg overflow-hidden w-full relative cursor-pointer hover:opacity-95 transition-opacity bg-slate-100/50 flex items-center justify-center border border-slate-200/10"
+                        style={{ height: 'auto', minHeight: '160px', maxHeight: '400px' }}
                         onClick={() => setShowPhotoPreview(true)}
                     >
-                        <Image
-                            src={images[0]}
-                            alt={activity.place || "Activity"}
-                            fill
-                            className="object-contain"
-                            unoptimized
-                            onError={(e) => { e.currentTarget.style.display = 'none' }}
-                        />
-                        {/* 🆕 多圖片指示器 */}
+                        {/* 🆕 底部模糊層：增加質感並填充空白 */}
+                        <div className="absolute inset-0 opacity-30 blur-2xl scale-110">
+                            <Image
+                                src={images[0]}
+                                alt=""
+                                fill
+                                className="object-cover"
+                                unoptimized
+                            />
+                        </div>
+
+                        {/* 🆕 主圖片層：不裁切 (Contain) */}
+                        <div className="relative w-full h-48 sm:h-64 flex justify-center">
+                            <Image
+                                src={images[0]}
+                                alt={activity.place || "Activity"}
+                                fill
+                                className="object-contain z-10 drop-shadow-md"
+                                unoptimized
+                                onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                        </div>
+
+                        {/* 🆕 多圖片指示器：升級樣式 */}
                         {images.length > 1 && (
-                            <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                                +{images.length - 1}
-                            </span>
+                            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg ring-1 ring-white/20 z-20">
+                                <Camera className="w-3 h-3" />
+                                <span>1 / {images.length}</span>
+                            </div>
                         )}
                     </div>
                 )}
@@ -237,8 +256,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 activity={activity}
                 onMap={openGoogleMap}
                 hideMapBtn={hideMapBtn}
-                onUpdateMemo={onUpdateMemo}
-                onUpdateSubItems={onUpdateSubItems}
+                onUpdateActivity={onUpdateActivity}
             />
 
             {/* 🆕 全螢幕圖片預覽 (支援多圖片) */}
@@ -250,27 +268,10 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                             全螢幕預覽活動圖片
                         </DialogDescription>
                     </DialogHeader>
-                    {(() => {
-                        const images = activity.image_urls?.length
-                            ? activity.image_urls
-                            : (activity.image_url ? [activity.image_url] : [])
-                        return images.length > 0 ? (
-                            <div className="relative w-full h-[80vh]">
-                                <ZoomableImage
-                                    src={images[0]}
-                                    alt={activity.place || "Preview"}
-                                    onClose={() => setShowPhotoPreview(false)}
-                                />
-                                {images.length > 1 && (
-                                    <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-                                        {images.map((_, i) => (
-                                            <span key={i} className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-white' : 'bg-white/40'}`} />
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : null
-                    })()}
+                    <PhotoGalleryPreview
+                        activity={activity}
+                        onClose={() => setShowPhotoPreview(false)}
+                    />
                 </DialogContent>
             </Dialog>
         </div>
@@ -284,11 +285,10 @@ interface DetailDialogProps {
     activity: Activity
     onMap: (e: React.MouseEvent) => void
     hideMapBtn: boolean
-    onUpdateMemo: (id: string, memo: string) => Promise<boolean>
-    onUpdateSubItems: (id: string, items: SubItem[]) => Promise<boolean> // 新增
+    onUpdateActivity: (id: string, updates: Partial<Activity>) => Promise<boolean>
 }
 
-function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdateMemo, onUpdateSubItems }: DetailDialogProps) {
+function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdateActivity }: DetailDialogProps) {
     // Use activity.id + open as key to reset state when activity changes
     const [isEditing, setIsEditing] = useState(false)
     const [note, setNote] = useState(activity.memo || "")
@@ -309,12 +309,16 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
         if (saving) return // 防止重複點擊
         setSaving(true)
         try {
-            // 同時更新 memo 和 sub_items
-            const [memoSuccess, linksSuccess] = await Promise.all([
-                onUpdateMemo(activity.id || '', note),
-                onUpdateSubItems(activity.id || '', links)
-            ])
-            if (memoSuccess && linksSuccess) {
+            // 🆕 優化：在儲存前過濾完全空白的連結
+            const filteredLinks = links.filter(l => l.name?.trim() || l.link?.trim())
+
+            // 🆕 關鍵修復：整合為單一 API 呼叫，徹底解決並發 500 錯誤與 UI 不同步
+            const success = await onUpdateActivity(activity.id || '', {
+                memo: note,
+                sub_items: filteredLinks
+            })
+
+            if (success) {
                 toast.success("已儲存")
                 setIsEditing(false)
             }
@@ -456,5 +460,74 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                 </div>
             </DialogContent>
         </Dialog>
+    )
+}
+
+// --- 🆕 多圖片藝廊預覽元件 ---
+interface PhotoGalleryPreviewProps {
+    activity: Activity
+    onClose: () => void
+}
+
+function PhotoGalleryPreview({ activity, onClose }: PhotoGalleryPreviewProps) {
+    const images = activity.image_urls?.length
+        ? activity.image_urls
+        : (activity.image_url ? [activity.image_url] : [])
+
+    const [currentIndex, setCurrentIndex] = useState(0)
+
+    if (images.length === 0) return null
+
+    return (
+        <div className="relative w-full h-[80vh] flex flex-col justify-center">
+            <ZoomableImage
+                src={images[currentIndex]}
+                alt={activity.place || "Preview"}
+                onClose={onClose}
+            />
+
+            {/* 🆕 圖片導航指示器 (Dots) */}
+            {images.length > 1 && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-50">
+                    {images.map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={(e) => { e.stopPropagation(); setCurrentIndex(i); }}
+                            className={cn(
+                                "w-2 h-2 rounded-full transition-all duration-300",
+                                i === currentIndex
+                                    ? "bg-white scale-125 shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                                    : "bg-white/30 hover:bg-white/50"
+                            )}
+                        />
+                    ))}
+                </div>
+            )}
+
+            {/* 🆕 左右切換按鈕 (中心側邊) */}
+            {images.length > 1 && (
+                <>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev - 1 + images.length) % images.length); }}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all z-50"
+                    >
+                        <span className="text-xl">←</span>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setCurrentIndex((prev) => (prev + 1) % images.length); }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-sm transition-all z-50"
+                    >
+                        <span className="text-xl">→</span>
+                    </button>
+                </>
+            )}
+
+            {/* 🆕 頁碼顯示 */}
+            {images.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm z-50">
+                    {currentIndex + 1} / {images.length}
+                </div>
+            )}
+        </div>
     )
 }

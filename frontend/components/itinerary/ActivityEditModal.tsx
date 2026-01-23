@@ -220,14 +220,21 @@ export function ActivityEditModal({
                                             <button
                                                 key={idx}
                                                 type="button"
-                                                className="w-full text-left p-2 rounded hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
+                                                className="w-full text-left p-3 rounded-lg hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
                                                 onClick={() => handleSelectLocation(loc)}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    <span>{icon}</span>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200">
+                                                        {icon} {loc.type || '地點'}
+                                                    </span>
                                                     <span className="font-bold text-sm text-slate-800">{loc.name}</span>
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 line-clamp-1 ml-6">{loc.display_name}</div>
+                                                <div className="text-[10px] text-slate-500 line-clamp-1 truncate">
+                                                    {loc.display_name}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                    {loc.lat?.toFixed(6)}, {loc.lng?.toFixed(6)}
+                                                </div>
                                             </button>
                                         )
                                     })}
@@ -269,6 +276,38 @@ export function ActivityEditModal({
                             onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })}
                             className="w-full"
                         />
+                    </div>
+
+                    {/* Meta Info: Link, Reservation, Cost */}
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-dashed">
+                        <div className="col-span-2 space-y-1.5">
+                            <Label className="text-xs">Primary Link (Website / Nav)</Label>
+                            <Input
+                                placeholder="https://..."
+                                className="text-xs"
+                                value={editItem.link_url || ''}
+                                onChange={(e) => setEditItem({ ...editItem, link_url: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Reservation Code</Label>
+                            <Input
+                                placeholder="PDR / Code"
+                                className="text-xs"
+                                value={editItem.reservation_code || ''}
+                                onChange={(e) => setEditItem({ ...editItem, reservation_code: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs">Estimated Cost</Label>
+                            <Input
+                                type="number"
+                                placeholder="Amount"
+                                className="text-xs"
+                                value={editItem.cost || ''}
+                                onChange={(e) => setEditItem({ ...editItem, cost: e.target.value ? parseFloat(e.target.value) : undefined })}
+                            />
+                        </div>
                     </div>
 
                     {/* Category */}
@@ -370,13 +409,14 @@ export function ActivityEditModal({
                         </div>
                     </div>
 
-                    {/* Private Mode Toggle */}
-                    <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-slate-50 dark:bg-slate-800">
-                        <div className="space-y-0.5">
-                            <Label className="text-sm font-medium">Private Activity</Label>
-                            <p className="text-[10px] text-slate-500">Only visible to you (Local Tag)</p>
-                        </div>
-                        <div className="flex items-center gap-2">
+                    {/* Setting Toggles */}
+                    <div className="grid grid-cols-1 gap-2">
+                        {/* Private Mode Toggle */}
+                        <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-slate-50/50 dark:bg-slate-800/50">
+                            <div className="space-y-0.5">
+                                <Label className="text-sm font-medium">Private Activity</Label>
+                                <p className="text-[10px] text-slate-500">Only visible to you (Local Tag)</p>
+                            </div>
                             <input
                                 type="checkbox"
                                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -389,6 +429,23 @@ export function ActivityEditModal({
                                         setEditItem({ ...editItem, tags: currentTags.filter(t => t !== "Private") })
                                     }
                                 }}
+                            />
+                        </div>
+
+                        {/* No Navigation Toggle */}
+                        <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-slate-50/50 dark:bg-slate-800/50">
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <Label className="text-sm font-medium">不須導航</Label>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">Manual</span>
+                                </div>
+                                <p className="text-[10px] text-slate-500">隱藏卡片上的地圖按鈕</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                checked={!!editItem.hide_navigation}
+                                onChange={(e) => setEditItem({ ...editItem, hide_navigation: e.target.checked })}
                             />
                         </div>
                     </div>

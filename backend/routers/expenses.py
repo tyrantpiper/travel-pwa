@@ -4,6 +4,7 @@ Expenses Router
 Handles all expense-related API endpoints.
 """
 
+from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Depends
 from models.base import ExpenseRequest, UpdateExpenseRequest
 from utils.deps import get_supabase
@@ -13,9 +14,24 @@ router = APIRouter(prefix="/api", tags=["expenses"])
 
 
 @router.post("/expenses")
-async def add_expense(request: ExpenseRequest, supabase=Depends(get_supabase)):
+async def add_expense(
+    request: ExpenseRequest, 
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
     """創建新費用記錄"""
     try:
+        # 🛡️ 權限檢查 (Cautious Authorization Check)
+        if x_user_id and request.itinerary_id:
+            member_check = supabase.table("trip_members")\
+                .select("user_id")\
+                .eq("itinerary_id", request.itinerary_id)\
+                .eq("user_id", x_user_id)\
+                .execute()
+            
+            if not member_check.data:
+                raise HTTPException(status_code=403, detail="您沒有權限為此行程新增費用")
+
         print(f"📝 [Expense] Creating expense: {request.title}, amount: {request.amount_jpy}, user: {request.created_by}")
         
         # 🆕 Phase 7: Ensure user exists before adding expense (FK defense)
@@ -37,10 +53,10 @@ async def add_expense(request: ExpenseRequest, supabase=Depends(get_supabase)):
             "image_url": request.image_url,
             "incurred_at": request.expense_date  # 🔧 FIX: DB column is 'incurred_at' not 'expense_date'
         }
-        print(f"   Payload: {payload}")
         result = supabase.table("expenses").insert(payload).execute()
-        print(f"   ✅ Success: {result}")
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"   ❌ Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,7 +68,7 @@ async def get_expenses(
     user_id: str = Header(None, alias="X-User-ID"),
     supabase=Depends(get_supabase)
 ):
-    """獲取行程的費用列表
+    """獲獲取行程的費用列表
     
     邏輯：抓出 (該行程的所有公帳) OR (該行程中 我建立的私帳)
     """
@@ -81,10 +97,31 @@ async def get_expenses(
 async def update_expense(
     expense_id: str, 
     request: UpdateExpenseRequest,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
     supabase=Depends(get_supabase)
 ):
     """更新費用記錄"""
     try:
+        # 🛡️ 權限檢查 (本人才能修改自己的私帳，或成員修改公帳)
+        exp_res = supabase.table("expenses").select("*").eq("id", expense_id).execute()
+        if not exp_res.data:
+            raise HTTPException(status_code=404, detail="Expense not found")
+        
+        exp_data = exp_res.data[0]
+        if x_user_id and exp_data['created_by'] != x_user_id:
+             # 如果不是本人，必須是行程成員才能修改公帳 (或乾脆禁止非本人修改)
+             if not exp_data['is_public']:
+                 raise HTTPException(status_code=403, detail="您沒有權限修改此費用")
+             
+             # 公帳修改權限檢查
+             member_check = supabase.table("trip_members")\
+                .select("user_id")\
+                .eq("itinerary_id", exp_data['itinerary_id'])\
+                .eq("user_id", x_user_id)\
+                .execute()
+             if not member_check.data:
+                 raise HTTPException(status_code=403, detail="您沒有權限修改此行程的公帳費用")
+
         data = request.dict(exclude_unset=True)
         if 'amount_jpy' in data:
             data['amount'] = data.pop('amount_jpy')  # 對應 DB 欄位
@@ -93,19 +130,30 @@ async def update_expense(
         if 'expense_date' in data:
             data['incurred_at'] = data.pop('expense_date')
 
-        # 🆕 Currency update is handled automatically if present in request due to Pydantic model
-        
         supabase.table("expenses").update(data).eq("id", expense_id).execute()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/expenses/{expense_id}")
-async def delete_expense(expense_id: str, supabase=Depends(get_supabase)):
+async def delete_expense(
+    expense_id: str, 
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
     """刪除費用記錄"""
     try:
+        # 🛡️ 權限檢查
+        exp_res = supabase.table("expenses").select("created_by").eq("id", expense_id).execute()
+        if exp_res.data and x_user_id and exp_res.data[0]['created_by'] != x_user_id:
+             raise HTTPException(status_code=403, detail="您只能刪除自己建立的費用")
+
         supabase.table("expenses").delete().eq("id", expense_id).execute()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

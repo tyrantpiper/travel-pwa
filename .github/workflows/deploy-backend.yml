@@ -7,10 +7,6 @@ on:
       - 'backend/**'
   workflow_dispatch:
 
-env:
-  ARCGIS_API_KEY: "${{ secrets.ARCGIS_API_KEY }}"
-  CLOUDINARY_API_SECRET: "${{ secrets.CLOUDINARY_API_SECRET }}"
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -44,6 +40,6 @@ jobs:
             --timeout 60s \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co,API_VERSION=v1,NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu,CLOUDINARY_API_KEY=996197457174111,ARCGIS_API_KEY=$ARCGIS_API_KEY,CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET" \
-            --set-secrets "SUPABASE_KEY=supabase-key:latest" \
+            --set-env-vars "SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co,API_VERSION=v1,NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu,CLOUDINARY_API_KEY=996197457174111" \
+            --set-secrets "SUPABASE_KEY=supabase-key:latest,ARCGIS_API_KEY=arcgis-api-key:latest,CLOUDINARY_API_SECRET=cloudinary-api-secret:latest" \
             --project antigravity-prod-2026

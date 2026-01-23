@@ -25,10 +25,10 @@ export function AppShell() {
     return (
         <>
             <OfflineBanner />
-            <div className="min-h-screen bg-background flex flex-col">
+            <div className="h-screen bg-background flex flex-col overflow-hidden">
                 {/* 🔧 Phase 14: Scroll Architecture Refactor - AppShell no longer scrolls, each View manages its own scroll */}
-                <main className="flex-1 pb-20 overflow-hidden flex flex-col" data-scroll="true">
-                    <div className={activeView === "itinerary" ? "flex-1 h-full overflow-hidden" : "hidden"}><ItineraryView /></div>
+                <main className="flex-1 pb-20 flex flex-col min-h-0" data-scroll="true">
+                    <div className={activeView === "itinerary" ? "flex-1 h-full min-h-0 overflow-hidden" : "hidden"}><ItineraryView /></div>
                     <div className={activeView === "info" ? "flex-1 h-full overflow-hidden" : "hidden"}><InfoView /></div>
                     <div className={activeView === "tools" ? "flex-1 h-full overflow-hidden" : "hidden"}><ToolsView /></div>
                     <div className={activeView === "profile" ? "flex-1 h-full overflow-hidden" : "hidden"}><ProfileView /></div>

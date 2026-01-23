@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -32,6 +32,7 @@ import { useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
 import { expensesApi } from "@/lib/api"
+import { useOfflineMutation } from "@/lib/sync-hooks"
 
 // Type definitions
 interface Expense {
@@ -148,6 +149,7 @@ export function ToolsView() {
     const { t } = useLanguage()
     const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()  // 🔧 FIX: Restore full context
     const { mutate } = useSWRConfig()
+    const { mutate: offlineMutate } = useOfflineMutation() // 🆕 Resilience Hook
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
     const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
 
@@ -216,6 +218,7 @@ export function ToolsView() {
     const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
     const [isDeletingCard, setIsDeletingCard] = useState(false)
     const [editingCard, setEditingCard] = useState<CreditCard | null>(null)
+    const [viewingCard, setViewingCard] = useState<CreditCard | null>(null) // 🆕 Detail View State
     const [newCardName, setNewCardName] = useState("")
     const [newRewardRate, setNewRewardRate] = useState("")
     const [newRewardLimit, setNewRewardLimit] = useState("")
@@ -255,15 +258,25 @@ export function ToolsView() {
     const saveTripInfo = async (mergedSharedCards: CreditCard[]) => {
         if (!activeTripId) return
         try {
-            await fetch(`${API_BASE}/api/trips/${activeTripId}/info`, {
+            // 🧠 v4.1: Integrate with Offline Engine & Atomic RPC
+            const userId = localStorage.getItem("user_uuid") || ""
+            const url = `${API_BASE}/api/trips/${activeTripId}/info`
+            const options = {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-User-ID": userId
+                },
                 body: JSON.stringify({
                     flight_info: (activeTrip as Trip)?.flight_info || {},
                     hotel_info: (activeTrip as Trip)?.hotel_info || {},
                     credit_cards: mergedSharedCards // 🆕 Sync Shared Cards
                 })
-            })
+            }
+
+            // 🛡️ Drop-in replacement with offline queue support
+            await offlineMutate(url, options)
+
             // Re-fetch trip data using context mutate for proper SWR revalidation
             tripMutate()
         } catch (e) {
@@ -711,52 +724,32 @@ export function ToolsView() {
                 creator_id: userId || undefined
             }
 
-            // 2. Logic Split: Public vs Private
-            if (newCardIsPublic) {
-                // A. Add/Update in Shared List
-                const updatedShared = editingCard
-                    ? sharedCards.map(c => c.id === cardData.id ? cardData : c)
-                    : [...sharedCards, cardData]
+            // 🧠 v3.11: Atomic Migration Logic (Fixes Data Loss)
+            // Regardless of current/previous state, we purge from BOTH lists first
+            const purgedLocal = localCards.filter(c => c.id !== cardData.id)
+            const purgedShared = sharedCards.filter(c => c.id !== cardData.id)
 
-                // B. Remove from Local (Migration case)
-                const updatedLocal = localCards.filter(c => c.id !== cardData.id)
+            // 🧠 v4.5: Always Sync to Cloud for Cross-Device Support
+            // Regardless of public/private state, we store on server for user sync.
+            const updatedShared = [...purgedShared, cardData]
+            setSharedCards(updatedShared)
 
-                setSharedCards(updatedShared)
-                setLocalCards(updatedLocal)
-                saveCardsToLocalStorage(updatedLocal)
+            // Clean up local storage for this card (migration)
+            setLocalCards(purgedLocal)
+            saveCardsToLocalStorage(purgedLocal)
 
-                // C. Sync to Cloud
-                await saveTripInfo(updatedShared)
-                toast.success("卡片已儲存 (已共享)")
+            await saveTripInfo(updatedShared)
 
-            } else {
-                // A. Add/Update in Local List
-                const updatedLocal = editingCard
-                    ? localCards.map(c => c.id === cardData.id ? cardData : c)
-                    : [...localCards, cardData]
-
-                // B. Remove from Shared (Migration case: Public -> Private)
-                const updatedShared = sharedCards.filter(c => c.id !== cardData.id)
-
-                setLocalCards(updatedLocal)
-                setSharedCards(updatedShared)
-                saveCardsToLocalStorage(updatedLocal)
-
-                // C. Sync Cloud (if we removed something)
-                if (updatedShared.length !== sharedCards.length) {
-                    await saveTripInfo(updatedShared)
-                }
-                toast.success("卡片已儲存 (私人)")
-            }
-
+            toast.success(newCardIsPublic ? "卡片已儲存 (已共享)" : "卡片已儲存 (雲端私人同步)")
             setCardDialogOpen(false)
+            setViewingCard(null)
             haptic.success()
         } catch (e) {
             console.error("Failed to save card:", e)
             toast.error("儲存失敗，請稍後再試")
             haptic.error()
         } finally {
-            setIsSavingCard(false) // 🛡️ Always reset loading state
+            setIsSavingCard(false)
         }
     }
 
@@ -770,18 +763,22 @@ export function ToolsView() {
 
         setIsDeletingCard(true)
         const cardId = deletingCardId
-        const targetIsPublic = sharedCards.some(c => c.id === cardId)
+        const isOnCloud = sharedCards.some(c => c.id === cardId)
 
         // Optimistic UI: save old state for rollback
         const oldShared = [...sharedCards]
         const oldLocal = [...localCards]
 
         try {
-            if (targetIsPublic) {
+            // Check if card is on cloud
+            if (isOnCloud) {
                 const updatedShared = sharedCards.filter(c => c.id !== cardId)
                 setSharedCards(updatedShared)
                 await saveTripInfo(updatedShared)
-            } else {
+            }
+
+            // Also check/clean local (migration safety)
+            if (localCards.some(c => c.id === cardId)) {
                 const updatedLocal = localCards.filter(c => c.id !== cardId)
                 setLocalCards(updatedLocal)
                 saveCardsToLocalStorage(updatedLocal)
@@ -885,34 +882,36 @@ export function ToolsView() {
                                                             <Trash2 className="w-3.5 h-3.5 text-white" />
                                                         </button>
                                                         <div
-                                                            onClick={() => openEditCardDialog(card)}
-                                                            className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-shadow"
+                                                            onClick={() => setViewingCard(card)}
+                                                            className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-all border border-slate-600/30 active:scale-[0.98]"
                                                         >
-                                                            <div className="flex justify-between items-start">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <p className="font-semibold text-lg">{card.name}</p>
+                                                            <div className="flex justify-between items-start gap-2">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-semibold text-lg truncate min-w-0">{card.name}</p>
+
+                                                                    <div className="flex gap-1 mt-1.5 mb-2 shrink-0">
                                                                         {card.is_public ? (
-                                                                            <div className="text-[10px] bg-blue-500/20 text-blue-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                            <div className="text-[10px] bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1 border border-blue-500/30">
                                                                                 <Users className="w-3 h-3" /> 共享
                                                                             </div>
                                                                         ) : (
-                                                                            <div className="text-[10px] bg-amber-500/20 text-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                                                                <User className="w-3 h-3" /> 私有
+                                                                            <div className="text-[10px] bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-500/30">
+                                                                                <User className="w-3 h-3" /> 私人儲存
                                                                             </div>
                                                                         )}
                                                                     </div>
-                                                                    <p className="text-slate-300 text-sm mt-1">
+
+                                                                    <p className="text-slate-300 text-sm flex items-center gap-1">
                                                                         回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
                                                                         {card.rewardLimit > 0 && (
-                                                                            <span className="ml-2">上限 ${card.rewardLimit.toLocaleString()}</span>
+                                                                            <span className="ml-2 bg-slate-900/40 px-2 py-0.5 rounded-md border border-white/10 shrink-0">上限 ${card.rewardLimit.toLocaleString()}</span>
                                                                         )}
                                                                     </p>
                                                                 </div>
-                                                                <CreditCard className="w-6 h-6 text-slate-400" />
+                                                                <CreditCard className="w-6 h-6 text-slate-400 shrink-0 opacity-40" />
                                                             </div>
                                                             {card.notes && (
-                                                                <p className="text-xs text-slate-400 mt-2 line-clamp-2">📝 {card.notes}</p>
+                                                                <p className="text-xs text-slate-400 mt-2 line-clamp-1 opacity-70">📝 {card.notes}</p>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1236,12 +1235,110 @@ export function ToolsView() {
                 activeTripId={activeTripId}
                 activeTrip={activeTrip}
                 selectedCurrency={selectedCurrency}
-                onSaveSuccess={(targetDate) => {
+                onSaveSuccess={(targetDate: string) => {
                     setSelectedDate(targetDate)
                     setExpenseView('daily')
                     fetchExpenses()
                 }}
             />
+
+            {/* 🆕 v4.2: 信用卡詳情預覽 Sheet - 修正標題壓迫感與內容截斷問題 */}
+            <Sheet open={!!viewingCard} onOpenChange={(open) => !open && setViewingCard(null)}>
+                <SheetContent
+                    side="bottom"
+                    className="rounded-t-[2.5rem] max-h-[95dvh] p-0 border-0 bg-slate-900 text-white overflow-hidden shadow-2xl transition-all duration-300"
+                >
+                    {viewingCard && (
+                        <div className="flex flex-col h-full max-h-[95dvh]">
+                            {/* Decorative Header - 增加高度與內部間距 (Breathing Room) */}
+                            <SheetHeader className="relative pt-10 pb-8 px-8 bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 overflow-hidden shrink-0">
+                                {/* Background Decorative Element */}
+                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+
+                                <div className="relative z-10 space-y-3">
+                                    <div className="flex gap-2">
+                                        {viewingCard.is_public ? (
+                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-500/30 text-blue-100 px-3 py-1 rounded-full border border-blue-400/40 flex items-center gap-1.5 backdrop-blur-md">
+                                                <Users className="w-3 h-3" /> {t('shared') || "公開共享"}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/30 text-amber-100 px-3 py-1 rounded-full border border-amber-400/40 flex items-center gap-1.5 backdrop-blur-md">
+                                                <User className="w-3 h-3" /> {t('private') || "私人儲存"}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <SheetTitle className="text-xl md:text-2xl font-black text-white leading-tight pr-8">
+                                        {viewingCard.name}
+                                    </SheetTitle>
+                                    <SheetDescription className="sr-only">
+                                        查看信用卡詳情，包括回饋比例與各項設定。
+                                    </SheetDescription>
+                                </div>
+                            </SheetHeader>
+
+                            {/* Scrollable Content Area */}
+                            <div className="p-8 space-y-8 flex-1 overflow-y-auto overscroll-contain pb-32">
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 hover:bg-white/10 transition-colors">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">回饋趴數</p>
+                                        <p className="text-3xl font-black text-emerald-400 tracking-tight">
+                                            {viewingCard.rewardRate}
+                                            <span className="text-sm font-bold ml-1 opacity-70">%</span>
+                                        </p>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 rounded-3xl p-5 hover:bg-white/10 transition-colors">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">回饋上限</p>
+                                        <div className="flex items-baseline gap-1">
+                                            {viewingCard.rewardLimit > 0 ? (
+                                                <>
+                                                    <span className="text-sm font-bold text-slate-400">NT$</span>
+                                                    <p className="text-3xl font-black tracking-tight">{viewingCard.rewardLimit.toLocaleString()}</p>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-500 text-xl font-bold italic tracking-tight">無上限</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {viewingCard.notes && (
+                                    <div className="bg-white/5 border border-white/10 rounded-3xl p-6 relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50" />
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                            <FileText className="w-3 h-3 text-indigo-400" /> 備忘錄
+                                        </p>
+                                        <div className="text-sm text-slate-100 leading-relaxed font-medium whitespace-pre-wrap">
+                                            {viewingCard.notes}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Action Buttons Container */}
+                                <div className="flex gap-4 pt-4">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-[3] bg-white text-slate-900 hover:bg-slate-200 border-0 h-14 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-all"
+                                        onClick={() => openEditCardDialog(viewingCard)}
+                                    >
+                                        <Edit2 className="w-5 h-5 mr-2" /> 編輯資料
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        className="flex-1 h-14 rounded-2xl p-0 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-95"
+                                        onClick={() => {
+                                            setViewingCard(null)
+                                            handleDeleteCard(viewingCard.id)
+                                        }}
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </SheetContent>
+            </Sheet>
 
             {/* 🆕 v3.8: 信用卡編輯 Dialog */}
             < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >

@@ -1,5 +1,5 @@
 import useSWR from "swr"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -14,7 +14,7 @@ export function useTrips(userId: string | null) {
         { revalidateOnFocus: false }
     )
     return {
-        trips: data || [],
+        trips: Array.isArray(data) ? data : [],
         isLoading: !error && !data,
         isError: error,
         mutate
@@ -76,13 +76,13 @@ export function useExpenses(tripId: string | null, userId: string | null) {
  * Usage: const haptic = useHaptic(); haptic.tap();
  */
 export function useHaptic() {
-    const vibrate = (pattern: number | number[]) => {
+    const vibrate = useCallback((pattern: number | number[]) => {
         if (typeof window !== 'undefined' && 'vibrate' in navigator) {
             navigator.vibrate(pattern)
         }
-    }
+    }, [])
 
-    return {
+    return useMemo(() => ({
         /** Light tap - for button clicks */
         tap: () => vibrate(10),
         /** Medium feedback - for successful actions */
@@ -91,7 +91,7 @@ export function useHaptic() {
         error: () => vibrate([50, 30, 50]),
         /** Custom pattern */
         custom: (pattern: number | number[]) => vibrate(pattern)
-    }
+    }), [vibrate])
 }
 
 /**

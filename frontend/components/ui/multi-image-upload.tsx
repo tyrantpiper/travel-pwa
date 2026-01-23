@@ -56,6 +56,19 @@ export function MultiImageUpload({
     const [previewIndex, setPreviewIndex] = useState<number | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    // 🆕 使用內部 State 管理穩定 ID，防止 URL 變動或特殊字元導致 dnd-kit 失效
+    const [photoItems, setPhotoItems] = useState<{ id: string, url: string }[]>(() =>
+        values.map((url, i) => ({ id: `photo-${i}-${url.slice(-10)}`, url }))
+    )
+
+    // 🛡️ v4.9: 避免在 useEffect 中同步 setState 導致 Cascading Renders (React Compiler 規範)
+    // 直接在 Render 階段偵測 Props 變動並調整 State，這是 React 官方推薦的同步模式
+    const [prevValues, setPrevValues] = useState(values)
+    if (values !== prevValues) {
+        setPrevValues(values)
+        setPhotoItems(values.map((url, i) => ({ id: `photo-${i}-${url.slice(-10)}`, url })))
+    }
+
     // 🆕 DND Sensors - 長按 250ms 才啟動拖曳，避免與捲動衝突
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -72,16 +85,21 @@ export function MultiImageUpload({
     )
 
     // 🆕 拖曳結束處理
-    const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event
         if (over && active.id !== over.id) {
-            const oldIndex = values.indexOf(active.id as string)
-            const newIndex = values.indexOf(over.id as string)
-            const newOrder = arrayMove(values, oldIndex, newIndex)
-            onChange(newOrder)
-            toast.success("排序已更新")
+            const oldIndex = photoItems.findIndex(item => item.id === active.id)
+            const newIndex = photoItems.findIndex(item => item.id === over.id)
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newItems = arrayMove(photoItems, oldIndex, newIndex)
+                setPhotoItems(newItems) // 立即更新 UI
+                const newUrls = newItems.map(item => item.url)
+                onChange(newUrls) // 同步回父組件
+                toast.success("排序已更新")
+            }
         }
-    }, [values, onChange])
+    }
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -136,7 +154,11 @@ export function MultiImageUpload({
             xhr.onload = () => {
                 if (xhr.status === 200) {
                     const data = JSON.parse(xhr.responseText)
-                    onChange([...values, data.secure_url])
+                    const newUrl = data.secure_url
+                    const newUrls = [...values, newUrl]
+                    onChange(newUrls)
+                    // 同步更新內部狀態以便立即顯示
+                    setPhotoItems(prev => [...prev, { id: `photo-new-${Date.now()}`, url: newUrl }])
                     toast.success("圖片上傳成功")
                 } else {
                     toast.error("上傳失敗")
@@ -169,6 +191,8 @@ export function MultiImageUpload({
     const handleRemove = useCallback((index: number) => {
         const newValues = values.filter((_, i) => i !== index)
         onChange(newValues)
+        // 同步內部狀態
+        setPhotoItems(prev => prev.filter((_, i) => i !== index))
     }, [values, onChange])
 
     const canAddMore = values.length < maxImages
@@ -188,14 +212,14 @@ export function MultiImageUpload({
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
                 >
-                    <SortableContext items={values} strategy={rectSortingStrategy}>
+                    <SortableContext items={photoItems.map(p => p.id)} strategy={rectSortingStrategy}>
                         <div className="flex flex-wrap gap-2">
                             {/* 已上傳的圖片 - 可拖曳 */}
-                            {values.map((url, index) => (
+                            {photoItems.map((item, index) => (
                                 <SortablePhoto
-                                    key={url}
-                                    id={url}
-                                    url={url}
+                                    key={item.id}
+                                    id={item.id}
+                                    url={item.url}
                                     index={index}
                                     onRemove={() => handleRemove(index)}
                                     onPreview={() => setPreviewIndex(index)}

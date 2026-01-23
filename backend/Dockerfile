@@ -1,34 +1,44 @@
-# 1. Base Image: 使用 Python 3.14 Slim 版本 (2026 最強效能)
-FROM python:3.14-slim
+# 1. Builder Stage: 安裝編譯工具並構建相依項目
+FROM python:3.14-slim AS builder
 
-# 2. 設定工作目錄
-WORKDIR /app
+WORKDIR /build
 
-# 3. 安裝系統依賴 (需要編譯 C extensions 如 rapidfuzz/orjson)
+# 安裝系統依賴 (需要編譯 C extensions 如 rapidfuzz/orjson)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. 安裝 Python 依賴
+# 安裝 Python 依賴到用戶目錄 (--user)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --user --no-cache-dir -r requirements.txt
 
-# 5. 複製程式碼
+
+# 2. Final Runner Stage: 乾淨的運行環境
+FROM python:3.14-slim
+
+WORKDIR /app
+
+# 建立非 root 用戶
+RUN adduser --disabled-password --gecos '' appuser
+
+# 從 Builder 階段搬運編譯好的套件
+COPY --from=builder /root/.local /home/appuser/.local
+# 複製程式碼並設定權限
 COPY . .
+RUN chown -R appuser:appuser /app
 
-# 6. 建構非 root 用戶 (安全性)
-RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
+# 設定環境變數
+ENV PATH="/home/appuser/.local/bin:${PATH}"
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
+# 切換到非 root 用戶
 USER appuser
 
-# 7. 設定 Cloud Run 端口 (預設 8080)
-ENV PORT=8080
 EXPOSE 8080
 
-# 8. 啟動指令 (使用 Gunicorn + Uvicorn Workers 獲得最佳效能)
-# --workers 1: Cloud Run 實例通常只有 1 vCPU，所以 1 worker 足夠 (避免 context switch overhead)
-# --threads 8: 增加併發處理能力 (對於 I/O bound 任務如 API call 很有效)
-# --timeout 0: 讓 Cloud Run 自行管理 timeout
+# 啟動指令 (維持原有 Gunicorn + Uvicorn 配置，保證穩定性)
 CMD exec gunicorn main:app \
     --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Share2, Check, Copy } from "lucide-react"
+import { Share2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -47,7 +47,7 @@ export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps
             setIsCopied(true)
             toast.success("連結已複製到剪貼簿")
             setTimeout(() => setIsCopied(false), 2000)
-        } catch (err) {
+        } catch {
             toast.error("無法分享或複製連結")
         } finally {
             setIsSharing(false)

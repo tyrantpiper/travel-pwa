@@ -110,7 +110,7 @@ export default function PublicTripView({ trip }: PublicTripViewProps) {
                                                                 {activity.notes || activity.desc}
                                                             </p>
                                                         )}
-                                                        {activity.lat && activity.lng && (
+                                                        {activity.lat && activity.lng && !activity.hide_navigation && (
                                                             <a
                                                                 href={`https://www.google.com/maps?q=${activity.lat},${activity.lng}`}
                                                                 target="_blank"

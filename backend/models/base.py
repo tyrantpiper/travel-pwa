@@ -73,6 +73,9 @@ class ItineraryItem(BaseModel):
     reservation_code: Optional[str] = ""
     sub_items: List[dict] = []
     link_url: Optional[str] = None
+    image_url: Optional[str] = None      # 🆕 新增：單張圖片
+    image_urls: Optional[List[str]] = [] # 🆕 新增：多張圖片
+    hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
 
 
 class SaveItineraryRequest(BaseModel):
@@ -114,16 +117,19 @@ class UpdateItemRequest(BaseModel):
     time_slot: Optional[str] = None
     place_name: Optional[str] = None
     notes: Optional[str] = None
-    cost_amount: Optional[float] = 0
+    cost_amount: Optional[float] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     memo: Optional[str] = None
     sub_items: Optional[List[dict]] = None
+    link_url: Optional[str] = None
+    reservation_code: Optional[str] = None
     image_url: Optional[str] = None      # 向後相容
     image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     sort_order: Optional[int] = None  # 🆕 拖曳排序
+    hide_navigation: Optional[bool] = None # 🆕 新增：手動隱藏導航
 
 
 class CreateItemRequest(BaseModel):
@@ -139,6 +145,12 @@ class CreateItemRequest(BaseModel):
     image_url: Optional[str] = None       # 向後相容
     image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
     tags: Optional[List[str]] = None
+    memo: Optional[str] = None
+    link_url: Optional[str] = None
+    reservation_code: Optional[str] = None
+    cost_amount: Optional[float] = 0
+    sub_items: Optional[List[dict]] = None
+    hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
 
 
 # 🆕 拖曳排序請求
