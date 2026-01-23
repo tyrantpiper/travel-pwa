@@ -193,7 +193,7 @@ async def initialize_supabase():
 
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
-@app.get("/health")
+@app.route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
     """
     健康檢查端點 - UptimeRobot 每 5 分鐘戳一次
@@ -259,7 +259,7 @@ async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-AP
 
 # --- API 路由 ---
 @app.get("/")
-def health_check():
+def root_status():
     return {"status": "Alive", "mode": "BYOK"}
 
 @app.post("/api/plan")
