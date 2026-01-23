@@ -12,6 +12,9 @@ import { POISearch } from "@/components/poi-search"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { ItineraryItemState, LocationInfo, DailyLocation, GeocodeResult } from "@/lib/itinerary-types"
 import { geocodeApi } from "@/lib/api"
+import { useHaptic } from "@/lib/hooks"
+import { useLanguage } from "@/lib/LanguageContext"
+import { X } from "lucide-react"
 
 const ACTIVITY_CATEGORIES = [
     { id: 'sightseeing', icon: '🎯', label: '景點' },
@@ -59,6 +62,8 @@ export function ActivityEditModal({
     const [searchRegion, setSearchRegion] = useState("")
     const [placeSearchResults, setPlaceSearchResults] = useState<LocationInfo[]>([])
     const [isSearching, setIsSearching] = useState(false)
+    const haptic = useHaptic()
+    const { t } = useLanguage()
 
     const handleSearchPlace = async () => {
         if (!editItem?.place?.trim()) return
@@ -93,7 +98,13 @@ export function ActivityEditModal({
 
     const handleSelectLocation = (loc: LocationInfo) => {
         if (editItem) {
-            setEditItem({ ...editItem, place: loc.name, lat: loc.lat, lng: loc.lng })
+            setEditItem({
+                ...editItem,
+                place: loc.name,
+                lat: loc.lat,
+                lng: loc.lng,
+                link_url: editItem.link_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name)}`
+            })
             setPlaceSearchResults([])
         }
     }
@@ -133,7 +144,7 @@ export function ActivityEditModal({
 
                     {/* Time */}
                     <div className="space-y-1.5">
-                        <Label>Time</Label>
+                        <Label>{t('time')}</Label>
                         <Input
                             type="time"
                             value={editItem.time}
@@ -192,7 +203,7 @@ export function ActivityEditModal({
 
                     {/* Place */}
                     <div className="space-y-1.5">
-                        <Label>Place</Label>
+                        <Label>{t('place')}</Label>
                         <div className="space-y-2">
                             <div className="flex gap-2">
                                 <Input
@@ -256,6 +267,7 @@ export function ActivityEditModal({
                                         place: poi.name,
                                         lat: poi.lat,
                                         lng: poi.lng,
+                                        link_url: editItem.link_url || poi.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`,
                                         desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : editItem.desc
                                     })
                                     toast.success(`已選擇: ${poi.name}`)
@@ -268,27 +280,30 @@ export function ActivityEditModal({
                         </div>
                     )}
 
+                    {/* Primary Link - Priority Moved Up */}
+                    <div className="space-y-1.5 bg-amber-50/50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
+                        <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
+                            🚀 {t('primary_address') || "Primary Address / Nav Link"}
+                        </Label>
+                        <Input
+                            placeholder="https://... or raw address"
+                            className="text-xs bg-white dark:bg-slate-900 border-amber-100"
+                            value={editItem.link_url || ''}
+                            onChange={(e) => setEditItem({ ...editItem, link_url: e.target.value })}
+                        />
+                    </div>
+
                     {/* Notes */}
                     <div className="space-y-1.5">
-                        <Label>Notes</Label>
+                        <Label>{t('notes')}</Label>
                         <Input
                             value={editItem.desc}
                             onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })}
                             className="w-full"
                         />
                     </div>
-
-                    {/* Meta Info: Link, Reservation, Cost */}
+                    {/* Reservation & Cost Grid */}
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-dashed">
-                        <div className="col-span-2 space-y-1.5">
-                            <Label className="text-xs">Primary Link (Website / Nav)</Label>
-                            <Input
-                                placeholder="https://..."
-                                className="text-xs"
-                                value={editItem.link_url || ''}
-                                onChange={(e) => setEditItem({ ...editItem, link_url: e.target.value })}
-                            />
-                        </div>
                         <div className="space-y-1.5">
                             <Label className="text-xs">Reservation Code</Label>
                             <Input
@@ -339,15 +354,18 @@ export function ActivityEditModal({
                         <div className="space-y-2">
                             <div className="flex flex-wrap gap-1">
                                 {(editItem.tags || []).map((tag: string, i: number) => (
-                                    <span key={i} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs flex items-center gap-1">
+                                    <span key={i} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs flex items-center gap-1.5 transition-all active:scale-95">
                                         {tag}
                                         <button
                                             type="button"
-                                            className="hover:text-red-800"
-                                            onClick={() => setEditItem({
-                                                ...editItem,
-                                                tags: (editItem.tags || []).filter((_: string, idx: number) => idx !== i)
-                                            })}
+                                            className="w-4 h-4 flex items-center justify-center font-black text-red-500 hover:text-red-700 bg-white/50 rounded-full"
+                                            onClick={() => {
+                                                haptic.tap()
+                                                setEditItem({
+                                                    ...editItem,
+                                                    tags: (editItem.tags || []).filter((_: string, idx: number) => idx !== i)
+                                                })
+                                            }}
                                         >×</button>
                                     </span>
                                 ))}
@@ -394,16 +412,21 @@ export function ActivityEditModal({
                                     onChange={(e) => setEditItem({ ...editItem, lng: e.target.value })}
                                 />
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-400">{editItem.lat && editItem.lng ? "Precise" : "Search mode"}</span>
+                            <div className="flex justify-between items-center px-1">
+                                <span className="text-[10px] text-slate-400 font-medium">
+                                    {editItem.lat && editItem.lng ? "📍 Precise Geolocation" : "🔍 Search mode"}
+                                </span>
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 text-[10px] text-red-400"
-                                    onClick={() => setEditItem({ ...editItem, lat: null, lng: null })}
+                                    className="h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 font-bold flex items-center gap-1"
+                                    onClick={() => {
+                                        haptic.tap()
+                                        setEditItem({ ...editItem, lat: null, lng: null })
+                                    }}
                                 >
-                                    Clear
+                                    <X className="w-3 h-3" /> Clear Coords
                                 </Button>
                             </div>
                         </div>
@@ -457,6 +480,6 @@ export function ActivityEditModal({
                     </DialogFooter>
                 </div>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }

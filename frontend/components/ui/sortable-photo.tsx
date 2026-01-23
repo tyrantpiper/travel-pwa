@@ -15,6 +15,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { X, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useHaptic } from "@/lib/hooks"
 
 interface SortablePhotoProps {
     id: string
@@ -33,6 +34,7 @@ export const SortablePhoto = memo(function SortablePhoto({
     onPreview,
     getThumbnailUrl
 }: SortablePhotoProps) {
+    const haptic = useHaptic()
     const {
         attributes,
         listeners,
@@ -77,30 +79,31 @@ export const SortablePhoto = memo(function SortablePhoto({
                 />
             </div>
 
-            {/* 拖曳把手 - 長按/滑鼠拖曳 */}
+            {/* 拖曳把手提示 - 恆顯但低調 (PWA 友好) */}
             <div
                 {...attributes}
                 {...listeners}
                 className={cn(
                     "absolute top-0 left-0 w-full h-full",
                     "flex items-center justify-center",
-                    "bg-black/0 hover:bg-black/20 transition-colors",
+                    "bg-black/0 active:bg-black/20 transition-colors",
                     "touch-none cursor-grab active:cursor-grabbing"
                 )}
             >
-                {/* 拖曳圖示 - hover 時顯示 */}
+                {/* 拖曳圖示 - 優化 PWA 可發現性 */}
                 <GripVertical
-                    className="w-5 h-5 text-white drop-shadow-md opacity-0 group-hover:opacity-70 transition-opacity"
+                    className="w-5 h-5 text-white drop-shadow-md opacity-30 group-hover:opacity-70 transition-opacity"
                 />
             </div>
 
-            {/* 刪除按鈕 */}
+            {/* 刪除按鈕 - 恆顯 (PWA 友好) + 擴大觸控熱區 */}
             <button
                 onClick={(e) => {
                     e.stopPropagation()
+                    haptic.tap()
                     onRemove()
                 }}
-                className="absolute top-0.5 right-0.5 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                className="absolute -top-1 -right-1 p-2 bg-red-500 text-white rounded-full transition-all z-10 shadow-lg ring-2 ring-white hover:bg-red-600 active:scale-95"
             >
                 <X className="w-3 h-3" />
             </button>

@@ -91,6 +91,7 @@ async def get_public_trip_by_public_id(
                     "lng": item["location_lng"],
                     "image_url": item.get("image_url"),
                     "tags": item.get("tags", []),
+                    "hide_navigation": item.get("hide_navigation", False)
                 })
         
         content = trip.get("content") or {}
@@ -262,7 +263,10 @@ async def get_trip_by_id(
                     "link_url": item.get("link_url"), 
                     "sub_items": item.get("sub_items") or [],
                     "image_url": item.get("image_url"),
-                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else [])  # 🆕 多圖片
+                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else []),  # 🆕 多圖片
+                    "hide_navigation": item.get("hide_navigation", False),  # 🆕 v4.8: 修正導航隱藏失效
+                    "is_private": item.get("is_private", False),            # 🆕 修正權限標記失效
+                    "private_owner_id": item.get("private_owner_id")
                 })
         
         # 🆕 隱私過濾輔助函數（修正版：使用 private_owner_id）

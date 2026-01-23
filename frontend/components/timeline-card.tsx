@@ -59,19 +59,9 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
     const openGoogleMap = (e: React.MouseEvent) => {
         e.stopPropagation()
-        let url = ""
-        if (activity.link_url) {
-            url = activity.link_url
-        } else if (activity.lat && activity.lng && activity.place) {
-            // 使用經緯度定位 + 商家名稱搜尋（最精準）
-            url = `https://www.google.com/maps/search/${encodeURIComponent(activity.place)}/@${activity.lat},${activity.lng},17z`
-        } else if (activity.lat && activity.lng) {
-            // 只有經緯度
-            url = `https://www.google.com/maps/search/?api=1&query=${activity.lat},${activity.lng}`
-        } else {
-            // 只有名稱
-            url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place || "")}`
-        }
+        const url = activity.link_url?.startsWith('http')
+            ? activity.link_url
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.link_url || activity.place || "")}`;
         window.open(url, '_blank')
     }
 
@@ -349,12 +339,36 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                     <div className="p-6 space-y-6">
 
                         {/* 1. 攻略/簡介 (唯讀) */}
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                <Info className="w-3 h-3" /> Info & Guide
-                            </h4>
-                            <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm whitespace-pre-wrap">
-                                {activity.desc || "暫無簡介。"}
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                    <Info className="w-3 h-3" /> Info & Guide
+                                </h4>
+                                <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm whitespace-pre-wrap">
+                                    {activity.desc || "暫無簡介。"}
+                                </div>
+                            </div>
+
+                            {/* 🆕 新增：主要地址與 Meta 資訊 */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {activity.link_url && (
+                                    <div className="col-span-2 p-3 bg-amber-50/30 dark:bg-amber-900/10 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
+                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">主要地址 / 導航連結</div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono">{activity.link_url}</div>
+                                    </div>
+                                )}
+                                {activity.reservation_code && (
+                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">預約代碼</div>
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{activity.reservation_code}</div>
+                                    </div>
+                                )}
+                                {activity.cost !== undefined && (
+                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">預估花費</div>
+                                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200">¥{activity.cost.toLocaleString()}</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

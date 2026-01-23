@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
+import { useState, useEffect } from "react"
+import { useHaptic } from "@/lib/hooks"
 
 export interface FlightData {
     dep_date: string
@@ -35,6 +37,16 @@ interface FlightCardProps {
 
 export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardProps) {
     const { t } = useLanguage()
+    const haptic = useHaptic()
+    const [showConfirmClear, setShowConfirmClear] = useState(false)
+
+    // Auto-reset confirmation state after 3 seconds
+    useEffect(() => {
+        if (showConfirmClear) {
+            const timer = setTimeout(() => setShowConfirmClear(false), 3000)
+            return () => clearTimeout(timer)
+        }
+    }, [showConfirmClear])
 
     // 🛡️ 保持既有優點：強大的向後相容與多旅客支援
     const getPnrs = (): string[] => {
@@ -77,14 +89,34 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
             <div className="absolute top-[38%] -left-3 w-6 h-6 bg-stone-50 dark:bg-slate-900 rounded-full border-r border-slate-200/60 z-10 hidden sm:block shadow-inner" />
             <div className="absolute top-[38%] -right-3 w-6 h-6 bg-stone-50 dark:bg-slate-900 rounded-full border-l border-slate-200/60 z-10 hidden sm:block shadow-inner" />
 
-            {/* 清除按鈕 */}
+            {/* 清除按鈕 - 2026 安全升級版 (PWA 友好) */}
             {isEditing && onClear && (
                 <button
-                    onClick={onClear}
-                    className="absolute top-4 right-4 z-20 p-2 rounded-full bg-slate-100/50 hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        if (!showConfirmClear) {
+                            haptic.tap()
+                            setShowConfirmClear(true)
+                        } else {
+                            haptic.success()
+                            onClear()
+                            setShowConfirmClear(false)
+                        }
+                    }}
+                    className={cn(
+                        "absolute top-4 right-4 z-20 transition-all duration-300 flex items-center gap-2 px-3 py-2 rounded-full shadow-lg border",
+                        showConfirmClear
+                            ? "bg-red-500 text-white border-red-600 scale-105"
+                            : "bg-white/90 dark:bg-slate-800/90 text-slate-400 hover:text-red-500 border-slate-200 dark:border-slate-700"
+                    )}
                     title={t('clear_flight_info')}
                 >
-                    <Trash2 className="w-4 h-4" />
+                    {showConfirmClear ? (
+                        <span className="text-[10px] font-bold tracking-tight whitespace-nowrap animate-in fade-in slide-in-from-right-2">
+                            {t('confirm_delete') || "確定清除？"}
+                        </span>
+                    ) : null}
+                    <Trash2 className={cn("w-4 h-4", showConfirmClear && "animate-pulse")} />
                 </button>
             )}
 
