@@ -30,7 +30,7 @@ from models.base import (
     AddDayRequest,
     ReorderRequest  # 🆕 拖曳排序
 )
-from utils.deps import get_supabase
+from utils.deps import get_supabase, get_verified_user
 from utils.helpers import generate_room_code, generate_public_id, ensure_user_exists
 from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
@@ -124,12 +124,14 @@ async def get_public_trip_by_public_id(
 
 @router.get("/trips")
 async def get_trips(
-    user_id: str = Header(None, alias="X-User-ID"),
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """📋 取得我參與的所有行程
     
-    透過 Header 傳入 user_id，返回該使用者參與的所有行程
+    🛡️ 已強化身分驗證：
+    1. 優先從 JWT 驗證
+    2. 回落至 Header (向後相容)
     """
     print(f"📋 查詢使用者 {user_id} 的所有行程")
     
@@ -189,7 +191,7 @@ async def get_trips(
 @router.get("/trips/{trip_id}")
 async def get_trip_by_id(
     trip_id: str, 
-    user_id: str = Header(None, alias="X-User-ID"),
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """🆕 獲取特定行程 (by ID)
@@ -462,10 +464,21 @@ async def create_manual_trip(
 async def update_trip_title(
     trip_id: str, 
     request: UpdateTripTitleRequest,
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """🔥 修改行程標題"""
     try:
+        # 🛡️ 權限檢查 (只有成員能修改標題)
+        member_check = supabase.table("trip_members")\
+            .select("user_id")\
+            .eq("itinerary_id", trip_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權限修改此行程標題")
+
         supabase.table("itineraries").update({"title": request.title}).eq("id", trip_id).execute()
         return {"status": "success"}
     except Exception as e:
@@ -600,7 +613,11 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/save-itinerary")
-async def save_itinerary(request: SaveItineraryRequest, supabase=Depends(get_supabase)):
+async def save_itinerary(
+    request: SaveItineraryRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """💾 儲存行程到資料庫
     
     產生房間碼，創建主行程，並批量插入細項。
@@ -978,23 +995,23 @@ async def leave_trip(
 async def update_trip_info(
     trip_id: str, 
     request: UpdateInfoRequest, 
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """✈️ 更新行程資訊 (航班、住宿、信用卡)"""
     try:
         # 🛡️ 權限檢查 (Cautious Authorization Check)
-        if x_user_id:
+        if user_id:
             # 驗證使用者是否為該行程的成員
             member_check = supabase.table("trip_members")\
                 .select("user_id")\
                 .eq("itinerary_id", trip_id)\
-                .eq("user_id", x_user_id)\
+                .eq("user_id", user_id)\
                 .execute()
             
             if not member_check.data:
                 # 🔒 安全防線：拒絕非成員修改行程資訊
-                print(f"🔒 [Auth Denied] User {x_user_id} tried to update Trip {trip_id}")
+                print(f"🔒 [Auth Denied] User {user_id} tried to update Trip {trip_id}")
                 raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
 
         # 1. 如果有更新信用卡，執行原子化 RPC 更新 (🛡️ Cautious Fix: 原子化更新，防止併發覆蓋)

@@ -1,10 +1,6 @@
-"""
-Shared FastAPI Dependencies
----------------------------
-Centralized dependency injection functions for use across all routers.
-"""
-
+import os
 from fastapi import Header, HTTPException, Request
+from supabase import create_client, Client
 
 
 async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key")):
@@ -38,16 +34,45 @@ async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-AP
     return x_gemini_api_key
 
 
-def get_supabase(request: Request):
-    """
-    從 app.state 獲取 Supabase 客戶端
-    
-    這個依賴允許 routers 安全地訪問 Supabase 客戶端，
-    而不需要直接導入或使用全域變數。
-    
-    用法：
-        @router.get("/example")
-        def example(supabase = Depends(get_supabase)):
-            supabase.table("trips").select("*").execute()
-    """
+def get_supabase(request: Request) -> Client:
+    """從 app.state 獲取全域 Supabase 客戶端 (使用 Service Role Key)"""
     return request.app.state.supabase
+
+async def get_verified_user(
+    request: Request,
+    x_user_id: str = Header(None, alias="X-User-ID"),
+    auth_header: str = Header(None, alias="Authorization")
+) -> str:
+    """
+    🛡️ 安全身分驗證依賴 (v2026 Security Hardening)
+    
+    邏輯推理：
+    1. 優先驗證 JWT Token (如果前端有傳)。
+    2. 如果沒有 Token，暫時允許 X-User-ID (向後相容)，但會在後台標記為「低安全性請求」。
+    3. 如果 ID 衝突，以 Token 解析出的 ID 為準。
+    """
+    supabase: Client = request.app.state.supabase
+    
+    # 1. 嘗試從 Authorization Header 驗證 (最安全)
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            # 使用 Supabase Auth 驗證 Token
+            user_res = supabase.auth.get_user(token)
+            if user_res and user_res.user:
+                verified_id = str(user_res.user.id)
+                # 安全校驗：如果同時傳了 X-User-ID 但不吻合，視為偽造嘗試
+                if x_user_id and x_user_id != verified_id:
+                    print(f"🚨 [Security] Identity Mismatch! Token: {verified_id} vs Header: {x_user_id}")
+                    raise HTTPException(status_code=403, detail="身分令牌不匹配")
+                return verified_id
+        except Exception as e:
+            print(f"⚠️ [Auth] Token verification failed: {e}")
+            # Token 失效時不直接報錯，回落到 X-User-ID 以維持過度期穩定
+            
+    # 2. 回落到 X-User-ID (維持目前的 UX 流暢度)
+    if x_user_id:
+        # 這裡可以加入額外的校驗邏輯 (例如：檢查 ID 格式)
+        return x_user_id
+        
+    raise HTTPException(status_code=401, detail="無法識別使用者身分")

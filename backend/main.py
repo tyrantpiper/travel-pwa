@@ -75,7 +75,7 @@ except ImportError as e:
 
 # 🆕 Phase 4: 導入共用依賴 (供 routers 使用)
 try:
-    from utils.deps import get_gemini_key, get_supabase
+    from utils.deps import get_gemini_key, get_supabase, get_verified_user
     from utils.ai_config import PRIMARY_MODEL, LITE_MODEL, SMART_NO_TOOL_MODEL, REASONING_MODEL
     print("[Utils] ✅ Loaded shared dependencies")
 except ImportError as e:
@@ -503,7 +503,7 @@ async def chat_with_ryan(
     request: Request, 
     body: ChatRequest, 
     background_tasks: BackgroundTasks,
-    user_id: str = Header(None, alias="X-User-ID"),
+    user_id: str = Depends(get_verified_user),
     api_key: str = Depends(get_gemini_key)
 ):
     try:

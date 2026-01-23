@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from typing import Optional
 import uuid
 from datetime import datetime, timezone
-from utils.deps import get_supabase
+from utils.deps import get_supabase, get_verified_user
 from models.base import UpdateProfileRequest
 
 # 🆕 Standardized prefix for user endpoints
@@ -100,7 +100,7 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
 @router.put("/me")
 async def update_user_profile(
     request: UpdateProfileRequest,
-    user_id: str = Header(None, alias="X-User-ID"),
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """
