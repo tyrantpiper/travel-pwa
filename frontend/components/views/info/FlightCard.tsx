@@ -91,117 +91,145 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
             {/* Top Section: Flight Path & Airports */}
             <div className="p-8 pt-10 bg-gradient-to-br from-blue-50/30 via-transparent to-indigo-50/20 dark:from-blue-900/10 dark:to-transparent">
 
-                {/* 📅 Date Header (Premium Typography) */}
-                <div className="flex items-center justify-between mb-8 px-2">
-                    <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] pl-1">
+                {/* 📅 Date Header (Premium Symmetry & Typography) */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center mb-10 px-1">
+                    <div className="space-y-1.5 overflow-hidden">
+                        <Label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-[0.25em] pl-1 drop-shadow-sm">
                             {t('departure_date')}
                         </Label>
-                        <Input
-                            type="date"
-                            disabled={!isEditing}
-                            value={data.dep_date || data.date || ""}
-                            onChange={e => onChange('dep_date', e.target.value)}
-                            className={cn(
-                                "h-auto p-0 border-0 bg-transparent text-sm font-black shadow-none focus-visible:ring-0",
-                                !isEditing && "text-slate-500"
-                            )}
-                        />
+                        {isEditing ? (
+                            <Input
+                                type="date"
+                                value={data.dep_date || data.date || ""}
+                                onChange={e => onChange('dep_date', e.target.value)}
+                                className="h-7 p-0 border-0 bg-transparent text-sm font-black shadow-none focus-visible:ring-0"
+                            />
+                        ) : (
+                            <div className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pl-1 leading-none">
+                                {data.dep_date || data.date || t('no_date')}
+                            </div>
+                        )}
                     </div>
-                    <div className="h-px flex-1 mx-6 bg-slate-200/50 dark:bg-slate-700/50 hidden sm:block relative">
-                        <div className="absolute right-0 -top-1 w-2 h-2 rounded-full bg-blue-400/30" />
+
+                    <div className="flex flex-col items-center px-4">
+                        <div className="h-px w-12 sm:w-20 bg-gradient-to-r from-blue-400/50 via-slate-300/30 to-indigo-400/50 relative">
+                            <div className="absolute left-0 -top-0.5 w-1 h-1 rounded-full bg-blue-500" />
+                            <div className="absolute right-0 -top-0.5 w-1 h-1 rounded-full bg-indigo-500" />
+                        </div>
                     </div>
-                    <div className="space-y-1 text-right">
-                        <Label className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] pr-1 flex justify-end">
+
+                    <div className="space-y-1.5 text-right overflow-hidden">
+                        <Label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.25em] pr-1 flex justify-end drop-shadow-sm">
                             {t('arrival_date')}
                         </Label>
-                        <Input
-                            type="date"
-                            disabled={!isEditing}
-                            value={data.arr_date || data.date || ""}
-                            onChange={e => onChange('arr_date', e.target.value)}
-                            className={cn(
-                                "h-auto p-0 border-0 bg-transparent text-sm font-black shadow-none focus-visible:ring-0 text-right justify-end",
-                                !isEditing && "text-slate-500"
-                            )}
-                        />
+                        {isEditing ? (
+                            <div className="flex justify-end">
+                                <Input
+                                    type="date"
+                                    value={data.arr_date || data.date || ""}
+                                    onChange={e => onChange('arr_date', e.target.value)}
+                                    className="h-7 p-0 border-0 bg-transparent text-sm font-black shadow-none focus-visible:ring-0 text-right w-fit"
+                                />
+                            </div>
+                        ) : (
+                            <div className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pr-1 leading-none text-right">
+                                {data.arr_date || data.date || t('no_date')}
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* ✈️ Main Airport & Time Grid */}
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-6 relative px-1">
                     {/* Departure Station */}
-                    <div className="min-w-0">
-                        <Input
-                            disabled={!isEditing}
-                            value={data.dep_airport}
-                            onChange={e => onChange('dep_airport', e.target.value.toUpperCase())}
-                            className={cn(
-                                "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent",
-                                isEditing ? "text-4xl h-12 border-b-2 border-slate-100 rounded-none mb-1 text-center" : "text-5xl text-slate-900 dark:text-white"
-                            )}
-                            maxLength={3}
-                            placeholder="TPE"
-                        />
-                        <div className="flex items-center gap-2 mt-2">
-                            <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                    <div className="relative group/dep">
+                        <div className="absolute -inset-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl scale-95 opacity-0 group-hover/dep:opacity-100 group-hover/dep:scale-100 transition-all duration-300" />
+                        <div className="relative">
                             <Input
-                                type={isEditing ? "time" : "text"}
                                 disabled={!isEditing}
-                                value={data.dep_time}
-                                onChange={e => onChange('dep_time', e.target.value)}
+                                value={data.dep_airport}
+                                onChange={e => onChange('dep_airport', e.target.value.toUpperCase())}
                                 className={cn(
-                                    "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all",
-                                    isEditing ? "text-xs font-semibold border-b border-blue-100 rounded-none w-full" : "text-xl font-black text-slate-600 dark:text-slate-400"
+                                    "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent",
+                                    isEditing ? "text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center" : "text-5xl sm:text-6xl text-slate-900 dark:text-white"
                                 )}
-                                placeholder="00:00"
+                                maxLength={3}
+                                placeholder="TPE"
                             />
+                            <div className="flex items-center gap-2 mt-3">
+                                <div className="p-1 rounded-md bg-blue-100/50 dark:bg-blue-900/30">
+                                    <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <Input
+                                    type={isEditing ? "time" : "text"}
+                                    disabled={!isEditing}
+                                    value={data.dep_time}
+                                    onChange={e => onChange('dep_time', e.target.value)}
+                                    className={cn(
+                                        "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all",
+                                        isEditing ? "text-xs font-semibold border-b border-blue-100 dark:border-blue-800 rounded-none w-full" : "text-2xl font-black text-slate-700 dark:text-slate-300"
+                                    )}
+                                    placeholder="00:00"
+                                />
+                            </div>
                         </div>
                     </div>
 
                     {/* Flight Path Visual */}
-                    <div className="flex flex-col items-center justify-center">
-                        <motion.div
-                            animate={{
-                                x: [0, 5, 0],
-                                rotate: 90
-                            }}
-                            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                            className="relative"
-                        >
-                            <Plane className="w-7 h-7 text-blue-500/40" />
-                        </motion.div>
-                        <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-blue-200 to-transparent dark:via-blue-800 mt-3 rounded-full opacity-50" />
+                    <div className="flex flex-col items-center justify-center px-2">
+                        <div className="relative flex items-center justify-center w-16 sm:w-24">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full h-[2px] bg-gradient-to-r from-blue-300/30 via-slate-200/50 to-indigo-300/30 dark:via-slate-700/50 rounded-full" />
+                            </div>
+                            <motion.div
+                                animate={{
+                                    x: [-32, 32],
+                                    opacity: [0, 1, 1, 0]
+                                }}
+                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                                className="relative z-10"
+                            >
+                                <Plane className="w-5 h-5 text-blue-500/60 rotate-90" />
+                            </motion.div>
+                        </div>
+                        <div className="mt-4 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] font-mono">
+                            Non-Stop
+                        </div>
                     </div>
 
                     {/* Arrival Station */}
-                    <div className="min-w-0 text-right">
-                        <div className="flex justify-end">
-                            <Input
-                                disabled={!isEditing}
-                                value={data.arr_airport}
-                                onChange={e => onChange('arr_airport', e.target.value.toUpperCase())}
-                                className={cn(
-                                    "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right",
-                                    isEditing ? "text-4xl h-12 border-b-2 border-slate-100 rounded-none mb-1 text-center" : "text-5xl text-slate-900 dark:text-white"
-                                )}
-                                maxLength={3}
-                                placeholder="NRT"
-                            />
-                        </div>
-                        <div className="flex items-center justify-end gap-2 mt-2">
-                            <Input
-                                type={isEditing ? "time" : "text"}
-                                disabled={!isEditing}
-                                value={data.arr_time}
-                                onChange={e => onChange('arr_time', e.target.value)}
-                                className={cn(
-                                    "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all text-right",
-                                    isEditing ? "text-xs font-semibold border-b border-indigo-100 rounded-none w-full" : "text-xl font-black text-slate-600 dark:text-slate-400"
-                                )}
-                                placeholder="00:00"
-                            />
-                            <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <div className="relative group/arr text-right">
+                        <div className="absolute -inset-2 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl scale-95 opacity-0 group-hover/arr:opacity-100 group-hover/arr:scale-100 transition-all duration-300" />
+                        <div className="relative">
+                            <div className="flex justify-end">
+                                <Input
+                                    disabled={!isEditing}
+                                    value={data.arr_airport}
+                                    onChange={e => onChange('arr_airport', e.target.value.toUpperCase())}
+                                    className={cn(
+                                        "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right",
+                                        isEditing ? "text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center" : "text-5xl sm:text-6xl text-slate-900 dark:text-white"
+                                    )}
+                                    maxLength={3}
+                                    placeholder="NRT"
+                                />
+                            </div>
+                            <div className="flex items-center justify-end gap-2 mt-3">
+                                <Input
+                                    type={isEditing ? "time" : "text"}
+                                    disabled={!isEditing}
+                                    value={data.arr_time}
+                                    onChange={e => onChange('arr_time', e.target.value)}
+                                    className={cn(
+                                        "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all text-right",
+                                        isEditing ? "text-xs font-semibold border-b border-indigo-100 dark:border-indigo-800 rounded-none w-full" : "text-2xl font-black text-slate-700 dark:text-slate-300"
+                                    )}
+                                    placeholder="00:00"
+                                />
+                                <div className="p-1 rounded-md bg-indigo-100/50 dark:bg-indigo-900/30">
+                                    <Clock className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -213,149 +241,164 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
             </div>
 
             {/* Bottom Section: Airline & Traveler Info */}
-            <div className="p-8 space-y-8 bg-white/40 dark:bg-slate-800/20">
-                {/* 🛡️ THE FIX: Airline & Flight Number Alignment */}
-                <div className="grid grid-cols-2 gap-8">
+            <div className="p-8 space-y-8 bg-white/40 dark:bg-slate-800/20 relative">
+                {/* 🛡️ Airline & Flight Number (Boarding Pass Layout) */}
+                <div className="grid grid-cols-2 gap-8 relative z-10">
                     <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] pl-1">
+                        <Label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] pl-1">
                             {t('airline')}
                         </Label>
-                        <Input
-                            disabled={!isEditing}
-                            value={data.airline}
-                            onChange={e => onChange('airline', e.target.value)}
-                            placeholder="Eg. JAL / ANA"
-                            className={cn(
-                                "h-10 border-0 bg-slate-50/50 dark:bg-slate-900/50 rounded-xl text-sm font-bold px-4 focus-visible:ring-blue-500/20",
-                                !isEditing && "bg-transparent px-0 text-xl font-black text-slate-900 dark:text-white"
-                            )}
-                        />
+                        {isEditing ? (
+                            <Input
+                                value={data.airline}
+                                onChange={e => onChange('airline', e.target.value)}
+                                placeholder="Eg. JAL / ANA"
+                                className="h-10 border-0 bg-slate-100/50 dark:bg-slate-900/50 rounded-xl text-sm font-bold px-4 focus-visible:ring-blue-500/20"
+                            />
+                        ) : (
+                            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                                <span className="w-1.5 h-6 bg-blue-500 rounded-full" />
+                                {data.airline || "-"}
+                            </div>
+                        )}
                     </div>
-                    {/* 🎯 RIGHT ALIGNMENT FIX APPLIED HERE */}
+                    {/* 🎯 RIGHT ALIGNMENT SYMMETRY */}
                     <div className="space-y-2 flex flex-col items-end">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] pr-1 w-full text-right flex justify-end">
+                        <Label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] pr-1 w-full text-right flex justify-end">
                             {t('flight_number')}
                         </Label>
-                        <Input
-                            disabled={!isEditing}
-                            value={data.code}
-                            onChange={e => onChange('code', e.target.value)}
-                            placeholder="JL802"
-                            className={cn(
-                                "h-10 border-0 bg-slate-50/50 dark:bg-slate-900/50 rounded-xl text-sm font-black font-mono text-right px-4 focus-visible:ring-blue-500/20",
-                                !isEditing && "bg-transparent px-0 text-2xl text-blue-600 dark:text-blue-400"
-                            )}
-                        />
+                        {isEditing ? (
+                            <Input
+                                value={data.code}
+                                onChange={e => onChange('code', e.target.value)}
+                                placeholder="JL802"
+                                className="h-10 border-0 bg-slate-100/50 dark:bg-slate-900/50 rounded-xl text-sm font-black font-mono text-right px-4 focus-visible:ring-blue-500/20 w-full"
+                            />
+                        ) : (
+                            <div className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-wider font-mono text-right">
+                                {data.code || "-"}
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* 🎒 Traveler Information Grid (PNR / Terminal / Seat) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-slate-100/50 dark:border-slate-700/30">
-                    {/* PNR Column */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-slate-200/50 dark:border-slate-700/30">
+                    {/* PNR Column - Orange Theme */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-1">
-                            <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('confirmation_pnr')}</Label>
+                            <Label className="text-[10px] font-bold text-orange-600/60 dark:text-orange-400/60 uppercase tracking-widest">{t('confirmation_pnr')}</Label>
                             {isEditing && (
-                                <button onClick={() => onChange('pnrs', [...pnrs, ''])} className="text-[10px] font-bold text-blue-500 hover:text-blue-600 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                                <button onClick={() => onChange('pnrs', [...pnrs, ''])} className="text-[9px] font-black text-orange-600 hover:text-orange-700 transition-colors bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 rounded-md border border-orange-200/50">
                                     + ADD
                                 </button>
                             )}
                         </div>
                         <div className="space-y-2">
                             {pnrs.map((item, idx) => (
-                                <div key={idx} className="group/item flex items-center gap-2">
+                                <div key={idx} className="group/item relative">
                                     {isEditing ? (
-                                        <div className="flex-1 flex gap-1 items-center bg-slate-50 dark:bg-slate-900/30 p-1 rounded-lg border border-transparent focus-within:border-blue-200">
+                                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-orange-100 dark:border-orange-900/30 shadow-sm focus-within:ring-2 focus-within:ring-orange-500/10">
                                             <Input
                                                 value={item}
                                                 onChange={e => handleUpdateList('pnrs', idx, e.target.value)}
                                                 placeholder="PNR"
-                                                className="h-7 text-xs font-mono font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-2"
+                                                className="h-8 text-sm font-mono font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-3"
                                             />
-                                            <button onClick={() => onChange('pnrs', pnrs.filter((_, i) => i !== idx))} className="p-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                            <button onClick={() => onChange('pnrs', pnrs.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     ) : (
                                         <button
                                             onClick={() => handleCopy(item)}
-                                            className="w-full flex items-center justify-between p-4 rounded-2xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100/50 dark:border-orange-900/30 hover:bg-orange-100/50 transition-all text-left shadow-sm hover:shadow-md"
+                                            className="w-full flex items-center justify-between p-4 rounded-[1.25rem] bg-gradient-to-br from-orange-50/80 to-amber-50/50 dark:from-orange-950/20 dark:to-orange-900/10 border border-orange-200/60 dark:border-orange-900/40 hover:shadow-lg hover:shadow-orange-500/5 transition-all text-left group/btn overflow-hidden"
                                         >
-                                            <span className="text-2xl font-black font-mono text-orange-600 dark:text-orange-400 tracking-wider">
+                                            <div className="absolute top-0 right-0 p-1 opacity-10 group-hover/btn:opacity-20 transition-opacity">
+                                                <div className="w-12 h-12 border-4 border-orange-500 rounded-full flex items-center justify-center -rotate-12 translate-x-4 -translate-y-4">
+                                                    <span className="text-[8px] font-black">OK</span>
+                                                </div>
+                                            </div>
+                                            <span className="text-2xl font-black font-mono text-orange-600 dark:text-orange-400 tracking-[0.1em]">
                                                 {item || "-"}
                                             </span>
-                                            <Copy className="w-4 h-4 text-orange-300 group-hover/item:text-orange-500 transition-colors" />
+                                            <Copy className="w-4 h-4 text-orange-300 group-hover/btn:text-orange-500 transition-colors shrink-0" />
                                         </button>
                                     )}
                                 </div>
                             ))}
-                            {pnrs.length === 0 && !isEditing && <span className="text-sm text-slate-300 italic px-2">{t('no_pnr_set')}</span>}
+                            {pnrs.length === 0 && !isEditing && <span className="text-xs text-slate-400 italic font-medium px-2">{t('no_pnr_set')}</span>}
                         </div>
                     </div>
 
-                    {/* Terminal Column */}
+                    {/* Terminal Column - Indigo Theme */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-1">
-                            <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('terminal')}</Label>
+                            <Label className="text-[10px] font-bold text-indigo-600/60 dark:text-indigo-400/60 uppercase tracking-widest">{t('terminal')}</Label>
                             {isEditing && (
-                                <button onClick={() => onChange('terminals', [...terminals, ''])} className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 transition-colors bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-full">
+                                <button onClick={() => onChange('terminals', [...terminals, ''])} className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 transition-colors bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 rounded-md border border-indigo-200/50">
                                     + ADD
                                 </button>
                             )}
                         </div>
                         <div className="space-y-2">
                             {terminals.map((item, idx) => (
-                                <div key={idx} className="group/item flex items-center gap-2">
+                                <div key={idx} className="group/item">
                                     {isEditing ? (
-                                        <div className="flex-1 flex gap-1 items-center bg-slate-50 dark:bg-slate-900/30 p-1 rounded-lg border border-transparent focus-within:border-indigo-200">
+                                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-indigo-100 dark:border-indigo-900/30 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/10">
                                             <Input
                                                 value={item}
                                                 onChange={e => handleUpdateList('terminals', idx, e.target.value)}
                                                 placeholder="T1/T2"
-                                                className="h-7 text-xs font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-2"
+                                                className="h-8 text-sm font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-3"
                                             />
-                                            <button onClick={() => onChange('terminals', terminals.filter((_, i) => i !== idx))} className="p-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                            <button onClick={() => onChange('terminals', terminals.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     ) : (
-                                        <div className="w-full p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-700/30 border border-slate-100 dark:border-slate-600 text-center shadow-sm">
-                                            <span className="text-2xl font-black text-slate-700 dark:text-slate-200">{item || "-"}</span>
+                                        <div className="w-full p-4 rounded-[1.25rem] bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-800/30 text-center shadow-sm relative overflow-hidden group/term">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/40" />
+                                            <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">{item || "-"}</span>
                                         </div>
                                     )}
                                 </div>
                             ))}
-                            {terminals.length === 0 && !isEditing && <span className="text-sm text-slate-300 italic px-2">{t('no_terminal_set')}</span>}
+                            {terminals.length === 0 && !isEditing && <span className="text-xs text-slate-400 italic font-medium px-2">{t('no_terminal_set')}</span>}
                         </div>
                     </div>
 
-                    {/* Seat Column */}
+                    {/* Seat Column - Blue Theme */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-1">
-                            <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('seat_assignments')}</Label>
+                            <Label className="text-[10px] font-bold text-blue-600/60 dark:text-blue-400/60 uppercase tracking-widest">{t('seat_assignments')}</Label>
                             {isEditing && (
-                                <button onClick={() => onChange('seats', [...seats, ''])} className="text-[10px] font-bold text-blue-500 hover:text-blue-600 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                                <button onClick={() => onChange('seats', [...seats, ''])} className="text-[9px] font-black text-blue-600 hover:text-blue-700 transition-colors bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-md border border-blue-200/50">
                                     + ADD
                                 </button>
                             )}
                         </div>
                         <div className="space-y-2">
                             {seats.map((item, idx) => (
-                                <div key={idx} className="group/item flex items-center gap-2">
+                                <div key={idx} className="group/item">
                                     {isEditing ? (
-                                        <div className="flex-1 flex gap-1 items-center bg-slate-50 dark:bg-slate-900/30 p-1 rounded-lg border border-transparent focus-within:border-blue-200">
+                                        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-blue-100 dark:border-blue-900/30 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/10">
                                             <Input
                                                 value={item}
                                                 onChange={e => handleUpdateList('seats', idx, e.target.value)}
                                                 placeholder="12A"
-                                                className="h-7 text-xs font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-2"
+                                                className="h-8 text-sm font-bold bg-transparent border-0 shadow-none focus-visible:ring-0 px-3"
                                             />
-                                            <button onClick={() => onChange('seats', seats.filter((_, i) => i !== idx))} className="p-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                            <button onClick={() => onChange('seats', seats.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     ) : (
-                                        <div className="w-full p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100/50 dark:border-blue-900/30 text-center shadow-sm">
-                                            <span className="text-2xl font-black text-blue-600 dark:text-blue-300">{item || "-"}</span>
+                                        <div className="w-full p-4 rounded-[1.25rem] bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 text-center shadow-sm relative group/seat">
+                                            <div className="absolute top-2 right-2 flex gap-0.5 opacity-20">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-300" />
+                                            </div>
+                                            <span className="text-2xl font-black text-blue-700 dark:text-blue-300 tracking-tight">{item || "-"}</span>
                                         </div>
                                     )}
                                 </div>
                             ))}
-                            {seats.length === 0 && !isEditing && <span className="text-sm text-slate-300 italic px-2">{t('no_seats_set')}</span>}
+                            {seats.length === 0 && !isEditing && <span className="text-xs text-slate-400 italic font-medium px-2">{t('no_seats_set')}</span>}
                         </div>
                     </div>
                 </div>
