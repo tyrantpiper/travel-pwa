@@ -93,8 +93,8 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
 
                 {/* 📅 Date Header (Premium Symmetry & Typography) */}
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center mb-10 px-1">
-                    <div className="space-y-1.5 overflow-hidden">
-                        <Label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-[0.25em] pl-1 drop-shadow-sm">
+                    <div className="space-y-1.5 min-w-0">
+                        <Label className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] sm:tracking-[0.25em] pl-1 drop-shadow-sm whitespace-nowrap">
                             {t('departure_date')}
                         </Label>
                         {isEditing ? (
@@ -105,7 +105,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                 className="h-7 p-0 border-0 bg-transparent text-sm font-black shadow-none focus-visible:ring-0"
                             />
                         ) : (
-                            <div className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pl-1 leading-none">
+                            <div className="text-lg sm:text-base md:text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pl-1 leading-tight whitespace-nowrap overflow-visible">
                                 {data.dep_date || data.date || t('no_date')}
                             </div>
                         )}
@@ -118,8 +118,8 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                         </div>
                     </div>
 
-                    <div className="space-y-1.5 text-right overflow-hidden">
-                        <Label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.25em] pr-1 flex justify-end drop-shadow-sm">
+                    <div className="space-y-1.5 text-right min-w-0">
+                        <Label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] sm:tracking-[0.25em] pr-1 flex justify-end drop-shadow-sm whitespace-nowrap">
                             {t('arrival_date')}
                         </Label>
                         {isEditing ? (
@@ -132,7 +132,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                 />
                             </div>
                         ) : (
-                            <div className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pr-1 leading-none text-right">
+                            <div className="text-lg sm:text-base md:text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight pr-1 leading-tight text-right whitespace-nowrap overflow-visible">
                                 {data.arr_date || data.date || t('no_date')}
                             </div>
                         )}
@@ -145,32 +145,36 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                     <div className="relative group/dep">
                         <div className="absolute -inset-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl scale-95 opacity-0 group-hover/dep:opacity-100 group-hover/dep:scale-100 transition-all duration-300" />
                         <div className="relative">
-                            <Input
-                                disabled={!isEditing}
-                                value={data.dep_airport}
-                                onChange={e => onChange('dep_airport', e.target.value.toUpperCase())}
-                                className={cn(
-                                    "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent",
-                                    isEditing ? "text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center" : "text-5xl sm:text-6xl text-slate-900 dark:text-white"
-                                )}
-                                maxLength={3}
-                                placeholder="TPE"
-                            />
+                            {isEditing ? (
+                                <Input
+                                    value={data.dep_airport}
+                                    onChange={e => onChange('dep_airport', e.target.value.toUpperCase())}
+                                    className="border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center"
+                                    maxLength={3}
+                                    placeholder="TPE"
+                                />
+                            ) : (
+                                <div className="text-4xl sm:text-6xl font-black tracking-tighter leading-tight text-slate-900 dark:text-white h-fit overflow-visible">
+                                    {data.dep_airport || "TPE"}
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 mt-3">
                                 <div className="p-1 rounded-md bg-blue-100/50 dark:bg-blue-900/30">
                                     <Clock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                <Input
-                                    type={isEditing ? "time" : "text"}
-                                    disabled={!isEditing}
-                                    value={data.dep_time}
-                                    onChange={e => onChange('dep_time', e.target.value)}
-                                    className={cn(
-                                        "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all",
-                                        isEditing ? "text-xs font-semibold border-b border-blue-100 dark:border-blue-800 rounded-none w-full" : "text-2xl font-black text-slate-700 dark:text-slate-300"
-                                    )}
-                                    placeholder="00:00"
-                                />
+                                {isEditing ? (
+                                    <Input
+                                        type="time"
+                                        value={data.dep_time}
+                                        onChange={e => onChange('dep_time', e.target.value)}
+                                        className="h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all text-xs font-semibold border-b border-blue-100 dark:border-blue-800 rounded-none w-full"
+                                        placeholder="00:00"
+                                    />
+                                ) : (
+                                    <div className="text-xl sm:text-2xl font-black text-slate-700 dark:text-slate-300 leading-tight h-fit overflow-visible">
+                                        {data.dep_time || "00:00"}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -201,31 +205,35 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                     <div className="relative group/arr text-right">
                         <div className="absolute -inset-2 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl scale-95 opacity-0 group-hover/arr:opacity-100 group-hover/arr:scale-100 transition-all duration-300" />
                         <div className="relative">
-                            <div className="flex justify-end">
-                                <Input
-                                    disabled={!isEditing}
-                                    value={data.arr_airport}
-                                    onChange={e => onChange('arr_airport', e.target.value.toUpperCase())}
-                                    className={cn(
-                                        "border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right",
-                                        isEditing ? "text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center" : "text-5xl sm:text-6xl text-slate-900 dark:text-white"
-                                    )}
-                                    maxLength={3}
-                                    placeholder="NRT"
-                                />
-                            </div>
+                            {isEditing ? (
+                                <div className="flex justify-end">
+                                    <Input
+                                        value={data.arr_airport}
+                                        onChange={e => onChange('arr_airport', e.target.value.toUpperCase())}
+                                        className="border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center"
+                                        maxLength={3}
+                                        placeholder="NRT"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="text-4xl sm:text-6xl font-black tracking-tighter leading-tight text-slate-900 dark:text-white h-fit overflow-visible text-right">
+                                    {data.arr_airport || "NRT"}
+                                </div>
+                            )}
                             <div className="flex items-center justify-end gap-2 mt-3">
-                                <Input
-                                    type={isEditing ? "time" : "text"}
-                                    disabled={!isEditing}
-                                    value={data.arr_time}
-                                    onChange={e => onChange('arr_time', e.target.value)}
-                                    className={cn(
-                                        "h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all text-right",
-                                        isEditing ? "text-xs font-semibold border-b border-indigo-100 dark:border-indigo-800 rounded-none w-full" : "text-2xl font-black text-slate-700 dark:text-slate-300"
-                                    )}
-                                    placeholder="00:00"
-                                />
+                                {isEditing ? (
+                                    <Input
+                                        type="time"
+                                        value={data.arr_time}
+                                        onChange={e => onChange('arr_time', e.target.value)}
+                                        className="h-auto p-0 border-0 shadow-none focus-visible:ring-0 bg-transparent transition-all text-right text-xs font-semibold border-b border-indigo-100 dark:border-indigo-800 rounded-none w-full"
+                                        placeholder="00:00"
+                                    />
+                                ) : (
+                                    <div className="text-xl sm:text-2xl font-black text-slate-700 dark:text-slate-300 leading-tight h-fit overflow-visible text-right">
+                                        {data.arr_time || "00:00"}
+                                    </div>
+                                )}
                                 <div className="p-1 rounded-md bg-indigo-100/50 dark:bg-indigo-900/30">
                                     <Clock className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                                 </div>
