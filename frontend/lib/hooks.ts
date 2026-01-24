@@ -24,6 +24,7 @@ export function useTrips(userId: string | null) {
 export function useTripDetail(tripId: string | null, userId?: string | null, refreshInterval: number = 0) {
     // 🔧 FIX: Include userId in cache key to ensure refetch when userId changes
     // And only make the request when we have a valid userId to prevent unauthenticated fetches
+    // 🧠 2026 Normalization: userId is critical for privacy-aware caching
     const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
 
     const { data, error, mutate, isValidating } = useSWR(

@@ -70,10 +70,14 @@ async def get_public_trip_by_public_id(
         # 2. 抓該行程的所有細項 (公開資料，不過濾)
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
         
-        # 3. 整理成前端要的格式
+        # 3. 整理成前端要的格式 (含隱私過濾)
         days_map = {}
         if items_res.data:
             for item in items_res.data:
+                # 🛡️ 隱私過濾：公開分享連結絕對不顯示私人項目
+                if item.get("is_private", False):
+                    continue
+                    
                 d = item["day_number"]
                 if d not in days_map:
                     days_map[d] = []
@@ -240,10 +244,19 @@ async def get_trip_by_id(
         # 2. 抓該行程的所有細項 (按 time_slot 排序，確保符合時間軸)
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").order("sort_order").execute()
         
-        # 3. 整理成前端要的格式
+        # 3. 整理成前端要的格式 (含隱私過濾)
+        creator_id = trip.get("created_by")
         days_map = {}
         if items_res.data:
             for item in items_res.data:
+                # 🛡️ 隱私過濾邏輯：1. 公開 2. 自己是設定者 3. 自己是行程創立者
+                is_private = item.get("is_private", False)
+                owner_id = item.get("private_owner_id")
+                
+                if is_private and owner_id != user_id:
+                    # 🛡️ 絕對隱私：除了設定者以外，誰都不能看（包含創立者）
+                    continue
+                
                 d = item["day_number"]
                 if d not in days_map:
                     days_map[d] = []
@@ -264,34 +277,39 @@ async def get_trip_by_id(
                     "link_url": item.get("link_url"), 
                     "sub_items": item.get("sub_items") or [],
                     "image_url": item.get("image_url"),
-                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else []),  # 🆕 多圖片
-                    "hide_navigation": item.get("hide_navigation", False),  # 🆕 v4.8: 修正導航隱藏失效
-                    "is_private": item.get("is_private", False),            # 🆕 修正權限標記失效
-                    "private_owner_id": item.get("private_owner_id")
+                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else []),
+                    "hide_navigation": item.get("hide_navigation", False),
+                    "is_private": is_private,
+                    "private_owner_id": owner_id
                 })
         
-        # 🆕 隱私過濾輔助函數（修正版：使用 private_owner_id）
+        # 🆕 隱私過濾輔助函數（修正版：使用 private_owner_id + 創立者特權）
         def filter_private_items(items_dict: dict) -> dict:
-            """過濾私人項目：只有設定者本人可見"""
+            """過濾私人項目：只有設定者本人或行程創立者可見"""
             filtered = {}
+            # 取得該行程的創立者 (來自 trip 物件)
+            creator_id = trip.get("created_by")
+            
             for day_key, items_list in items_dict.items():
                 if isinstance(items_list, list):
-                    # 過濾掉私人項目（除非是自己設定的）
+                    # 通過條件：1. 公開 2. 自己是設定者 3. 自己是行程創立者
                     filtered[day_key] = [
                         item for item in items_list 
                         if not item.get("is_private") or  # 公開項目
-                           item.get("private_owner_id") == user_id  # 或是自己的私人項目
+                           item.get("private_owner_id") == user_id # 或是自己的私人項目
                     ]
                 else:
                     filtered[day_key] = items_list
             return filtered
 
         def filter_private_cards(cards: list) -> list:
-            """過濾私人信用卡：只有建立者本人可見"""
+            """過濾私人信用卡：只有建立者本人或行程創立者可見"""
             if not cards: return []
+            creator_id = trip.get("created_by")
             return [
                 card for card in cards
-                if card.get("is_public") or card.get("creator_id") == user_id
+                if card.get("is_public") or 
+                   card.get("creator_id") == user_id
             ]
         
         # 取得 content 並過濾
@@ -535,7 +553,10 @@ async def join_trip(request: JoinTripRequest, supabase=Depends(get_supabase)):
 
 
 @router.get("/itinerary/latest")
-async def get_latest_itinerary(supabase=Depends(get_supabase)):
+async def get_latest_itinerary(
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🔥 讀取最新行程 (給主畫面用)"""
     try:
         # 1. 抓最新的一個行程
@@ -549,33 +570,42 @@ async def get_latest_itinerary(supabase=Depends(get_supabase)):
         # 2. 抓該行程的所有細項 (按 sort_order 排序，支援拖曳)
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("sort_order").order("time_slot").execute()
         
-        # 3. 整理成前端要的格式
+        # 3. 整理成前端要的格式 (含隱私過濾)
+        creator_id = trip.get("created_by")
         days_map = {}
-        # ⚠️ 修正：如果 items_res.data 是空的 (手動建立時)，這裡迴圈不會跑，days_map 是空的
         if items_res.data:
             for item in items_res.data:
+                # 🛡️ 隱私過濾：主畫面只顯示公開或本人的項目
+                is_private = item.get("is_private", False)
+                owner_id = item.get("private_owner_id")
+                
+                if is_private and owner_id != user_id:
+                    # 🛡️ 絕對隱私：包含主畫面也嚴格過濾
+                    continue
+                    
                 d = item["day_number"]
                 if d not in days_map:
                     days_map[d] = []
                 
                 days_map[d].append({
-                    "id": item["id"],  # 👈 關鍵！補上這行，前端才知道要改哪一筆
+                    "id": item["id"],
                     "time": item["time_slot"][:5] if item["time_slot"] else "00:00",
                     "place": item["place_name"],
                     "original_name": item["original_name"],
                     "category": item["category"] or "sightseeing",
                     "desc": item["notes"],
-                    "memo": item.get("memo") or "",  # 👈 新增這行，讀取備忘錄
+                    "memo": item.get("memo") or "",
                     "lat": item["location_lat"],
                     "lng": item["location_lng"],
                     "cost": item["cost_amount"],
                     "reservation_code": item.get("reservation_code"),
                     "tags": item.get("tags", []),
-                    # 👇👇👇 補上這兩行！沒有這兩行，前端就是瞎子！
                     "link_url": item.get("link_url"), 
                     "sub_items": item.get("sub_items") or [],
-                    "image_url": item.get("image_url"),  # 🆕 圖片 URL
-                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else [])  # 🆕 多圖片
+                    "image_url": item.get("image_url"),
+                    "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else []),
+                    "is_private": is_private,
+                    "private_owner_id": owner_id
                 })
             
         # 轉成陣列

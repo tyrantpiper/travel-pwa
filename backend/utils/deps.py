@@ -61,6 +61,7 @@ async def get_verified_user(
             user_res = supabase.auth.get_user(token)
             if user_res and user_res.user:
                 verified_id = str(user_res.user.id)
+                print(f"🛡️ [Auth] Verified JWT for User: {verified_id}")
                 # 安全校驗：如果同時傳了 X-User-ID 但不吻合，視為偽造嘗試
                 if x_user_id and x_user_id != verified_id:
                     print(f"🚨 [Security] Identity Mismatch! Token: {verified_id} vs Header: {x_user_id}")
@@ -72,7 +73,9 @@ async def get_verified_user(
             
     # 2. 回落到 X-User-ID (維持目前的 UX 流暢度)
     if x_user_id:
-        # 這裡可以加入額外的校驗邏輯 (例如：檢查 ID 格式)
+        # 🧪 Debug Log: 追蹤 ID 來源
+        is_uuid = len(x_user_id) == 36 and "-" in x_user_id
+        print(f"👤 [Identity] Identifying via X-User-ID: {x_user_id} (IsUUID: {is_uuid})")
         return x_user_id
         
     raise HTTPException(status_code=401, detail="無法識別使用者身分")

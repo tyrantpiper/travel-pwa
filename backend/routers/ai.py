@@ -17,7 +17,7 @@ from models.base import (
     GenerateTripRequest, 
     SimplePromptRequest
 )
-from utils.deps import get_gemini_key
+from utils.deps import get_gemini_key, get_verified_user
 from utils.ai_config import PRIMARY_MODEL
 from services.geocode_service import geocode_place
 import uuid
@@ -442,6 +442,7 @@ async def generate_day_review(
     trip_id: str,
     day: int,
     request: Request,
+    user_id: str = Depends(get_verified_user),
     api_key: str = Depends(get_gemini_key),
     supabase=Depends(get_supabase)
 ):
@@ -471,9 +472,18 @@ async def generate_day_review(
         if not items_res.data or len(items_res.data) == 0:
             raise HTTPException(status_code=400, detail=f"Day {day} 沒有任何行程項目")
         
-        # 3. 格式化活動列表
+        # 3. 格式化活動列表 (🛡️ 隱私過濾：不餵給 AI 私人內容，除非是本人/創立者)
         activities_text = ""
         for item in items_res.data:
+            # 🛡️ 隱私檢查
+            is_private = item.get("is_private", False)
+            owner_id = item.get("private_owner_id")
+            creator_id = trip.get("created_by")
+            
+            if is_private and owner_id != user_id:
+                # 🛡️ 絕對隱私：除了本人外，AI 也不應該看到（包含創立者）
+                continue
+                
             time = item.get("time_slot", "")[:5] if item.get("time_slot") else "??:??"
             place = item.get("place_name", "未知地點")
             category = item.get("category", "")

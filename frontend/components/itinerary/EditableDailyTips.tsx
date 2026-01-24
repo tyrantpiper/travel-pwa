@@ -85,15 +85,24 @@ export default function EditableDailyTips({
     const [localCosts, setLocalCosts] = useState<CostItem[]>(costs || [])
     const [localTickets, setLocalTickets] = useState<TicketItem[]>(tickets || [])
 
-    // 🔧 FIX: Sync local state when props update (async data loading)
-    useEffect(() => { setLocalNotes(notes || []) }, [notes])
-    useEffect(() => { setLocalCosts(costs || []) }, [costs])
-    useEffect(() => { setLocalTickets(tickets || []) }, [tickets])
-
     // Adding state
     const [addingNote, setAddingNote] = useState(false)
     const [addingCost, setAddingCost] = useState(false)
     const [addingTicket, setAddingTicket] = useState(false)
+
+    // 🔧 FIX: Sync local state when props update (async data loading)
+    // 🛡️ L4 Protection: Skip sync if user is currently adding an item to prevent "Renew Overwrite"
+    useEffect(() => {
+        if (!addingNote) setLocalNotes(notes || [])
+    }, [notes, addingNote])
+
+    useEffect(() => {
+        if (!addingCost) setLocalCosts(costs || [])
+    }, [costs, addingCost])
+
+    useEffect(() => {
+        if (!addingTicket) setLocalTickets(tickets || [])
+    }, [tickets, addingTicket])
 
     // Forms
     const [newNote, setNewNote] = useState<NoteItem>({ icon: "⚠️", title: "", content: "" })
@@ -279,11 +288,12 @@ export default function EditableDailyTips({
         setProcessingCosts(prev => new Set(prev).add(idx))
 
         try {
-            const updated = localCosts.map((c, i) =>
+            const updated: CostItem[] = localCosts.map((c, i) =>
                 i === idx ? {
                     ...c,
                     is_private: !c.is_private,
-                    private_owner_id: !c.is_private ? userId : undefined
+                    // 🧠 Secure ID Assignment: Must use stable UUID
+                    private_owner_id: !c.is_private ? (userId || localStorage.getItem("user_uuid") || undefined) : undefined
                 } : c
             )
             if (await onUpdate("costs", updated)) {
@@ -378,11 +388,12 @@ export default function EditableDailyTips({
         setProcessingTickets(prev => new Set(prev).add(idx))
 
         try {
-            const updated = localTickets.map((t, i) =>
+            const updated: TicketItem[] = localTickets.map((t, i) =>
                 i === idx ? {
                     ...t,
                     is_private: !t.is_private,
-                    private_owner_id: !t.is_private ? userId : undefined
+                    // 🧠 Secure ID Assignment: Must use stable UUID
+                    private_owner_id: !t.is_private ? (userId || localStorage.getItem("user_uuid") || undefined) : undefined
                 } : t
             )
             if (await onUpdate("tickets", updated)) {

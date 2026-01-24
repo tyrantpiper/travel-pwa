@@ -37,12 +37,27 @@ export default function EditableDailyChecklist({
     const haptic = useHaptic()
     const [localItems, setLocalItems] = useState<ChecklistItem[]>(items || [])
 
+    const [isAdding, setIsAdding] = useState(false)
+    const [newItemText, setNewItemText] = useState("")
+    const [isUpdating, setIsUpdating] = useState(false)
+    // 🆕 Per-item processing state for anti-spam
+    const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
+    // 🆕 編輯模式狀態
+    const [isEditing, setIsEditing] = useState(false)
+    const [editData, setEditData] = useState<ChecklistItem[]>([])
+
+    // Debounce ref for toggle updates
+    const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+    // 🆕 Track pending optimistic updates to prevent useEffect from overwriting
+    const pendingUpdatesCount = useRef(0)
+
     // 🔧 FIX: Sync local items when props update (async data loading)
-    // 🆕 Skip sync when optimistic updates are pending to prevent flicker
+    // 🛡️ L4 Protection: Skip sync if user is currently adding an item or saving to prevent "Renew Overwrite"
     useEffect(() => {
-        if (pendingUpdatesCount.current > 0) return
+        if (pendingUpdatesCount.current > 0 || isAdding) return
         setLocalItems(items || [])
-    }, [items])
+    }, [items, isAdding])
 
     // 🆕 Cleanup: cancel debounce on unmount to prevent memory leak
     useEffect(() => {
@@ -52,24 +67,6 @@ export default function EditableDailyChecklist({
             }
         }
     }, [])
-
-    const [isAdding, setIsAdding] = useState(false)
-    const [newItemText, setNewItemText] = useState("")
-    const [isUpdating, setIsUpdating] = useState(false)
-
-    // 🆕 Per-item processing state for anti-spam
-    const [processingItems, setProcessingItems] = useState<Set<string>>(new Set())
-
-    // 🆕 編輯模式狀態
-    const [isEditing, setIsEditing] = useState(false)
-    const [editData, setEditData] = useState<ChecklistItem[]>([])
-
-    // Debounce ref for toggle updates
-    const debounceRef = useRef<NodeJS.Timeout | null>(null)
-
-    // 🆕 Track pending optimistic updates to prevent useEffect from overwriting
-    // Uses counter (not boolean) to handle multiple concurrent operations
-    const pendingUpdatesCount = useRef(0)
 
     // 生成 UUID
     const generateId = () => crypto.randomUUID()
@@ -186,11 +183,12 @@ export default function EditableDailyChecklist({
         haptic.tap()
         pendingUpdatesCount.current++  // 🆕 Mark update pending
         setProcessingItems(prev => new Set(prev).add(id))
-        const newItems = localItems.map(item =>
+        const newItems: ChecklistItem[] = localItems.map(item =>
             item.id === id ? {
                 ...item,
                 is_private: !item.is_private,
-                private_owner_id: !item.is_private ? userId : undefined
+                // 🧠 Secure ID Assignment: Must use stable UUID
+                private_owner_id: !item.is_private ? (userId || localStorage.getItem("user_uuid") || undefined) : undefined
             } : item
         )
         setLocalItems(newItems)
@@ -260,12 +258,14 @@ export default function EditableDailyChecklist({
     const totalCount = localItems.length
     const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
-    // 🆕 排序邏輯：已勾選項目移到最上面，保留組內原始順序
+    // 🆕 排序邏輯：1. 私人項目最優先, 2. 已勾選項目次優先, 3. 保持穩定原始順序
     const sortedItems = useMemo(() => {
         return [...localItems].sort((a, b) => {
-            // 已勾選在前
+            // 第一層：私人項目 (is_private) 最置頂
+            if (a.is_private !== b.is_private) return a.is_private ? -1 : 1
+            // 第二層：已勾選 (checked)
             if (a.checked !== b.checked) return a.checked ? -1 : 1
-            // 同組內保持原始順序 (依據在 localItems 中的位置)
+            // 第三層：保持穩定順序 (依據在 localItems 中的位置)
             return localItems.indexOf(a) - localItems.indexOf(b)
         })
     }, [localItems])
