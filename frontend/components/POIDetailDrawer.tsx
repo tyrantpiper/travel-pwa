@@ -10,6 +10,19 @@ import {
 import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
 
+export interface ClusterItem {
+    id?: string;
+    lat: number;
+    lng: number;
+    place: string;
+    number: number;
+    time?: string;
+    category?: string;
+    desc?: string;
+    notes?: string;
+    time_slot?: string;
+}
+
 // POI 基礎資料 (來自 OSM 向量圖層)
 export interface POIBasicData {
     name: string
@@ -22,6 +35,8 @@ export interface POIBasicData {
     opening_hours?: string
     photo_url?: string   // 🆕 Optional photo from external sources
     image_url?: string   // 🆕 Alternative image field
+    clusterItems?: ClusterItem[] // 🆕 Added for Cluster Support
+    number?: number      // 🆕 Added for Itinerary Sequence
 }
 
 // AI 增強資料
@@ -38,6 +53,8 @@ interface POIDetailDrawerProps {
     poi: POIBasicData | null
     onAddToItinerary: (poi: POIBasicData, time: string, aiSummary?: POIEnrichData) => void
     suggestedTime?: string  // 建議時間 (來自父組件計算)
+    isInternal?: boolean    // 🆕 是否在容器內部 (例如地圖內)
+    onSelectClusterItem?: (item: ClusterItem) => void // 🆕 點擊群聚項目
 }
 
 export default function POIDetailDrawer({
@@ -45,7 +62,9 @@ export default function POIDetailDrawer({
     onClose,
     poi,
     onAddToItinerary,
-    suggestedTime = "10:00"
+    suggestedTime = "10:00",
+    isInternal = false,
+    onSelectClusterItem
 }: POIDetailDrawerProps) {
     const haptic = useHaptic()
     const [aiData, setAiData] = useState<POIEnrichData | null>(null)
@@ -181,7 +200,7 @@ export default function POIDetailDrawer({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={onClose}
-                            className="fixed inset-0 bg-black/50 z-50"
+                            className={`${isInternal ? 'absolute' : 'fixed'} inset-0 bg-black/50 ${isInternal ? 'z-[40]' : 'z-[100]'}`}
                         />
                     )}
 
@@ -191,7 +210,7 @@ export default function POIDetailDrawer({
                         animate={{ y: 0 }}
                         exit={{ y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className={`fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 rounded-t-3xl shadow-2xl overflow-hidden transition-all ${isMinimized ? 'max-h-[120px]' : 'max-h-[80vh]'}`}
+                        className={`${isInternal ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 ${isInternal ? 'z-[50] border-t border-x border-slate-200 dark:border-slate-800' : 'z-[100] shadow-2xl'} bg-white dark:bg-slate-900 rounded-t-3xl overflow-hidden transition-all ${isMinimized ? 'max-h-[110px]' : (isInternal ? 'max-h-[70%]' : 'max-h-[85vh]')}`}
                     >
                         {/* 🆕 拖曳把手 - 點擊切換最小化 */}
                         <button
@@ -221,15 +240,65 @@ export default function POIDetailDrawer({
                                     <p className="text-xs text-slate-500 truncate">{poi.address || poi.type}</p>
                                 </div>
                             </div>
+                        ) : poi.type === 'cluster' ? (
+                            /* 🆕 CLUSTER LIST VIEW (2026 Selection Menu) */
+                            <div className="px-6 pb-8 space-y-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
+                                    <h3 className="text-lg font-black text-slate-900 dark:text-white">{poi.name}</h3>
+                                </div>
+                                <div className={`grid gap-2 overflow-y-auto ${isInternal ? 'max-h-[220px]' : 'max-h-[50vh]'} pr-1`}>
+                                    {poi.clusterItems?.map((item, idx) => (
+                                        <button
+                                            key={item.id || idx}
+                                            onClick={() => {
+                                                haptic.tap();
+                                                if (onSelectClusterItem) {
+                                                    onSelectClusterItem(item);
+                                                } else {
+                                                    onAddToItinerary({
+                                                        name: item.place,
+                                                        type: item.category || 'sightseeing',
+                                                        lat: item.lat,
+                                                        lng: item.lng,
+                                                        address: item.desc || item.notes
+                                                    }, item.time || "10:00");
+                                                }
+                                            }}
+                                            className="w-full text-left p-4 bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-2xl border border-slate-100 dark:border-slate-800 transition-all active:scale-[0.98] group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-indigo-500/20">
+                                                        {item.number}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{item.place}</div>
+                                                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.time || item.time_slot || '--:--'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="text-slate-300 group-hover:translate-x-1 transition-transform">→</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-slate-400 text-center italic">點擊上方行程以查看具體位置或快速加入</p>
+                            </div>
                         ) : (
-                            <div className="px-6 pb-6 space-y-4 overflow-y-auto max-h-[calc(80vh-60px)]">
+                            <div className={`px-6 pb-6 space-y-4 overflow-y-auto ${isInternal ? 'max-h-[240px]' : 'max-h-[calc(85vh-100px)]'}`}>
                                 {/* ========== Layer 1: OSM 骨架層 ========== */}
 
                                 {/* Header */}
                                 <div className="flex items-start gap-3">
-                                    <span className="text-3xl">{getTypeIcon(poi.type)}</span>
-                                    <div className="flex-1">
-                                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                                    {poi.number ? (
+                                        <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center text-sm font-black shadow-lg shadow-indigo-500/20 shrink-0">
+                                            {poi.number}
+                                        </div>
+                                    ) : (
+                                        <span className="text-3xl">{getTypeIcon(poi.type)}</span>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
                                             {poi.name}
                                         </h2>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">

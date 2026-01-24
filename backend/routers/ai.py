@@ -6,6 +6,7 @@ Note: Chat endpoints remain in main.py due to complex dependencies.
 """
 
 import json
+import asyncio
 from google import genai
 from google.genai import types
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -250,19 +251,25 @@ async def parse_markdown(
         
         items = parsed_data.get("items", [])
         
-        # 🌍 自動為沒有座標的地點做地理編碼
+        # 🌍 🆕 Parallel Geocoding with Concurrency Throttle (Semaphore)
         if items:
-            print(f"🌍 開始地理編碼 {len(items)} 個地點...")
-            geocoded_count = 0
-            for item in items:
+            print(f"🌍 Starting Parallel Geocoding for {len(items)} items...")
+            semaphore = asyncio.Semaphore(5)  # Limit concurrent requests to 5
+            
+            async def geocode_task(item):
                 place = item.get("place_name", "")
                 if place and not item.get("lat"):
-                    coords = await geocode_place(place)
-                    if coords:
-                        item["lat"] = coords["lat"]
-                        item["lng"] = coords["lng"]
-                        geocoded_count += 1
-            print(f"✅ 成功地理編碼 {geocoded_count} 個地點")
+                    async with semaphore:
+                        coords = await geocode_place(place)
+                        if coords:
+                            item["lat"] = coords["lat"]
+                            item["lng"] = coords["lng"]
+                            return True
+                return False
+
+            results = await asyncio.gather(*(geocode_task(item) for item in items))
+            geocoded_count = sum(1 for r in results if r)
+            print(f"✅ Successfully geocoded {geocoded_count} items in parallel")
         
         return {
             "status": "success",
@@ -393,19 +400,26 @@ async def ai_generate(
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         parsed_data = json.loads(cleaned_text)
         
-        # 🌍 自動為每個地點查詢經緯度
+        # 🌍 🆕 Parallel Geocoding with Concurrency Throttle (Semaphore)
         if "items" in parsed_data:
-            print(f"🌍 開始地理編碼 {len(parsed_data['items'])} 個地點...")
-            geocoded_count = 0
-            for item in parsed_data["items"]:
+            items = parsed_data["items"]
+            print(f"🌍 Starting Parallel Geocoding for {len(items)} items...")
+            semaphore = asyncio.Semaphore(5)
+            
+            async def geocode_task(item):
                 place = item.get("place_name", "")
                 if place and not item.get("lat"):
-                    coords = await geocode_place(place)
-                    if coords:
-                        item["lat"] = coords["lat"]
-                        item["lng"] = coords["lng"]
-                        geocoded_count += 1
-            print(f"✅ 成功地理編碼 {geocoded_count} 個地點")
+                    async with semaphore:
+                        coords = await geocode_place(place)
+                        if coords:
+                            item["lat"] = coords["lat"]
+                            item["lng"] = coords["lng"]
+                            return True
+                return False
+
+            results = await asyncio.gather(*(geocode_task(item) for item in items))
+            geocoded_count = sum(1 for r in results if r)
+            print(f"✅ Successfully geocoded {geocoded_count} items in parallel")
         
         return parsed_data
         

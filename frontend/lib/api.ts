@@ -34,6 +34,7 @@ export const API = {
     ROUTE: `${API_HOST}/api/route`,
     USERS: `${API_HOST}/api/users`,
     APP: `${API_HOST}/api/app`,
+    RESOLVE_LINK: `${API_HOST}/api/geocode/resolve-link`,
 }
 
 export { API_HOST }
@@ -455,6 +456,17 @@ export const geocodeApi = {
             return data
         }
         return parsed.data
+    },
+
+    /** 🧠 Resolve location from Google Maps Link (2026 Heuristic) */
+    resolveLink: async (url: string) => {
+        const res = await fetch(API.RESOLVE_LINK, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url })
+        })
+        if (!res.ok) throw new Error("Link resolution failed")
+        return res.json()
     },
 }
 

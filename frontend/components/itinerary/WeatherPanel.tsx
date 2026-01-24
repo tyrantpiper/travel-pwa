@@ -135,57 +135,66 @@ export function WeatherPanel({
                 )}
             </div>
 
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                        {weatherData.length > 0 ? (
-                            weatherData[0].code <= 3 ? <Sun className="w-5 h-5 text-amber-500" /> : <CloudRain className="w-5 h-5 text-blue-500" />
-                        ) : (
-                            <div className="w-5 h-5 bg-slate-200 animate-pulse rounded" />
-                        )}
-                    </div>
-                    <div>
-                        <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                            {resolvedLocation?.name || "未知地點"}
-                            {resolvedLocation && (
-                                <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded">
-                                    {resolvedLocation.lat.toFixed(2)}, {resolvedLocation.lng.toFixed(2)}
-                                </span>
-                            )}
-                        </h4>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5 mb-0.5">
-                            <Clock className="w-3 h-3" />
-                            {getNowInZone(currentTimezone)}
-                        </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">
+            <div className="space-y-4 mb-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                        <div className="p-2.5 bg-amber-100 dark:bg-amber-900/30 rounded-xl shrink-0 mt-0.5">
                             {weatherData.length > 0 ? (
-                                <>{Math.min(...weatherData.map(w => w.temp))}°C ~ {Math.max(...weatherData.map(w => w.temp))}°C</>
+                                weatherData[0].code <= 3 ? <Sun className="w-5 h-5 text-amber-500" /> : <CloudRain className="w-5 h-5 text-blue-500" />
+                            ) : (
+                                <div className="w-5 h-5 bg-slate-200 animate-pulse rounded" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2 leading-tight">
+                                <span className="break-words">{resolvedLocation?.name || "未知地點"}</span>
+                                {resolvedLocation && (
+                                    <span className="text-[9px] font-mono font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded inline-block">
+                                        {resolvedLocation.lat.toFixed(2)}, {resolvedLocation.lng.toFixed(2)}
+                                    </span>
+                                )}
+                            </h4>
+                            <div className="flex items-center gap-1.5 text-[9px] text-slate-400 font-mono mt-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {getNowInZone(currentTimezone)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                        <p className="text-sm font-black text-slate-700 dark:text-slate-200 font-mono">
+                            {weatherData.length > 0 ? (
+                                <>{Math.min(...weatherData.map(w => w.temp))}° / {Math.max(...weatherData.map(w => w.temp))}°</>
                             ) : (
                                 <span className="inline-block w-16 h-3 bg-slate-100 animate-pulse rounded" />
                             )}
                         </p>
                     </div>
                 </div>
-                <span className={`text-xs flex items-center gap-1 ml-2 shrink-0 ${weatherMode === 'live' ? 'text-green-500' :
-                    weatherMode === 'forecast' ? 'text-blue-500' :
-                        weatherMode === 'seasonal' ? 'text-purple-500' :
-                            'text-amber-500'
-                    }`}>
-                    <span className={`w-2 h-2 rounded-full ${weatherMode === 'live' ? 'bg-green-500 animate-pulse' :
-                        weatherMode === 'forecast' ? 'bg-blue-500' :
-                            weatherMode === 'seasonal' ? 'bg-purple-500' :
-                                'bg-amber-500'
-                        }`} />
-                    {weatherMode === 'live' && '即時天氣'}
-                    {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
-                    {weatherMode === 'seasonal' && '季節預報'}
-                    {weatherMode === 'trend' && '歷史同期參考'}
-                    {(weatherMode === 'seasonal' || weatherMode === 'trend') && (
-                        <span className="ml-1 text-[9px] text-slate-400">(趨勢僅供參考)</span>
-                    )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <span className={`text-[9px] font-bold flex items-center gap-1 px-1.5 py-0.5 rounded-full border transition-all duration-300 ${weatherMode === 'live' ? 'bg-green-50/80 border-green-200 text-green-600 shadow-sm' :
+                        weatherMode === 'forecast' ? 'bg-blue-50/80 border-blue-200 text-blue-600 shadow-sm' :
+                            weatherMode === 'seasonal' ? 'bg-purple-50/80 border-purple-200 text-purple-600 shadow-sm' :
+                                'bg-amber-50/80 border-amber-200 text-amber-600 shadow-sm'
+                        }`}>
+                        <span className={`w-1 h-1 rounded-full ${weatherMode === 'live' ? 'bg-green-500 animate-pulse' :
+                            weatherMode === 'forecast' ? 'bg-blue-500' :
+                                weatherMode === 'seasonal' ? 'bg-purple-500' :
+                                    'bg-amber-500'
+                            }`} />
+                        {weatherMode === 'live' && '即時天氣'}
+                        {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
+                        {weatherMode === 'seasonal' && '季節預報'}
+                        {weatherMode === 'trend' && '歷史同期參考'}
+                        {(weatherMode === 'seasonal' || weatherMode === 'trend') && (
+                            <span className="text-[7px] opacity-60">(觀望趨勢)</span>
+                        )}
+                    </span>
+
                     {weatherConfidence !== null && (
                         <span className={cn(
-                            "ml-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all duration-300",
+                            "px-1.5 py-0.5 rounded-full text-[9px] font-bold border transition-all duration-300",
                             weatherConfidence >= 80 ? "bg-green-50/80 border-green-200 text-green-600 shadow-sm" :
                                 weatherConfidence >= 50 ? "bg-amber-50/80 border-amber-200 text-amber-600" :
                                     "bg-red-50/80 border-red-200 text-red-600"
@@ -193,7 +202,7 @@ export function WeatherPanel({
                             信心度 {weatherConfidence}%
                         </span>
                     )}
-                </span>
+                </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-2">

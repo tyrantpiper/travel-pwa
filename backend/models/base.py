@@ -361,3 +361,8 @@ class UpdateProfileRequest(BaseModel):
     """更新使用者資料請求"""
     name: Optional[str] = None
     avatar_url: Optional[str] = None
+
+
+class ResolveLinkRequest(BaseModel):
+    """解析地圖連結請求"""
+    url: str

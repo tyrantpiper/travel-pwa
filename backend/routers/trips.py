@@ -91,6 +91,7 @@ async def get_public_trip_by_public_id(
                     "lng": item["location_lng"],
                     "image_url": item.get("image_url"),
                     "tags": item.get("tags", []),
+                    "link_url": item.get("link_url"),
                     "hide_navigation": item.get("hide_navigation", False)
                 })
         

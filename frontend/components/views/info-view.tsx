@@ -26,6 +26,7 @@ import { COUNTRY_REGIONS } from "@/lib/constants"
 import { tripsApi, geocodeApi } from "@/lib/api"
 import { useHaptic } from "@/lib/hooks"
 import { FlightCard } from "./info/FlightCard"
+import { extractCoordsFromUrl, isGoogleMapsShortlink } from "@/lib/location-utils"
 
 
 
@@ -83,6 +84,8 @@ export function InfoView() {
     const [hotelSearchResults, setHotelSearchResults] = useState<PlaceSearchResult[]>([])
     const [isHotelSearching, setIsHotelSearching] = useState(false)
     const [searchingHotelIdx, setSearchingHotelIdx] = useState<number | null>(null)
+    const [resolutionState, setResolutionState] = useState<{ idx: number | null, status: 'idle' | 'success' | 'fallback' | 'error' }>({ idx: null, status: 'idle' })
+    const [isResolvingHotel, setIsResolvingHotel] = useState(false)
     const [flightTab, setFlightTab] = useState<'outbound' | 'inbound'>('outbound')
     const [activeSection, setActiveSection] = useState("flights")
 
@@ -248,6 +251,47 @@ export function InfoView() {
         setHotelSearchQuery("")
         setSearchingHotelIdx(null)
         toast.success(`已選擇: ${place.name}`)
+    }
+
+    // 🧠 Magic Resolve for Hotel links
+    const handleResolveHotelLink = async (idx: number) => {
+        const hotel = hotels[idx]
+        if (!hotel?.link_url?.trim()) return
+
+        const url = hotel.link_url.trim()
+        haptic.tap()
+
+        // Tier 1: Regex
+        const extracted = extractCoordsFromUrl(url)
+        if (extracted.lat && extracted.lng) {
+            updateHotelFields(idx, { lat: extracted.lat, lng: extracted.lng })
+            setResolutionState({ idx, status: 'success' })
+            toast.success("已從連結提取座標")
+            return
+        }
+
+        // Tier 2: API
+        if (isGoogleMapsShortlink(url)) {
+            setIsResolvingHotel(true)
+            setResolutionState({ idx, status: 'idle' })
+            try {
+                const result = await geocodeApi.resolveLink(url)
+                if (result.success && result.lat && result.lng) {
+                    updateHotelFields(idx, { lat: result.lat, lng: result.lng })
+                    setResolutionState({ idx, status: result.method.includes('jit') ? 'fallback' : 'success' })
+                    toast.success(result.method.includes('jit') ? "已透過地名完成定位" : "已解析縮網址座標")
+                } else {
+                    setResolutionState({ idx, status: 'error' })
+                    toast.error("解析失敗，請手動搜尋地點")
+                }
+            } catch {
+                setResolutionState({ idx, status: 'error' })
+            } finally {
+                setIsResolvingHotel(false)
+            }
+        } else {
+            toast.info("此連結不包含可識別座標，請使用搜尋功能")
+        }
     }
 
 
@@ -452,15 +496,38 @@ export function InfoView() {
                                                                     {/* 🆕 Primary Address Input - Moved to main card for direct access */}
                                                                     {isEditing && (
                                                                         <div className="space-y-1 bg-amber-50/50 dark:bg-amber-900/10 p-2 rounded-lg border border-amber-100/50 dark:border-amber-800/50">
-                                                                            <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-bold">
-                                                                                <MapPin className="w-3 h-3" /> {t('primary_address') || "Primary Address / Nav Link"}
-                                                                            </Label>
-                                                                            <Input
-                                                                                className="h-8 text-xs font-mono bg-white dark:bg-slate-900 border-amber-100/50"
-                                                                                placeholder={t('primary_address_placeholder') || "Paste address or Google Maps link..."}
-                                                                                value={item.link_url || ""}
-                                                                                onChange={e => updateHotel(idx, 'link_url', e.target.value)}
-                                                                            />
+                                                                            <div className="flex justify-between items-center mb-1">
+                                                                                <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-bold">
+                                                                                    <MapPin className="w-3 h-3" /> {t('primary_address') || "Primary Address / Nav Link"}
+                                                                                </Label>
+                                                                                {resolutionState.idx === idx && (
+                                                                                    <div className="flex items-center gap-1.5">
+                                                                                        {isResolvingHotel && <Loader2 className="w-2.5 h-2.5 text-amber-500 animate-spin" />}
+                                                                                        {!isResolvingHotel && resolutionState.status === 'success' && <div className="text-[8px] bg-green-500 text-white px-1 rounded-sm uppercase font-black">Link Pin</div>}
+                                                                                        {!isResolvingHotel && resolutionState.status === 'fallback' && <div className="text-[8px] bg-amber-500 text-white px-1 rounded-sm uppercase font-black">AI PIN</div>}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex gap-2">
+                                                                                <Input
+                                                                                    className="h-8 text-xs font-mono bg-white dark:bg-slate-900 border-amber-100/50 flex-1"
+                                                                                    placeholder={t('primary_address_placeholder') || "Paste address or Google Maps link..."}
+                                                                                    value={item.link_url || ""}
+                                                                                    onChange={e => {
+                                                                                        updateHotel(idx, 'link_url', e.target.value)
+                                                                                        if (resolutionState.idx === idx) setResolutionState({ idx: null, status: 'idle' })
+                                                                                    }}
+                                                                                />
+                                                                                <Button
+                                                                                    size="sm"
+                                                                                    variant="secondary"
+                                                                                    disabled={isResolvingHotel || !item.link_url?.trim()}
+                                                                                    onClick={() => handleResolveHotelLink(idx)}
+                                                                                    className="h-8 px-3 bg-amber-100/80 hover:bg-amber-200 text-amber-700 border-none transition-all active:scale-95 text-[10px] font-bold"
+                                                                                >
+                                                                                    {isResolvingHotel && resolutionState.idx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析"}
+                                                                                </Button>
+                                                                            </div>
                                                                         </div>
                                                                     )}
                                                                     {/* Place Search - 全寬顯示 */}
@@ -703,6 +770,7 @@ export function InfoView() {
                                                     <Label className="text-[10px] text-slate-400 uppercase font-bold ml-1">{t('booking_id')}</Label>
                                                     <Input className="h-9 text-xs font-mono" value={tempHotel.booking_id} onChange={e => setTempHotel({ ...tempHotel, booking_id: e.target.value })} />
                                                 </div>
+
 
                                                 <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200">
                                                     <div className="space-y-0.5">

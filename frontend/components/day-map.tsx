@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
-import type { MapRef, LngLatBoundsLike } from "react-map-gl/maplibre"
+import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
 import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
+import { cn } from "@/lib/utils"
 
 // Activity 類型定義
 interface Activity {
@@ -20,8 +21,11 @@ interface Activity {
     lng?: number
     place?: string
     time?: string
+    time_slot?: string
     desc?: string
     category?: string
+    memo?: string
+    notes?: string
 }
 
 // Marker 必須有座標
@@ -34,6 +38,8 @@ interface MarkerData {
     desc?: string
     category?: string
     number: number
+    memo?: string
+    notes?: string
 }
 
 // 路線顏色對照
@@ -238,6 +244,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     const [searchResultMarker, setSearchResultMarker] = useState<{ lat: number; lng: number; name: string } | null>(null)
 
 
+
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
             alert("您的瀏覽器不支援定位功能")
@@ -395,15 +402,42 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         setPoiDrawerOpen(true)
     }, [addToHistory])
 
-    // 過濾出有座標的地點
-    const markers = activities
-        .filter((a): a is Activity & { lat: number; lng: number } =>
-            typeof a.lat === 'number' && typeof a.lng === 'number'
-        )
-        .map((a, index) => ({
-            ...a,
-            number: index + 1
-        })) as MarkerData[]
+    // 🆕 2026 Sequential Index Lock + Geometric Identity Clustering
+    // 算法描述：
+    // 1. 遍歷活動計算順序數字 (displayCounter)
+    // 2. 使用 ε-Logic (精度 0.0001, 約 11公尺) 進行地理群聚
+    const allMarkers: MarkerData[] = []
+    let displayCounter = 0
+
+    activities.forEach((a) => {
+        const isHeader = a.category === 'header' || (a.time || "00:00") === '00:00' || a.time_slot === '00:00'
+        if (!isHeader) {
+            displayCounter++
+            if (typeof a.lat === 'number' && typeof a.lng === 'number') {
+                allMarkers.push({
+                    ...a,
+                    lat: a.lat,
+                    lng: a.lng,
+                    number: displayCounter
+                })
+            }
+        }
+    })
+
+    // 🧠 ε-Clustering: 將極近距離的點歸類至同一個 Cluster
+    const groupedMarkers: { [key: string]: MarkerData[] } = {}
+    allMarkers.forEach(m => {
+        // 使用 4 位小數位作為 Key (~11m 精度)
+        const clusterKey = `${m.lat.toFixed(4)},${m.lng.toFixed(4)}`
+        if (!groupedMarkers[clusterKey]) groupedMarkers[clusterKey] = []
+        groupedMarkers[clusterKey].push(m)
+    })
+
+    // 將分群結果轉回陣列供渲染
+    const clusters = Object.values(groupedMarkers)
+
+    // 用於圖資管線的 Markers (維持原本邏輯，確保路線不斷裂)
+    const markers = allMarkers
 
     const markersKey = markers.map(m => `${m.lat},${m.lng}`).join('|')
     const { route, routeInfo, loading } = useRoute(markersKey, markers, mode)
@@ -579,60 +613,71 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         })
         console.log(`🌍 已將 ${chineseLayerCount} 個標籤圖層中文化`)
 
-        // 🆕 POI 點擊事件 (Progressive Intelligence Layer 1)
-        map.on('click', (e) => {
-            // 查詢點擊位置的 POI 圖層
-            const features = map.queryRenderedFeatures(e.point, {
-                layers: map.getStyle()?.layers
-                    ?.filter(l => l.id.includes('poi') || l.id.includes('label'))
-                    .map(l => l.id) || []
+        // 🆕 POI Hover 游標優化 (移至 onLoad)
+        const updateCursor = () => {
+            const currentMap = mapRef.current?.getMap()
+            if (!currentMap) return
+            const poiLayers = currentMap.getStyle()?.layers
+                ?.filter(l => l.id.includes('poi') || l.id.includes('label'))
+                .map(l => l.id) || []
+
+            poiLayers.forEach(layerId => {
+                currentMap.on('mouseenter', layerId, () => {
+                    currentMap.getCanvas().style.cursor = 'pointer'
+                })
+                currentMap.on('mouseleave', layerId, () => {
+                    currentMap.getCanvas().style.cursor = ''
+                })
             })
+        }
+        updateCursor()
+    }, [])
 
-            if (features.length > 0) {
-                const feature = features[0]
-                const props = feature.properties || {}
-                const coords = feature.geometry.type === 'Point'
-                    ? (feature.geometry as GeoJSON.Point).coordinates
-                    : [e.lngLat.lng, e.lngLat.lat]
+    // 🆕 2026 Logic: 統一地圖點擊處理 (Base Map POIs)
+    const handleMapClick = useCallback((e: MapLayerMouseEvent) => {
+        const map = mapRef.current?.getMap()
+        if (!map) return
 
-                // 構建 POI 基礎資料
-                // 🌍 中文名稱優先級
-                const getName = () => {
-                    for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
-                        if (props[key]) return props[key]
-                    }
-                    return '未知地點'
+        // 查詢點擊位置的 POI (使用 5px 緩衝區增加命中率)
+        const bbox: [[number, number], [number, number]] = [
+            [e.point.x - 5, e.point.y - 5],
+            [e.point.x + 5, e.point.y + 5]
+        ]
+
+        const features = map.queryRenderedFeatures(bbox, {
+            layers: map.getStyle()?.layers
+                ?.filter(l => l.type === 'symbol' && l.layout?.['text-field'])
+                .map(l => l.id) || []
+        })
+
+        if (features && features.length > 0) {
+            const feature = features[0]
+            const props = feature.properties || {}
+            const coords = feature.geometry.type === 'Point'
+                ? (feature.geometry as GeoJSON.Point).coordinates
+                : [e.lngLat.lng, e.lngLat.lat]
+
+            const getName = () => {
+                for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
+                    if (props[key]) return props[key]
                 }
-
-                const poiData: POIBasicData = {
-                    name: getName(),
-                    type: props.class || props.subclass || props.type || 'place',
-                    lat: coords[1] as number,
-                    lng: coords[0] as number,
-                    address: props.address || props.addr_street,
-                    phone: props.phone,
-                    website: props.website,
-                    opening_hours: props.opening_hours
-                }
-
-                setSelectedPOI(poiData)
-                setPoiDrawerOpen(true)
+                return props.name || '未知地點'
             }
-        })
 
-        // 🆕 POI Hover 游標優化
-        const poiLayers = map.getStyle()?.layers
-            ?.filter(l => l.id.includes('poi') || l.id.includes('label'))
-            .map(l => l.id) || []
+            const poiData: POIBasicData = {
+                name: getName(),
+                type: props.class || props.subclass || props.type || 'place',
+                lat: coords[1],
+                lng: coords[0],
+                address: props.address || props.addr_street || props['addr:full'],
+                phone: props.phone || props['contact:phone'],
+                website: props.website || props['contact:website'],
+                opening_hours: props.opening_hours
+            }
 
-        poiLayers.forEach(layerId => {
-            map.on('mouseenter', layerId, () => {
-                map.getCanvas().style.cursor = 'pointer'
-            })
-            map.on('mouseleave', layerId, () => {
-                map.getCanvas().style.cursor = ''
-            })
-        })
+            setSelectedPOI(poiData)
+            setPoiDrawerOpen(true)
+        }
     }, [])
 
     // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
@@ -703,7 +748,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             </div>
 
             {/* 地圖容器 - 全裝置統一加大 h-[480px]，防止捲動干擾 + 消除震動 */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[480px] w-full z-0 relative touch-none overscroll-none">
+            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[480px] w-full z-0 relative overscroll-none">
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}
@@ -888,6 +933,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
+                    onClick={(e) => {
+                        // 防止點擊 UI 時觸發地圖點擊
+                        if ((e.originalEvent.target as HTMLElement).closest('button')) return
+                        handleMapClick(e)
+                    }}
                     attributionControl={false}
                     minZoom={3}
                     maxZoom={20}
@@ -944,41 +994,98 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         </Source>
                     )}
 
-                    {/* 標記點 */}
-                    {markers.map((m, idx) => {
-                        const isFirst = idx === 0
-                        const isLast = idx === markers.length - 1
-                        const color = isFirst ? "#22c55e" : isLast ? "#ef4444" : "#0f172a"
+                    {/* 🆕 2026 Stacked Deck Rendering Engine */}
+                    {clusters.map((cluster, cIdx) => {
+                        const isCluster = cluster.length > 1
+                        const m = cluster[0] // 主標記
+                        const isFirst = allMarkers.findIndex(am => am.id === m.id) === 0
+                        const isLast = allMarkers.findIndex(am => am.id === m.id) === allMarkers.length - 1
+                        const color = isCluster ? "#6366f1" : (isFirst ? "#22c55e" : isLast ? "#ef4444" : "#0f172a")
 
                         return (
                             <Marker
-                                key={m.id || `marker-${idx}`}
+                                key={`cluster-${cIdx}-${m.id || cIdx}`}
                                 longitude={m.lng}
                                 latitude={m.lat}
-                                anchor="center"
+                                anchor="bottom"
                                 onClick={(e) => {
                                     e.originalEvent.stopPropagation()
-                                    setPopupInfo(m)
+                                    if (isCluster) {
+                                        setSelectedPOI({
+                                            name: `${cluster.length} 個行程於此`,
+                                            type: "cluster",
+                                            lat: m.lat,
+                                            lng: m.lng,
+                                            address: cluster.map(item => `[${item.number}] ${item.place}`).join(' | '),
+                                            // @ts-expect-error: Custom property for Clustering
+                                            clusterItems: cluster
+                                        })
+                                        setPoiDrawerOpen(true)
+                                    } else {
+                                        setPopupInfo(m)
+                                    }
                                 }}
                             >
-                                <div
-                                    style={{
-                                        backgroundColor: color,
-                                        color: "white",
-                                        width: 28,
-                                        height: 28,
-                                        borderRadius: "50%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontWeight: "bold",
-                                        border: "3px solid white",
-                                        boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-                                        fontSize: 12,
-                                        cursor: "pointer"
-                                    }}
-                                >
-                                    {m.number}
+                                <div className="flex flex-col items-center group cursor-pointer relative">
+                                    <AnimatePresence>
+                                        {m.place && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 5, scale: 0.9 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.8 }}
+                                                className="mb-1.5 px-2 py-0.5 bg-white/85 dark:bg-slate-900/90 backdrop-blur-md border border-white/60 dark:border-slate-800 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] pointer-events-none z-20"
+                                            >
+                                                <span className="text-[10px] font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap block max-w-[120px] truncate">
+                                                    {m.place} {isCluster && <span className="text-indigo-500 ml-1">(+{cluster.length - 1})</span>}
+                                                </span>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {/* 📍 IDENTITY PIN(S) */}
+                                    <div className="relative h-7 w-7 flex items-center justify-center">
+                                        {/* 🎨 [BACK] Stack Layers Visual Effect */}
+                                        {isCluster && (
+                                            <>
+                                                <div className="absolute top-[-3px] left-[3px] w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-700 border-2 border-white dark:border-slate-800 opacity-60 scale-95" />
+                                                <div className="absolute top-[-1.5px] left-[1.5px] w-6 h-6 rounded-full bg-slate-400 dark:bg-slate-600 border-2 border-white dark:border-slate-800 opacity-80" />
+                                            </>
+                                        )}
+
+                                        {/* 📍 [FRONT] Main Numeric Identity Pin */}
+                                        <div
+                                            className={cn(
+                                                "relative z-10 transition-all duration-300",
+                                                "group-hover:scale-125 group-hover:-translate-y-1 active:scale-95 shadow-xl",
+                                                isCluster ? "ring-2 ring-indigo-500/30 rounded-full" : ""
+                                            )}
+                                            style={{
+                                                backgroundColor: color,
+                                                color: "white",
+                                                width: 26,
+                                                height: 26,
+                                                borderRadius: "50%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontWeight: "black",
+                                                border: "2.5px solid white",
+                                                boxShadow: isCluster ? "0 4px 15px rgba(99, 102, 241, 0.4)" : "0 4px 12px rgba(0,0,0,0.25)",
+                                                fontSize: 11,
+                                            }}
+                                        >
+                                            {isCluster ? `${m.number}..` : m.number}
+                                            {/* Pin Pointer */}
+                                            <div
+                                                className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0"
+                                                style={{
+                                                    borderLeft: '4px solid transparent',
+                                                    borderRight: '4px solid transparent',
+                                                    borderTop: `6px solid ${color}`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </Marker>
                         )
@@ -1044,58 +1151,80 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                 >
                                     📍 在 Google Maps 開啟導航
                                 </a>
+
+                                {/* 🆕 2026 Bridge: See More (Open Detail Drawer) */}
+                                <button
+                                    onClick={() => {
+                                        const marker = popupInfo
+                                        setSelectedPOI({
+                                            name: marker.place || '行程地點',
+                                            type: marker.category || 'sightseeing',
+                                            lat: marker.lat,
+                                            lng: marker.lng,
+                                            address: marker.desc || marker.memo,
+                                            number: marker.number
+                                        })
+                                        setPoiDrawerOpen(true)
+                                        setPopupInfo(null) // 關閉 Popup
+                                    }}
+                                    className="w-full mt-3 py-2 px-3 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100 transition-colors border border-indigo-100/50"
+                                >
+                                    <span>✨ 查看更多內容</span>
+                                </button>
                             </div>
                         </Popup>
                     )}
                 </Map>
-            </div>
 
-            {/* 圖例 */}
-            <div className="flex items-center justify-center gap-4 text-[10px] text-slate-400">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> 起點</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-800"></span> 途經</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 終點</span>
-                {mapMode === 'satellite' && <span className="flex items-center gap-1">🛰️ 衛星模式</span>}
-            </div>
-
-
-
-            {/* 🆕 POI Detail Drawer (Progressive Intelligence) */}
-            <POIDetailDrawer
-                isOpen={poiDrawerOpen}
-                onClose={() => setPoiDrawerOpen(false)}
-                poi={selectedPOI}
-                suggestedTime={(() => {
-                    // 智慧時間計算：最後活動 +1.5 小時
-                    if (activities.length > 0) {
-                        const lastActivity = activities[activities.length - 1]
-                        if (lastActivity.time) {
-                            const [h, m] = lastActivity.time.split(":").map(Number)
-                            const totalMinutes = h * 60 + m + 90
-                            const newH = Math.min(23, Math.floor(totalMinutes / 60))
-                            const newM = totalMinutes % 60
-                            return `${newH.toString().padStart(2, "0")}:${newM.toString().padStart(2, "0")}`
+                {/* 🆕 POI Detail Drawer (Moved INSIDE container for Local Containment) */}
+                <POIDetailDrawer
+                    isOpen={poiDrawerOpen}
+                    onClose={() => setPoiDrawerOpen(false)}
+                    poi={selectedPOI}
+                    isInternal={true}
+                    suggestedTime={(() => {
+                        // 智慧時間計算：最後活動 +1.5 小時
+                        if (activities.length > 0) {
+                            const lastActivity = activities[activities.length - 1]
+                            if (lastActivity.time) {
+                                const [h, m] = lastActivity.time.split(":").map(Number)
+                                const totalMinutes = h * 60 + m + 90
+                                const newH = Math.min(23, Math.floor(totalMinutes / 60))
+                                const newM = totalMinutes % 60
+                                return `${newH.toString().padStart(2, "0")}:${newM.toString().padStart(2, "0")}`
+                            }
                         }
-                    }
-                    return "10:00"
-                })()}
-                onAddToItinerary={(poi, time, aiSummary) => {
-                    // 調用父層 callback
-                    if (onAddPOI) {
-                        const notes = aiSummary
-                            ? `${aiSummary.summary}\n必點: ${aiSummary.must_try?.join(', ') || ''}`
-                            : undefined
-                        onAddPOI(poi, time, notes)
-                    } else {
-                        console.log('📍 Add to itinerary:', poi, time)
-                        if (aiSummary) {
-                            console.log('🧠 AI Summary:', aiSummary)
+                        return "10:00"
+                    })()}
+                    onAddToItinerary={(poi, time, aiSummary) => {
+                        if (onAddPOI) {
+                            const notes = aiSummary
+                                ? `${aiSummary.summary}\n必點: ${aiSummary.must_try?.join(', ') || ''}`
+                                : undefined
+                            onAddPOI(poi, time, notes)
                         }
-                    }
-                    // 🆕 清除搜尋標記
-                    setSearchResultMarker(null)
-                }}
-            />
-        </div>
+                        setSearchResultMarker(null)
+                    }}
+                    onSelectClusterItem={(item) => {
+                        // 🧠 點擊群聚項目：聚焦地圖並顯示單點細節
+                        mapRef.current?.flyTo({
+                            center: [item.lng, item.lat],
+                            zoom: 17,
+                            duration: 1200
+                        })
+
+                        setSelectedPOI({
+                            name: item.place,
+                            type: item.category || 'sightseeing',
+                            lat: item.lat,
+                            lng: item.lng,
+                            address: item.desc || item.notes,
+                            number: item.number
+                        })
+                        // 注意：這裡不關閉 Drawer，而是切換它進入單點顯示模式 (POIDetailDrawer 內部會自動切換，因為 poi.type 不再是 'cluster')
+                    }}
+                />
+            </div>
+        </div >
     )
 }

@@ -10,8 +10,10 @@ from services.geocode_service import (
     smart_geocode_logic,
     reverse_geocode_with_photon,
     reverse_geocode_with_ai_enhancement,  # 🆕 AI 增強版
-    log_debug
+    log_debug,
+    geocode_place # 🆕 用於 Tier 3 Fallback
 )
+from services.link_resolver import resolve_google_maps_link # 🆕 Link-to-Pin 核心
 from utils.limiter import limiter
 
 router = APIRouter(prefix="/api/geocode", tags=["geocode"])
@@ -63,3 +65,29 @@ async def geocode_reverse(request: Request, body: GeocodeReverseRequest):
         return {"success": True, **result}
     
     return {"success": False, "name": "Unknown", "address": ""}
+
+
+@router.post("/resolve-link")
+@limiter.limit("20/minute")
+async def geocode_resolve_link(request: Request, body: dict):
+    """🆕 Heuristic Link-to-Pin Engine (2026)
+    
+    解析 Google Maps 連結並提取座標或語意關鍵字。
+    """
+    url = body.get("url")
+    if not url:
+        return {"success": False, "error": "No URL provided"}
+        
+    # Tier 1 & 2: Redirect + Regex
+    result = await resolve_google_maps_link(url)
+    
+    # Tier 3: Semantic Fallback (If logic allows)
+    if not result.get("lat") and result.get("query"):
+        # 如果只有文字沒有座標，嘗試自動 Geocode (JIT Resolution)
+        geo = await geocode_place(result["query"])
+        if geo:
+            result["lat"] = geo["lat"]
+            result["lng"] = geo["lng"]
+            result["method"] = f"{result['method']}+jit_geocode"
+            
+    return {"success": True, **result}

@@ -940,8 +940,12 @@ export function ItineraryView() {
             lat: item.lat,
             lng: item.lng,
             image_url: item.image_url,
-            image_urls: item.image_urls || [], // 🆕 Restore Audit 3.0: Multi-image support
-            tags: item.tags || []
+            image_urls: item.image_urls || [],
+            tags: item.tags || [],
+            link_url: item.link_url || "",
+            reservation_code: item.reservation_code || "",
+            cost: item.cost,
+            hide_navigation: !!item.hide_navigation
         })
         setIsEditOpen(true)
     }, [isOnline])

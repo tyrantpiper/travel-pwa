@@ -228,7 +228,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                 <Plane className="w-5 h-5 text-blue-500/60 rotate-90" />
                             </motion.div>
                         </div>
-                        <div className="mt-4 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] font-mono">
+                        <div className="mt-4 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] font-mono whitespace-nowrap">
                             Non-Stop
                         </div>
                     </div>

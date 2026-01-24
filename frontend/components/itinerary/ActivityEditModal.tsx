@@ -14,7 +14,8 @@ import { ItineraryItemState, LocationInfo, DailyLocation, GeocodeResult } from "
 import { geocodeApi } from "@/lib/api"
 import { useHaptic } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
-import { X } from "lucide-react"
+import { X, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
+import { extractCoordsFromUrl, isGoogleMapsShortlink } from "@/lib/location-utils"
 
 const ACTIVITY_CATEGORIES = [
     { id: 'sightseeing', icon: '🎯', label: '景點' },
@@ -62,6 +63,8 @@ export function ActivityEditModal({
     const [searchRegion, setSearchRegion] = useState("")
     const [placeSearchResults, setPlaceSearchResults] = useState<LocationInfo[]>([])
     const [isSearching, setIsSearching] = useState(false)
+    const [isResolvingLink, setIsResolvingLink] = useState(false)
+    const [resolveStatus, setResolveStatus] = useState<'idle' | 'success' | 'fallback' | 'error'>('idle')
     const haptic = useHaptic()
     const { t } = useLanguage()
 
@@ -94,6 +97,52 @@ export function ActivityEditModal({
             })))
         } catch { toast.error('搜尋失敗') }
         finally { setIsSearching(false) }
+    }
+
+    // 🧠 Heuristic Link-to-Pin Resolution
+    const handleLinkBlur = async () => {
+        if (!editItem?.link_url?.trim()) return
+        const url = editItem.link_url.trim()
+
+        // ⚡ Tier 1: Client-side Regex (Zero Latency)
+        const extracted = extractCoordsFromUrl(url)
+        if (extracted.lat && extracted.lng) {
+            console.log(`⚡ Tier 1 Resolve: ${extracted.method}`)
+            updateCoords(extracted.lat, extracted.lng)
+            setResolveStatus('success')
+            toast.success("已從連結自動提取座標")
+            return
+        }
+
+        // 🌐 Tier 2: Backend Redirect Proxy (for Shortlinks)
+        if (isGoogleMapsShortlink(url)) {
+            setIsResolvingLink(true)
+            setResolveStatus('idle')
+            try {
+                const result = await geocodeApi.resolveLink(url)
+                if (result.success && result.lat && result.lng) {
+                    updateCoords(result.lat, result.lng)
+                    setResolveStatus(result.method.includes('jit') ? 'fallback' : 'success')
+                    toast.success(result.method.includes('jit') ? "已透過地名語意自動定位" : "已完成縮網址座標解析")
+                } else {
+                    setResolveStatus('error')
+                }
+            } catch (e) {
+                console.error("Link Resolution Error:", e)
+                setResolveStatus('error')
+            } finally {
+                setIsResolvingLink(false)
+            }
+        }
+    }
+
+    const updateCoords = (lat: number | string, lng: number | string) => {
+        if (!editItem) return
+        setEditItem({
+            ...editItem,
+            lat: lat,
+            lng: lng
+        })
     }
 
     const handleSelectLocation = (loc: LocationInfo) => {
@@ -282,15 +331,43 @@ export function ActivityEditModal({
 
                     {/* Primary Link - Priority Moved Up */}
                     <div className="space-y-1.5 bg-amber-50/50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
-                        <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
-                            🚀 {t('primary_address') || "Primary Address / Nav Link"}
-                        </Label>
-                        <Input
-                            placeholder="https://... or raw address"
-                            className="text-xs bg-white dark:bg-slate-900 border-amber-100"
-                            value={editItem.link_url || ''}
-                            onChange={(e) => setEditItem({ ...editItem, link_url: e.target.value })}
-                        />
+                        <div className="flex justify-between items-center mb-1">
+                            <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
+                                🚀 {t('primary_address') || "Primary Address / Nav Link"}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                {isResolvingLink && <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />}
+                                {!isResolvingLink && resolveStatus === 'success' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                                {!isResolvingLink && resolveStatus === 'fallback' && (
+                                    <div className="flex items-center gap-1 text-[9px] text-amber-600 font-bold">
+                                        <AlertCircle className="w-3 h-3" />
+                                        語意定位
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="https://... or raw address"
+                                className="text-xs bg-white dark:bg-slate-900 border-amber-100 flex-1"
+                                value={editItem.link_url || ''}
+                                onChange={(e) => {
+                                    setEditItem({ ...editItem, link_url: e.target.value })
+                                    setResolveStatus('idle')
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={isResolvingLink || !editItem.link_url?.trim()}
+                                onClick={handleLinkBlur} // Re-using handleLinkBlur as the manual trigger
+                                className="h-9 px-3 bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-none transition-all active:scale-95"
+                            >
+                                {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析"}
+                            </Button>
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-1">💡 貼上連結後點擊「解析」以自動獲取地圖座標</p>
                     </div>
 
                     {/* Notes */}
