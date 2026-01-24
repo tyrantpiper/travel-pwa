@@ -24,7 +24,7 @@ import { ZenRenew } from "@/components/ui/zen-renew"
 import { toast } from "sonner"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { tripsApi, geocodeApi } from "@/lib/api"
-import { useHaptic } from "@/lib/hooks"
+import { useHaptic, useTripDetail } from "@/lib/hooks"
 import { FlightCard } from "./info/FlightCard"
 import { extractCoordsFromUrl, isGoogleMapsShortlink } from "@/lib/location-utils"
 
@@ -61,9 +61,12 @@ interface PlaceSearchResult {
 
 export function InfoView() {
     const { t } = useLanguage()
-    const { activeTripId, activeTrip, mutate: tripMutate } = useTripContext()
+    const { activeTripId, activeTrip, mutate: tripMutate, userId } = useTripContext()
     const haptic = useHaptic()
     const [isEditing, setIsEditing] = useState(false)
+
+    // 🚀 SWR Hook for Caching & Sync
+    const { trip: activeTripData, mutate: reloadTripDetail } = useTripDetail(activeTripId, userId)
 
     const [flights, setFlights] = useState(DEFAULT_FLIGHTS)
     const [hotels, setHotels] = useState<Hotel[]>([DEFAULT_HOTEL])
@@ -106,57 +109,43 @@ export function InfoView() {
         handleSave() // Sync to backend
     }
 
+    // 🔄 Sync SWR Data to Local State (Hybrid Mode)
+    // Only update when switching trips or initial load, NOT while user is editing
     useEffect(() => {
-        const fetchInfo = async () => {
-            if (!activeTripId) {
-                setFlights(DEFAULT_FLIGHTS)
-                setHotels([DEFAULT_HOTEL])
-                return
-            }
-            try {
-                const userId = localStorage.getItem("user_uuid") || ""
-                const data = await tripsApi.get(activeTripId, userId)
-                if (data) {
-                    if (data.flight_info?.outbound) {
-                        setFlights({
-                            outbound: { ...DEFAULT_FLIGHTS.outbound, ...data.flight_info.outbound },
-                            inbound: { ...DEFAULT_FLIGHTS.inbound, ...data.flight_info.inbound }
-                        })
-                    } else {
-                        setFlights(DEFAULT_FLIGHTS)
-                    }
-                    const hData = data.hotel_info || {}
-                    const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
-                        .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
-                    setHotels(parsedHotels)
-                }
-            } catch (e) { console.error(e) }
+        if (!activeTripId) {
+            setFlights(DEFAULT_FLIGHTS)
+            setHotels([DEFAULT_HOTEL])
+            return
         }
-        fetchInfo()
-    }, [activeTripId])
+
+        // If we are editing, don't overwrite user's work with background revalidations
+        if (isEditing) return
+
+        if (activeTripData) {
+            if (activeTripData.flight_info?.outbound) {
+                setFlights({
+                    outbound: { ...DEFAULT_FLIGHTS.outbound, ...activeTripData.flight_info.outbound },
+                    inbound: { ...DEFAULT_FLIGHTS.inbound, ...activeTripData.flight_info.inbound }
+                })
+            } else {
+                setFlights(DEFAULT_FLIGHTS)
+            }
+            const hData = activeTripData.hotel_info || {}
+            const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
+                .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
+            setHotels(parsedHotels)
+        }
+    }, [activeTripData, activeTripId, isEditing])
 
     // 獨立的刷新函數供 ZenRenew 使用
     const refreshInfo = async () => {
         if (!activeTripId) return
         try {
-            const userId = localStorage.getItem("user_uuid") || ""
-            const data = await tripsApi.get(activeTripId, userId)
-            if (data) {
-                if (data.flight_info?.outbound) {
-                    setFlights({
-                        outbound: { ...DEFAULT_FLIGHTS.outbound, ...data.flight_info.outbound },
-                        inbound: { ...DEFAULT_FLIGHTS.inbound, ...data.flight_info.inbound }
-                    })
-                }
-                const hData = data.hotel_info || {}
-                const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
-                    .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
-                setHotels(parsedHotels)
-                await tripMutate() // 🔄 Refresh global context
-            }
+            await reloadTripDetail() // 🔄 Check server
+            await tripMutate() // 🔄 Refresh global context
         } catch (e) {
             console.error(e)
-            throw e // 🆕 Re-throw for ZenRenew state machine
+            throw e
         }
     }
 

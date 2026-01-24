@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 
-const fetcherWithUserId = ([url, uid]: [string, string]) =>
+export const fetcherWithUserId = ([url, uid]: [string, string]) =>
     fetch(API_BASE + url, { headers: { "X-User-ID": uid } }).then(r => r.json())
 
 export function useTrips(userId: string | null) {

@@ -28,7 +28,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
 import { Virtuoso } from "react-virtuoso"
-import { useHaptic } from "@/lib/hooks"
+import { useExpenses, useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
 import { expensesApi } from "@/lib/api"
@@ -147,11 +147,23 @@ import { CountingNumber } from "@/components/ui/counting-number"
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTrip, activeTripId, trips, mutate: tripMutate } = useTripContext()  // 🔧 FIX: Restore full context
+    const { activeTrip, activeTripId, trips, mutate: tripMutate, userId } = useTripContext()  // 🔧 FIX: Restore full context
     const { mutate } = useSWRConfig()
     const { mutate: offlineMutate } = useOfflineMutation() // 🆕 Resilience Hook
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
     const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
+
+    // 🚀 SWR Hook for Expenses
+    const { expenses: swrExpenses, mutate: reloadExpenses } = useExpenses(activeTripId, userId)
+
+    // 🔄 Sync SWR -> Local State
+    useEffect(() => {
+        if (swrExpenses) {
+            setExpenses(swrExpenses)
+        } else if (!activeTripId) {
+            setExpenses([])
+        }
+    }, [swrExpenses, activeTripId])
 
     const [rate, setRate] = useState(0.22)
 
@@ -283,21 +295,6 @@ export function ToolsView() {
             console.error("Failed to sync shared cards:", e)
         }
     }
-
-    useEffect(() => {
-        const fetchExpenses = async () => {
-            try {
-                if (activeTripId) {
-                    const userId = localStorage.getItem("user_uuid") || ""
-                    const data = await expensesApi.getByTrip(activeTripId, userId)
-                    setExpenses(data || [])
-                } else {
-                    setExpenses([])
-                }
-            } catch (e) { console.error(e) }
-        }
-        fetchExpenses()
-    }, [activeTripId])
 
     // 🆕 Phase 9: Reset selectedDate when trip changes
     useEffect(() => {
@@ -479,24 +476,12 @@ export function ToolsView() {
         return `${dayLabel} ${d.getMonth() + 1}/${d.getDate()} (${weekday})`
     }
 
-    // fetchExpenses function for use outside of useEffect
-    const fetchExpenses = async () => {
-        try {
-            if (activeTripId) {
-                const userId = localStorage.getItem("user_uuid") || ""
-                const data = await expensesApi.getByTrip(activeTripId, userId)
-                setExpenses(data || [])
-            } else {
-                setExpenses([])
-            }
-        } catch (e) { console.error(e) }
-    }
     const handleDeleteExpense = async (id: string) => {
         if (!confirm(t('confirm_delete'))) return
         try {
             const userId = localStorage.getItem("user_uuid") || ""
             await expensesApi.delete(id, userId)
-            fetchExpenses()
+            reloadExpenses() // 🔄 Use SWR mutate
         } catch (e) { console.error(e) }
     }
 
@@ -812,7 +797,7 @@ export function ToolsView() {
                                     onRefresh={async () => {
                                         const r = await getExchangeRate(selectedCurrency || 'JPY')
                                         setRate(r)
-                                        await Promise.all([fetchExpenses(), tripMutate()])
+                                        await Promise.all([reloadExpenses(), tripMutate()])
                                     }}
                                     successMessage="資料與匯率已更新"
                                     className="text-white/80 hover:text-white"
@@ -1238,7 +1223,7 @@ export function ToolsView() {
                 onSaveSuccess={(targetDate: string) => {
                     setSelectedDate(targetDate)
                     setExpenseView('daily')
-                    fetchExpenses()
+                    reloadExpenses()
                 }}
             />
 
