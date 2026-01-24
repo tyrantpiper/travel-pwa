@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, ReactNode } from "react"
+import { createContext, useContext, useEffect, ReactNode, useTransition } from "react"
 import { useTrips } from "./hooks"
 import { useTripStore } from "./stores/tripStore"
 
@@ -14,6 +14,7 @@ interface TripContextType {
     activeTrip: any | null
     mutate: () => Promise<unknown>
     userId: string | null
+    isTransitioning: boolean
 }
 
 const TripContext = createContext<TripContextType | undefined>(undefined)
@@ -36,6 +37,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
     const setActiveTripId = useTripStore((s) => s.setActiveTripId)
     const setUserId = useTripStore((s) => s.setUserId)
     const setActiveTripTitle = useTripStore((s) => s.setActiveTripTitle)
+    const [isTransitioning, startTransition] = useTransition()
 
     // 初始化時從 localStorage 讀取 user_uuid (保持向後兼容)
     useEffect(() => {
@@ -100,20 +102,22 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
     // 當切換行程時的處理函數
     const handleSetActiveTripId = (id: string | null) => {
-        setActiveTripId(id)
-        if (id) {
-            // 同步到舊的 localStorage 格式 (向後兼容)
-            localStorage.setItem("active_trip_id", id)
-            const trip = trips.find((t: { id: string }) => t.id === id)
-            if (trip?.title) {
-                localStorage.setItem("active_trip_title", trip.title)
-                setActiveTripTitle(trip.title)
+        startTransition(() => {
+            setActiveTripId(id)
+            if (id) {
+                // 同步到舊的 localStorage 格式 (向後兼容)
+                localStorage.setItem("active_trip_id", id)
+                const trip = trips.find((t: { id: string }) => t.id === id)
+                if (trip?.title) {
+                    localStorage.setItem("active_trip_title", trip.title)
+                    setActiveTripTitle(trip.title)
+                }
+            } else {
+                localStorage.removeItem("active_trip_id")
+                localStorage.removeItem("active_trip_title")
+                setActiveTripTitle(null)
             }
-        } else {
-            localStorage.removeItem("active_trip_id")
-            localStorage.removeItem("active_trip_title")
-            setActiveTripTitle(null)
-        }
+        })
     }
 
     const activeTrip = trips.find((t: { id: string; title?: string }) => t.id === activeTripId) || null
@@ -134,7 +138,8 @@ export function TripProvider({ children }: { children: ReactNode }) {
             isLoading,
             activeTrip,
             mutate,
-            userId
+            userId,
+            isTransitioning
         }}>
             {children}
         </TripContext.Provider>
