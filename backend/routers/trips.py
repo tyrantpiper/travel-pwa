@@ -1031,32 +1031,13 @@ async def update_day_data(
         return {"status": "success", "message": "Day data updated"}
 
     except HTTPException:
-            existing_checklists[day_key] = new_data
-            content["day_checklists"] = existing_checklists
-        
-        # 🆕 AI 深度審核報告
-        if request.day_ai_reviews is not None:
-            existing_reviews = content.get("day_ai_reviews", {})
-            # 允許傳入空字串或 None 來清除審核
-            if new_data == "" or new_data is None:
-                # 清除審核：如果存在則刪除
-                if day_key in existing_reviews:
-                    del existing_reviews[day_key]
-            else:
-                existing_reviews[day_key] = new_data
-            content["day_ai_reviews"] = existing_reviews
-        
-        # 3. 寫回資料庫
-        update_res = supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
-        
-        print(f"✅ Day {request.day} 資訊更新成功")
-        return {"status": "success", "day": request.day}
-        
-    except HTTPException:
         raise
     except Exception as e:
-        print(f"🔥 Update Day Data Error: {e}")
+        print(f"Update Day Error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+        
 
 
 @router.patch("/trips/{trip_id}/location")
