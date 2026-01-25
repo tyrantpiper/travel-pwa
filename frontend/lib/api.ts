@@ -125,7 +125,10 @@ export const tripsApi = {
     create: async (params: CreateTripParams) => {
         const res = await fetch(API.TRIP_CREATE_MANUAL, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-ID": params.user_id
+            },
             body: JSON.stringify(params)
         })
         if (!res.ok) {
@@ -146,7 +149,10 @@ export const tripsApi = {
     join: async (params: JoinTripParams) => {
         const res = await fetch(API.TRIP_JOIN, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-ID": params.user_id
+            },
             body: JSON.stringify(params)
         })
         if (!res.ok) throw new Error("Invalid code")

@@ -590,7 +590,10 @@ export function ToolsView() {
                 // 1. 建立新行程
                 const response = await fetch(`${API_BASE}/api/save-itinerary`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-User-ID": userId
+                    },
                     body: JSON.stringify({
                         title: result.title || "New Trip",
                         start_date: result.start_date || new Date().toISOString().split('T')[0],
@@ -621,7 +624,10 @@ export function ToolsView() {
                 // 2. 匯入至現有行程
                 const response = await fetch(`${API_BASE}/api/import-to-trip`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-User-ID": userId
+                    },
                     body: JSON.stringify({
                         trip_id: selectedImportTripId,
                         items: result.items,
