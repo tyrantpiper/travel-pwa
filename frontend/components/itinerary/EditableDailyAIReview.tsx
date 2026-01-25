@@ -76,9 +76,10 @@ export default function EditableDailyAIReview({
     }
 
     // 格式化審核報告 - 識別標題和列表項目
-    const formatReview = (text: string) => {
+    const formatReview = (text: string | null | undefined) => {
+        if (!text) return null
         // 處理可能的 literal \n 字串
-        const normalizedText = text.replace(/\\n/g, '\n')
+        const normalizedText = String(text).replace(/\\n/g, '\n')
         const lines = normalizedText.split('\n')
 
         return lines.map((line, i) => {

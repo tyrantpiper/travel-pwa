@@ -152,10 +152,10 @@ export default function EditableDailyTips({
     }, [])
 
     // === Helpers ===
-    const formatCurrency = (amount: string, currency: string = DEFAULT_CURRENCY) => {
+    const formatCurrency = (amount: string | number, currency: string = DEFAULT_CURRENCY) => {
         // Try to parse number
-        const num = parseFloat(amount.replace(/,/g, ''))
-        if (isNaN(num)) return amount // invalid number
+        const num = typeof amount === 'number' ? amount : parseFloat(String(amount).replace(/,/g, ''))
+        if (isNaN(num)) return String(amount) // invalid number
 
         // Base display
         const baseDisplay = `${currency} ${num.toLocaleString()}`
@@ -172,9 +172,9 @@ export default function EditableDailyTips({
     const calculateTotal = (items: { amount?: string, price?: string, currency?: string }[]) => {
         const totals: Record<string, number> = {}
         items.forEach(item => {
-            const amtStr = item.amount || item.price || "0"
+            const valRaw = item.amount || item.price || "0"
             const cur = item.currency || DEFAULT_CURRENCY
-            const val = parseFloat(amtStr.replace(/,/g, ''))
+            const val = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw).replace(/,/g, ''))
             if (!isNaN(val)) {
                 totals[cur] = (totals[cur] || 0) + val
             }

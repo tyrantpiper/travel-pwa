@@ -309,8 +309,8 @@ export function ExpenseDialog({
                             >
                                 {(() => {
                                     // 🆕 Caution: Use '/' replacement to force local timezone parsing (Fixes Phase 8 weekday drift)
-                                    const startDate = new Date(activeTrip.start_date!.replace(/-/g, '/'))
-                                    const endDate = activeTrip.end_date ? new Date(activeTrip.end_date.replace(/-/g, '/')) : null
+                                    const startDate = new Date(String(activeTrip.start_date!).replace(/-/g, '/'))
+                                    const endDate = activeTrip.end_date ? new Date(String(activeTrip.end_date).replace(/-/g, '/')) : null
                                     const totalDays = activeTrip.days?.length ||
                                         (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
 
