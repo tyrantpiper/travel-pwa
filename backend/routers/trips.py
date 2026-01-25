@@ -966,7 +966,8 @@ async def update_day_data(
         print(f"📝 更新 Day {request.day} 資訊 for Trip {trip_id}")
         
         # 1. 取得現有行程 (包含頂層欄位以進行 Lazy Migration)
-        trip_res = supabase.table("itineraries").select("content, day_notes, day_costs, day_tickets, day_checklists, ai_review, day_ai_reviews").eq("id", trip_id).execute()
+        # 🔧 FIX: Use select("*") to avoid crashing if legacy columns don't exist in DB
+        trip_res = supabase.table("itineraries").select("*").eq("id", trip_id).execute()
         if not trip_res.data:
             raise HTTPException(status_code=404, detail="Trip not found")
         
