@@ -73,9 +73,14 @@ class ItineraryItem(BaseModel):
     reservation_code: Optional[str] = ""
     sub_items: List[dict] = []
     link_url: Optional[str] = None
+    website_link: Optional[str] = None   # 🆕 新增：官網、IG、FB 
     image_url: Optional[str] = None      # 🆕 新增：單張圖片
     image_urls: Optional[List[str]] = [] # 🆕 新增：多張圖片
+    preview_metadata: Optional[Dict[str, Any]] = {} # 🆕 新增：連結預覽元數據
     hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
+    memo: Optional[str] = None           # 🆕 使用者私人備忘錄
+    is_private: Optional[bool] = False      # 🆕 新增：私密項目支援
+    is_highlight: Optional[bool] = False    # 🆕 新增：高亮項目 (琥珀邊框)
 
 
 class SaveItineraryRequest(BaseModel):
@@ -123,13 +128,17 @@ class UpdateItemRequest(BaseModel):
     memo: Optional[str] = None
     sub_items: Optional[List[dict]] = None
     link_url: Optional[str] = None
+    website_link: Optional[str] = None   # 🆕 官網連結
     reservation_code: Optional[str] = None
     image_url: Optional[str] = None      # 向後相容
     image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
+    preview_metadata: Optional[Dict[str, Any]] = None # 🆕 預覽元數據
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     sort_order: Optional[int] = None  # 🆕 拖曳排序
     hide_navigation: Optional[bool] = None # 🆕 新增：手動隱藏導航
+    is_private: Optional[bool] = None      # 🆕 新增：私密項目更新
+    is_highlight: Optional[bool] = None    # 🆕 新增：高亮項目更新
 
 
 class CreateItemRequest(BaseModel):
@@ -147,10 +156,14 @@ class CreateItemRequest(BaseModel):
     tags: Optional[List[str]] = None
     memo: Optional[str] = None
     link_url: Optional[str] = None
+    website_link: Optional[str] = None   # 🆕 官網連結
     reservation_code: Optional[str] = None
     cost_amount: Optional[float] = 0
     sub_items: Optional[List[dict]] = None
+    preview_metadata: Optional[Dict[str, Any]] = {}
     hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
+    is_private: Optional[bool] = False      # 🆕 新增：私密項目建立
+    is_highlight: Optional[bool] = False    # 🆕 新增：高亮項目建立
 
 
 # 🆕 拖曳排序請求

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
+import { compressImage } from "@/lib/image-utils"
 
 interface ImageUploadProps {
     value?: string
@@ -32,6 +33,9 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
         setLoading(true)
         setProgress(0)
         try {
+            // 🆕 執行前端預壓縮 (2026 Optimization)
+            const compressedFile = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
             const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY
 
@@ -63,7 +67,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
             const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`
             const data = new FormData()
-            data.append("file", file)
+            data.append("file", compressedFile, file.name)
             data.append("timestamp", timestamp.toString())
             data.append("folder", folder)
             data.append("signature", signature)

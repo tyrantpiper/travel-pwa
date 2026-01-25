@@ -7,15 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
+import { ChecklistItem } from "@/lib/itinerary-types"
 
-// Types
-interface ChecklistItem {
-    id: string
-    text: string
-    checked: boolean
-    is_private?: boolean
-    private_owner_id?: string
-}
+// Types moved to @/lib/itinerary-types
 
 interface EditableDailyChecklistProps {
     tripId: string

@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button"
 import { useTripDetail, useOnlineStatus, useHaptic } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
-import { ItineraryItemState, Trip, Activity, DailyLocation, DayWeather } from "@/lib/itinerary-types"
+import { ItineraryItemState, Trip, Activity, DailyLocation, DayWeather, ChecklistItem } from "@/lib/itinerary-types"
 import { ActivityEditModal } from "@/components/itinerary/ActivityEditModal"
 import { CreateTripModal, JoinTripDialog } from "@/components/itinerary/TripDialogs"
 import EditableDailyTips from "@/components/itinerary/EditableDailyTips"
@@ -144,8 +144,6 @@ export function ItineraryView() {
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')
     const [resolvedLocation, setResolvedLocation] = useState<{ name: string, lat: number, lng: number } | null>(null) // 🆕 統一位置狀態
-    console.log("[ItineraryView] Resolved Location:", resolvedLocation) // 🔍 Debug Log
-    console.log("[ItineraryView] Weather Mode:", weatherMode) // 🔍 Debug Log
     const [elevation, setElevation] = useState<number | null>(null)
     const [weatherConfidence, setWeatherConfidence] = useState<number | null>(null) // 🆕 2026: 預報信心度
 
@@ -202,8 +200,6 @@ export function ItineraryView() {
         setIsReordering(true)
 
         try {
-            const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
             const items = pendingReorder.newOrder.map((activity, index) => {
                 const baseTime = adjustTimes ? `${String(9 + Math.floor(index * 1.5)).padStart(2, '0')}:00` : null
                 return {
@@ -213,13 +209,8 @@ export function ItineraryView() {
                 }
             })
 
-            const res = await fetch(`${API_BASE}/api/items/reorder`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ items, adjust_times: adjustTimes })
-            })
-
-            if (!res.ok) throw new Error("Reorder failed")
+            // 🔒 Standardized: Use itemsApi.reorder with userId
+            await itemsApi.reorder(items, adjustTimes, userId || "")
 
             toast.success(adjustTimes ? "順序與時間已更新" : "順序已更新")
             await reloadTripDetail()
@@ -232,7 +223,7 @@ export function ItineraryView() {
             setIsReorderDialogOpen(false)
             setIsReordering(false)
         }
-    }, [pendingReorder, activeTripId, reloadTripDetail, isReordering])
+    }, [pendingReorder, activeTripId, reloadTripDetail, isReordering, userId])
 
 
     // 🆕 2026: Store-based GC is now handled by the weatherStore itself
@@ -789,8 +780,8 @@ export function ItineraryView() {
 
         setIsDeleting(true)
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${deletingTripId}`, { method: "DELETE" })
-            if (!res.ok) throw new Error("Delete failed")
+            // 🔒 Standardized: Use tripsApi.delete with userId
+            await tripsApi.delete(deletingTripId, userId || undefined)
 
             haptic.success()
             toast.success("行程已刪除")
@@ -835,19 +826,22 @@ export function ItineraryView() {
 
         let finalLat = editItem?.lat
         let finalLng = editItem?.lng
-        if (editItem?.place && (!finalLat || !finalLng)) {
+
+        // 🧠 偵測：如果地點存在但無座標，啟動智能搜尋
+        if (editItem?.place && (finalLat === null || finalLat === undefined || finalLng === null || finalLng === undefined)) {
             try {
-                // 🆕 使用智能地理編碼 API
                 const data = await geocodeApi.search({
                     query: editItem.place,
                     limit: 1,
-                    tripTitle: currentTrip?.title  // 🆕 智能國家判斷
+                    tripTitle: currentTrip?.title
                 })
                 if (data.results && data.results.length > 0) {
                     finalLat = data.results[0].lat
                     finalLng = data.results[0].lng
                 }
-            } catch { }
+            } catch (e) {
+                console.warn("⚠️ Geocoding during save failed:", e)
+            }
         }
 
         try {
@@ -858,34 +852,46 @@ export function ItineraryView() {
                 place: editItem?.place || "",
                 desc: editItem?.desc,
                 category: editItem?.category,
-                lat: (finalLat && !isNaN(Number(finalLat))) ? Number(finalLat) : null,
-                lng: (finalLng && !isNaN(Number(finalLng))) ? Number(finalLng) : null,
+                lat: (finalLat !== null && finalLat !== undefined && !isNaN(Number(finalLat))) ? Number(finalLat) : null,
+                lng: (finalLng !== null && finalLng !== undefined && !isNaN(Number(finalLng))) ? Number(finalLng) : null,
                 image_url: editItem?.image_url,
                 image_urls: editItem?.image_urls,
                 tags: editItem?.tags,
                 memo: editItem?.memo,
                 sub_items: editItem?.sub_items,
                 link_url: editItem?.link_url,
+                website_link: editItem?.website_link,
+                preview_metadata: editItem?.preview_metadata,
                 reservation_code: editItem?.reservation_code,
                 cost: editItem?.cost,
-                hide_navigation: editItem?.hide_navigation
+                hide_navigation: editItem?.hide_navigation,
+                is_private: editItem?.is_private,
+                is_highlight: editItem?.is_highlight
             }
 
             if (isAddMode) {
-                if (!currentTrip || !editItem) return
+                if (!currentTrip || !editItem) {
+                    toast.error("參數缺失，無法新增項目")
+                    return
+                }
                 await itemsApi.create(activityData)
             } else {
-                if (!editItem || !editItem.id) return
+                if (!editItem || !editItem.id) {
+                    console.error("❌ Edit failed: Missing ID", editItem)
+                    toast.error("系統辨識異常：缺少項目 ID")
+                    return
+                }
                 await itemsApi.update(editItem.id, activityData)
             }
             haptic.success()
             toast.success("已儲存變更")
             setIsEditOpen(false)
-            reloadTripDetail()
+            await reloadTripDetail()
         } catch (e) {
-            console.error("Save activity error:", e)
+            console.error("🔥 Save activity error:", e)
             haptic.error()
-            toast.error("Save failed")
+            // 🆕 顯示更具體的錯誤
+            toast.error(e instanceof Error ? `儲存失敗: ${e.message}` : "儲存失敗，請檢查網路連線")
         } finally {
             setIsSavingActivity(false)
         }
@@ -893,14 +899,15 @@ export function ItineraryView() {
 
     const handleUpdateActivity = useCallback(async (id: string, updates: Partial<Activity>): Promise<boolean> => {
         try {
-            await itemsApi.update(id, updates)
+            await itemsApi.update(id, updates, userId || "")
             await reloadTripDetail()
             return true
-        } catch {
-            toast.error("儲存失敗")
+        } catch (e) {
+            console.error("🔥 handleUpdateActivity error:", e)
+            toast.error(e instanceof Error ? `更新失敗: ${e.message}` : "更新失敗")
             return false
         }
-    }, [reloadTripDetail])
+    }, [reloadTripDetail, userId])
 
 
     const handleDeleteItem = useCallback(async (id: string) => {
@@ -916,13 +923,19 @@ export function ItineraryView() {
                     activities: d.activities?.filter((a) => a.id !== id) || []
                 }))
             }
-            reloadTripDetail(optimisticData, false) // Update cache without revalidation
+            reloadTripDetail(optimisticData, false)
         }
 
-        // Background API call
-        fetch(`${API_BASE}/api/items/${id}`, { method: "DELETE" })
-            .catch(() => reloadTripDetail()) // Revert on error
-    }, [t, currentTrip, reloadTripDetail, haptic])
+        try {
+            // 🔒 Standardized: Use itemsApi.delete with userId
+            await itemsApi.delete(id, userId || "")
+            haptic.success()
+        } catch (e) {
+            console.error("🔥 Delete item error:", e)
+            toast.error(e instanceof Error ? e.message : "刪除失敗，已啟動自動復原")
+            await reloadTripDetail() // Revert UI
+        }
+    }, [t, currentTrip, reloadTripDetail, haptic, userId])
 
     // ⚡ Memoized Handlers for SortableTimelineCard (Fixed: Stable References)
     const handleEditActivity = useCallback((item: Activity) => {
@@ -943,9 +956,13 @@ export function ItineraryView() {
             image_urls: item.image_urls || [],
             tags: item.tags || [],
             link_url: item.link_url || "",
+            website_link: item.website_link || "",
+            preview_metadata: item.preview_metadata || {},
             reservation_code: item.reservation_code || "",
-            cost: item.cost,
-            hide_navigation: !!item.hide_navigation
+            cost: item.cost ?? item.cost_amount,
+            hide_navigation: !!item.hide_navigation,
+            is_private: !!item.is_private,
+            is_highlight: !!item.is_highlight
         })
         setIsEditOpen(true)
     }, [isOnline])
@@ -965,8 +982,8 @@ export function ItineraryView() {
 
         try {
             // 1. 先發送 API 請求
-            const res = await fetch(`${API_BASE}/api/trips/${currentTrip.id}/days/${dayNum}`, { method: "DELETE" })
-            if (!res.ok) throw new Error("Delete failed")
+            // 🔒 Standardized: Use tripsApi.deleteDay with userId
+            await tripsApi.deleteDay(currentTrip.id, dayNum, userId || "")
 
             haptic.success()
             toast.success("已刪除")
@@ -999,7 +1016,6 @@ export function ItineraryView() {
         setIsAddingDay(true)
         haptic.tap()
 
-        const insertPos = position === "before" ? `before:1` : "end"
         const isOptimistic = position === "end" && !cloneContent
 
         if (isOptimistic) {
@@ -1034,14 +1050,8 @@ export function ItineraryView() {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${currentTrip.id}/days`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ position: insertPos, clone_content: cloneContent })
-            })
-
-            if (!res.ok) throw new Error("API failed")
-            const data = await res.json()
+            // 🔒 Standardized: Use tripsApi.addDay with userId
+            const data = await tripsApi.addDay(currentTrip.id, position === "before" ? "before:1" : "end", userId || "", cloneContent)
 
             if (!isOptimistic) {
                 toast.success(cloneContent ? `已新增第 ${data.new_day} 天 (包含克隆內容)` : `已新增第 ${data.new_day} 天`)
@@ -1188,7 +1198,27 @@ export function ItineraryView() {
                 onOpenChange={setIsLocEditOpen}
                 day={day}
                 dailyLocs={dailyLocs}
-                setDailyLocs={setDailyLocs}
+                setDailyLocs={async (newLocs) => {
+                    if (!activeTripId) return
+                    try {
+                        const targetLoc = newLocs[day]
+                        if (!targetLoc) return
+
+                        // 🧠 Persistence: Immediately sync to backend
+                        await tripsApi.updateLocation(activeTripId, {
+                            day,
+                            name: targetLoc.name,
+                            lat: targetLoc.lat,
+                            lng: targetLoc.lng
+                        }, userId || "")
+
+                        setDailyLocs(newLocs)
+                        await reloadTripDetail()
+                    } catch (e) {
+                        console.error("🔥 Location sync failed:", e)
+                        toast.error("更新地點失敗，請檢查網路")
+                    }
+                }}
                 currentTrip={currentTrip}
                 biasLoc={calculateBiasLocation(day)}
             />
@@ -1231,6 +1261,7 @@ export function ItineraryView() {
                     tripId={activeTripId || ""}
                     day={day}
                     review={getDayData(currentTrip?.day_ai_reviews, day) || (day === 1 ? currentTrip?.ai_review : undefined)}
+                    userId={userId || ""}
                     onUpdate={async () => {
                         await reloadTripDetail()
                     }}
@@ -1267,7 +1298,14 @@ export function ItineraryView() {
                     key={`checklist-${day}`}
                     tripId={activeTripId || ""}
                     day={day}
-                    items={day === 1 ? [...(getDayData(currentTrip?.day_checklists, 0) || []), ...(getDayData(currentTrip?.day_checklists, 1) || [])] : (getDayData(currentTrip?.day_checklists, day) || [])}
+                    items={day === 1 ? (() => {
+                        const d0 = getDayData(currentTrip?.day_checklists, 0) || [];
+                        const d1 = getDayData(currentTrip?.day_checklists, 1) || [];
+                        // 🛡️ L4 深度防禦：使用 Map 依據 ID 去重，防止 React Key 衝突導致崩潰
+                        const uniqueMap = new Map();
+                        [...d0, ...d1].forEach(item => { if (item.id) uniqueMap.set(item.id, item); });
+                        return Array.from(uniqueMap.values()) as ChecklistItem[];
+                    })() : (getDayData(currentTrip?.day_checklists, day) || [])}
                     userId={userId || undefined}
                     onUpdate={async (items) => {
                         if (!activeTripId) return false

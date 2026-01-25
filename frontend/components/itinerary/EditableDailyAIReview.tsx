@@ -11,6 +11,7 @@ interface EditableDailyAIReviewProps {
     tripId: string
     day: number
     review: string | undefined
+    userId?: string              // 🆕 新增
     onUpdate: () => Promise<void>  // 刷新行程資料
 }
 
@@ -27,6 +28,7 @@ export default function EditableDailyAIReview({
     tripId,
     day,
     review,
+    userId,
     onUpdate
 }: EditableDailyAIReviewProps) {
     const [isLoading, setIsLoading] = useState(false)
@@ -41,7 +43,7 @@ export default function EditableDailyAIReview({
         setLoadingAction("generate")
 
         try {
-            await tripsApi.generateAIReview(tripId, day)
+            await tripsApi.generateAIReview(tripId, day, userId)
             toast.success(`Day ${day} AI 審核完成!`)
             await onUpdate()
         } catch (error) {
@@ -61,7 +63,7 @@ export default function EditableDailyAIReview({
         setLoadingAction("clear")
 
         try {
-            await tripsApi.clearAIReview(tripId, day)
+            await tripsApi.clearAIReview(tripId, day, userId)
             toast.success("已清除審核報告")
             await onUpdate()
         } catch (error) {

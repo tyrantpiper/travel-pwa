@@ -94,9 +94,14 @@ async def get_public_trip_by_public_id(
                     "lat": item["location_lat"],
                     "lng": item["location_lng"],
                     "image_url": item.get("image_url"),
+                    "image_urls": item.get("image_urls", []),
                     "tags": item.get("tags", []),
                     "link_url": item.get("link_url"),
-                    "hide_navigation": item.get("hide_navigation", False)
+                    "website_link": item.get("website_link"),
+                    "preview_metadata": item.get("preview_metadata"),
+                    "reservation_code": item.get("reservation_code"),
+                    "hide_navigation": item.get("hide_navigation", False),
+                    "is_highlight": item.get("is_highlight", False)
                 })
         
         content = trip.get("content") or {}
@@ -394,10 +399,22 @@ async def kick_member(
 
 
 @router.delete("/trips/{trip_id}")
-async def delete_trip(trip_id: str, supabase=Depends(get_supabase)):
+async def delete_trip(
+    trip_id: str, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🗑️ 刪除整趟行程 (誠實版)"""
     try:
-        print(f"🗑️ 嘗試刪除行程 ID: {trip_id}")
+        print(f"🗑️ 嘗試刪除行程 ID: {trip_id}, 由使用者: {user_id}")
+        
+        # 0. 權限檢查：只有行程創立者可以刪除行程
+        trip_check = supabase.table("itineraries").select("created_by").eq("id", trip_id).execute()
+        if not trip_check.data:
+            raise HTTPException(status_code=404, detail="找不到此行程")
+        
+        if trip_check.data[0]['created_by'] != user_id:
+            raise HTTPException(status_code=403, detail="只有行程創立者可以刪除行程")
         
         # 1. 先刪除所有細項
         supabase.table("itinerary_items").delete().eq("itinerary_id", trip_id).execute()
@@ -429,6 +446,7 @@ async def delete_trip(trip_id: str, supabase=Depends(get_supabase)):
 @router.post("/trip/create-manual")
 async def create_manual_trip(
     request: CreateManualTripRequest,
+    user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """🔥 手動建立空白行程"""
@@ -436,7 +454,7 @@ async def create_manual_trip(
         # 🆕 Phase 2: 行程數量限制（最多 3 個自建行程）
         count_res = supabase.table("itineraries")\
             .select("id", count="exact")\
-            .eq("created_by", request.user_id)\
+            .eq("created_by", user_id)\
             .execute()
         
         owned_count = count_res.count or 0
@@ -452,7 +470,7 @@ async def create_manual_trip(
         trip_data = {
             "title": request.title,
             "creator_name": request.creator_name,
-            "created_by": request.user_id,
+            "created_by": user_id,
             "share_code": room_code,
             "public_id": pub_id,
             "start_date": request.start_date,
@@ -466,7 +484,7 @@ async def create_manual_trip(
         
         
         # 🆕 Phase 3.1: 確保使用者存在 (滿足外鍵約束)
-        await ensure_user_exists(supabase, request.user_id, request.creator_name)
+        await ensure_user_exists(supabase, user_id, request.creator_name)
         
         trip_res = supabase.table("itineraries").insert(trip_data).execute()
         trip_id = trip_res.data[0]['id']
@@ -474,7 +492,7 @@ async def create_manual_trip(
         # 加入成員
         supabase.table("trip_members").insert({
             "itinerary_id": trip_id,
-            "user_id": request.user_id,
+            "user_id": user_id,
             "user_name": request.creator_name
         }).execute()
 
@@ -513,7 +531,11 @@ async def update_trip_title(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/join-trip")
-async def join_trip(request: JoinTripRequest, supabase=Depends(get_supabase)):
+async def join_trip(
+    request: JoinTripRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🚪 加入行程 (通過房間碼)"""
     print(f"🚪 使用者 {request.user_name} 嘗試加入房間: {request.share_code}")
     
@@ -528,14 +550,14 @@ async def join_trip(request: JoinTripRequest, supabase=Depends(get_supabase)):
         trip = trip_res.data[0]
         print(f"✅ 找到行程: {trip['title']}")
         
-        # 🆕 Phase 3.1: 確保加入者也存在於 users 表 (滿足外鍵約束)
-        await ensure_user_exists(supabase, request.user_id, request.user_name)
+        # 🆕 Phase 3.1: 確保加入者也存在於專屬 users 表 (滿足外鍵約束)
+        await ensure_user_exists(supabase, user_id, request.user_name)
         
         # 2. 加入成員 (如果已加入會報錯，我們用 try 接住忽略)
         try:
             supabase.table("trip_members").insert({
                 "itinerary_id": trip['id'],
-                "user_id": request.user_id,
+                "user_id": user_id,
                 "user_name": request.user_name
             }).execute()
             print(f"✅ 成功加入成員")
@@ -754,10 +776,14 @@ async def save_itinerary(
                 "tags": item.tags,
                 "sub_items": item.sub_items,
                 "link_url": item.link_url,
+                "website_link": item.website_link,
                 "memo": item.memo,
                 "image_url": item.image_url,
                 "image_urls": item.image_urls or ([item.image_url] if item.image_url else []),
-                "hide_navigation": item.hide_navigation
+                "hide_navigation": item.hide_navigation,
+                "is_private": item.is_private,
+                "is_highlight": item.is_highlight,
+                "preview_metadata": item.preview_metadata
             })
             
         # 批次寫入
@@ -868,10 +894,14 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
                 "tags": item.tags,
                 "sub_items": item.sub_items,
                 "link_url": item.link_url,
+                "website_link": item.website_link,
                 "memo": item.memo,
                 "image_url": item.image_url,
                 "image_urls": item.image_urls or ([item.image_url] if item.image_url else []),
-                "hide_navigation": item.hide_navigation
+                "hide_navigation": item.hide_navigation,
+                "is_private": item.is_private,
+                "is_highlight": item.is_highlight,
+                "preview_metadata": item.preview_metadata
             })
             
         if items_data:
@@ -970,11 +1000,29 @@ async def update_day_data(
 
 
 @router.patch("/trips/{trip_id}/location")
-async def update_trip_location(trip_id: str, request: UpdateLocationRequest, supabase=Depends(get_supabase)):
+async def update_trip_location(
+    trip_id: str, 
+    request: UpdateLocationRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🗺️ 更新行程的每日地點"""
     try:
         # 1. 先讀取現有的 content
         res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="找不到此行程")
+        
+        # 🧪 權限檢查：只有行程成員可以修改地點
+        member_check = supabase.table("trip_members")\
+            .select("user_id")\
+            .eq("itinerary_id", trip_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權限修改此行程的資訊")
+
         content = res.data['content'] or {}
         
         # 2. 更新該日期的地點
@@ -1094,9 +1142,23 @@ async def update_trip_info(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/items")
-async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)):
+async def create_item(
+    request: CreateItemRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """➕ 新增單筆行程項目"""
     try:
+        # 🧪 權限檢查：只有行程成員可以新增項目
+        member_check = supabase.table("trip_members")\
+            .select("user_id")\
+            .eq("itinerary_id", request.itinerary_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權限在此行程新增項目")
+
         data = {
             "itinerary_id": request.itinerary_id,
             "day_number": request.day_number,
@@ -1112,9 +1174,13 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
             "memo": request.memo,
             "sub_items": request.sub_items,
             "link_url": request.link_url,
+            "website_link": request.website_link,
             "reservation_code": request.reservation_code,
             "cost_amount": request.cost_amount,
-            "hide_navigation": request.hide_navigation
+            "preview_metadata": request.preview_metadata,
+            "hide_navigation": request.hide_navigation,
+            "is_private": request.is_private,
+            "is_highlight": request.is_highlight
         }
         
         res = supabase.table("itinerary_items").insert(data).execute()
@@ -1131,10 +1197,23 @@ async def create_item(request: CreateItemRequest, supabase=Depends(get_supabase)
 
 # 🆕 批次排序更新 API (Moved up to avoid conflict with {item_id})
 @router.patch("/items/reorder")
-async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase)):
+async def reorder_items(
+    request: ReorderRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🔄 批次更新多個項目的排序順序"""
-    print(f"🔄 批次排序: {len(request.items)} 項目, adjust_times={request.adjust_times}")
+    print(f"🔄 批次排序: {len(request.items)} 項目, user={user_id}")
     try:
+        if request.items:
+            # 🛡️ 權限檢查：拿第一個項目的行程 ID 來檢查身分
+            first_item = supabase.table("itinerary_items").select("itinerary_id").eq("id", request.items[0].item_id).single().execute()
+            if first_item.data:
+                tid = first_item.data["itinerary_id"]
+                member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", tid).eq("user_id", user_id).execute()
+                if not member_check.data:
+                    raise HTTPException(status_code=403, detail="您沒有權限排序此行程")
+
         results = []
         for item in request.items:
             data = {"sort_order": item.sort_order}
@@ -1156,10 +1235,22 @@ async def reorder_items(request: ReorderRequest, supabase=Depends(get_supabase))
 
 
 @router.patch("/items/{item_id}")
-async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends(get_supabase)):
+async def update_item(
+    item_id: str, 
+    request: UpdateItemRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """📝 修改單一細項"""
-    print(f"📝 嘗試更新細項 {item_id}: {request}")
+    print(f"📝 嘗試更新細項 {item_id}, user={user_id}")
     try:
+        # 🛡️ 權限檢查
+        item_check = supabase.table("itinerary_items").select("itinerary_id").eq("id", item_id).single().execute()
+        if item_check.data:
+            tid = item_check.data["itinerary_id"]
+            member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", tid).eq("user_id", user_id).execute()
+            if not member_check.data:
+                 raise HTTPException(status_code=403, detail="您沒有權限修改此項目")
         # 只更新有值的欄位
         data = {}
         if request.time_slot is not None: data["time_slot"] = request.time_slot
@@ -1173,6 +1264,7 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         if request.memo is not None: data["memo"] = request.memo
         # 🆕 新增：處理預約資訊
         if request.link_url is not None: data["link_url"] = request.link_url
+        if request.website_link is not None: data["website_link"] = request.website_link
         if request.reservation_code is not None: data["reservation_code"] = request.reservation_code
         # 👇 新增：處理 sub_items (連結列表)
         if request.sub_items is not None: data["sub_items"] = request.sub_items
@@ -1183,10 +1275,14 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         if request.image_url is not None: data["image_url"] = request.image_url
         # 🆕 新增：處理多圖片 URLs
         if request.image_urls is not None: data["image_urls"] = request.image_urls
+        # 🆕 新增：處理預覽元數據
+        if request.preview_metadata is not None: data["preview_metadata"] = request.preview_metadata
         # 🆕 新增：處理排序順序 (拖曳排序)
         if request.sort_order is not None: data["sort_order"] = request.sort_order
         # 🆕 新增：手動隱藏導航
         if request.hide_navigation is not None: data["hide_navigation"] = request.hide_navigation
+        if request.is_private is not None: data["is_private"] = request.is_private
+        if request.is_highlight is not None: data["is_highlight"] = request.is_highlight
         
         if not data:
             print("⚠️ 沒有資料需要更新")
@@ -1196,20 +1292,36 @@ async def update_item(item_id: str, request: UpdateItemRequest, supabase=Depends
         
         if not res.data:
             print(f"❌ 更新失敗：找不到 ID {item_id}")
-            raise HTTPException(status_code=404, detail="Item not found")
+            # 🕵️ Diagnostic: Raise specific error details if available
+            err_msg = str(getattr(res, 'error', 'Item not found'))
+            raise HTTPException(status_code=404, detail=err_msg)
 
         print("✅ 更新成功")
         return {"status": "success", "data": res.data}
     except Exception as e:
-        print(f"🔥 Update Item Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        traceback.print_exc()
+        print(f"🔥 Update Item Exception: {e}")
+        raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
 
 
 @router.delete("/items/{item_id}")
-async def delete_item(item_id: str, supabase=Depends(get_supabase)):
+async def delete_item(
+    item_id: str, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🗑️ 刪除單一細項"""
-    print(f"🗑️ 嘗試刪除細項 {item_id}")
+    print(f"🗑️ 嘗試刪除細項 {item_id}, user={user_id}")
     try:
+        # 🛡️ 權限檢查
+        item_check = supabase.table("itinerary_items").select("itinerary_id").eq("id", item_id).single().execute()
+        if item_check.data:
+            tid = item_check.data["itinerary_id"]
+            member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", tid).eq("user_id", user_id).execute()
+            if not member_check.data:
+                 raise HTTPException(status_code=403, detail="您沒有權限刪除此項目")
+
         res = supabase.table("itinerary_items").delete().eq("id", item_id).execute()
         
         if not res.data:
@@ -1230,15 +1342,24 @@ async def delete_item(item_id: str, supabase=Depends(get_supabase)):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.delete("/trips/{trip_id}/days/{day_number}")
-async def delete_day(trip_id: str, day_number: int, supabase=Depends(get_supabase)):
+async def delete_day(
+    trip_id: str, 
+    day_number: int, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
     """🗑️ 刪除整天行程 (Deep Logic Fix)
     
     包含 Deep Content Shift 算法，用於防止「幽靈資料」：
     - 刪除的天數資料必須清空
     - 後面的資料必須往前補
     """
-    print(f"🗑️ 嘗試刪除行程 {trip_id} 的第 {day_number} 天 (With Deep Content Clean)")
+    print(f"🗑️ 嘗試刪除行程 {trip_id} 第 {day_number} 天, user={user_id}")
     try:
+        # 🛡️ 權限檢查
+        member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權限修改此行程")
         # 1. 取得現有行程與 content
         trip = supabase.table("itineraries").select("start_date, end_date, content").eq("id", trip_id).single().execute()
         if not trip.data:
@@ -1310,17 +1431,19 @@ async def delete_day(trip_id: str, day_number: int, supabase=Depends(get_supabas
 
 
 @router.post("/trips/{trip_id}/days")
-async def add_day(trip_id: str, request: AddDayRequest, supabase=Depends(get_supabase)):
-    """➕ 新增天數 (With Ghostbuster)
-    
-    包含複雜算法：
-    - Ghostbuster: 偵測幽靈資料
-    - Deep Content Shift: 反向位移
-    - Scorched Earth Clean: 焦土清理
-    - Smart Clone: 智慧複製內容
-    """
-    print(f"➕ 嘗試新增天數到行程 {trip_id}, 位置: {request.position}, 移植內容: {request.clone_content} (With Ghostbuster)")
+async def add_day(
+    trip_id: str, 
+    request: AddDayRequest, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
+    """➕ 新增天數 (With Ghostbuster)"""
+    print(f"➕ 新增天數 to {trip_id}, user={user_id}")
     try:
+        # 🛡️ 權限檢查
+        member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權限修改此行程")
         # 1. 取得現有行程資訊
         trip = supabase.table("itineraries").select("start_date, end_date, content").eq("id", trip_id).single().execute()
         if not trip.data:
@@ -1427,10 +1550,26 @@ async def add_day(trip_id: str, request: AddDayRequest, supabase=Depends(get_sup
             print(f"   🌱 執行智慧移植: 從 Day {source_day_for_clone} -> Day {new_day}")
             src_key = str(source_day_for_clone)
             
-            import copy
+            # 🆕 身分洗白 (Identity Wash) 強化版
+            def wash_ids(items):
+                if not isinstance(items, list): return items
+                import uuid
+                new_items = copy.deepcopy(items)
+                for item in new_items:
+                    if isinstance(item, dict) and "id" in item:
+                        item["id"] = str(uuid.uuid4())
+                return new_items
+
             for field in CLONEABLE_FIELDS: # 只複製允許的欄位
                 if field in content and src_key in content[field]:
-                    content[field][target_key] = copy.deepcopy(content[field][src_key])
+                    data = content[field][src_key]
+                    
+                    # 🛡️ 對所有清單類型欄位執行身分洗白
+                    if field in ["day_checklists", "day_costs", "day_tickets"] and isinstance(data, list):
+                        data = wash_ids(data)
+                        print(f"      🆔 已為 {field} 內的 {len(data)} 個項目重整唯一身份")
+                        
+                    content[field][target_key] = data
                     print(f"      ✅ 複製 {field}")
 
         # 6. 更新行程 (Content + EndDate)

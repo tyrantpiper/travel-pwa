@@ -32,18 +32,27 @@ HTTPX_CLIENT = httpx.AsyncClient(
     limits=httpx.Limits(max_keepalive_connections=20, max_connections=50)
 )
 
-# 🆕 載入連鎖店品牌庫
-BRANDS_PATH = Path(__file__).parent.parent / "data" / "brands.json"
-BRANDS_DB = {}
-if BRANDS_PATH.exists():
-    try:
-        # 🆕 Use orjson for 5x-10x faster loading
-        BRANDS_DB = orjson.loads(BRANDS_PATH.read_bytes())
-        print(f"[OK] Loaded brands.json: {sum(len(v) for k, v in BRANDS_DB.items() if k != '__comment')} brands")
-    except Exception as e:
-        print(f"⚠️ Error loading brands.json: {e}")
-else:
-    print(f"⚠️ brands.json not found at {BRANDS_PATH}")
+# 2026 Resilience: Lazy Loading Brands & Landmarks
+_BRANDS_DB = None
+_FUZZY_INDEX = None
+_LANDMARKS_KEYS_SORTED = None
+
+def get_brands_db():
+    global _BRANDS_DB
+    if _BRANDS_DB is not None: return _BRANDS_DB
+    BRANDS_PATH = Path(__file__).parent.parent / "data" / "brands.json"
+    if BRANDS_PATH.exists():
+        try:
+            _BRANDS_DB = orjson.loads(BRANDS_PATH.read_bytes())
+            print(f"[OK] [Lazy] Loaded brands.json")
+        except Exception as e:
+            print(f"⚠️ Error loading brands.json: {e}")
+            _BRANDS_DB = {}
+    else:
+        _BRANDS_DB = {}
+    return _BRANDS_DB
+
+# Note: get_fuzzy_index() is defined below near the data loading logic
 
 
 # 🆕 繁簡日漢字對照表（用於模糊搜尋標準化）
@@ -637,85 +646,70 @@ LANDMARKS_DB = {
     "香港機場": {"aliases": ["hong kong airport", "hkg", "赤鱲角"], "search": "Hong Kong International Airport", "display": "香港國際機場", "country": "HK"},
 }
 
-# 🆕 Load External JSON for Massive Expansion
-try:
-    data_path = Path(__file__).parent.parent / "data" / "landmarks.json"
-    if data_path.exists():
-        # 🆕 Use orjson.loads for 10x faster startup speed
-        external_data = orjson.loads(data_path.read_bytes())
-        # Filter: Skip metadata keys (starting with _) and non-dict entries
-        valid_entries = {
-            k: v for k, v in external_data.items()
-            if isinstance(v, dict) and not k.startswith("_")
-        }
-        LANDMARKS_DB.update(valid_entries)
-        print(f"📦 Loaded {len(valid_entries)} external landmarks from landmarks.json")
-except Exception as e:
-    print(f"⚠️ Failed to load external landmarks: {e}")
+def get_fuzzy_index():
+    global _FUZZY_INDEX, _LANDMARKS_KEYS_SORTED
+    if _FUZZY_INDEX is not None:
+        return _FUZZY_INDEX, _LANDMARKS_KEYS_SORTED
+    
+    print("🧠 [Lazy] Building fuzzy search index and loading external data...")
+    
+    # 🆕 Load External JSON for Massive Expansion
+    try:
+        data_path = Path(__file__).parent.parent / "data" / "landmarks.json"
+        if data_path.exists():
+            external_data = orjson.loads(data_path.read_bytes())
+            valid_entries = {k: v for k, v in external_data.items() if isinstance(v, dict) and not k.startswith("_")}
+            LANDMARKS_DB.update(valid_entries)
+            print(f"📦 Loaded {len(valid_entries)} external landmarks")
+    except Exception as e:
+        print(f"⚠️ Failed to load external landmarks: {e}")
 
-# 🆕 Load Country-Separated Data (Phase 5: Modular Architecture)
-try:
-    countries_dir = Path(__file__).parent.parent / "data" / "countries"
-    if countries_dir.exists():
-        total_country_entries = 0
-        for country_path in countries_dir.iterdir():
-            if country_path.is_dir():
-                country_code = country_path.name.upper()
-                for json_file in country_path.glob("*.json"):
-                    try:
-                        # 🆕 Use orjson for modular shards
-                        country_data = orjson.loads(json_file.read_bytes())
-                        # Filter: Skip __meta and non-dict entries
-                        valid_entries = {
-                            k: v for k, v in country_data.items()
-                            if isinstance(v, dict) and not k.startswith("_")
-                        }
-                        LANDMARKS_DB.update(valid_entries)
-                        total_country_entries += len(valid_entries)
-                        print(f"  🌏 {country_code}/{json_file.name}: {len(valid_entries)} entries")
-                    except Exception as fe:
-                        print(f"  ⚠️ Error loading {json_file}: {fe}")
-        print(f"📦 Loaded {total_country_entries} entries from countries/ directory")
-except Exception as e:
-    print(f"⚠️ Failed to load country data: {e}")
+    # 🆕 Load Country-Separated Data
+    try:
+        countries_dir = Path(__file__).parent.parent / "data" / "countries"
+        if countries_dir.exists():
+            for country_path in countries_dir.iterdir():
+                if country_path.is_dir():
+                    for json_file in country_path.glob("*.json"):
+                        try:
+                            country_data = orjson.loads(json_file.read_bytes())
+                            valid_entries = {k: v for k, v in country_data.items() if isinstance(v, dict) and not k.startswith("_")}
+                            LANDMARKS_DB.update(valid_entries)
+                        except Exception: pass
+            print("📦 Loaded country-specific databases")
+    except Exception as e:
+        print(f"⚠️ Failed to load country data: {e}")
 
-
-# 預先計算排序後的鍵（最長優先匹配）
-LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)
-
-# 🆕 預先建立模糊搜尋索引（效能優化，避免每次調用都重建）
-FUZZY_SEARCH_INDEX = {}
-for _k, _v in LANDMARKS_DB.items():
-    _normalized = normalize_for_fuzzy(_k)
-    if _normalized:
-        FUZZY_SEARCH_INDEX[_normalized] = (_k, _v)
-    for _alias in _v.get("aliases", []):
-        _normalized_alias = normalize_for_fuzzy(_alias)
-        if _normalized_alias:
-            FUZZY_SEARCH_INDEX[_normalized_alias] = (_k, _v)
-print(f"[OK] Built fuzzy search index: {len(FUZZY_SEARCH_INDEX)} entries")
+    # Build Index
+    _FUZZY_INDEX = {}
+    for k, v in LANDMARKS_DB.items():
+        norm = normalize_for_fuzzy(k)
+        if norm: _FUZZY_INDEX[norm] = (k, v)
+        for alias in v.get("aliases", []):
+            norm_alias = normalize_for_fuzzy(alias)
+            if norm_alias: _FUZZY_INDEX[norm_alias] = (k, v)
+    
+    _LANDMARKS_KEYS_SORTED = sorted(LANDMARKS_DB.keys(), key=len, reverse=True)
+    print(f"[OK] [Lazy] Index built: {len(_FUZZY_INDEX)} entries")
+    return _FUZZY_INDEX, _LANDMARKS_KEYS_SORTED
 
 
 def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
-    """🏰 確定性翻譯著名景點（無需 AI）
-    
-    🆕 v2.1: 支援模糊搜尋和連鎖店品牌匹配
-    
-    Returns: (search_terms: list, display_name: str, landmark_data: dict|None) 或 ([query], None, None)
-    """
+    """🏰 確定性翻譯著名景點（無需 AI）"""
     query_lower = query.lower().strip()
     
+    # 🆕 Lazy load indices
+    FUZZY_INDEX, LANDMARKS_KEYS_SORTED = get_fuzzy_index()
+    BRANDS_DB = get_brands_db()
+    
     # === 1. 精確匹配（最快） ===
-    # 使用最長優先匹配（關鍵字必須在查詢中，防止誤匹配）
     for landmark_key in LANDMARKS_KEYS_SORTED:
         landmark = LANDMARKS_DB[landmark_key]
         
-        # 檢查主關鍵字（必須是關鍵字在查詢中，而不是反過來）
         if landmark_key.lower() in query_lower:
             print(f"🏰 Landmark Match: '{query}' → '{landmark['display']}'")
             return ([landmark["search"], query], landmark["display"], landmark)
         
-        # 檢查別名（同樣只檢查別名是否在查詢中）
         for alias in landmark.get("aliases", []):
             if alias.lower() in query_lower:
                 print(f"🏰 Alias Match: '{alias}' → '{landmark['display']}'")

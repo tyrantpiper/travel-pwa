@@ -15,18 +15,27 @@ import os
 import orjson
 import random
 import string
-from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from utils.limiter import limiter
-from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
+from dotenv import load_dotenv
 
-# 🆕 模組化：從 models.base 導入所有 Pydantic 模型
-# （原有的 class 定義暫時保留，確認無誤後再移除）
+# 1. 載入環境變數
+load_dotenv()
+
+# 🛡️ 診斷日誌配置
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ryan-travel-api")
+
+# 🆕 模組化導入 (使用 Delayed Import 策略減少啟動崩潰)
 try:
     from models.base import (
         UserPreferences, MarkdownImportRequest, GenerateTripRequest, SimplePromptRequest,
@@ -39,78 +48,59 @@ try:
     )
     print("[Modules] ✅ Loaded models from models.base")
 except ImportError as e:
-    print(f"[Modules] ⚠️ Failed to import models.base: {e}, using inline definitions")
+    print(f"[Modules] ⚠️ Failed to import models.base: {e}")
 
-# 🆕 Phase 3: 載入 geocode_service（取代 main.py 內聯定義）
-try:
-    from services.geocode_service import (
-        # 函數
-        smart_geocode_logic,
-        geocode_with_arcgis,
-        geocode_with_nominatim,
-        geocode_with_photon,
-        reverse_geocode_with_photon,
-        geocode_place,
-        detect_country_from_keywords,
-        translate_famous_landmark,
-        filter_results_by_country,
-        detect_country_from_trip_title,
-        detect_country_from_query,
-        translate_place_name,
-        log_debug,
-        # 資料結構
-        COUNTRY_BOUNDS,
-        LOCATION_KEYWORDS,
-        LANDMARKS_DB,
-        LANDMARKS_KEYS_SORTED,
-        TRANSLATION_CACHE,
-    )
-    _GEOCODE_SERVICE_LOADED = True
-    print("[Services] ✅ Loaded geocode_service (12 functions, 5 data structures)")
-except ImportError as e:
-    _GEOCODE_SERVICE_LOADED = False
-    print(f"[Services] ⚠️ geocode_service not available: {e}")
-    # 🔴 如果 geocode_service 加載失敗，伺服器不應啟動
-    raise ImportError(f"Critical: geocode_service is required but failed to load: {e}")
+# 🆕 Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- Startup Logic ---
+    print("🚀 [Lifespan] Initializing system resources...")
+    
+    # 1. 初始化 Supabase
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        try:
+            from supabase import create_client
+            app.state.supabase = create_client(supabase_url, supabase_key)
+            print("[Supabase] ✅ Connected successfully")
+        except Exception as e:
+            print(f"⚠️ [Supabase] Startup Error: {e}")
+            app.state.supabase = None
+    else:
+        print("⚠️ [Supabase] Missing credentials, check .env")
+        app.state.supabase = None
 
-# 🆕 Phase 4: 導入共用依賴 (供 routers 使用)
-try:
-    from utils.deps import get_gemini_key, get_supabase, get_verified_user
-    from utils.ai_config import PRIMARY_MODEL, LITE_MODEL, SMART_NO_TOOL_MODEL, REASONING_MODEL
-    print("[Utils] ✅ Loaded shared dependencies")
-except ImportError as e:
-    print(f"[Utils] ⚠️ Failed to import utils: {e}")
-    # 如果導入失敗，保留原有定義（這些會在後面定義）
+    # 2. 預熱 Geocode Service (如果需要)
+    try:
+        from services.geocode_service import HTTPX_CLIENT
+        print("[HTTPX] ✅ Global connection pool ready")
+    except ImportError as e:
+        print(f"⚠️ [Services] Geocode service loading issue: {e}")
 
-from supabase import create_client, Client
-from google import genai
-from google.genai import types # 🆕 Import types
-import httpx  # For async HTTP requests (geocoding)
-from dotenv import load_dotenv
-
-# 1. 載入環境變數 (只讀 Supabase)
-load_dotenv()
-
-from fastapi.responses import ORJSONResponse
+    yield
+    
+    # --- Shutdown Logic ---
+    print("🛑 [Lifespan] Releasing resources...")
+    try:
+        from services.geocode_service import HTTPX_CLIENT
+        await HTTPX_CLIENT.aclose()
+        print("[HTTPX] ✅ Connection pool closed")
+    except Exception as e:
+        print(f"⚠️ [Shutdown] Error closing HTTPX: {e}")
 
 # 0. Initialize App
-# 🆕 v4.0: 使用 ORJSONResponse 提高 2026 版序列化效能 (Cloud Run Optimized)
 app = FastAPI(
     title="Ryan's AI Travel Tool (BYOK Edition)",
-    default_response_class=ORJSONResponse
+    default_response_class=ORJSONResponse,
+    lifespan=lifespan
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# 🆕 Phase 4: 註冊 Routers
+# 🆕 Phase 4: 註冊 Routers (保持在頂層但延遲部分內部依賴)
 from routers.geocode import router as geocode_router
-from services.geocode_service import HTTPX_CLIENT
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    print("[Shutdown] Closing global HTTPX connection pool...")
-    await HTTPX_CLIENT.aclose()
 from routers.expenses import router as expenses_router
 from routers.ai import router as ai_router
 from routers.trips import router as trips_router
@@ -119,6 +109,7 @@ from routers.route import router as route_router
 from routers.poi import router as poi_router
 from routers.users import router as users_router
 from routers.app import router as app_router
+
 app.include_router(geocode_router)
 app.include_router(expenses_router)
 app.include_router(ai_router)
@@ -126,9 +117,9 @@ app.include_router(trips_router)
 app.include_router(gdpr_router)
 app.include_router(route_router)
 app.include_router(poi_router)
-app.include_router(users_router)  # 🆕 Users Router
-app.include_router(app_router)    # 🆕 App Router
-print("[Routers] ✅ Registered: geocode, expenses, ai, trips, gdpr, route, poi, users, app")
+app.include_router(users_router)
+app.include_router(app_router)
+print("[Routers] ✅ All systems registered")
 
 # 2. CORS 設定 (嚴格模式)
 # 🚨 生產環境：只允許特定來源
@@ -175,21 +166,7 @@ async def add_security_headers(request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
-# 3. 初始化 Supabase (Managed in Startup)
-@app.on_event("startup")
-async def initialize_supabase():
-    try:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
-        if url and key:
-            app.state.supabase = create_client(url, key)
-            print("[Supabase] Connected successfully")
-        else:
-            print("⚠️ Supabase Warning: Missing credentials")
-            app.state.supabase = None
-    except Exception as e:
-        print(f"⚠️ Supabase Startup Error: {e}")
-        app.state.supabase = None
+# 3. 初始化已遷移至 Lifespan Manager
 
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
@@ -237,6 +214,7 @@ else:
 
 # --- 嚴謹的依賴注入 (Dependency Injection) ---
 # 🔒 完全 BYOK 模式：使用者必須自己提供 API Key
+from utils.deps import get_verified_user
 
 async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key")):
     """ 

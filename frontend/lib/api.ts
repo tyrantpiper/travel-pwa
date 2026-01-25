@@ -14,7 +14,7 @@ import {
     UserProfileSchema,
     GeocodeResponseSchema
 } from './schemas';
-import { SubItem } from './itinerary-types';
+import { SubItem, PreviewMetadata } from './itinerary-types';
 import { z } from "zod";
 
 // === API Endpoints ===
@@ -73,6 +73,9 @@ export interface CreateItemParams {
     cost?: number | null
     sub_items?: SubItem[]
     hide_navigation?: boolean
+    is_private?: boolean       // 🆕 新增
+    is_highlight?: boolean     // 🆕 新增
+    preview_metadata?: PreviewMetadata     // 🆕 新增
 }
 
 export interface UpdateItemParams {
@@ -92,6 +95,10 @@ export interface UpdateItemParams {
     cost?: number | null
     sort_order?: number
     hide_navigation?: boolean
+    is_private?: boolean       // 🆕 新增
+    is_highlight?: boolean     // 🆕 新增
+    preview_metadata?: PreviewMetadata     // 🆕 新增
+    website_link?: string      // 🆕 新增
 }
 
 export interface GeocodeSearchParams {
@@ -146,8 +153,14 @@ export const tripsApi = {
     },
 
     /** Delete a trip */
-    delete: async (tripId: string) => {
-        const res = await fetch(`${API.TRIPS}/${tripId}`, { method: "DELETE" })
+    delete: async (tripId: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API.TRIPS}/${tripId}`, {
+            method: "DELETE",
+            headers
+        })
         if (!res.ok) throw new Error("Failed to delete trip")
         return res.json()
     },
@@ -198,10 +211,13 @@ export const tripsApi = {
     },
 
     /** Update daily location */
-    updateLocation: async (tripId: string, location: { day: number; name: string; lat: number; lng: number }) => {
+    updateLocation: async (tripId: string, location: { day: number; name: string; lat: number; lng: number }, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/location`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(location)
         })
         if (!res.ok) throw new Error("Failed to update location")
@@ -209,19 +225,28 @@ export const tripsApi = {
     },
 
     /** Add a new day to trip */
-    addDay: async (tripId: string, position: "before" | "end") => {
+    addDay: async (tripId: string, position: "before" | "end" | "before:1", userId?: string, cloneContent: boolean = false) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/days`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ position })
+            headers,
+            body: JSON.stringify({ position, clone_content: cloneContent })
         })
         if (!res.ok) throw new Error("Failed to add day")
         return res.json()
     },
 
     /** Delete a day from trip */
-    deleteDay: async (tripId: string, dayNum: number) => {
-        const res = await fetch(`${API.TRIPS}/${tripId}/days/${dayNum}`, { method: "DELETE" })
+    deleteDay: async (tripId: string, dayNum: number, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API.TRIPS}/${tripId}/days/${dayNum}`, {
+            method: "DELETE",
+            headers
+        })
         if (!res.ok) throw new Error("Failed to delete day")
         return res.json()
     },
@@ -246,7 +271,7 @@ export const tripsApi = {
     },
 
     /** 🕵️ Generate AI day review */
-    generateAIReview: async (tripId: string, day: number): Promise<{ status: string; day: number; review: string }> => {
+    generateAIReview: async (tripId: string, day: number, userId?: string): Promise<{ status: string; day: number; review: string }> => {
         const apiKey = typeof window !== 'undefined'
             ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
             : ""
@@ -255,12 +280,15 @@ export const tripsApi = {
             throw new Error("請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)")
         }
 
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Gemini-API-Key": apiKey
+        }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/days/${day}/ai-review`, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-Gemini-API-Key": apiKey
-            }
+            headers
         })
         if (!res.ok) {
             const error = await res.json().catch(() => ({ detail: "AI 審核失敗" }))
@@ -270,10 +298,13 @@ export const tripsApi = {
     },
 
     /** 🗑️ Clear AI day review */
-    clearAIReview: async (tripId: string, day: number) => {
+    clearAIReview: async (tripId: string, day: number, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({ day, day_ai_reviews: { [day]: "" } })
         })
         if (!res.ok) throw new Error("Failed to clear AI review")
@@ -339,7 +370,7 @@ export const itemsApi = {
     /** Create a new item */
     create: async (params: CreateItemParams) => {
         // 欄位轉換：前端 → 後端格式
-        const backendPayload = {
+        const backendPayload: Record<string, unknown> & { itinerary_id?: string } = {
             itinerary_id: params.trip_id,
             day_number: params.day,
             time_slot: params.time,
@@ -356,11 +387,21 @@ export const itemsApi = {
             link_url: params.link_url,
             reservation_code: params.reservation_code,
             cost_amount: params.cost,
-            hide_navigation: params.hide_navigation
+            hide_navigation: params.hide_navigation,
+            is_private: params.is_private,
+            is_highlight: params.is_highlight,
+            preview_metadata: params.preview_metadata
         }
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+
+        // Use a generic userID if provided in params or separate arg? 
+        // For itemsApi.create, params has trip_id, but the user_id for auth should come from context
+        const userId = (params as CreateItemParams & { user_id?: string }).user_id || "";
+        if (userId) headers["X-User-ID"] = userId
+
         const res = await offlineFetch(API.ITEMS, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(backendPayload)
         })
         if (!res.ok) throw new Error("Failed to create item")
@@ -368,7 +409,7 @@ export const itemsApi = {
     },
 
     /** Update an existing item */
-    update: async (itemId: string, params: UpdateItemParams) => {
+    update: async (itemId: string, params: UpdateItemParams, userId?: string) => {
         // 🔄 Map frontend params to backend expected payload
         const payload: Record<string, unknown> = {}
         if (params.time !== undefined) payload.time_slot = params.time
@@ -387,10 +428,17 @@ export const itemsApi = {
         if (params.cost !== undefined) payload.cost_amount = params.cost
         if (params.sort_order !== undefined) payload.sort_order = params.sort_order
         if (params.hide_navigation !== undefined) payload.hide_navigation = params.hide_navigation
+        if (params.is_private !== undefined) payload.is_private = params.is_private
+        if (params.is_highlight !== undefined) payload.is_highlight = params.is_highlight
+        if (params.preview_metadata !== undefined) payload.preview_metadata = params.preview_metadata
+        if (params.website_link !== undefined) payload.website_link = params.website_link
+
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
 
         const res = await offlineFetch(`${API.ITEMS}/${itemId}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(payload)
         })
         if (!res.ok) throw new Error("Failed to update item")
@@ -404,11 +452,31 @@ export const itemsApi = {
     },
 
     /** Delete an item */
-    delete: async (itemId: string) => {
-        const res = await offlineFetch(`${API.ITEMS}/${itemId}`, { method: "DELETE" })
+    delete: async (itemId: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await offlineFetch(`${API.ITEMS}/${itemId}`, {
+            method: "DELETE",
+            headers
+        })
         if (!res.ok) throw new Error("Failed to delete item")
         return res.json()
     },
+
+    /** Reorder items */
+    reorder: async (items: { item_id: string; sort_order: number; time_slot?: string | null }[], adjustTimes: boolean, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API.ITEMS}/reorder`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ items, adjust_times: adjustTimes })
+        })
+        if (!res.ok) throw new Error("Failed to reorder items")
+        return res.json()
+    }
 }
 
 /**
@@ -459,11 +527,11 @@ export const geocodeApi = {
     },
 
     /** 🧠 Resolve location from Google Maps Link (2026 Heuristic) */
-    resolveLink: async (url: string) => {
+    resolveLink: async (url: string, type: "map" | "media" = "map") => {
         const res = await fetch(API.RESOLVE_LINK, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url, type })
         })
         if (!res.ok) throw new Error("Link resolution failed")
         return res.json()

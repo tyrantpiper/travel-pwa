@@ -43,10 +43,14 @@ export const ItineraryItemSchema = z.object({
     image_urls: z.array(z.string()).default([]),
     sub_items: z.array(SubItemSchema).default([]),
     link_url: z.string().optional().nullable(),
+    website_link: z.string().optional().nullable(),   // 🆕 官網連結
+    preview_metadata: z.any().optional(),             // 🆕 預覽元數據
     reservation_code: z.string().optional().nullable(),
     cost_amount: z.number().nullable().default(0).transform(v => v ?? 0),
     sort_order: z.number().default(0),
     hide_navigation: z.boolean().default(false),
+    is_private: z.boolean().default(false),
+    is_highlight: z.boolean().default(false),
 });
 
 export const TripDaySchema = z.object({

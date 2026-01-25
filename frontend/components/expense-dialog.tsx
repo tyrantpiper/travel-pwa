@@ -228,11 +228,12 @@ export function ExpenseDialog({
                 onOpenChange(false)
                 onSaveSuccess(payload.expense_date)
             } else {
-                throw new Error("API Error")
+                const errorData = await res.json().catch(() => ({}))
+                throw new Error(errorData.detail || "API Error")
             }
-        } catch {
+        } catch (e) {
             haptic.error()
-            toast.error("Save failed")
+            toast.error(e instanceof Error ? `儲存失敗: ${e.message}` : "儲存失敗")
         } finally {
             setIsSavingExpense(false)
         }

@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from typing import Optional
 import uuid
 from datetime import datetime, timezone
+import orjson
 from utils.deps import get_supabase, get_verified_user
 from models.base import UpdateProfileRequest
 
@@ -129,9 +130,9 @@ async def update_user_profile(
         user_uuid = str(uuid.UUID(user_id_clean))
         print(f"🔍 Normalized UUID: {user_uuid}")
         
-        # 🛡️ Direct HTTP approach - Bypass SDK to avoid UUID type issues
+        # 🛡️ Direct HTTP approach - Optimized with async httpx
         import os
-        import requests as http_requests
+        from services.geocode_service import HTTPX_CLIENT
         
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
@@ -152,27 +153,26 @@ async def update_user_profile(
         print(f"📡 Checking existence at: {check_url}")
         
         try:
-            check_resp = http_requests.get(check_url, headers=headers, timeout=10)
+            # Use the global HTTPX_CLIENT for connection pooling
+            check_resp = await HTTPX_CLIENT.get(check_url, headers=headers)
         except Exception as conn_err:
             print(f"🔥 Supabase Connection Error: {conn_err}")
             raise HTTPException(status_code=503, detail="無法連線至資料庫服務，請稍後再試")
         
-        if not check_resp.ok:
+        if not check_resp.is_success:
             print(f"❌ Check existence failed: {check_resp.status_code} - {check_resp.text}")
             
-            # 🛡️ Cautious Fallback: 若資料表真的不存在 (404)，不應該直接噴 500 卡死前端
-            # 相反地，我們回傳成功，讓前端能完成本地快取更新，維持使用者體驗。
             if check_resp.status_code == 404:
-                print("⚠️ [Resilience] users 資料表不存在！執行降級處理 (Success with missing table)")
+                print("⚠️ [Resilience] users 資料表不存在！執行降級處理")
                 return {
                     "status": "success", 
-                    "message": "Profile updated (Session Only - Database Migration Pending)",
+                    "message": "Profile updated (Local Cache Only)",
                     "data": {"id": user_uuid, "name": request.name}
                 }
             
             raise HTTPException(status_code=check_resp.status_code, detail=f"Supabase check failed: {check_resp.text}")
 
-        user_exists = len(check_resp.json()) > 0
+        user_exists = len(orjson.loads(check_resp.content)) > 0
         print(f"👤 User exists: {user_exists}")
         
         if user_exists:
@@ -185,8 +185,7 @@ async def update_user_profile(
                 update_data["avatar_url"] = request.avatar_url
             
             update_url = f"{supabase_url}/rest/v1/users?id=eq.{user_uuid}"
-            print(f"📡 PATCH URL: {update_url}")
-            resp = http_requests.patch(update_url, headers=headers, json=update_data, timeout=10)
+            resp = await HTTPX_CLIENT.patch(update_url, headers=headers, content=orjson.dumps(update_data))
         else:
             # Step 2b: User doesn't exist - POST to insert
             print(f"🆕 Creating new user: {user_uuid}")
@@ -196,18 +195,15 @@ async def update_user_profile(
                 "avatar_url": request.avatar_url
             }
             insert_url = f"{supabase_url}/rest/v1/users"
-            print(f"📡 POST URL: {insert_url}")
-            resp = http_requests.post(insert_url, headers=headers, json=insert_data, timeout=10)
+            resp = await HTTPX_CLIENT.post(insert_url, headers=headers, content=orjson.dumps(insert_data))
         
-        if resp.ok:
-            result_data = resp.json()
-            print(f"✅ User update/insert success: {result_data}")
+        if resp.is_success:
+            result_data = orjson.loads(resp.content)
+            print(f"✅ User update/insert success")
             return {"status": "success", "data": result_data[0] if result_data else {"id": user_uuid}}
         else:
             print(f"🔥 HTTP Error during update: {resp.status_code} - {resp.text}")
-            # Same guard for the update/insert response - Resilience fallback
             if resp.status_code == 404:
-                print("⚠️ [Resilience] Update blocked by missing table. Returning 200 to UI.")
                 return {"status": "success", "note": "Table missing, update skipped"}
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
             

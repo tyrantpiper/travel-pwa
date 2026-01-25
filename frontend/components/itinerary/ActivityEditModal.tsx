@@ -99,40 +99,62 @@ export function ActivityEditModal({
         finally { setIsSearching(false) }
     }
 
-    // 🧠 Heuristic Link-to-Pin Resolution
-    const handleLinkBlur = async () => {
-        if (!editItem?.link_url?.trim()) return
-        const url = editItem.link_url.trim()
+    // 🧠 Heuristic Dual-Link Engine (Split-Field)
+    const handleResolveLink = async (type: "map" | "media") => {
+        const url = type === "map" ? editItem?.link_url : editItem?.website_link
+        if (!url || !editItem) return
 
-        // ⚡ Tier 1: Client-side Regex (Zero Latency)
-        const extracted = extractCoordsFromUrl(url)
-        if (extracted.lat && extracted.lng) {
-            console.log(`⚡ Tier 1 Resolve: ${extracted.method}`)
-            updateCoords(extracted.lat, extracted.lng)
-            setResolveStatus('success')
-            toast.success("已從連結自動提取座標")
+        // ⚡ Tier 1: Client-side Regex (Only for Map coordinates)
+        if (type === "map") {
+            const extracted = extractCoordsFromUrl(url)
+            if (extracted.lat && extracted.lng) {
+                updateCoords(extracted.lat, extracted.lng)
+                setResolveStatus('success')
+                toast.success("已從連結自動提取座標")
+                return
+            }
+        }
+
+        // 🌐 Tier 2: Backend Neural Engine (Scraper + Geocoder)
+        if (type === "map" && !isGoogleMapsShortlink(url)) {
+            toast.info("此連結不包含可識別座標，請使用搜尋功能")
             return
         }
 
-        // 🌐 Tier 2: Backend Redirect Proxy (for Shortlinks)
-        if (isGoogleMapsShortlink(url)) {
-            setIsResolvingLink(true)
-            setResolveStatus('idle')
-            try {
-                const result = await geocodeApi.resolveLink(url)
-                if (result.success && result.lat && result.lng) {
+        setIsResolvingLink(true)
+        setResolveStatus('idle')
+        try {
+            const result = await geocodeApi.resolveLink(url, type)
+            if (result.success) {
+                if (type === "map" && result.lat && result.lng) {
                     updateCoords(result.lat, result.lng)
-                    setResolveStatus(result.method.includes('jit') ? 'fallback' : 'success')
-                    toast.success(result.method.includes('jit') ? "已透過地名語意自動定位" : "已完成縮網址座標解析")
-                } else {
-                    setResolveStatus('error')
+                    setResolveStatus(result.method?.includes('jit') ? 'fallback' : 'success')
+                    toast.success(result.method?.includes('jit') ? "已透過地名語意自動定位" : "已完成座標解析")
+                    // 同步儲存地圖預覽
+                    if (result.metadata?.image) {
+                        setEditItem({
+                            ...editItem,
+                            preview_metadata: { ...editItem.preview_metadata, map_image: result.metadata.image }
+                        })
+                    }
+                } else if (type === "media") {
+                    const meta = result.metadata || {}
+                    setEditItem({
+                        ...editItem,
+                        preview_metadata: { ...editItem.preview_metadata, og_image: meta.image, og_title: meta.title }
+                    })
+                    setResolveStatus('success')
+                    toast.success("官網首圖解析成功！")
                 }
-            } catch (e) {
-                console.error("Link Resolution Error:", e)
+            } else {
                 setResolveStatus('error')
-            } finally {
-                setIsResolvingLink(false)
+                toast.error("解析失敗：" + (result.error || "請檢查網址"))
             }
+        } catch (e) {
+            console.error("Link Resolution Error:", e)
+            setResolveStatus('error')
+        } finally {
+            setIsResolvingLink(false)
         }
     }
 
@@ -330,44 +352,74 @@ export function ActivityEditModal({
                     )}
 
                     {/* Primary Link - Priority Moved Up */}
-                    <div className="space-y-1.5 bg-amber-50/50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
-                        <div className="flex justify-between items-center mb-1">
-                            <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
-                                🚀 {t('primary_address') || "Primary Address / Nav Link"}
+                    <div className="space-y-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                        {/* 1. 媒體連結 (Website/Social) */}
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] text-blue-600 dark:text-blue-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
+                                🔗 {t('media_link')}
                             </Label>
-                            <div className="flex items-center gap-2">
-                                {isResolvingLink && <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />}
-                                {!isResolvingLink && resolveStatus === 'success' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                                {!isResolvingLink && resolveStatus === 'fallback' && (
-                                    <div className="flex items-center gap-1 text-[9px] text-amber-600 font-bold">
-                                        <AlertCircle className="w-3 h-3" />
-                                        語意定位
-                                    </div>
-                                )}
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder={t('media_link_placeholder')}
+                                    className="text-xs bg-white dark:bg-slate-900 border-blue-100 flex-1"
+                                    value={editItem.website_link || ''}
+                                    onChange={(e) => setEditItem({ ...editItem, website_link: e.target.value })}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={isResolvingLink || !editItem.website_link?.trim()}
+                                    onClick={() => handleResolveLink("media")}
+                                    className="h-9 px-3 bg-blue-600 text-white hover:bg-blue-700 border-none transition-all active:scale-95"
+                                >
+                                    {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析美照"}
+                                </Button>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="https://... or raw address"
-                                className="text-xs bg-white dark:bg-slate-900 border-amber-100 flex-1"
-                                value={editItem.link_url || ''}
-                                onChange={(e) => {
-                                    setEditItem({ ...editItem, link_url: e.target.value })
-                                    setResolveStatus('idle')
-                                }}
-                            />
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                disabled={isResolvingLink || !editItem.link_url?.trim()}
-                                onClick={handleLinkBlur} // Re-using handleLinkBlur as the manual trigger
-                                className="h-9 px-3 bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-none transition-all active:scale-95"
-                            >
-                                {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析"}
-                            </Button>
+
+                        <div className="border-t border-slate-100 dark:border-slate-800 my-2" />
+
+                        {/* 2. 地圖連結 (Google Maps) */}
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center mb-1">
+                                <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
+                                    📍 {t('primary_address') || "Map / Navigation Link"}
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                    {isResolvingLink && <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />}
+                                    {!isResolvingLink && resolveStatus === 'success' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
+                                    {!isResolvingLink && resolveStatus === 'fallback' && (
+                                        <div className="flex items-center gap-1 text-[9px] text-amber-600 font-bold">
+                                            <AlertCircle className="w-3 h-3" />
+                                            語意定位
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="https://maps.app.goo.gl/..."
+                                    className="text-xs bg-white dark:bg-slate-900 border-amber-100 flex-1"
+                                    value={editItem.link_url || ''}
+                                    onChange={(e) => {
+                                        setEditItem({ ...editItem, link_url: e.target.value })
+                                        setResolveStatus('idle')
+                                    }}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    disabled={isResolvingLink || !editItem.link_url?.trim()}
+                                    onClick={() => handleResolveLink("map")}
+                                    className="h-9 px-3 bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-none transition-all active:scale-95"
+                                >
+                                    {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析座標"}
+                                </Button>
+                            </div>
                         </div>
-                        <p className="text-[9px] text-slate-400 mt-1">💡 貼上連結後點擊「解析」以自動獲取地圖座標</p>
+                        <p className="text-[9px] text-slate-400">💡 建議分開填寫地圖網址與連結，系統將自動抓取預覽圖</p>
                     </div>
 
                     {/* Notes */}
@@ -493,18 +545,35 @@ export function ActivityEditModal({
                                 <span className="text-[10px] text-slate-400 font-medium">
                                     {editItem.lat && editItem.lng ? "📍 Precise Geolocation" : "🔍 Search mode"}
                                 </span>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 font-bold flex items-center gap-1"
-                                    onClick={() => {
-                                        haptic.tap()
-                                        setEditItem({ ...editItem, lat: null, lng: null })
-                                    }}
-                                >
-                                    <X className="w-3 h-3" /> Clear Coords
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    {(editItem.preview_metadata?.og_image || editItem.preview_metadata?.map_image) && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-[10px] text-blue-500 hover:text-blue-600 hover:bg-blue-50 font-bold"
+                                            onClick={() => {
+                                                haptic.tap()
+                                                setEditItem({ ...editItem, preview_metadata: {} })
+                                                toast.info("已清除連結預覽")
+                                            }}
+                                        >
+                                            <X className="w-3 h-3" /> Clear Preview
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 font-bold flex items-center gap-1"
+                                        onClick={() => {
+                                            haptic.tap()
+                                            setEditItem({ ...editItem, lat: null, lng: null })
+                                        }}
+                                    >
+                                        <X className="w-3 h-3" /> Clear Coords
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -519,15 +588,10 @@ export function ActivityEditModal({
                             </div>
                             <input
                                 type="checkbox"
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                checked={(editItem.tags || []).includes("Private")}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                checked={!!editItem.is_private}
                                 onChange={(e) => {
-                                    const currentTags = editItem.tags || []
-                                    if (e.target.checked) {
-                                        setEditItem({ ...editItem, tags: [...currentTags, "Private"] })
-                                    } else {
-                                        setEditItem({ ...editItem, tags: currentTags.filter(t => t !== "Private") })
-                                    }
+                                    setEditItem({ ...editItem, is_private: e.target.checked })
                                 }}
                             />
                         </div>
@@ -548,6 +612,25 @@ export function ActivityEditModal({
                                 onChange={(e) => setEditItem({ ...editItem, hide_navigation: e.target.checked })}
                             />
                         </div>
+
+                        {/* ⚠️ Temporarily Removed: High-Priority Toggle (VIP) */}
+                        {/* 
+                        <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-amber-50/30 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/50">
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                    <Label className="text-sm font-medium text-amber-700 dark:text-amber-400">高亮顯示</Label>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 font-bold">VIP</span>
+                                </div>
+                                <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70">在時間軸上以琥珀金邊框固定顯示</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                checked={!!editItem.is_highlight}
+                                onChange={(e) => setEditItem({ ...editItem, is_highlight: e.target.checked })}
+                            />
+                        </div>
+                        */}
                     </div>
 
                     <DialogFooter>

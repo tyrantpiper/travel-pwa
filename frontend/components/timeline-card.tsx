@@ -26,6 +26,7 @@ import {
 
 import { Activity, SubItem } from "@/lib/itinerary-types"
 import { toast } from "sonner"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface TimelineCardProps {
     activity: Activity
@@ -37,6 +38,7 @@ interface TimelineCardProps {
 }
 
 export const TimelineCard = memo(function TimelineCard({ activity, isLast, index, onEdit, onDelete, onUpdateActivity }: TimelineCardProps) {
+    const { t } = useLanguage()
     const [showDetail, setShowDetail] = useState(false)
     const [showPhotoPreview, setShowPhotoPreview] = useState(false)  // 🆕 圖片預覽狀態
 
@@ -110,6 +112,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                                 fill
                                 className="object-contain z-10 drop-shadow-md"
                                 unoptimized
+                                decoding="async"
                                 onError={(e) => { e.currentTarget.style.display = 'none' }}
                             />
                         </div>
@@ -160,6 +163,11 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                     )}>
                         {getIcon()} {isHeader ? "INFO" : activity.category}
                     </span>
+                    {activity.is_private && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100 flex items-center gap-1 font-bold">
+                            🔒 {t('private') || "Private"}
+                        </span>
+                    )}
                     {activity.tags?.map((tag: string) => (
                         <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-100">#{tag}</span>
                     ))}
@@ -223,19 +231,16 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                     <div className="w-6 h-6 rounded-full mt-1 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm z-10">
                         <Lightbulb className="w-3 h-3" strokeWidth={3} />
                     </div>
-                ) : activity.is_highlight ? (
-                    <div className="w-5 h-5 rounded-full mt-1 bg-amber-500 ring-4 ring-amber-100 dark:ring-amber-900/50 z-10 flex items-center justify-center text-[9px] text-white font-bold">{index}</div>
                 ) : (
                     <div className="w-5 h-5 rounded-full mt-1 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 flex items-center justify-center text-[9px] font-bold z-10 border-2 border-white dark:border-slate-900 shadow-sm">{index}</div>
                 )}
                 {!isLast && <div className="w-px flex-1 bg-slate-200 dark:bg-slate-700 my-1" />}
             </div>
             {/* 右側：卡片內容 */}
-            <div className={cn("timeline-card flex-1 min-w-0 mb-6 relative p-4 rounded-xl border cursor-default overflow-hidden",
+            <div className={cn("timeline-card flex-1 min-w-0 mb-6 relative p-4 rounded-xl border cursor-default overflow-hidden transition-all duration-300",
                 isHeader ? "bg-amber-50/30 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-700/50" :
-                    activity.is_highlight ? "bg-amber-50/50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700" : "bg-white dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-600 shadow-sm dark:shadow-none"
+                    "bg-white dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-600 shadow-sm dark:shadow-none"
             )}>
-                {activity.is_highlight && <div className="absolute top-0 left-0 w-1 h-full bg-amber-400 rounded-l-xl" />}
                 {renderContent()}
             </div>
 
@@ -279,9 +284,11 @@ interface DetailDialogProps {
 }
 
 function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdateActivity }: DetailDialogProps) {
+    const { t } = useLanguage()
     // Use activity.id + open as key to reset state when activity changes
     const [isEditing, setIsEditing] = useState(false)
     const [note, setNote] = useState(activity.memo || "")
+    const [mediaLink, setMediaLink] = useState(activity.website_link || "")
     // 👇 新增：連結列表狀態
     const [links, setLinks] = useState<SubItem[]>(activity.sub_items || [])
     const [saving, setSaving] = useState(false)
@@ -290,10 +297,11 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
         // Reset state when dialog opens or activity changes
         if (open) {
             setNote(activity.memo || "")
+            setMediaLink(activity.website_link || "")
             setLinks(activity.sub_items || [])
             setIsEditing(false)
         }
-    }, [open, activity.id, activity.memo, activity.sub_items])
+    }, [open, activity.id, activity.memo, activity.sub_items, activity.website_link])
 
     const handleSave = async () => {
         if (saving) return // 防止重複點擊
@@ -305,6 +313,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
             // 🆕 關鍵修復：整合為單一 API 呼叫，徹底解決並發 500 錯誤與 UI 不同步
             const success = await onUpdateActivity(activity.id || '', {
                 memo: note,
+                website_link: mediaLink,
                 sub_items: filteredLinks
             })
 
@@ -322,6 +331,50 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
     const removeLink = (idx: number) => setLinks(links.filter((_, i) => i !== idx))
     const updateLink = (idx: number, field: keyof SubItem, val: string) => {
         const newLinks = [...links]; newLinks[idx][field] = val; setLinks(newLinks)
+    }
+
+    // 🆕 核心解析邏輯 (神經網絡連動)
+    const handleResolveLink = async (type: "map" | "media") => {
+        const url = type === "map" ? activity.link_url : mediaLink
+        if (!url) return
+
+        setSaving(true)
+        try {
+            const res = await fetch("/api/geocode/resolve-link", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, type })
+            })
+            const data = await res.json()
+
+            if (data.success) {
+                if (type === "map" && data.lat) {
+                    await onUpdateActivity(activity.id || '', {
+                        lat: data.lat,
+                        lng: data.lng,
+                        preview_metadata: { ...activity.preview_metadata, map_image: data.metadata?.image }
+                    })
+                    toast.success("座標與地圖預覽已更新")
+                } else if (type === "media") {
+                    // 解析首圖並存入 metadata
+                    const meta = data.metadata || {}
+                    await onUpdateActivity(activity.id || '', {
+                        website_link: url,
+                        preview_metadata: { ...activity.preview_metadata, og_image: meta.image, og_title: meta.title }
+                    })
+
+                    // 🔄 如果抓到首圖，自動詢問是否加入藝廊 (或是直接展示)
+                    toast.success("首圖解析成功！")
+                }
+            } else {
+                toast.error("無法解析網址：" + (data.error || "未知錯誤"))
+            }
+        } catch (error) {
+            toast.error("解析發生錯誤")
+            console.error(error)
+        } finally {
+            setSaving(false)
+        }
     }
 
     return (
@@ -353,8 +406,14 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                             <div className="grid grid-cols-2 gap-3">
                                 {activity.link_url && (
                                     <div className="col-span-2 p-3 bg-amber-50/30 dark:bg-amber-900/10 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
-                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">主要地址 / 導航連結</div>
-                                        <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono">{activity.link_url}</div>
+                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">📍 導航 / 地點連結</div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono mb-2">{activity.link_url}</div>
+                                        {activity.website_link && (
+                                            <>
+                                                <div className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold mb-1 tracking-wider border-t border-amber-100/50 pt-2">🔗 官網 / 媒體連結</div>
+                                                <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono">{activity.website_link}</div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                                 {activity.reservation_code && (
@@ -370,6 +429,53 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                     </div>
                                 )}
                             </div>
+
+                            {/* 🆕 解析按鈕 UI 組件 (用於編輯模式) */}
+                            {isEditing && (
+                                <div className="space-y-4 pt-2">
+                                    <div className="space-y-2 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800">
+                                        <Label className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold">🔗 {t('media_link')}</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                className="h-9 text-xs flex-1"
+                                                placeholder={t('media_link_placeholder')}
+                                                value={mediaLink}
+                                                onChange={e => setMediaLink(e.target.value)}
+                                            />
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-9 text-[10px] bg-blue-600 text-white hover:bg-blue-700 hover:text-white border-0"
+                                                onClick={() => handleResolveLink("media")}
+                                                disabled={saving || !mediaLink}
+                                            >
+                                                {saving ? "..." : "解析美照"}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 p-3 bg-amber-50/50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800">
+                                        <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold">📍 導航 / 地點連結 (Google Maps)</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                className="h-9 text-xs flex-1"
+                                                placeholder="https://maps.app.goo.gl/..."
+                                                value={activity.link_url || ""}
+                                                readOnly
+                                            />
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-9 text-[10px] bg-amber-500 text-white hover:bg-amber-600 hover:text-white border-0"
+                                                onClick={() => handleResolveLink("map")}
+                                                disabled={saving || !activity.link_url}
+                                            >
+                                                {saving ? "..." : "解析坐標"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* 2. Memo & Links (合併編輯區) */}

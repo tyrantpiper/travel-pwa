@@ -70,20 +70,28 @@ async def geocode_reverse(request: Request, body: GeocodeReverseRequest):
 @router.post("/resolve-link")
 @limiter.limit("20/minute")
 async def geocode_resolve_link(request: Request, body: dict):
-    """🆕 Heuristic Link-to-Pin Engine (2026)
+    """🆕 Heuristic Dual-Link Engine (2026)
     
-    解析 Google Maps 連結並提取座標或語意關鍵字。
+    解析 Google Maps 座標或 官網/社群 媒體首圖。
+    body: { url: str, type: "map" | "media" }
     """
     url = body.get("url")
+    res_type = body.get("type", "map")
+    
     if not url:
         return {"success": False, "error": "No URL provided"}
         
-    # Tier 1 & 2: Redirect + Regex
+    if res_type == "media":
+        # 解析官網/IG/FB 首圖
+        from services.link_resolver import resolve_generic_link
+        result = await resolve_generic_link(url)
+        return result
+
+    # 預設：解析地圖 (Tier 1 & 2: Redirect + Regex)
     result = await resolve_google_maps_link(url)
     
-    # Tier 3: Semantic Fallback (If logic allows)
+    # Tier 3: Semantic Fallback
     if not result.get("lat") and result.get("query"):
-        # 如果只有文字沒有座標，嘗試自動 Geocode (JIT Resolution)
         geo = await geocode_place(result["query"])
         if geo:
             result["lat"] = geo["lat"]

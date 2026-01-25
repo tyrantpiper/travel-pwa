@@ -13,6 +13,15 @@ export interface LocationInfo extends Coordinate {
     source?: string
 }
 
+export interface PreviewMetadata {
+    og_image?: string
+    og_title?: string
+    og_description?: string
+    map_image?: string
+    custom_order?: string[]
+    hidden_images?: string[]
+}
+
 export interface ItineraryItemState {
     id?: string
     itinerary_id?: string
@@ -29,9 +38,14 @@ export interface ItineraryItemState {
     sub_items?: SubItem[]
     memo?: string
     link_url?: string
+    website_link?: string
+    preview_metadata?: PreviewMetadata
     reservation_code?: string
     cost?: number | null
+    cost_amount?: number | null // 🆕 For backend parity
     hide_navigation?: boolean
+    is_private?: boolean
+    is_highlight?: boolean
 }
 
 export interface DailyLocation {
@@ -80,9 +94,13 @@ export interface Activity {
     memo?: string // User's private memo
     sub_items?: SubItem[]
     link_url?: string // External link for the place itself
+    website_link?: string
+    preview_metadata?: PreviewMetadata
     reservation_code?: string
     cost?: number | null
+    cost_amount?: number | null
     hide_navigation?: boolean
+    is_private?: boolean
     is_highlight?: boolean
     sort_order?: number  // 🆕 拖曳排序
 }
@@ -111,6 +129,14 @@ export interface TicketItem {
     note?: string
 }
 
+export interface ChecklistItem {
+    id: string
+    text: string
+    checked: boolean
+    is_private?: boolean
+    private_owner_id?: string
+}
+
 export interface Trip {
     id: string
     title: string
@@ -127,7 +153,7 @@ export interface Trip {
     day_notes?: Record<number, NoteItem[]>
     day_costs?: Record<number, CostItem[]>
     day_tickets?: Record<number, TicketItem[]>
-    day_checklists?: Record<number, { id: string; text: string; checked: boolean }[]>
+    day_checklists?: Record<number, ChecklistItem[]>
     ai_review?: string
     day_ai_reviews?: Record<number, string>  // 🆕 每日 AI 審核
 }

@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
+import { compressImage } from "@/lib/image-utils"
 
 // 🆕 DND-Kit imports
 import {
@@ -113,8 +114,10 @@ export function MultiImageUpload({
 
         setLoading(true)
         setProgress(0)
-
         try {
+            // 🆕 執行前端預壓縮 (2026 Optimization)
+            const compressedFile = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
             const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY
 
@@ -136,7 +139,7 @@ export function MultiImageUpload({
             const { signature } = await res.json()
 
             const formData = new FormData()
-            formData.append("file", file)
+            formData.append("file", compressedFile, file.name)
             formData.append("api_key", apiKey)
             formData.append("timestamp", String(timestamp))
             formData.append("signature", signature)
