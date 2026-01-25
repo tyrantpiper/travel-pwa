@@ -1139,8 +1139,10 @@ async def update_trip_info(
                 print(f"🔒 [Auth Denied] User {user_id} tried to update Trip {trip_id}")
                 raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
 
-        # 🛡️ 戰略修復 3.0: 統一合併更新 (Unified Merge-Aware Update)
-        # 杜絕「先更新 RPC、後被單獨 UPDATE 覆蓋」的競爭風險
+        # 🛡️ 戰略修復 3.1: 深度欄位保護更新 (Deep Field Protection)
+        # 僅更新請求中明確提供的欄位，避免預設 None 值覆蓋現有資料
+        provided_data = request.model_dump(exclude_unset=True)
+        print(f"🛠️ [Partial Update] Fields to update: {list(provided_data.keys())}")
         
         # 1. 取得最新 content (單一來源)
         trip_res = supabase.table("itineraries").select("content, flight_info, hotel_info").eq("id", trip_id).single().execute()
@@ -1149,25 +1151,28 @@ async def update_trip_info(
             
         current_content = trip_res.data.get("content") or {}
         update_columns = {}
-        
-        # 2. 準備更新集 (同時更新獨立欄位與 JSONB)
-        if request.credit_cards is not None:
-            current_content["credit_cards"] = request.credit_cards
-            print(f"🃏 Adding {len(request.credit_cards)} cards to content merge")
 
-        if request.flight_info is not None:
-            update_columns["flight_info"] = request.flight_info
-            current_content["flight_info"] = request.flight_info
+        # 2. 迭代處理提供的欄位
+        if "credit_cards" in provided_data:
+            cards = provided_data["credit_cards"]
+            current_content["credit_cards"] = cards
+            print(f"   🃏 Cards updated: {len(cards)} items")
+
+        if "flight_info" in provided_data:
+            f_info = provided_data["flight_info"]
+            update_columns["flight_info"] = f_info
+            current_content["flight_info"] = f_info
             
-        if request.hotel_info is not None:
-            update_columns["hotel_info"] = request.hotel_info
-            current_content["hotel_info"] = request.hotel_info
+        if "hotel_info" in provided_data:
+            h_info = provided_data["hotel_info"]
+            update_columns["hotel_info"] = h_info
+            current_content["hotel_info"] = h_info
 
         # 3. 執行單次原子化寫入 (Atomic Unit of Work)
         update_columns["content"] = current_content
         
         supabase.table("itineraries").update(update_columns).eq("id", trip_id).execute()
-        print(f"✅ Strategy 3.0: Unified update successful for Trip {trip_id}")
+        print(f"✅ Strategy 3.1: Partial update successful for Trip {trip_id}")
         
         return {"status": "success"}
     except HTTPException:

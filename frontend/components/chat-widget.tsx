@@ -358,16 +358,17 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             setIsSummarizing(true)
             toast.info("🧠 正在整理記憶...", { duration: 2000 })
 
-            // 背景呼叫摘要 API
             const toSummarize = messages.slice(0, messages.length - KEEP_RECENT)
+            const targetUserId = contextUserId || localStorage.getItem("user_uuid") || ""
             fetch(`${API_BASE}/api/chat/summarize`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-Gemini-API-Key": apiKey
+                    "X-Gemini-API-Key": apiKey,
+                    "X-User-ID": targetUserId
                 },
                 body: JSON.stringify({
-                    history: toSummarize.map(m => ({
+                    history: toSummarize.map((m: Message) => ({
                         role: m.role,
                         displayContent: m.displayContent
                     }))
@@ -473,7 +474,8 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                     },
                     abortControllerRef.current?.signal,  // 🆕 傳入 AbortSignal
                     leanItinerary,  // 🆕 行程上下文
-                    focusedDay   // 🆕 v3.8: 傳入當前焦點天數
+                    focusedDay,   // 🆕 v3.8: 傳入當前焦點天數
+                    contextUserId || localStorage.getItem("user_uuid") || ""
                 )
             } catch (streamError) {
                 console.error("⚠️ Streaming 失敗，使用 fallback:", streamError)
@@ -487,7 +489,8 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "X-Gemini-API-Key": apiKey
+                        "X-Gemini-API-Key": apiKey,
+                        "X-User-ID": contextUserId || localStorage.getItem("user_uuid") || ""
                     },
                     body: JSON.stringify({
                         message: userMsg,

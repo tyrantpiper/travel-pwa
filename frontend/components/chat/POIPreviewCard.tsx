@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useTripContext } from "@/lib/trip-context"
-
-// API Base URL
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+import { itemsApi, poiApi } from "@/lib/api"
 
 // 三源整合資料結構
 interface EnrichedPOI {
@@ -52,7 +50,7 @@ export default function POIPreviewCard({
     onAdded,
     onDismiss
 }: POIPreviewCardProps) {
-    const { activeTripId, mutate } = useTripContext()
+    const { activeTripId, mutate, userId } = useTripContext()
     const [isAdding, setIsAdding] = useState(false)
     const [isAdded, setIsAdded] = useState(false)
     const [enriched, setEnriched] = useState<EnrichedPOI | null>(null)
@@ -65,17 +63,10 @@ export default function POIPreviewCard({
 
             setIsLoadingEnrich(true)
             try {
-                const response = await fetch(`${API_BASE}/api/poi/enrich`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: poiData.place_name })
-                })
-
-                if (response.ok) {
-                    const data = await response.json()
-                    if (data.success && data.poi) {
-                        setEnriched(data.poi)
-                    }
+                // 🛡️ v5: Standardized Enrichment with Auth
+                const data = await poiApi.enrich(poiData.place_name, userId || undefined)
+                if (data.success && data.poi) {
+                    setEnriched(data.poi)
                 }
             } catch (error) {
                 console.log("三源資料獲取失敗 (不影響主流程):", error)
@@ -85,7 +76,7 @@ export default function POIPreviewCard({
         }
 
         fetchEnrichedData()
-    }, [poiData.place_name])
+    }, [poiData.place_name, userId])
 
     // 分類顏色映射
     const categoryColors: Record<string, string> = {
@@ -124,24 +115,18 @@ export default function POIPreviewCard({
         setIsAdding(true)
 
         try {
-            const response = await fetch(`${API_BASE}/api/items`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    itinerary_id: activeTripId,
-                    day_number: poiData.day_number || 1,
-                    time_slot: poiData.time_slot || "12:00",
-                    place_name: poiData.place_name,
-                    category: poiData.category || "sightseeing",
-                    notes: poiData.desc || "",
-                    lat: poiData.lat,
-                    lng: poiData.lng
-                })
+            // 🛡️ v5: Standardized Item Creation with Auth
+            await itemsApi.create({
+                trip_id: activeTripId,
+                day: poiData.day_number || 1,
+                time: poiData.time_slot || "12:00",
+                place: poiData.place_name,
+                category: poiData.category || "sightseeing",
+                desc: poiData.desc || "",
+                lat: poiData.lat,
+                lng: poiData.lng,
+                user_id: userId || undefined
             })
-
-            if (!response.ok) {
-                throw new Error("Failed to add item")
-            }
 
             // 成功
             setIsAdded(true)

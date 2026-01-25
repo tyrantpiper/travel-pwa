@@ -128,15 +128,17 @@ export async function streamChat(
     apiKey: string,
     handlers: SSEHandlers,
     signal?: AbortSignal,
-    // 🆕 新增行程上下文參數
+    // 🆕 新增行程上下文與使用者 ID
     itinerary?: unknown,
-    focused_day?: number
+    focused_day?: number,
+    userId?: string
 ): Promise<void> {
     const response = await fetch(`${apiUrl}/api/chat/stream`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "X-Gemini-API-Key": apiKey,
+            "X-User-ID": userId || ""
         },
         body: JSON.stringify({
             message,

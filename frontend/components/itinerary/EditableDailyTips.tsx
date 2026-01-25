@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -64,6 +65,70 @@ const NOTE_ICONS = [
     // 🎒 其他實用
     "🎒", "📸", "💊", "☂️", "🔋"
 ]
+
+// 🆕 IconPicker Component for custom emoji selection
+function IconPicker({ value, onChange }: { value: string, onChange: (val: string) => void }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const [customValue, setCustomValue] = useState("")
+
+    return (
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    className="w-12 h-9 text-lg flex items-center justify-center bg-transparent border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    title="選擇或輸入圖標"
+                >
+                    {value || "⚠️"}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="start">
+                <div className="space-y-3">
+                    <div className="grid grid-cols-6 gap-2">
+                        {NOTE_ICONS.map(icon => (
+                            <button
+                                key={icon}
+                                onClick={() => {
+                                    onChange(icon)
+                                    setIsOpen(false)
+                                }}
+                                className={cn(
+                                    "text-lg p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors",
+                                    value === icon && "bg-amber-100 dark:bg-amber-900/40"
+                                )}
+                            >
+                                {icon}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="貼上自定義 Emoji"
+                                className="h-8 text-xs flex-1"
+                                value={customValue}
+                                onChange={(e) => {
+                                    const val = e.target.value
+                                    setCustomValue(val)
+                                    // 🚀 如果輸入包含 emoji，自動應用第一個字元
+                                    if (val.trim()) {
+                                        onChange(val.trim())
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') setIsOpen(false)
+                                }}
+                            />
+                            <Button size="sm" className="h-8 px-2" onClick={() => setIsOpen(false)}>
+                                <Check className="w-3 h-3" />
+                            </Button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">可以直接由貼上或輸入表情符號</p>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
 const CURRENCIES = ["JPY", "TWD", "USD", "EUR", "KRW", "HKD"]
 const DEFAULT_CURRENCY = "JPY"
 
@@ -481,13 +546,10 @@ export default function EditableDailyTips({
                     {editingNotes && editNotesData.map((note, idx) => (
                         <div key={idx} className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-amber-200 dark:border-amber-700 space-y-2">
                             <div className="flex gap-2">
-                                <select
-                                    className="w-12 h-9 text-lg bg-transparent border border-slate-200 dark:border-slate-600 rounded"
+                                <IconPicker
                                     value={note.icon || "⚠️"}
-                                    onChange={(e) => handleUpdateEditNote(idx, 'icon', e.target.value)}
-                                >
-                                    {NOTE_ICONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
-                                </select>
+                                    onChange={(val) => handleUpdateEditNote(idx, 'icon', val)}
+                                />
                                 <Input
                                     placeholder="標題"
                                     className="flex-1 h-9 text-sm"
@@ -529,9 +591,10 @@ export default function EditableDailyTips({
                     {addingNote && (
                         <div className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-amber-200 dark:border-amber-700 space-y-2 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex gap-2">
-                                <select className="w-12 h-9 text-lg bg-transparent border border-slate-200 dark:border-slate-600 rounded" value={newNote.icon} onChange={(e) => setNewNote({ ...newNote, icon: e.target.value })}>
-                                    {NOTE_ICONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
-                                </select>
+                                <IconPicker
+                                    value={newNote.icon || "⚠️"}
+                                    onChange={(val) => setNewNote({ ...newNote, icon: val })}
+                                />
                                 <Input placeholder="標題" className="flex-1 h-9 text-sm" value={newNote.title} onChange={(e) => setNewNote({ ...newNote, title: e.target.value })} />
                             </div>
                             <Input placeholder="內容..." className="h-9 text-sm" value={newNote.content} onChange={(e) => setNewNote({ ...newNote, content: e.target.value })} />

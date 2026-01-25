@@ -31,7 +31,7 @@ import { Virtuoso } from "react-virtuoso"
 import { useExpenses, useHaptic } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
-import { expensesApi } from "@/lib/api"
+import { expensesApi, tripsApi, aiApi } from "@/lib/api"
 import { useOfflineMutation } from "@/lib/sync-hooks"
 
 // Type definitions
@@ -273,21 +273,19 @@ export function ToolsView() {
             // 🧠 v4.1: Integrate with Offline Engine & Atomic RPC
             const userId = localStorage.getItem("user_uuid") || ""
             const url = `${API_BASE}/api/trips/${activeTripId}/info`
-            const options = {
+            const payload = {
+                credit_cards: mergedSharedCards // 🕵️ Forensic Fix: Send ONLY cards to prevent clobbering
+            }
+
+            // 🛡️ Drop-in replacement with offline queue support
+            await offlineMutate(url, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
                     "X-User-ID": userId
                 },
-                body: JSON.stringify({
-                    flight_info: (activeTrip as Trip)?.flight_info || {},
-                    hotel_info: (activeTrip as Trip)?.hotel_info || {},
-                    credit_cards: mergedSharedCards // 🆕 Sync Shared Cards
-                })
-            }
-
-            // 🛡️ Drop-in replacement with offline queue support
-            await offlineMutate(url, options)
+                body: JSON.stringify(payload)
+            })
 
             // Re-fetch trip data using context mutate for proper SWR revalidation
             tripMutate()
@@ -502,26 +500,20 @@ export function ToolsView() {
         if (!markdown.trim()) return
         setMdLoading(true)
         setParseProgress("🤖 AI 正在解析行程...")
-        const apiKey = localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
+        const userId = localStorage.getItem("user_uuid") || ""
+
         try {
-            const response = await fetch(`${API_BASE}/api/parse-md`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Gemini-API-Key": apiKey
-                },
-                body: JSON.stringify({ markdown_text: markdown })
+            // 🛡️ Use standardized aiApi wrapper
+            const data = await aiApi.parseMarkdown({
+                markdown_text: markdown,
+                user_id: userId
             })
             setParseProgress("🌍 正在地理編碼地點...")
-            const data = await response.json()
-            if (!response.ok) {
-                toast.error(data.detail || "Parse failed")
-            } else {
-                setMdResult(data)
-                toast.success(`✅ 成功解析 ${data.items?.length || 0} 個地點`)
-            }
-        } catch { toast.error("Parse failed") }
-        finally {
+            setMdResult(data)
+            toast.success(`✅ 成功解析 ${data.items?.length || 0} 個地點`)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Parse failed")
+        } finally {
             setMdLoading(false)
             setParseProgress(null)
         }
@@ -531,35 +523,20 @@ export function ToolsView() {
         if (!aiPrompt.trim()) return
         setAiLoading(true)
         setGenerateProgress("🤖 AI 正在生成行程...")
-        const apiKey = localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
-
-        // 🛡️ 安全檢查：API Key 必須存在
-        if (!apiKey) {
-            toast.error("請先在設定中輸入 Gemini API Key")
-            setAiLoading(false)
-            setGenerateProgress(null)
-            return
-        }
+        const userId = localStorage.getItem("user_uuid") || ""
 
         try {
-            const response = await fetch(`${API_BASE}/api/ai-generate`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-Gemini-API-Key": apiKey
-                },
-                body: JSON.stringify({ prompt: aiPrompt })
+            // 🛡️ Use standardized aiApi wrapper
+            const data = await aiApi.generateTrip({
+                prompt: aiPrompt,
+                user_id: userId
             })
             setGenerateProgress("🌍 正在地理編碼地點...")
-            const data = await response.json()
-            if (!response.ok) {
-                toast.error(data.detail || "Generate failed")
-            } else {
-                setAiResult(data)
-                toast.success(`✅ 成功生成 ${data.data?.items?.length || 0} 個地點`)
-            }
-        } catch { toast.error("Generate failed") }
-        finally {
+            setAiResult(data)
+            toast.success(`✅ 成功生成 ${data.data?.items?.length || 0} 個地點`)
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Generate failed")
+        } finally {
             setAiLoading(false)
             setGenerateProgress(null)
         }
@@ -587,76 +564,56 @@ export function ToolsView() {
 
         try {
             if (selectedImportTripId === "new") {
-                // 1. 建立新行程
-                const response = await fetch(`${API_BASE}/api/save-itinerary`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-User-ID": userId
-                    },
-                    body: JSON.stringify({
-                        title: result.title || "New Trip",
-                        start_date: result.start_date || new Date().toISOString().split('T')[0],
-                        end_date: result.end_date || new Date().toISOString().split('T')[0],
-                        items: result.items,
-                        user_id: userId,
-                        creator_name: userName,
-                        daily_locations: result.daily_locations || {}, // 🆕 傳遞每日地點
-                        day_notes: result.day_notes || {},
-                        day_costs: result.day_costs || {},
-                        day_tickets: result.day_tickets || {},
-                        day_checklists: result.day_checklists || {},
-                        ai_review: result.ai_review
-                    })
+                // 1. 建立新行程 - 使用 standardized tripsApi
+                const data = await tripsApi.saveItinerary({
+                    title: result.title || "New Trip",
+                    start_date: result.start_date || new Date().toISOString().split('T')[0],
+                    end_date: result.end_date || new Date().toISOString().split('T')[0],
+                    items: result.items,
+                    user_id: userId,
+                    creator_name: userName,
+                    daily_locations: result.daily_locations || {},
+                    day_notes: result.day_notes || {},
+                    day_costs: result.day_costs || {},
+                    day_tickets: result.day_tickets || {},
+                    day_checklists: result.day_checklists || {},
+                    ai_review: result.ai_review
                 })
-                const data = await response.json()
-                if (response.ok) {
-                    toast.success(`行程已建立！房間代碼: ${data.share_code}`)
-                    setMarkdown("")
-                    setMdResult(null)
-                    setAiResult(null)
-                    setSelectedImportTripId("new") // Reset
-                    mutate((key) => typeof key === 'string' ? key.includes('/api/trips') : Array.isArray(key) && key[0]?.includes('/api/trips'), undefined, { revalidate: true })
-                } else {
-                    toast.error(data.detail || "Save failed")
-                }
+
+                toast.success(`行程已建立！房間代碼: ${data.share_code}`)
+                setMarkdown("")
+                setMdResult(null)
+                setAiResult(null)
+                setSelectedImportTripId("new") // Reset
+                mutate((key) => typeof key === 'string' ? key.includes('/api/trips') : Array.isArray(key) && key[0]?.includes('/api/trips'), undefined, { revalidate: true })
             } else {
-                // 2. 匯入至現有行程
-                const response = await fetch(`${API_BASE}/api/import-to-trip`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-User-ID": userId
-                    },
-                    body: JSON.stringify({
-                        trip_id: selectedImportTripId,
-                        items: result.items,
-                        daily_locations: result.daily_locations || {},
-                        day_notes: result.day_notes || {},
-                        day_costs: result.day_costs || {},
-                        day_tickets: result.day_tickets || {},
-                        day_checklists: result.day_checklists || {},
-                        ai_review: result.ai_review
-                    })
+                // 2. 匯入至現有行程 - 使用 standardized tripsApi
+                const data = await tripsApi.importToTrip(selectedImportTripId, {
+                    items: result.items,
+                    daily_locations: result.daily_locations || {},
+                    day_notes: result.day_notes || {},
+                    day_costs: result.day_costs || {},
+                    day_tickets: result.day_tickets || {},
+                    day_checklists: result.day_checklists || {},
+                    ai_review: result.ai_review,
+                    user_id: userId
                 })
-                const data = await response.json()
-                if (response.ok) {
-                    toast.success(data.message || "匯入成功")
-                    setMarkdown("")
-                    setMdResult(null)
-                    setAiResult(null)
-                    setSelectedImportTripId("new") // Reset
-                    // Refresh trip data if active
-                    if (activeTripId === selectedImportTripId) {
-                        // Force refresh current trip
-                        mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
-                    }
-                } else {
-                    toast.error(data.detail || "Import failed")
+
+                toast.success(data.message || "匯入成功")
+                setMarkdown("")
+                setMdResult(null)
+                setAiResult(null)
+                setSelectedImportTripId("new") // Reset
+                // Refresh trip data if active
+                if (activeTripId === selectedImportTripId) {
+                    mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
                 }
             }
-        } catch { toast.error("Save failed") }
-        finally { setIsSaving(false) }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Save failed")
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

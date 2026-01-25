@@ -42,7 +42,6 @@ import { ItineraryHeader } from "@/components/itinerary/ItineraryHeader"
 import { ItineraryTimeline } from "@/components/itinerary/ItineraryTimeline"
 
 const DEFAULT_START_DATE = new Date()
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 /**
  * 🔧 Helper to access day data with number/string key fallback
@@ -756,19 +755,7 @@ export function ItineraryView() {
 
         setLeavingTripId(tripId)
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${tripId}/leave`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-User-ID": userId || ""
-                }
-            })
-
-            if (!res.ok) {
-                const err = await res.json()
-                throw new Error(err.detail || "Failed to leave trip")
-            }
-
+            await tripsApi.leave(tripId, userId || "")
             toast.success("已成功退出行程")
             reloadTrips() // 刷新列表，行程會立即消失
         } catch (e) {
@@ -1294,8 +1281,8 @@ export function ItineraryView() {
                             if (type === "notes") updatePayload.day_notes = { [day]: data }
                             if (type === "costs") updatePayload.day_costs = { [day]: data }
                             if (type === "tickets") updatePayload.day_tickets = { [day]: data }
-                            const userId = localStorage.getItem("user_uuid") || ""
-                            await tripsApi.updateDayData(activeTripId, day, updatePayload, userId)
+
+                            await tripsApi.updateDayData(activeTripId, day, updatePayload, userId || "")
                             await reloadTripDetail()
                             return true
                         } catch (e) {
@@ -1323,20 +1310,18 @@ export function ItineraryView() {
                         if (!activeTripId) return false
                         try {
                             // 1. Update current day items
-                            const userId = localStorage.getItem("user_uuid") || ""
                             await tripsApi.updateDayData(activeTripId, day, {
                                 day_checklists: { [day]: items }
-                            }, userId)
+                            }, userId || "")
 
                             // 2. Clear Day 0 items if they were merged into Day 1 (bcfeb32 parity)
                             // If user is editing Day 1 and there are items in Day 0 (pre-trip), we assume they are now merged and should be cleared from Day 0
                             const hasDay0Items = (getDayData(currentTrip?.day_checklists, 0)?.length || 0) > 0
                             if (day === 1 && hasDay0Items) {
                                 debugLog("🕵️ Detecting Day 0 items after merge, clearing Day 0...")
-                                const userId = localStorage.getItem("user_uuid") || ""
                                 await tripsApi.updateDayData(activeTripId, 0, {
                                     day_checklists: { "0": [] }
-                                }, userId)
+                                }, userId || "")
                             }
 
                             await reloadTripDetail()

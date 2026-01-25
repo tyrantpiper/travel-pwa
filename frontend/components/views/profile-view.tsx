@@ -260,7 +260,10 @@ export function ProfileView() {
 
             const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://tyrantpiper-ryan-travel-api.hf.space"
             const res = await fetch(`${API_BASE}/api/user/${userId}/data`, {
-                method: "DELETE"
+                method: "DELETE",
+                headers: {
+                    "X-User-ID": userId
+                }
             })
 
             if (!res.ok) throw new Error("刪除失敗")

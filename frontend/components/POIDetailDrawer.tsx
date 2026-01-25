@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
+import { poiApi } from "@/lib/api"
 
 export interface ClusterItem {
     id?: string;
@@ -163,24 +164,15 @@ export default function POIDetailDrawer({
         setAiError(null)
 
         try {
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/poi/ai-enrich`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        name: poi.name,
-                        type: poi.type,
-                        lat: poi.lat,
-                        lng: poi.lng,
-                        api_key: localStorage.getItem("user_gemini_key")
-                    })
-                }
-            )
+            const userId = localStorage.getItem("user_uuid") || ""
+            const data = await poiApi.enrich({
+                name: poi.name,
+                type: poi.type,
+                lat: poi.lat,
+                lng: poi.lng,
+                api_key: localStorage.getItem("user_gemini_key")
+            }, userId)
 
-            if (!response.ok) throw new Error("AI 分析失敗")
-
-            const data = await response.json()
             setAiData(data)
         } catch {
             setAiError("無法取得 AI 分析，請稍後再試")

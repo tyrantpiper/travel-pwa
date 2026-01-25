@@ -12,7 +12,9 @@ import {
     ItineraryItemSchema,
     ExpenseSchema,
     UserProfileSchema,
-    GeocodeResponseSchema
+    GeocodeResponseSchema,
+    AiParseResponseSchema,
+    AiGenerateResponseSchema
 } from './schemas';
 import { SubItem, PreviewMetadata } from './itinerary-types';
 import { z } from "zod";
@@ -114,6 +116,42 @@ export interface GeocodeSearchParams {
 }
 
 // 🆕 Export Sync Engine Params
+export interface AiParseParams {
+    markdown_text: string
+    user_id?: string
+}
+
+export interface AiGenerateParams {
+    prompt: string
+    user_id?: string
+}
+
+export interface SaveItineraryParams {
+    title: string
+    start_date: string
+    end_date: string
+    items: Record<string, unknown>[]
+    user_id: string
+    creator_name: string
+    daily_locations?: Record<string, Record<string, unknown>>
+    day_notes?: Record<string, Record<string, unknown>>
+    day_costs?: Record<string, Record<string, unknown>>
+    day_tickets?: Record<string, Record<string, unknown>>
+    day_checklists?: Record<string, Record<string, unknown>>
+    ai_review?: string
+}
+
+export interface ImportToTripParams {
+    trip_id: string
+    items: Record<string, unknown>[]
+    daily_locations?: Record<string, Record<string, unknown>>
+    day_notes?: Record<string, Record<string, unknown>>
+    day_costs?: Record<string, Record<string, unknown>>
+    day_tickets?: Record<string, Record<string, unknown>>
+    day_checklists?: Record<string, Record<string, unknown>>
+    ai_review?: string
+    user_id?: string
+}
 
 // === API Functions ===
 
@@ -143,6 +181,22 @@ export const tripsApi = {
             return data
         }
         return parsed.data
+    },
+
+    /** 🚗 Leave a trip */
+    leave: async (tripId: string, userId: string) => {
+        const res = await fetch(`${API_HOST}/api/trips/${tripId}/leave`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-ID": userId
+            }
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: "Failed to leave trip" }))
+            throw new Error(err.detail || "Failed to leave trip")
+        }
+        return res.json()
     },
 
     /** Join an existing trip via share code */
@@ -330,6 +384,107 @@ export const tripsApi = {
         }
         return res.json()
     },
+
+    /** 💾 Save a new itinerary from AI result */
+    saveItinerary: async (params: SaveItineraryParams) => {
+        const { user_id, ...data } = params
+        const res = await fetch(API.SAVE_ITINERARY, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-ID": user_id
+            },
+            body: JSON.stringify({ ...data, user_id })
+        })
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: "儲存行程失敗" }))
+            throw new Error(error.detail || "儲存行程失敗")
+        }
+        return res.json()
+    },
+
+    /** 📥 Import AI items into an existing trip */
+    importToTrip: async (tripId: string, params: Omit<ImportToTripParams, 'trip_id'>) => {
+        const { user_id, ...data } = params
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (user_id) headers["X-User-ID"] = user_id
+
+        const res = await fetch(`${API_HOST}/api/import-to-trip`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ trip_id: tripId, ...data })
+        })
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: "匯入行程失敗" }))
+            throw new Error(error.detail || "匯入行程失敗")
+        }
+        return res.json()
+    }
+}
+
+/**
+ * AI API Functions
+ */
+export const aiApi = {
+    /** 🤖 Parse markdown itinerary into structured data */
+    parseMarkdown: async (params: AiParseParams) => {
+        const apiKey = typeof window !== 'undefined'
+            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
+            : ""
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Gemini-API-Key": apiKey
+        }
+        if (params.user_id) headers["X-User-ID"] = params.user_id
+
+        const res = await fetch(API.PARSE_MD, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ markdown_text: params.markdown_text })
+        })
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({ detail: "AI 解析失敗" }))
+            throw new Error(data.detail || "AI 解析失敗")
+        }
+        const data = await res.json()
+        const parsed = AiParseResponseSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] AI parse validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
+    },
+
+    /** 🚀 Generate itinerary from prompt */
+    generateTrip: async (params: AiGenerateParams) => {
+        const apiKey = typeof window !== 'undefined'
+            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
+            : ""
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Gemini-API-Key": apiKey
+        }
+        if (params.user_id) headers["X-User-ID"] = params.user_id
+
+        const res = await fetch(API.GENERATE_TRIP, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ prompt: params.prompt })
+        })
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({ detail: "AI 生成失敗" }))
+            throw new Error(data.detail || "AI 生成失敗")
+        }
+        const data = await res.json()
+        const parsed = AiGenerateResponseSchema.safeParse(data)
+        if (!parsed.success) {
+            console.warn("⚠️ [API] AI generate validation warning:", parsed.error)
+            return data
+        }
+        return parsed.data
+    }
 }
 
 /**
@@ -404,7 +559,13 @@ export const itemsApi = {
         // Use a generic userID if provided in params or separate arg? 
         // For itemsApi.create, params has trip_id, but the user_id for auth should come from context
         const userId = (params as CreateItemParams & { user_id?: string }).user_id || "";
-        if (userId) headers["X-User-ID"] = userId
+        if (userId) {
+            headers["X-User-ID"] = userId;
+        } else {
+            console.warn("⚠️ [API] itemsApi.create called without userId. Standardizing to localStorage fallback if available.");
+            const fallbackId = typeof window !== 'undefined' ? localStorage.getItem("user_uuid") : "";
+            if (fallbackId) headers["X-User-ID"] = fallbackId;
+        }
 
         const res = await offlineFetch(API.ITEMS, {
             method: "POST",
@@ -649,4 +810,49 @@ export const appApi = {
         if (!res.ok) throw new Error("Failed to fetch donation progress")
         return res.json()
     },
+}
+
+/**
+ * POI API Functions
+ */
+export const poiApi = {
+    /** 🌐 Nearby Search with Auth Protection */
+    nearby: async (lat: number, lng: number, category: string, userId?: string) => {
+        const headers: Record<string, string> = {}
+        if (userId) headers["X-User-ID"] = userId
+        const res = await fetch(`${API_HOST}/api/poi/nearby?lat=${lat}&lng=${lng}&category=${category}&radius=1000`, { headers })
+        if (!res.ok) throw new Error("Nearby POI search failed")
+        return res.json()
+    },
+
+    /** 🔥 AI Recommend with Auth Protection */
+    recommend: async (params: { pois: unknown[], user_query: string, api_key: string, user_preferences?: Record<string, unknown> }, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+        const res = await fetch(`${API_HOST}/api/poi/recommend`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(params)
+        })
+        if (!res.ok) throw new Error("AI Recommendation failed")
+        return res.json()
+    },
+
+    /** 🆕 v5: Enriched POI Info with Auth Protection */
+    enrich: async (params: { name: string, type: string, lat: number, lng: number, api_key?: string | null }, userId?: string) => {
+        if (!params.name) throw new Error("POI name is required for enrichment");
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API_HOST}/api/poi/ai-enrich`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(params)
+        })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ detail: "POI 資訊預載失敗" }))
+            throw new Error(errorData.detail || "POI 資訊預載失敗")
+        }
+        return res.json()
+    }
 }

@@ -124,6 +124,25 @@ export const GeocodeResponseSchema = z.object({
     results: z.array(GeocodeResultSchema).default([]),
 });
 
+// === AI Schemas ===
+export const AiParseResponseSchema = z.object({
+    title: z.string().optional(),
+    start_date: z.string().optional(),
+    end_date: z.string().optional(),
+    items: z.array(z.any()).default([]), // Full validation in ItineraryItemSchema
+    daily_locations: z.record(z.string(), z.any()).optional(),
+    day_notes: z.record(z.string(), z.array(z.any())).optional(),
+    day_costs: z.record(z.string(), z.array(z.any())).optional(),
+    day_tickets: z.record(z.string(), z.array(z.any())).optional(),
+    day_checklists: z.record(z.string(), z.array(z.any())).optional(),
+    ai_review: z.string().optional(),
+});
+
+export const AiGenerateResponseSchema = z.object({
+    status: z.string().default("success"),
+    data: AiParseResponseSchema.optional(),
+});
+
 // === Types derived from Schemas ===
 export type LatLng = z.infer<typeof LatLngSchema>;
 export type ItineraryItem = z.infer<typeof ItineraryItemSchema>;

@@ -5,8 +5,8 @@ import { MapPin, Plus, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { poiApi } from "@/lib/api"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 // POI 類別定義
 const POI_CATEGORIES = [
@@ -62,10 +62,8 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
         setAiRecommendation(null)
 
         try {
-            const res = await fetch(
-                `${API_BASE}/api/poi/nearby?lat=${centerLat}&lng=${centerLng}&category=${categoryId}&radius=1000`
-            )
-            const data = await res.json()
+            const userId = localStorage.getItem("user_uuid") || ""
+            const data = await poiApi.nearby(centerLat, centerLng, categoryId, userId)
             setPois(data.pois || [])
         } catch (e) {
             console.error("POI search error:", e)
@@ -90,17 +88,13 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                 return
             }
 
-            const res = await fetch(`${API_BASE}/api/poi/recommend`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    pois: pois.slice(0, 10),
-                    user_query: "請推薦最適合觀光客的一間，說明原因。",
-                    api_key: apiKey,
-                    user_preferences: JSON.parse(localStorage.getItem("poi_preferences") || "{}")
-                })
-            })
-            const data = await res.json()
+            const userId = localStorage.getItem("user_uuid") || ""
+            const data = await poiApi.recommend({
+                pois: pois.slice(0, 10),
+                user_query: "請推薦最適合觀光客的一間，說明原因。",
+                api_key: apiKey,
+                user_preferences: JSON.parse(localStorage.getItem("poi_preferences") || "{}")
+            }, userId)
             setAiRecommendation(data.recommendation)
         } catch (e) {
             console.error("AI recommend error:", e)
