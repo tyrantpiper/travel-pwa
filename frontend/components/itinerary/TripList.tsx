@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Trip, Activity } from "@/lib/itinerary-types"
 import { generateTripPDF, downloadPDF, TripPDFData } from "@/lib/pdf-generator"
+import { tripsApi } from "@/lib/api"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 
 interface TripListProps {
     trips: Trip[]
@@ -34,9 +35,8 @@ export function TripList({
     const handleDownloadPDF = async (trip: Trip) => {
         const toastId: string | number = toast.loading("生成 PDF 中...")
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${trip.id}`)
-            if (!res.ok) throw new Error("無法取得行程資料")
-            const fullTrip = await res.json()
+            // 🔒 Standardized: Use tripsApi.get to include userId/Auth header for private trips
+            const fullTrip = await tripsApi.get(trip.id, userId || "")
 
             const pdfData: TripPDFData = {
                 title: fullTrip.title || trip.title,

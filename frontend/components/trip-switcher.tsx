@@ -12,10 +12,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useTripContext } from "@/lib/trip-context"
 import { useLanguage } from "@/lib/LanguageContext"
 import { toast } from "sonner"
+import { tripsApi } from "@/lib/api"
 import { preload } from "swr"
 import { fetcherWithUserId } from "@/lib/hooks"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
 
 export function TripSwitcher({
     className,
@@ -63,17 +64,14 @@ export function TripSwitcher({
 
         setIsSaving(true)
         try {
-            const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/title`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title: newTitle.trim() })
-            })
-            if (!res.ok) throw new Error("API failed")
+            // 🔒 Standardized: Use tripsApi.updateTitle to include userId/Auth header
+            await tripsApi.updateTitle(activeTripId, newTitle.trim(), userId || "")
 
             mutate()
             toast.success("標題已更新")
             setIsEditing(false)
-        } catch {
+        } catch (e) {
+            console.error("Update title error:", e)
             toast.error("更新失敗")
         } finally {
             setIsSaving(false)
