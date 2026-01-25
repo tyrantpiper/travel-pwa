@@ -323,9 +323,9 @@ async def get_trip_by_id(
         
         # 🔧 FIX: Data Restoration - Fallback to top-level columns if content is empty
         # This harmonizes logic with get_trips() list view
-        raw_day_costs = trip.get("day_costs") or content.get("day_costs", {})
-        raw_day_tickets = trip.get("day_tickets") or content.get("day_tickets", {})
-        raw_day_checklists = trip.get("day_checklists") or content.get("day_checklists", {})
+        raw_day_costs = content.get("day_costs") or trip.get("day_costs") or {}
+        raw_day_tickets = content.get("day_tickets") or trip.get("day_tickets") or {}
+        raw_day_checklists = content.get("day_checklists") or trip.get("day_checklists") or {}
         
         day_costs = filter_private_items(raw_day_costs)
         day_tickets = filter_private_items(raw_day_tickets)
@@ -341,14 +341,14 @@ async def get_trip_by_id(
             "public_id": trip.get("public_id", ""),
             "cover_image": trip.get("cover_image"),
             
-            # 🔧 FIX: Check top-level first, then content
-            "daily_locations": trip.get("daily_locations") or content.get("daily_locations", {}),
-            "day_notes": trip.get("day_notes") or content.get("day_notes", {}),
+            # 🔧 FIX: Check content first (New Truth), then top-level (Legacy Fallback)
+            "daily_locations": content.get("daily_locations") or trip.get("daily_locations") or {},
+            "day_notes": content.get("day_notes") or trip.get("day_notes") or {},
             "day_costs": day_costs,
             "day_tickets": day_tickets,
             "day_checklists": day_checklists,
-            "ai_review": trip.get("ai_review") or content.get("ai_review", ""),
-            "day_ai_reviews": trip.get("day_ai_reviews") or content.get("day_ai_reviews", {}),  # 🆕 每日 AI 審核報告
+            "ai_review": content.get("ai_review") or trip.get("ai_review") or "",
+            "day_ai_reviews": content.get("day_ai_reviews") or trip.get("day_ai_reviews") or {},  # 🆕 每日 AI 審核報告
             "flight_info": content.get("flight_info") or trip.get("flight_info") or {},
             "hotel_info": content.get("hotel_info") or trip.get("hotel_info") or {},
             "credit_cards": filter_private_cards(content.get("credit_cards", [])),
@@ -965,12 +965,29 @@ async def update_day_data(
                 raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
         print(f"📝 更新 Day {request.day} 資訊 for Trip {trip_id}")
         
-        # 1. 取得現有行程
-        trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).execute()
+        # 1. 取得現有行程 (包含頂層欄位以進行 Lazy Migration)
+        trip_res = supabase.table("itineraries").select("content, day_notes, day_costs, day_tickets, day_checklists, ai_review, day_ai_reviews").eq("id", trip_id).execute()
         if not trip_res.data:
             raise HTTPException(status_code=404, detail="Trip not found")
         
-        content = trip_res.data[0].get("content") or {}
+        trip = trip_res.data[0]
+        content = trip.get("content") or {}
+        
+        # 🧠 Lazy Migration Strategy (Merge-on-Write)
+        # 確保在寫入前，content 包含了所有 Legacy Data
+        def migrate_field(field_name: str):
+            # 如果 content 沒有該欄位 (或為空)，但頂層有，則遷移進來
+            if not content.get(field_name) and trip.get(field_name):
+                content[field_name] = trip.get(field_name)
+                print(f"📦 [Lazy Migration] Migrated {field_name} from legacy column to content")
+                
+        migrate_field("day_notes")
+        migrate_field("day_costs")
+        migrate_field("day_tickets")
+        migrate_field("day_checklists")
+        migrate_field("ai_review")
+        migrate_field("day_ai_reviews")
+        migrate_field("daily_locations") # Note: Usually fetched separately but good to ensure
         
         # 2. 更新對應的資料 (注意: 前端傳來的 key 是字串或整數，需統一處理)
         day_key = str(request.day)
@@ -998,6 +1015,22 @@ async def update_day_data(
         if request.day_checklists is not None:
             existing_checklists = content.get("day_checklists", {})
             new_data = request.day_checklists.get(day_key) or request.day_checklists.get(request.day) or []
+            existing_checklists[day_key] = new_data
+            content["day_checklists"] = existing_checklists
+            
+        # 🆕 AI 深度審核
+        if request.day_ai_reviews is not None:
+            existing_reviews = content.get("day_ai_reviews", {})
+            new_data = request.day_ai_reviews.get(day_key) or request.day_ai_reviews.get(request.day) or ""
+            existing_reviews[day_key] = new_data
+            content["day_ai_reviews"] = existing_reviews
+            
+        # 3. 儲存更新後的 content
+        supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+        
+        return {"status": "success", "message": "Day data updated"}
+
+    except HTTPException:
             existing_checklists[day_key] = new_data
             content["day_checklists"] = existing_checklists
         
