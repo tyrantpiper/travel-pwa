@@ -875,7 +875,6 @@ export function ItineraryView() {
                     return
                 }
                 // 🔒 Fix: Pass user_id for auth header
-                // @ts-ignore - API expects this property implicitly for auth
                 await itemsApi.create({ ...activityData, trip_id: currentTrip.id, user_id: userId || "" })
             } else {
                 if (!editItem || !editItem.id) {
