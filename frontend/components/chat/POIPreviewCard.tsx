@@ -64,7 +64,13 @@ export default function POIPreviewCard({
             setIsLoadingEnrich(true)
             try {
                 // 🛡️ v5: Standardized Enrichment with Auth
-                const data = await poiApi.enrich(poiData.place_name, userId || undefined)
+                const data = await poiApi.enrich({
+                    name: poiData.place_name,
+                    type: poiData.category || "sightseeing",
+                    lat: poiData.lat || 0,
+                    lng: poiData.lng || 0,
+                    api_key: localStorage.getItem("user_gemini_key")
+                }, userId || undefined)
                 if (data.success && data.poi) {
                     setEnriched(data.poi)
                 }
@@ -76,7 +82,7 @@ export default function POIPreviewCard({
         }
 
         fetchEnrichedData()
-    }, [poiData.place_name, userId])
+    }, [poiData.place_name, poiData.category, poiData.lat, poiData.lng, userId])
 
     // 分類顏色映射
     const categoryColors: Record<string, string> = {
