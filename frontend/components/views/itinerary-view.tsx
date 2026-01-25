@@ -304,6 +304,10 @@ export function ItineraryView() {
             return null
         }
 
+        // 🛑 Fix FOIC (Flash of Incorrect Content): Wait for trip to load
+        if (!currentTrip) return
+
+
         // 🛡️ AbortController 防止競爭條件
         const controller = new AbortController()
 
@@ -331,7 +335,7 @@ export function ItineraryView() {
             "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷", timezone: "Asia/Bangkok" },
         }
 
-        let activeLoc: { name: string, lat: number, lng: number } = { name: "東京", lat: 35.6895, lng: 139.6917 }
+        let activeLoc: { name: string, lat: number, lng: number } | null = null
         let found = false
 
         // Priority 1: Use manually set daily location (search results)
@@ -361,7 +365,7 @@ export function ItineraryView() {
 
         // Priority 3: Fallback to Trip Title
         if (!found && currentTrip?.title) {
-            activeLoc.name = currentTrip.title
+            activeLoc = { name: currentTrip.title, lat: 35.6895, lng: 139.6917 } // Default init
             for (const [cityName, coords] of Object.entries(CITY_COORDS)) {
                 if (currentTrip.title.includes(cityName)) {
                     activeLoc = { name: cityName, lat: coords.lat, lng: coords.lng }
@@ -370,6 +374,11 @@ export function ItineraryView() {
                     break
                 }
             }
+        }
+
+        // 🛡️ Final Guard: If still no location, default to Tokyo ONLY if we have looked everywhere
+        if (!activeLoc) {
+            activeLoc = { name: "東京", lat: 35.6895, lng: 139.6917 }
         }
 
         setResolvedLocation(activeLoc)

@@ -38,7 +38,7 @@ export function WeatherPanel({
                 >
                     <MapPin className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
                     <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
-                        {resolvedLocation?.name || "Tokyo (Default)"}
+                        {resolvedLocation?.name || <span className="inline-block w-20 h-4 bg-slate-200 animate-pulse rounded align-middle" />}
                     </span>
                     <Edit3 className="w-3 h-3 text-slate-300 group-hover:text-amber-500 transition-colors" />
                 </button>
@@ -351,16 +351,18 @@ export function WeatherPanel({
 
                 {/* Row 5: AQI */}
                 {(() => {
-                    const aqisPresent = weatherData.some(w => w.airQuality !== undefined)
-                    if (weatherData.length > 0 && !aqisPresent) return null
+                    // 🛡️ Fix: Always render AQI row (permanent display), show placeholder if no data
+                    const validData = weatherData.filter(w => w.airQuality !== undefined)
+                    const hasData = validData.length > 0
+
                     return (
                         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2 col-span-2">
                             <span className="text-lg">🍃</span>
                             <div className="flex-1">
                                 <div className="text-xs text-slate-500">空氣品質 (AQI)</div>
                                 <div className="text-sm font-medium text-slate-700">
-                                    {weatherData.length > 0 ? (() => {
-                                        const maxAQI = Math.max(...weatherData.map(w => w.airQuality ?? 0))
+                                    {hasData ? (() => {
+                                        const maxAQI = Math.max(...validData.map(w => w.airQuality!))
                                         let level = '良好'
                                         let color = 'text-green-600'
                                         if (maxAQI > 300) { level = '極危險'; color = 'text-red-600' }
@@ -369,7 +371,7 @@ export function WeatherPanel({
                                         else if (maxAQI > 100) { level = '對敏感人群不健康'; color = 'text-yellow-600' }
                                         else if (maxAQI > 50) { level = '普通'; color = 'text-yellow-500' }
                                         return <span className={color}>{maxAQI} ({level})</span>
-                                    })() : '--'}
+                                    })() : <span className="text-slate-400">-- (暫無資料)</span>}
                                 </div>
                             </div>
                         </div>
