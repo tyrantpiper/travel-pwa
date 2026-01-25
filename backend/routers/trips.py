@@ -320,9 +320,16 @@ async def get_trip_by_id(
         
         # 取得 content 並過濾
         content = trip.get("content") or {}
-        day_costs = filter_private_items(content.get("day_costs", {}))
-        day_tickets = filter_private_items(content.get("day_tickets", {}))
-        day_checklists = filter_private_items(content.get("day_checklists", {}))
+        
+        # 🔧 FIX: Data Restoration - Fallback to top-level columns if content is empty
+        # This harmonizes logic with get_trips() list view
+        raw_day_costs = trip.get("day_costs") or content.get("day_costs", {})
+        raw_day_tickets = trip.get("day_tickets") or content.get("day_tickets", {})
+        raw_day_checklists = trip.get("day_checklists") or content.get("day_checklists", {})
+        
+        day_costs = filter_private_items(raw_day_costs)
+        day_tickets = filter_private_items(raw_day_tickets)
+        day_checklists = filter_private_items(raw_day_checklists)
         
         return {
             "id": trip["id"],
@@ -333,13 +340,15 @@ async def get_trip_by_id(
             "share_code": trip.get("share_code", ""),
             "public_id": trip.get("public_id", ""),
             "cover_image": trip.get("cover_image"),
-            "daily_locations": content.get("daily_locations", {}),
-            "day_notes": content.get("day_notes", {}),
+            
+            # 🔧 FIX: Check top-level first, then content
+            "daily_locations": trip.get("daily_locations") or content.get("daily_locations", {}),
+            "day_notes": trip.get("day_notes") or content.get("day_notes", {}),
             "day_costs": day_costs,
             "day_tickets": day_tickets,
             "day_checklists": day_checklists,
-            "ai_review": content.get("ai_review", ""),
-            "day_ai_reviews": content.get("day_ai_reviews", {}),  # 🆕 每日 AI 審核報告
+            "ai_review": trip.get("ai_review") or content.get("ai_review", ""),
+            "day_ai_reviews": trip.get("day_ai_reviews") or content.get("day_ai_reviews", {}),  # 🆕 每日 AI 審核報告
             "flight_info": content.get("flight_info") or trip.get("flight_info") or {},
             "hotel_info": content.get("hotel_info") or trip.get("hotel_info") or {},
             "credit_cards": filter_private_cards(content.get("credit_cards", [])),
