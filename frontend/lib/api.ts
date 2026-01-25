@@ -57,6 +57,7 @@ export interface JoinTripParams {
 
 export interface CreateItemParams {
     trip_id: string
+    user_id?: string // 🔒 Added for Auth header propagation
     day: number
     time: string
     place: string

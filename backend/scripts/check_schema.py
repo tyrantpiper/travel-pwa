@@ -17,13 +17,13 @@ except Exception as e:
     sys.exit(1)
 
 def check_schema():
-    print("🔍 [SCHEMA PROBE] Fetching one record with select('*')...")
+    print("🔍 [SCHEMA PROBE] Fetching one record from 'itinerary_items'...")
     try:
         # Fetch one record with all columns
-        res = supabase.table("itineraries").select("*").limit(1).execute()
+        res = supabase.table("itinerary_items").select("*").limit(1).execute()
         
         if not res.data:
-            print("⚠️ No records found, cannot infer schema from data.")
+            print("⚠️ No records found in itinerary_items.")
             return
 
         record = res.data[0]
@@ -33,11 +33,11 @@ def check_schema():
             print(f"   - {col}")
             
         # Specific check for suspects
-        suspects = ["day_notes", "day_costs", "day_tickets", "day_checklists", "ai_review", "day_ai_reviews", "daily_locations"]
+        suspects = ["website_link", "image_urls", "preview_metadata", "sort_order", "hide_navigation", "is_highlight", "is_private"]
         print("\n🔍 Checking Suspect Columns:")
         for s in suspects:
             exists = s in columns
-            print(f"   - {s}: {'✅ Exists' if exists else '❌ MISSING (Root Cause)'}")
+            print(f"   - {s}: {'✅ Exists' if exists else '❌ MISSING (Possible 500 Cause)'}")
 
     except Exception as e:
         print(f"❌ Query failed: {e}")

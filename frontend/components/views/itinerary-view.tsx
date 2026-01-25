@@ -874,14 +874,17 @@ export function ItineraryView() {
                     toast.error("參數缺失，無法新增項目")
                     return
                 }
-                await itemsApi.create(activityData)
+                // 🔒 Fix: Pass user_id for auth header
+                // @ts-ignore - API expects this property implicitly for auth
+                await itemsApi.create({ ...activityData, trip_id: currentTrip.id, user_id: userId || "" })
             } else {
                 if (!editItem || !editItem.id) {
                     console.error("❌ Edit failed: Missing ID", editItem)
                     toast.error("系統辨識異常：缺少項目 ID")
                     return
                 }
-                await itemsApi.update(editItem.id, activityData)
+                // 🔒 Fix: Pass userId as 3rd argument for auth header
+                await itemsApi.update(editItem.id, activityData, userId || "")
             }
             haptic.success()
             toast.success("已儲存變更")
