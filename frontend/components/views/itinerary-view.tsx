@@ -115,6 +115,7 @@ export function ItineraryView() {
         try {
             await itemsApi.create({
                 trip_id: activeTripId,
+                user_id: userId || "", // 🔒 Fix: Auth header
                 day: day,
                 time: time,
                 place: poi.name,
