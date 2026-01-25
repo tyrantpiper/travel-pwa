@@ -351,7 +351,7 @@ export const fetchWeatherWithSDK = async (
             const forecast: HourlyForecast[] = []
             for (let i = 0; i < weatherData.hourly.time.length; i++) {
                 // 取得小時 (0-23)
-                const hour = new Date(weatherData.hourly.time[i]).getHours()
+                const hour = new Date(weatherData.hourly.time[i]).getUTCHours()
 
                 forecast.push({
                     time: `${hour}:00`,

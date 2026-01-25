@@ -474,7 +474,15 @@ export function InfoView() {
                                                         <Card className="border-0 shadow-sm relative group overflow-hidden">
                                                             <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
                                                             <CardContent className="p-4 pl-6">
-                                                                {isEditing && <button onClick={() => removeHotel(idx)} className="absolute top-2 right-2 text-slate-200 hover:text-red-500">X</button>}
+                                                                {isEditing && (
+                                                                    <button
+                                                                        onClick={() => removeHotel(idx)}
+                                                                        className="absolute top-3 right-3 z-10 p-3 bg-red-50/90 dark:bg-red-950/40 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-full transition-all active:scale-90 shadow-sm border border-red-100/50 touch-manipulation"
+                                                                        aria-label="刪除住宿"
+                                                                    >
+                                                                        <Trash2 className="w-5 h-5" />
+                                                                    </button>
+                                                                )}
 
                                                                 <div className="space-y-3">
                                                                     <div className="space-y-1">
@@ -900,7 +908,7 @@ export function InfoView() {
                                         <>
                                             <Button variant="outline" className="flex-1 h-11 rounded-xl border-slate-200" onClick={() => setDetailOpen(false)}>Close</Button>
                                             {((hotels[currentHotelIdx].lat && hotels[currentHotelIdx].lng) || hotels[currentHotelIdx].address || hotels[currentHotelIdx].link_url) && (
-                                                <Button className="flex-1 h-11 bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 text-white rounded-xl shadow-lg"
+                                                <Button className="flex-1 h-11 bg-slate-900 dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-100 text-white rounded-xl shadow-lg"
                                                     onClick={() => {
                                                         const item = hotels[currentHotelIdx];
                                                         const url = item.link_url?.startsWith('http')

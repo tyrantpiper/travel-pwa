@@ -59,6 +59,16 @@ export const TripDaySchema = z.object({
     items: z.array(ItineraryItemSchema).default([]),
 });
 
+export const CreditCardSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    rewardRate: z.number().default(0),
+    rewardLimit: z.number().default(0),
+    notes: z.string().optional().default(""),
+    is_public: z.boolean().default(false),
+    creator_id: z.string().optional(),
+});
+
 export const TripSchema = z.object({
     id: z.string(),
     title: z.string(),
@@ -78,6 +88,7 @@ export const TripSchema = z.object({
     day_checklists: z.record(z.string(), z.array(z.any())).default({}),
     flight_info: z.any().optional().nullable(),
     hotel_info: z.any().optional().nullable(),
+    credit_cards: z.array(CreditCardSchema).default([]), // 🆕 補齊信用卡欄位
 });
 
 // === Expenses ===
@@ -85,11 +96,16 @@ export const ExpenseSchema = z.object({
     id: z.string(),
     itinerary_id: z.string(),
     title: z.string().default("Expense"),
+    amount: z.number().optional().default(0), // 🆕 新增
     amount_jpy: z.number().default(0),
     currency: z.string().default("JPY"),
     category: z.string().default("other"),
     payment_method: z.string().optional().nullable(),
     expense_date: z.string().optional().nullable(),
+    card_name: z.string().optional().nullable(), // 🆕 新增
+    exchange_rate: z.number().optional().nullable(), // 🆕 新增
+    cashback_rate: z.number().optional().default(0), // 🆕 新增
+    is_public: z.boolean().default(false), // 🆕 新增
     created_by: z.string().optional(),
     creator_name: z.string().optional(),
 });

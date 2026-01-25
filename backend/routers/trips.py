@@ -308,13 +308,14 @@ async def get_trip_by_id(
             return filtered
 
         def filter_private_cards(cards: list) -> list:
-            """過濾私人信用卡：只有建立者本人或行程創立者可見"""
+            """過濾私人信用卡：只有建立者本人或行程創立者(救援)可見"""
             if not cards: return []
-            creator_id = trip.get("created_by")
+            trip_creator_id = trip.get("created_by")
             return [
                 card for card in cards
                 if card.get("is_public") or 
-                   card.get("creator_id") == user_id
+                   card.get("creator_id") == user_id or
+                   (user_id == trip_creator_id and not card.get("creator_id")) # 🛡️ 精確救援：僅救回無主資料
             ]
         
         # 取得 content 並過濾
@@ -729,13 +730,17 @@ async def save_itinerary(
             "end_date": end_date,
             "status": "active",
             # 👇 存入 JSONB 欄位: 包含 daily_locations 及新的 daily tips
+            # 👇 存入 JSONB 欄位 (🆕 v4.Long-term: 預留欄位以防未來擴充)
             "content": {
-                "daily_locations": request.daily_locations,
-                "day_notes": request.day_notes,
-                "day_costs": request.day_costs,
-                "day_tickets": request.day_tickets,
-                "day_checklists": request.day_checklists,
-                "ai_review": request.ai_review
+                "daily_locations": request.daily_locations or {},
+                "day_notes": request.day_notes or {},
+                "day_costs": request.day_costs or {},
+                "day_tickets": request.day_tickets or {},
+                "day_checklists": request.day_checklists or {},
+                "ai_review": request.ai_review or None,
+                "credit_cards": [], # 🆕 顯式初始化，防止後續讀取異常
+                "flight_info": None,
+                "hotel_info": None
             }
         }
         
@@ -862,16 +867,30 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
                     result[day_key] = new_items  # 非陣列則覆蓋
             return result
             
-        updated_content = {
-            # daily_locations: 保持覆蓋 (一天只有一個地點中心)
-            "daily_locations": merge_dicts(existing_content.get("daily_locations"), request.daily_locations),
-            # 🆕 以下使用深度追加合併，支援分批匯入
-            "day_notes": deep_merge_day_arrays(existing_content.get("day_notes"), request.day_notes),
-            "day_costs": deep_merge_day_arrays(existing_content.get("day_costs"), request.day_costs),
-            "day_tickets": deep_merge_day_arrays(existing_content.get("day_tickets"), request.day_tickets),
-            "day_checklists": deep_merge_day_arrays(existing_content.get("day_checklists"), request.day_checklists),
-            "ai_review": request.ai_review if request.ai_review else existing_content.get("ai_review")
-        }
+        # 🛡️ 戰略修復 4.0: 全欄位保留型深度合併 (Neural Preservation Merge)
+        # 確保在匯入內容時，不會抹除 credit_cards, flight_info, hotel_info 等欄位
+        updated_content = (existing_content or {}).copy()
+        
+        # A. 合併每日位置 (覆蓋)
+        if request.daily_locations:
+             updated_content["daily_locations"] = merge_dicts(
+                 updated_content.get("daily_locations"), 
+                 request.daily_locations
+             )
+        
+        # B. 深度合併每日數組數據 (追加)
+        if request.day_notes:
+            updated_content["day_notes"] = deep_merge_day_arrays(updated_content.get("day_notes"), request.day_notes)
+        if request.day_costs:
+            updated_content["day_costs"] = deep_merge_day_arrays(updated_content.get("day_costs"), request.day_costs)
+        if request.day_tickets:
+            updated_content["day_tickets"] = deep_merge_day_arrays(updated_content.get("day_tickets"), request.day_tickets)
+        if request.day_checklists:
+            updated_content["day_checklists"] = deep_merge_day_arrays(updated_content.get("day_checklists"), request.day_checklists)
+        
+        # C. 合併 AI 審核 (保留原有的或更新)
+        if request.ai_review:
+            updated_content["ai_review"] = request.ai_review
         
         # 3. 更新主行程 content
         supabase.table("itineraries").update({"content": updated_content}).eq("id", request.trip_id).execute()
@@ -977,7 +996,6 @@ async def update_day_data(
         if request.day_ai_reviews is not None:
             existing_reviews = content.get("day_ai_reviews", {})
             # 允許傳入空字串或 None 來清除審核
-            new_data = request.day_ai_reviews.get(day_key) or request.day_ai_reviews.get(request.day)
             if new_data == "" or new_data is None:
                 # 清除審核：如果存在則刪除
                 if day_key in existing_reviews:
@@ -1097,37 +1115,35 @@ async def update_trip_info(
                 print(f"🔒 [Auth Denied] User {user_id} tried to update Trip {trip_id}")
                 raise HTTPException(status_code=403, detail="您沒有權限修改此行程資訊")
 
-        # 1. 如果有更新信用卡，執行原子化 RPC 更新 (🛡️ Cautious Fix: 原子化更新，防止併發覆蓋)
-        if request.credit_cards is not None:
-            supabase.rpc("update_trip_credit_cards", {
-                "target_trip_id": trip_id,
-                "new_cards": request.credit_cards
-            }).execute()
-
-        # 2. 更新 Flight/Hotel (Hybrid Store: Columns + JSONB Content)
-        # 🛡️ 謹慎更新：僅在有資料時更新，避免覆蓋為 NULL
-        data = {}
-        patch_content = {}
+        # 🛡️ 戰略修復 3.0: 統一合併更新 (Unified Merge-Aware Update)
+        # 杜絕「先更新 RPC、後被單獨 UPDATE 覆蓋」的競爭風險
         
+        # 1. 取得最新 content (單一來源)
+        trip_res = supabase.table("itineraries").select("content, flight_info, hotel_info").eq("id", trip_id).single().execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        current_content = trip_res.data.get("content") or {}
+        update_columns = {}
+        
+        # 2. 準備更新集 (同時更新獨立欄位與 JSONB)
+        if request.credit_cards is not None:
+            current_content["credit_cards"] = request.credit_cards
+            print(f"🃏 Adding {len(request.credit_cards)} cards to content merge")
+
         if request.flight_info is not None:
-            data["flight_info"] = request.flight_info
-            patch_content["flight_info"] = request.flight_info
+            update_columns["flight_info"] = request.flight_info
+            current_content["flight_info"] = request.flight_info
+            
         if request.hotel_info is not None:
-            data["hotel_info"] = request.hotel_info
-            patch_content["hotel_info"] = request.hotel_info
-            
-        if data:
-            # A. 更新獨立欄位 (Legacy Columns)
-            supabase.table("itineraries").update(data).eq("id", trip_id).execute()
-            
-            # B. 同步更新 content (JSONB) 以確保 PWA 生態系一致性
-            # 🧠 v4.2: 採用 Fetch-Merge-Save 策略 (因為無法建立 generic RPC)
-            trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
-            if trip_res.data:
-                current_content = trip_res.data.get("content") or {}
-                # 僅合併本次更新的欄位，保留其他欄位 (如 day_notes)
-                new_content = {**current_content, **patch_content}
-                supabase.table("itineraries").update({"content": new_content}).eq("id", trip_id).execute()
+            update_columns["hotel_info"] = request.hotel_info
+            current_content["hotel_info"] = request.hotel_info
+
+        # 3. 執行單次原子化寫入 (Atomic Unit of Work)
+        update_columns["content"] = current_content
+        
+        supabase.table("itineraries").update(update_columns).eq("id", trip_id).execute()
+        print(f"✅ Strategy 3.0: Unified update successful for Trip {trip_id}")
         
         return {"status": "success"}
     except HTTPException:

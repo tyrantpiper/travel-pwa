@@ -79,6 +79,14 @@ export const useWeatherStore = create<WeatherState>()(
         {
             name: 'weather-storage',
             storage: createJSONStorage(() => idbStorage),
+            version: 1, // 🆕 Fix 1.1: Force cache invalidation due to Timezone Bug fix
+            migrate: (persistedState: unknown, version: number) => {
+                if (version === 0) {
+                    // if the stored value is in version 0, we flush the cache
+                    return { cache: {} }
+                }
+                return persistedState as WeatherState
+            },
         }
     )
 )

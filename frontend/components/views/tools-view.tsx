@@ -861,10 +861,10 @@ export function ToolsView() {
                                                         {/* 🆕 Trash button: always visible on mobile, hover on desktop */}
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
-                                                            className="absolute -top-2 -right-2 z-10 w-7 h-7 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-manipulation"
+                                                            className="absolute -top-3 -right-3 z-10 w-10 h-10 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-lg opacity-100 transition-all scale-100 active:scale-90 touch-manipulation"
                                                             aria-label="刪除卡片"
                                                         >
-                                                            <Trash2 className="w-3.5 h-3.5 text-white" />
+                                                            <Trash2 className="w-4 h-4 text-white" />
                                                         </button>
                                                         <div
                                                             onClick={() => setViewingCard(card)}
@@ -1435,8 +1435,8 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: 
                     )}
                     {(item.cashback_rate ?? 0) > 0 && <span className="text-[10px] text-green-500 block text-right">(-{Math.round(cashback)})</span>}
                 </div>
-                <Button variant="ghost" size="icon" className="h-11 w-11 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-11 w-11 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-12 w-12 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-5 h-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-12 w-12 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-5 h-5" /></Button>
             </div>
         </div>
     )
