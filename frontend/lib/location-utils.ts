@@ -43,8 +43,13 @@ export function extractCoordsFromUrl(url: string): ExtractedLocation {
 }
 
 /**
- * Check if a URL is a Google Maps shortlink
+ * Check if a URL is any type of Google Maps link (shortlink or standard search)
  */
+export function isGoogleMapsUrl(url: string | null | undefined): boolean {
+    if (!url) return false;
+    return /goo\.gl|maps\.app\.goo\.gl|google\.(?:com|co\.jp|com\.tw)\/maps/.test(url);
+}
+
 export function isGoogleMapsShortlink(url: string): boolean {
     return /goo\.gl|maps\.app\.goo\.gl/.test(url);
 }

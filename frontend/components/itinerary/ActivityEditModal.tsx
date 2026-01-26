@@ -15,7 +15,7 @@ import { geocodeApi } from "@/lib/api"
 import { useHaptic } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
 import { X, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
-import { extractCoordsFromUrl, isGoogleMapsShortlink } from "@/lib/location-utils"
+import { extractCoordsFromUrl, isGoogleMapsUrl } from "../../lib/location-utils"
 
 const ACTIVITY_CATEGORIES = [
     { id: 'sightseeing', icon: '🎯', label: '景點' },
@@ -116,7 +116,7 @@ export function ActivityEditModal({
         }
 
         // 🌐 Tier 2: Backend Neural Engine (Scraper + Geocoder)
-        if (type === "map" && !isGoogleMapsShortlink(url)) {
+        if (type === "map" && !isGoogleMapsUrl(url)) {
             toast.info("此連結不包含可識別座標，請使用搜尋功能")
             return
         }

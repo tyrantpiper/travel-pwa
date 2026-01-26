@@ -9,8 +9,8 @@ from typing import Optional, Dict, Any
 RE_COORD_A = re.compile(r'@(-?\d+\.\d+),(-?\d+\.\d+)')
 # Pattern B: !3dlat!4dlng (Protobuf style)
 RE_COORD_B = re.compile(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)')
-# Pattern C: search?q=...
-RE_QUERY = re.compile(r'[?&]q=([^&]+)')
+# Pattern C: search?q=... or ?query=...
+RE_QUERY = re.compile(r'[?&](?:q|query|place_name)=([^&]+)')
 
 async def fetch_og_metadata(url: str) -> Dict[str, Any]:
     """
@@ -101,9 +101,12 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # Step 3: Extract Search Query (Tier 3 Fallback)
     match_q = RE_QUERY.search(final_url)
     if match_q:
-        query = urllib.parse.unquote(match_q.group(1))
-        result["query"] = query
-        result["method"] = f"{result['method']}+query"
+        try:
+            query = urllib.parse.unquote(match_q.group(1))
+            result["query"] = query
+            result["method"] = f"{result['method']}+query"
+        except Exception:
+            pass
 
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
