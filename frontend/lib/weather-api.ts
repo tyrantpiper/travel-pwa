@@ -204,6 +204,12 @@ export const fetchWeatherWithSDK = async (
     targetDate: string | null,
     daysFromNow: number
 ): Promise<WeatherResult | null> => {
+    // 🛡️ Phase 25 Safety: Defensive coordinate validation
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        console.warn("[Weather SDK] 🛡️ Invalid coordinates detected, aborting fetch.", { lat, lng });
+        return null;
+    }
+
     try {
         // 決定模式
         let mode: WeatherMode = 'live'

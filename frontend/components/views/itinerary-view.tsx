@@ -149,6 +149,7 @@ export function ItineraryView() {
 
     // 🆕 P8: Active Flag (防止競態條件)
     const activeReqRef = useRef<string | null>(null)
+    const prewarmerReqRef = useRef<string | null>(null) // 🆕 Phase 25: 專屬預熱隔離 Ref
     const weatherStore = useWeatherStore()
     const currentDayData = useMemo(() => {
         if (!currentTrip?.days || !Array.isArray(currentTrip.days)) return []
@@ -697,7 +698,7 @@ export function ItineraryView() {
 
             // 🆕 P8: Active Flag (防止競態條件 - Race Condition Protection) for pre-warmer
             const currentReqId = Math.random().toString(36).substring(7)
-            activeReqRef.current = currentReqId // Update activeReqRef for pre-warmer
+            prewarmerReqRef.current = currentReqId // 🆕 Phase 25: 使用隔離 Ref，不與主執行軌跡衝突
 
             // 能源檢查：如果在 6 小時內已經預熱過此行程，則跳過
             const lastWarmupKey = `warmup_${activeTripId}`
@@ -728,7 +729,8 @@ export function ItineraryView() {
 
                 try {
                     const result = await fetchWeatherWithSDK(dayLat, dayLng, dateStr, daysFromNow)
-                    if (result && activeReqRef.current === currentReqId) {
+                    // 🆕 Phase 25: 檢查隔離 Ref，確保預熱請求的過時結果不會干擾當前視圖
+                    if (result && prewarmerReqRef.current === currentReqId) {
                         weatherStore.setWeatherData(dayLat, dayLng, dateStr, result)
                     }
                 } catch { /* ignore */ }
