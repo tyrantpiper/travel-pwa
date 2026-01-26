@@ -5,8 +5,9 @@
 
 // Pattern A: @lat,lng
 const RE_COORD_A = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-// Pattern B: !3dlat!4dlng (Protobuf style)
-const RE_COORD_B = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+// 🆕 2026 Pattern B+: Non-consecutive !3d/!4d (handles intermediate params like !8m2)
+const RE_LAT = /!3d(-?\d+\.\d+)/;
+const RE_LNG = /!4d(-?\d+\.\d+)/;
 
 export interface ExtractedLocation {
     lat: number | null;
@@ -19,18 +20,25 @@ export interface ExtractedLocation {
  * Zero-latency extraction for long URLs
  */
 export function extractCoordsFromUrl(url: string): ExtractedLocation {
-    // 🆕 Priority 1: Try Pattern B (!3d/!4d - Precise Pinpoint)
-    const matchB = url.match(RE_COORD_B);
-    if (matchB) {
+    if (!url) return { lat: null, lng: null, method: 'none' };
+
+    // 🛡️ Pre-processing: Decode %21 to ! for robust matching
+    const decodedUrl = decodeURIComponent(url.replace(/%21/g, '!'));
+
+    // 🆕 Priority 1: Try Pattern B+ (!3d / !4d - Precise Pinpoint, allows gaps)
+    const latMatch = decodedUrl.match(RE_LAT);
+    const lngMatch = decodedUrl.match(RE_LNG);
+
+    if (latMatch && lngMatch) {
         return {
-            lat: parseFloat(matchB[1]),
-            lng: parseFloat(matchB[2]),
+            lat: parseFloat(latMatch[1]),
+            lng: parseFloat(lngMatch[1]),
             method: 'client_regex_b'
         };
     }
 
     // 🆕 Priority 2: Try Pattern A (@lat,lng - Map Center Fallback)
-    const matchA = url.match(RE_COORD_A);
+    const matchA = decodedUrl.match(RE_COORD_A);
     if (matchA) {
         return {
             lat: parseFloat(matchA[1]),

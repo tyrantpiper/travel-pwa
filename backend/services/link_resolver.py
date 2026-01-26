@@ -86,15 +86,20 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
             return result
 
     # Step 2: Extract coordinates via Regex (Tier 1 & 2)
-    # 🆕 Priority 1: Pattern B (!3d!4d - Precise Pinpoint)
-    match_b = RE_COORD_B.search(final_url)
-    if match_b:
-        result["lat"] = float(match_b.group(1))
-        result["lng"] = float(match_b.group(2))
+    # 🛡️ Hyper-Unquote: Handle %21 and multiple encodings for 2026 Protobuf robustness
+    processed_url = urllib.parse.unquote(urllib.parse.unquote(final_url)).replace('%21', '!')
+    
+    # 🆕 Priority 1: Pattern B+ (!3d / !4d - Precise Pinpoint, allows gaps)
+    lat_match = re.search(r'!3d(-?\d+\.\d+)', processed_url)
+    lng_match = re.search(r'!4d(-?\d+\.\d+)', processed_url)
+    
+    if lat_match and lng_match:
+        result["lat"] = float(lat_match.group(1))
+        result["lng"] = float(lng_match.group(1))
         result["method"] = f"{result['method']}+regex_b"
     else:
         # 🆕 Priority 2: Pattern A (@lat,lng - Map Center Fallback)
-        match_a = RE_COORD_A.search(final_url)
+        match_a = RE_COORD_A.search(processed_url)
         if match_a:
             result["lat"] = float(match_a.group(1))
             result["lng"] = float(match_a.group(2))
