@@ -19,23 +19,23 @@ export interface ExtractedLocation {
  * Zero-latency extraction for long URLs
  */
 export function extractCoordsFromUrl(url: string): ExtractedLocation {
-    // Try Pattern A (@lat,lng)
-    const matchA = url.match(RE_COORD_A);
-    if (matchA) {
-        return {
-            lat: parseFloat(matchA[1]),
-            lng: parseFloat(matchA[2]),
-            method: 'client_regex_a'
-        };
-    }
-
-    // Try Pattern B (!3d/!4d)
+    // 🆕 Priority 1: Try Pattern B (!3d/!4d - Precise Pinpoint)
     const matchB = url.match(RE_COORD_B);
     if (matchB) {
         return {
             lat: parseFloat(matchB[1]),
             lng: parseFloat(matchB[2]),
             method: 'client_regex_b'
+        };
+    }
+
+    // 🆕 Priority 2: Try Pattern A (@lat,lng - Map Center Fallback)
+    const matchA = url.match(RE_COORD_A);
+    if (matchA) {
+        return {
+            lat: parseFloat(matchA[1]),
+            lng: parseFloat(matchA[2]),
+            method: 'client_regex_a'
         };
     }
 

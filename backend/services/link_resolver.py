@@ -86,17 +86,19 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
             return result
 
     # Step 2: Extract coordinates via Regex (Tier 1 & 2)
-    match_a = RE_COORD_A.search(final_url)
-    if match_a:
-        result["lat"] = float(match_a.group(1))
-        result["lng"] = float(match_a.group(2))
-        result["method"] = f"{result['method']}+regex_a"
+    # 🆕 Priority 1: Pattern B (!3d!4d - Precise Pinpoint)
+    match_b = RE_COORD_B.search(final_url)
+    if match_b:
+        result["lat"] = float(match_b.group(1))
+        result["lng"] = float(match_b.group(2))
+        result["method"] = f"{result['method']}+regex_b"
     else:
-        match_b = RE_COORD_B.search(final_url)
-        if match_b:
-            result["lat"] = float(match_b.group(1))
-            result["lng"] = float(match_b.group(2))
-            result["method"] = f"{result['method']}+regex_b"
+        # 🆕 Priority 2: Pattern A (@lat,lng - Map Center Fallback)
+        match_a = RE_COORD_A.search(final_url)
+        if match_a:
+            result["lat"] = float(match_a.group(1))
+            result["lng"] = float(match_a.group(2))
+            result["method"] = f"{result['method']}+regex_a"
 
     # Step 3: Extract Search Query (Tier 3 Fallback)
     match_q = RE_QUERY.search(final_url)
