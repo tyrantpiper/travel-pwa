@@ -743,14 +743,14 @@ def translate_famous_landmark(query: str, country_code: str = None) -> tuple:
         # 🆕 使用預先建立的索引（效能優化）
         match_result = process.extractOne(
             normalized_query, 
-            FUZZY_SEARCH_INDEX.keys(),
+            FUZZY_INDEX.keys(),
             scorer=fuzz.ratio,
             score_cutoff=88  # 🆕 提高閾值至 88% 減少誤匹配
         )
         
         if match_result:
             matched_key, score, _ = match_result
-            landmark_key, landmark = FUZZY_SEARCH_INDEX[matched_key]
+            landmark_key, landmark = FUZZY_INDEX[matched_key]
             print(f"[FUZZY] '{query}' -> '{landmark['display']}' (score: {score})")
             return ([landmark["search"], query], landmark["display"], landmark)
 

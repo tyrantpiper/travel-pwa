@@ -380,7 +380,10 @@ export function ActivityEditModal({
 
                     {/* Primary Link - Priority Moved Up */}
                     <div className="space-y-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                        {/* 🛡️ v35.46: Surgically hiding Media Link per user request. 
+                            Keeping logic in place, but removing UI visibility.
                         {/* 1. 媒體連結 (Website/Social) */}
+                        {/* 
                         <div className="space-y-1.5">
                             <Label className="text-[10px] text-blue-600 dark:text-blue-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
                                 🔗 {t('media_link')}
@@ -406,6 +409,7 @@ export function ActivityEditModal({
                         </div>
 
                         <div className="border-t border-slate-100 dark:border-slate-800 my-2" />
+                        */}
 
                         {/* 2. 地圖連結 (Google Maps) */}
                         <div className="space-y-1.5">
