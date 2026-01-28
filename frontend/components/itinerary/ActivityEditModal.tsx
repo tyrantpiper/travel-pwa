@@ -450,7 +450,7 @@ export function ActivityEditModal({
                                 </Button>
                             </div>
                         </div>
-                        <p className="text-[9px] text-slate-400">💡 建議分開填寫地圖網址與連結，系統將自動抓取預覽圖</p>
+
                     </div>
 
                     {/* Notes */}

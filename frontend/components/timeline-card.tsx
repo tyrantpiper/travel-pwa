@@ -80,9 +80,17 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
     const renderContent = () => {
         // 🆕 支援多圖片：優先使用 image_urls，fallback 到 image_url
-        const images = activity.image_urls?.length
+        // 🆕 Image Hunter: 若無上傳圖片，fallback 到 preview_metadata 的 OG/Map 圖片
+        const uploadedImages = activity.image_urls?.length
             ? activity.image_urls
             : (activity.image_url ? [activity.image_url] : [])
+
+        const previewImage = activity.preview_metadata?.map_image
+            || activity.preview_metadata?.og_image
+
+        const images = uploadedImages.length > 0
+            ? uploadedImages
+            : (previewImage ? [previewImage] : [])
 
         return (
             <>
@@ -590,9 +598,17 @@ interface PhotoGalleryPreviewProps {
 }
 
 function PhotoGalleryPreview({ activity, onClose }: PhotoGalleryPreviewProps) {
-    const images = activity.image_urls?.length
+    // 🆕 Image Hunter: 與 renderContent() 保持一致的圖片來源邏輯
+    const uploadedImages = activity.image_urls?.length
         ? activity.image_urls
         : (activity.image_url ? [activity.image_url] : [])
+
+    const previewImage = activity.preview_metadata?.map_image
+        || activity.preview_metadata?.og_image
+
+    const images = uploadedImages.length > 0
+        ? uploadedImages
+        : (previewImage ? [previewImage] : [])
 
     const [currentIndex, setCurrentIndex] = useState(0)
 

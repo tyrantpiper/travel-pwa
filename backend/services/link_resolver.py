@@ -1,8 +1,9 @@
 import httpx
 import re
+import os
 import urllib.parse
 from bs4 import BeautifulSoup
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 # 🆕 v35.26: Anti-Acidosis Protocol - Smart Redirect Tracer
 try:
@@ -50,18 +51,55 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
             og_desc = soup.find("meta", property="og:description")
             og_site = soup.find("meta", property="og:site_name")
             
-            if og_title: metadata["title"] = og_title.get("content")
-            if og_image: metadata["image"] = og_image.get("content")
-            if og_desc: metadata["description"] = og_desc.get("content")
-            if og_site: metadata["site_name"] = og_site.get("content")
+            if og_title:
+                metadata["title"] = og_title.get("content")
+            if og_image:
+                metadata["image"] = og_image.get("content")
+            if og_desc:
+                metadata["description"] = og_desc.get("content")
+            if og_site:
+                metadata["site_name"] = og_site.get("content")
+
+            # 2. 額外標籤支援 (twitter, thumbnail, itemprop)
+            if not metadata["image"]:
+                for tag in ["twitter:image", "image_src", "thumbnail"]:
+                    found = soup.find("meta", attrs={"name": tag}) or soup.find("link", attrs={"rel": tag})
+                    if found:
+                        metadata["image"] = found.get("content") or found.get("href")
+                        break
             
-            # 2. Fallback to normal meta/title
+            if not metadata["image"]:
+                itemprop_image = soup.find("meta", itemprop="image")
+                if itemprop_image:
+                    metadata["image"] = itemprop_image.get("content")
+
+            # 3. Engine 2 - 深度獵捕 (Deep Scraper Regex Probe)
+            if not metadata["image"] and "google.com/maps" in url:
+                # 搜尋埋藏在 JS 中的高畫質圖片模式
+                lh_matches = re.findall(r'https://lh\d\.googleusercontent\.com/p/[^\\"]+=w\d+-h\d+', resp.text)
+                if lh_matches:
+                    best_match = lh_matches[0]
+                    # 重寫為 1000x800 高清格式
+                    metadata["image"] = re.sub(r'=w\d+-h\d+', '=w1000-h800-k-no', best_match)
+                    print(f"🎯 DeepScraper: Found photo buried in JS: {metadata['image']}")
+
+            # 4. URL 正規化與過濾 (Protocol-relative & Generic Icon)
+            if metadata["image"]:
+                if metadata["image"].startswith("//"):
+                    metadata["image"] = "https:" + metadata["image"]
+                
+                if any(icon in metadata["image"] for icon in ["maps_512dp.png", "maps_icon_60.png"]):
+                    print(f"🚫 Filtering generic Google Maps logo: {metadata['image']}")
+                    metadata["image"] = None
+            
+            # 5. 回退機制 - Title & Description
             if not metadata["title"] and soup.title:
                 metadata["title"] = soup.title.string
                 
             if not metadata["description"]:
                 desc = soup.find("meta", attrs={"name": "description"})
-                if desc: metadata["description"] = desc.get("content")
+                if desc:
+                    metadata["description"] = desc.get("content")
 
     except Exception as e:
         print(f"⚠️ Metadata fetch failed for {url}: {e}")
@@ -163,6 +201,24 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
     
+    # 🆕 v35.46: Engine 2 Fallback - ArcGIS Static Map Snapshot
+    # If no real photo found, generate a static map preview if coords exist
+    if not result["metadata"].get("image") and result.get("lat") and result.get("lng"):
+        arcgis_key = os.getenv("ARCGIS_API_KEY")
+        if arcgis_key:
+            # ArcGIS Static Map API
+            # Size: 800x600, Zoom: 16 (Street Level), Style: World_Street_Map
+            marker_str = f"{result['lng']},{result['lat']}"
+            static_url = (
+                f"https://static.arcgis.com/staticmap?"
+                f"center={result['lng']},{result['lat']}&"
+                f"zoom=16&size=800,600&"
+                f"marker=color:red;{marker_str}&"
+                f"token={arcgis_key}"
+            )
+            result["metadata"]["image"] = static_url
+            print(f"🗺️ Engine 2 Fallback: Generated ArcGIS Static Map: {static_url[:60]}...")
+
     return result
 
 async def resolve_generic_link(url: str) -> Dict[str, Any]:
