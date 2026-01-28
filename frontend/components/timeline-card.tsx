@@ -508,9 +508,9 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                         {links.map((link, i) => (
                                             <div key={i} className="space-y-1 p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700 relative">
                                                 <button onClick={() => removeLink(i)} className="absolute top-1 right-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
-                                                <Input className="h-7 text-xs" placeholder="標題 (e.g. 訂位連結)" value={link.name} onChange={e => updateLink(i, 'name', e.target.value)} />
-                                                <Input className="h-7 text-xs" placeholder="註解 (e.g. 記得先付訂金)" value={link.desc} onChange={e => updateLink(i, 'desc', e.target.value)} />
-                                                <Input className="h-7 text-xs font-mono text-blue-600" placeholder="https://..." value={link.link} onChange={e => updateLink(i, 'link', e.target.value)} />
+                                                <Input className="h-7 text-xs" placeholder="標題 (e.g. 訂位連結)" value={link.name || ""} onChange={e => updateLink(i, 'name', e.target.value)} />
+                                                <Input className="h-7 text-xs" placeholder="註解 (e.g. 記得先付訂金)" value={link.desc || ""} onChange={e => updateLink(i, 'desc', e.target.value)} />
+                                                <Input className="h-7 text-xs font-mono text-blue-600" placeholder="https://..." value={link.link || ""} onChange={e => updateLink(i, 'link', e.target.value)} />
                                             </div>
                                         ))}
                                         <Button size="sm" variant="outline" onClick={addLink} className="w-full h-7 text-xs">+ 新增連結</Button>

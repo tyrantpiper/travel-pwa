@@ -46,6 +46,7 @@ export interface ItineraryItemState {
     hide_navigation?: boolean
     is_private?: boolean
     is_highlight?: boolean
+    isManualCoords?: boolean
 }
 
 export interface DailyLocation {

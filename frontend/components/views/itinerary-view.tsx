@@ -99,6 +99,7 @@ export function ItineraryView() {
     const [cloneSourceDay, setCloneSourceDay] = useState<number | null>(null)
     const [pendingAddDayPosition, setPendingAddDayPosition] = useState<'before' | 'end' | null>(null)
     const [isAddingDay, setIsAddingDay] = useState(false)
+    const originalUrlRef = useRef<string>("")
 
 
     // 🆕 DND Sensors (同多圖拖曳)
@@ -823,11 +824,18 @@ export function ItineraryView() {
 
         setIsSavingActivity(true)
 
-        let finalLat = editItem?.lat
-        let finalLng = editItem?.lng
+        // 🕵️ 奈米級決策矩陣 (Sub-Atomic Decision Matrix)
+        const isUrlChanged = editItem?.link_url !== originalUrlRef.current
+        const shouldAutoRefresh = isUrlChanged && !editItem?.isManualCoords && !isAddMode
 
-        // 🧠 偵測：如果地點存在但無座標，啟動智能搜尋
-        if (editItem?.place && (finalLat === null || finalLat === undefined || finalLng === null || finalLng === undefined)) {
+        // 🛡️ v35.38: If coords already resolved, preserve them
+        const hasResolvedCoords = editItem?.lat != null && editItem?.lng != null
+        let finalLat = hasResolvedCoords ? editItem.lat : (shouldAutoRefresh ? null : editItem?.lat)
+        let finalLng = hasResolvedCoords ? editItem.lng : (shouldAutoRefresh ? null : editItem?.lng)
+
+        // 🧠 v30.7: Signal Purity Guard - If URL changed, strictly SILENCE frontend search
+        // and let backend's high-precision JIT resolver handle it.
+        if (!shouldAutoRefresh && !editItem?.isManualCoords && editItem?.place && (finalLat === null || finalLat === undefined || finalLng === null || finalLng === undefined)) {
             try {
                 const data = await geocodeApi.search({
                     query: editItem.place,
@@ -851,8 +859,8 @@ export function ItineraryView() {
                 place: editItem?.place || "",
                 desc: editItem?.desc,
                 category: editItem?.category,
-                lat: (finalLat !== null && finalLat !== undefined && !isNaN(Number(finalLat))) ? Number(finalLat) : null,
-                lng: (finalLng !== null && finalLng !== undefined && !isNaN(Number(finalLng))) ? Number(finalLng) : null,
+                lat: (typeof finalLat === 'number' && !isNaN(finalLat)) ? finalLat : (finalLat === null ? null : undefined),
+                lng: (typeof finalLng === 'number' && !isNaN(finalLng)) ? finalLng : (finalLng === null ? null : undefined),
                 image_url: editItem?.image_url,
                 image_urls: editItem?.image_urls,
                 tags: editItem?.tags,
@@ -963,8 +971,10 @@ export function ItineraryView() {
             cost: item.cost ?? item.cost_amount,
             hide_navigation: !!item.hide_navigation,
             is_private: !!item.is_private,
-            is_highlight: !!item.is_highlight
+            is_highlight: !!item.is_highlight,
+            isManualCoords: false // 🆕 初始化為非手動
         })
+        originalUrlRef.current = item.link_url || "" // 🆕 捕獲初始網址
         setIsEditOpen(true)
     }, [isOnline])
 

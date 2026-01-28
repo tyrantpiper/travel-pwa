@@ -584,8 +584,8 @@ export const itemsApi = {
         if (params.place !== undefined) payload.place_name = params.place
         if (params.desc !== undefined) payload.notes = params.desc
         if (params.category !== undefined) payload.category = params.category
-        if (params.lat !== undefined) payload.lat = params.lat ? Number(params.lat) : null
-        if (params.lng !== undefined) payload.lng = params.lng ? Number(params.lng) : null
+        if (params.lat !== undefined) payload.lat = params.lat === null ? null : Number(params.lat)
+        if (params.lng !== undefined) payload.lng = params.lng === null ? null : Number(params.lng)
         if (params.image_url !== undefined) payload.image_url = params.image_url
         if (params.image_urls !== undefined) payload.image_urls = params.image_urls
         if (params.tags !== undefined) payload.tags = params.tags

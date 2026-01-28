@@ -106,7 +106,7 @@ export function InfoView() {
         newHotels[currentHotelIdx] = tempHotel
         setHotels(newHotels)
         setInnerEditing(false)
-        handleSave() // Sync to backend
+        handleSave() // Sync to backend (Chain-Reaction Trigger)
     }
 
     // 🔄 Sync SWR Data to Local State (Hybrid Mode)
@@ -162,7 +162,9 @@ export function InfoView() {
 
             toast.success("Done")
             setIsEditing(false)
-            tripMutate() // 🔄 Refresh global context
+            // 🧠 v4.5: Absolute Fidelity Protocol - Trigger detail revalidation before list mutate
+            await reloadTripDetail()
+            await tripMutate() // 🔄 Refresh global context
         } catch (e) {
             console.error("Save failed:", e)
             toast.error("Save failed. Please check your connection or permissions.")

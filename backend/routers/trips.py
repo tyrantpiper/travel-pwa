@@ -30,6 +30,7 @@ from models.base import (
     AddDayRequest,
     ReorderRequest  # 🆕 拖曳排序
 )
+from services.link_resolver import resolve_google_maps_link
 from utils.deps import get_supabase, get_verified_user
 from utils.helpers import generate_room_code, generate_public_id, ensure_user_exists
 from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
@@ -1290,7 +1291,8 @@ async def update_item(
     print(f"📝 嘗試更新細項 {item_id}, user={user_id}")
     try:
         # 🛡️ 權限檢查
-        item_check = supabase.table("itinerary_items").select("itinerary_id").eq("id", item_id).single().execute()
+        # 🛡️ 權限檢查與資料快照 (Select expanded for Visual Synergy)
+        item_check = supabase.table("itinerary_items").select("itinerary_id, link_url, location_lat, location_lng, image_url, image_urls, place_name").eq("id", item_id).single().execute()
         if item_check.data:
             tid = item_check.data["itinerary_id"]
             member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", tid).eq("user_id", user_id).execute()
@@ -1305,6 +1307,81 @@ async def update_item(
         # 👇 寫入資料庫
         if request.lat is not None: data["location_lat"] = request.lat
         if request.lng is not None: data["location_lng"] = request.lng
+
+        # 🕵️ JIT Resolution logic (Sub-Atomic Guard)
+        # 如果收到潛在的同步信號（lat 為 None）且網址異動
+        if request.link_url is not None and request.lat is None and item_check.data:
+            current_url = item_check.data.get("link_url", "") or ""
+            new_url = request.link_url or ""
+            
+            # Normalize for comparison
+            if new_url.rstrip("/") != current_url.rstrip("/"):
+                try:
+                    print(f"🛰️ Detected URL change with null coords signal, triggering JIT resolution for: {new_url}")
+                    resolved = await resolve_google_maps_link(new_url)
+                    if resolved and resolved.get("lat"):
+                        data["location_lat"] = float(resolved["lat"])
+                        data["location_lng"] = float(resolved["lng"])
+                        print(f"✅ JIT Resolution Success: {data['location_lat']}, {data['location_lng']}")
+
+                        # 🧬 v31.8: Absolute-Synergy Visual Sync (Zero-Regression Protocol)
+                        if resolved.get("metadata"):
+                            try:
+                                meta = resolved["metadata"]
+                                new_thumb = meta.get("image")
+                                
+                                if new_thumb and isinstance(new_thumb, str):
+                                    # 1. Gallery Merger (Cumulative Synergy)
+                                    # Priority order: Frontend Payload > DB Current > Resolved Thumbnail
+                                    raw_urls = request.image_urls if request.image_urls is not None else (item_check.data.get("image_urls") or [])
+                                    target_urls = raw_urls if isinstance(raw_urls, list) else []
+                                    
+                                    # Prepend new thumbnail to gallery if it's unique
+                                    clean_thumb = new_thumb.strip()
+                                    if clean_thumb and clean_thumb not in [str(u).strip() for u in target_urls if u]:
+                                        target_urls.insert(0, clean_thumb)
+                                        request.image_urls = target_urls
+                                        print(f"📸 Visual Synergy: Atomic gallery merge - Added {clean_thumb[:30]}...")
+                                    
+                                    # 2. Cover Protection (Human-Priority Guard)
+                                    # Only set as primary if BOTH the editor payload and DB are empty
+                                    if not request.image_url and not item_check.data.get("image_url"):
+                                        request.image_url = clean_thumb
+                                        print("📸 Visual Synergy: Primary cover populated (Empty-State Recovery)")
+
+                                # 3. Title Intelligence (Merit Preservation)
+                                # Never overwrite a name if the user or the DB already has one
+                                if meta.get("title") and not request.place_name and not item_check.data.get("place_name"):
+                                    request.place_name = meta["title"]
+                                    print(f"🏷️ Title Synergy: Auto-filling name: {meta['title']}")
+
+                                # 4. Atomic Metadata Injection
+                                data["preview_metadata"] = meta
+                            except Exception as inner_e:
+                                # 🛡️ Zero-Noise: Non-critical failures should never block the save
+                                print(f"⚠️ Visual JIT (trips.py) gracefully ignored: {inner_e}")
+                    else:
+                        # 🛡️ v35.24: Conditional Cleanse (Anti-Sticky-Pin)
+                        # Only invalidate if URL actually changed
+                        current_db_url = item_check.data.get("link_url") or ""
+                        if request.link_url and request.link_url.rstrip("/") != current_db_url.rstrip("/"):
+                            data["location_lat"] = None
+                            data["location_lng"] = None
+                            print("🧹 Sticky Pin Prevention: Cleansed stale coords due to URL change")
+                        else:
+                            # Preserve existing behavior for non-URL-change scenarios
+                            data.pop("location_lat", None)
+                            data.pop("location_lng", None)
+                except Exception as ex:
+                    print(f"⚠️ JIT Resolution Failed: {ex}")
+                    # 🛡️ v35.24: Same conditional cleanse for exception path
+                    current_db_url = item_check.data.get("link_url") or ""
+                    if request.link_url and request.link_url.rstrip("/") != current_db_url.rstrip("/"):
+                        data["location_lat"] = None
+                        data["location_lng"] = None
+                    else:
+                        data.pop("location_lat", None)
+                        data.pop("location_lng", None)
         # 👇 新增：處理備忘錄
         if request.memo is not None: data["memo"] = request.memo
         # 🆕 新增：處理預約資訊

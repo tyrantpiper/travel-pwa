@@ -288,7 +288,7 @@ export function ToolsView() {
             })
 
             // Re-fetch trip data using context mutate for proper SWR revalidation
-            tripMutate()
+            await tripMutate()
         } catch (e) {
             console.error("Failed to sync shared cards:", e)
         }

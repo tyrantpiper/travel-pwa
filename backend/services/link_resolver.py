@@ -4,6 +4,15 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from typing import Optional, Dict, Any
 
+# 🆕 v35.26: Anti-Acidosis Protocol - Smart Redirect Tracer
+try:
+    from backend.utils.smart_redirect_tracer import get_smart_tracer
+    from backend.utils.molecular_parser import get_molecular_parser
+except ImportError:
+    # Fallback for when running from backend/ directory
+    from utils.smart_redirect_tracer import get_smart_tracer
+    from utils.molecular_parser import get_molecular_parser
+
 # Regex for coordinates in URLs
 # Pattern A: @lat,lng
 RE_COORD_A = re.compile(r'@(-?\d+\.\d+),(-?\d+\.\d+)')
@@ -72,38 +81,74 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         "metadata": {}
     }
 
-    # Step 1: Follow redirects
+    # 🆕 v35.26: Anti-Acidosis Protocol - Use SmartRedirectTracer
     final_url = url
-    if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
+    smart_tracer = get_smart_tracer()
+    
+    try:
+        # Step 1: Smart Trace with precision analysis
+        if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
+            trace_result = await smart_tracer.trace_full_chain_smart(url)
+            
+            if trace_result.get('lat') and trace_result.get('lng'):
+                # Use traced coords with precision guarantee
+                result["lat"] = trace_result["lat"]
+                result["lng"] = trace_result["lng"]
+                result["method"] = f"smart_tracer+{trace_result.get('method', 'unknown')}"
+                result["resolved_url"] = trace_result.get("final_url", url)
+                final_url = trace_result.get("final_url", url)
+                print(f"✅ SmartTracer: ({result['lat']}, {result['lng']}) precision={trace_result.get('precision', 'N/A')}")
+            else:
+                # SmartTracer found no coords in chain, try final URL parsing
+                final_url = trace_result.get("final_url", url)
+                result["resolved_url"] = final_url
+                
+                # Use MolecularParser as fallback
+                parser = get_molecular_parser()
+                parsed = parser.parse_url(final_url)
+                if parsed:
+                    result["lat"] = parsed["lat"]
+                    result["lng"] = parsed["lng"]
+                    result["method"] = f"molecular+{parsed.get('method', 'unknown')}"
+                    print(f"✅ MolecularParser: ({result['lat']}, {result['lng']})")
+        else:
+            # Non-short URL: Direct parsing with MolecularParser
+            parser = get_molecular_parser()
+            parsed = parser.parse_url(url)
+            if parsed:
+                result["lat"] = parsed["lat"]
+                result["lng"] = parsed["lng"]
+                result["method"] = f"molecular+{parsed.get('method', 'unknown')}"
+            final_url = url
+    
+    except Exception as e:
+        # 🛡️ Graceful fallback: Use legacy logic if new tracer fails
+        print(f"⚠️ SmartTracer/MolecularParser failed, falling back to legacy: {e}")
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
                 resp = await client.get(url)
                 final_url = str(resp.url)
                 result["resolved_url"] = final_url
-                result["method"] = "redirect"
-        except Exception as e:
-            print(f"⚠️ Redirect resolution failed: {e}")
+                result["method"] = "legacy_redirect"
+        except Exception as legacy_e:
+            print(f"⚠️ Legacy fallback also failed: {legacy_e}")
             return result
-
-    # Step 2: Extract coordinates via Regex (Tier 1 & 2)
-    # 🛡️ Hyper-Unquote: Handle %21 and multiple encodings for 2026 Protobuf robustness
-    processed_url = urllib.parse.unquote(urllib.parse.unquote(final_url)).replace('%21', '!')
-    
-    # 🆕 Priority 1: Pattern B+ (!3d / !4d - Precise Pinpoint, allows gaps)
-    lat_match = re.search(r'!3d(-?\d+\.\d+)', processed_url)
-    lng_match = re.search(r'!4d(-?\d+\.\d+)', processed_url)
-    
-    if lat_match and lng_match:
-        result["lat"] = float(lat_match.group(1))
-        result["lng"] = float(lng_match.group(1))
-        result["method"] = f"{result['method']}+regex_b"
-    else:
-        # 🆕 Priority 2: Pattern A (@lat,lng - Map Center Fallback)
-        match_a = RE_COORD_A.search(processed_url)
-        if match_a:
-            result["lat"] = float(match_a.group(1))
-            result["lng"] = float(match_a.group(2))
-            result["method"] = f"{result['method']}+regex_a"
+        
+        # Legacy regex extraction
+        processed_url = urllib.parse.unquote(urllib.parse.unquote(final_url)).replace('%21', '!')
+        lat_match = re.search(r'!3d(-?\d+\.\d+)', processed_url)
+        lng_match = re.search(r'!4d(-?\d+\.\d+)', processed_url)
+        
+        if lat_match and lng_match:
+            result["lat"] = float(lat_match.group(1))
+            result["lng"] = float(lng_match.group(1))
+            result["method"] = f"{result['method']}+legacy_regex"
+        else:
+            match_a = RE_COORD_A.search(processed_url)
+            if match_a:
+                result["lat"] = float(match_a.group(1))
+                result["lng"] = float(match_a.group(2))
+                result["method"] = f"{result['method']}+legacy_regex_a"
 
     # Step 3: Extract Search Query (Tier 3 Fallback)
     match_q = RE_QUERY.search(final_url)

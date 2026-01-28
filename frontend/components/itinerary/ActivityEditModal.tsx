@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -67,6 +67,18 @@ export function ActivityEditModal({
     const [resolveStatus, setResolveStatus] = useState<'idle' | 'success' | 'fallback' | 'error'>('idle')
     const haptic = useHaptic()
     const { t } = useLanguage()
+    const originalUrlRef = useRef<string>("")
+
+    // 🕵️ 奈米級追蹤：掛載時捕獲原始網址，並重置人工狀態
+    useEffect(() => {
+        if (isOpen && editItem) {
+            originalUrlRef.current = editItem.link_url || ""
+            // 重置人工編輯狀態（除非已經標記過）
+            if (editItem.isManualCoords === undefined) {
+                setEditItem({ ...editItem, isManualCoords: false })
+            }
+        }
+    }, [isOpen, editItem, setEditItem])
 
     const handleSearchPlace = async () => {
         if (!editItem?.place?.trim()) return
@@ -111,7 +123,7 @@ export function ActivityEditModal({
                 updateCoords(extracted.lat, extracted.lng)
                 setResolveStatus('success')
                 toast.success("已從連結自動提取座標")
-                return
+                // 🚀 Decoupling: Continue to backend to fetch metadata (images) if possible
             }
         }
 
@@ -127,21 +139,33 @@ export function ActivityEditModal({
             const result = await geocodeApi.resolveLink(url, type)
             if (result.success) {
                 if (type === "map" && result.lat && result.lng) {
-                    updateCoords(result.lat, result.lng)
-                    setResolveStatus(result.method?.includes('jit') ? 'fallback' : 'success')
-                    toast.success(result.method?.includes('jit') ? "已透過地名語意自動定位" : "已完成座標解析")
-                    // 同步儲存地圖預覽
-                    if (result.metadata?.image) {
-                        setEditItem({
-                            ...editItem,
-                            preview_metadata: { ...editItem.preview_metadata, map_image: result.metadata.image }
-                        })
-                    }
-                } else if (type === "media") {
-                    const meta = result.metadata || {}
+                    // 🛡️ v35.38: Combine coord and metadata update into single setEditItem
+                    // to avoid closure bug where second setEditItem overwrites first
+                    const newMetadata = result.metadata?.image ? {
+                        ...editItem.preview_metadata,
+                        map_image: result.metadata.image
+                    } : editItem.preview_metadata
+
                     setEditItem({
                         ...editItem,
-                        preview_metadata: { ...editItem.preview_metadata, og_image: meta.image, og_title: meta.title }
+                        lat: result.lat,
+                        lng: result.lng,
+                        isManualCoords: true,
+                        preview_metadata: newMetadata
+                    })
+                    setResolveStatus(result.method?.includes('jit') ? 'fallback' : 'success')
+                    toast.success(result.method?.includes('jit') ? "已透過地名語意自動定位" : "已完成座標解析")
+                } else if (type === "media") {
+                    const meta = result.metadata || {}
+                    // 🧠 Quantum Merge: Ensure og_image/title is stored without deleting map_image
+                    // 🛡️ v35.38: Standard setEditItem (no closure issue for media type)
+                    setEditItem({
+                        ...editItem,
+                        preview_metadata: {
+                            ...editItem.preview_metadata,
+                            og_image: meta.image,
+                            og_title: meta.title
+                        }
                     })
                     setResolveStatus('success')
                     toast.success("官網首圖解析成功！")
@@ -163,7 +187,8 @@ export function ActivityEditModal({
         setEditItem({
             ...editItem,
             lat: lat,
-            lng: lng
+            lng: lng,
+            isManualCoords: true // 🚩 探針發射：只要座標變動，系統自動退讓
         })
     }
 
@@ -174,6 +199,7 @@ export function ActivityEditModal({
                 place: loc.name,
                 lat: loc.lat,
                 lng: loc.lng,
+                isManualCoords: true, // 🚩 手動選擇地點視同人工座標
                 link_url: editItem.link_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name)}`
             })
             setPlaceSearchResults([])
@@ -218,7 +244,7 @@ export function ActivityEditModal({
                         <Label>{t('time')}</Label>
                         <Input
                             type="time"
-                            value={editItem.time}
+                            value={editItem.time || ""}
                             onChange={(e) => setEditItem({ ...editItem, time: e.target.value })}
                             className="w-full"
                         />
@@ -278,7 +304,7 @@ export function ActivityEditModal({
                         <div className="space-y-2">
                             <div className="flex gap-2">
                                 <Input
-                                    value={editItem.place}
+                                    value={editItem.place || ""}
                                     onChange={(e) => setEditItem({ ...editItem, place: e.target.value })}
                                     placeholder="輸入商家/景點名稱..."
                                     onKeyDown={(e) => e.key === 'Enter' && handleSearchPlace()}
@@ -338,8 +364,9 @@ export function ActivityEditModal({
                                         place: poi.name,
                                         lat: poi.lat,
                                         lng: poi.lng,
+                                        isManualCoords: true, // 🚩 選擇 POI 視同人工座標
                                         link_url: editItem.link_url || poi.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`,
-                                        desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : editItem.desc
+                                        desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : (editItem.desc || "")
                                     })
                                     toast.success(`已選擇: ${poi.name}`)
                                 }}
@@ -426,7 +453,7 @@ export function ActivityEditModal({
                     <div className="space-y-1.5">
                         <Label>{t('notes')}</Label>
                         <Input
-                            value={editItem.desc}
+                            value={editItem.desc || ""}
                             onChange={(e) => setEditItem({ ...editItem, desc: e.target.value })}
                             className="w-full"
                         />
@@ -532,13 +559,13 @@ export function ActivityEditModal({
                                     placeholder="Lat"
                                     className="text-xs font-mono"
                                     value={editItem.lat || ''}
-                                    onChange={(e) => setEditItem({ ...editItem, lat: e.target.value })}
+                                    onChange={(e) => setEditItem({ ...editItem, lat: e.target.value, isManualCoords: true })}
                                 />
                                 <Input
                                     placeholder="Lng"
                                     className="text-xs font-mono"
                                     value={editItem.lng || ''}
-                                    onChange={(e) => setEditItem({ ...editItem, lng: e.target.value })}
+                                    onChange={(e) => setEditItem({ ...editItem, lng: e.target.value, isManualCoords: true })}
                                 />
                             </div>
                             <div className="flex justify-between items-center px-1">
@@ -568,7 +595,7 @@ export function ActivityEditModal({
                                         className="h-7 text-[10px] text-red-500 hover:text-red-600 hover:bg-red-50 font-bold flex items-center gap-1"
                                         onClick={() => {
                                             haptic.tap()
-                                            setEditItem({ ...editItem, lat: null, lng: null })
+                                            setEditItem({ ...editItem, lat: null, lng: null, isManualCoords: true })
                                         }}
                                     >
                                         <X className="w-3 h-3" /> Clear Coords
