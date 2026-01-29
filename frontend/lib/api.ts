@@ -610,11 +610,28 @@ export const itemsApi = {
             body: JSON.stringify(payload)
         })
         if (!res.ok) throw new Error("Failed to update item")
-        const data = await res.json()
-        const parsed = ItineraryItemSchema.safeParse(data)
+        const json = await res.json()
+
+        // 🛡️ Zero-Regression Unwrap: Handle backend envelope { status, data }
+        // Edge Case 1: Backend may return error status
+        if (json.status === "error") {
+            throw new Error(json.message || "Update failed")
+        }
+        // Edge Case 2: data is typically an array from Supabase .update()
+        // Edge Case 3: data could be empty if item was deleted mid-update
+        const itemData = (json.data && Array.isArray(json.data))
+            ? json.data[0]
+            : (json.data || json)
+
+        if (!itemData) {
+            console.warn("⚠️ [API] Item update returned empty data")
+            return json
+        }
+
+        const parsed = ItineraryItemSchema.safeParse(itemData)
         if (!parsed.success) {
             console.warn("⚠️ [API] Item update validation warning:", parsed.error)
-            return data
+            return itemData  // 🛡️ Return unwrapped data instead of envelope
         }
         return parsed.data
     },
