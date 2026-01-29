@@ -29,8 +29,15 @@ async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -
     # ArcGIS stops 格式: lng,lat;lng,lat
     stops_str = ";".join([f"{s.lng},{s.lat}" for s in stops])
     
-    # 交通模式對應
-    travel_mode = "Walking" if mode == "walk" else "Driving"
+    # 交通模式對應 (ArcGIS 官方名稱，必須完全匹配)
+    # 參考: https://developers.arcgis.com/rest/network/api-reference/route-synchronous-service.htm
+    ARCGIS_TRAVEL_MODES = {
+        "walk": "Walking Time",
+        "drive": "Driving Time",
+        "transit": "Driving Time"  # ArcGIS 不支援 transit，暫用開車模式
+    }
+    travel_mode = ARCGIS_TRAVEL_MODES.get(mode, "Driving Time")
+    print(f"   🚶 ArcGIS travelMode: {travel_mode} (mode={mode})")
     
     async with httpx.AsyncClient(timeout=15.0) as client:
         res = await client.get(
@@ -86,15 +93,34 @@ async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -
 
 
 async def route_with_osrm(stops: List[RouteStop], mode: str) -> dict:
-    """備援：使用 OSRM 計算路線"""
+    """備援：使用 OSRM 計算路線 (FOSSGIS 伺服器)"""
     coords = ";".join([f"{s.lng},{s.lat}" for s in stops])
-    profile = "foot" if mode == "walk" else "car" if mode == "drive" else "foot"
     
-    url = f"https://router.project-osrm.org/route/v1/{profile}/{coords}"
+    # 🆕 FOSSGIS 伺服器（真正支援步行路線）
+    # 參考: https://routing.openstreetmap.de
+    # 重要：使用專用子域名 routed-foot / routed-car
+    if mode == "walk":
+        server = "https://routing.openstreetmap.de/routed-foot"
+        profile = "foot"
+    elif mode == "drive":
+        server = "https://routing.openstreetmap.de/routed-car"
+        profile = "driving"
+    else:  # transit 或其他
+        server = "https://routing.openstreetmap.de/routed-car"
+        profile = "driving"
+    
+    url = f"{server}/route/v1/{profile}/{coords}"
+    print(f"   🌐 FOSSGIS Server: {server.split('/')[-1]}, Profile: {profile}, Mode: {mode}")
     print(f"   🔍 OSRM Request URL (前100字元): {url[:100]}...")
     print(f"   🔍 OSRM Stops count: {len(stops)}")
     
-    async with httpx.AsyncClient(timeout=30.0) as client:  # 增加 timeout 到 30 秒
+    # 🆕 User-Agent 必須設定，否則會被 FOSSGIS 封鎖
+    headers = {
+        "User-Agent": "RyanTravelPWA/1.0 (https://github.com/ryan-travel-app)",
+        "Accept": "application/json"
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
         try:
             res = await client.get(
                 url,
@@ -121,7 +147,7 @@ async def route_with_osrm(stops: List[RouteStop], mode: str) -> dict:
             duration_min = round(route["duration"] / 60)
             
             return {
-                "source": "osrm",
+                "source": "osrm-fossgis",  # 🆕 標明使用 FOSSGIS 伺服器
                 "route": {
                     "type": "Feature",
                     "properties": {},
@@ -130,6 +156,7 @@ async def route_with_osrm(stops: List[RouteStop], mode: str) -> dict:
                 "distance": f"{distance_km} km",
                 "duration": f"{duration_min} 分鐘" if duration_min < 60 else f"{duration_min // 60}h {duration_min % 60}m"
             }
+
         except httpx.TimeoutException:
             print(f"   ❌ OSRM Timeout after 30s")
             raise Exception("OSRM timeout")
