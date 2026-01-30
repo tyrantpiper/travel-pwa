@@ -111,7 +111,8 @@ export default function EditableDailyChecklist({
         const newItem: ChecklistItem = {
             id: generateId(),
             text: newItemText.trim(),
-            checked: false
+            checked: false,
+            is_private: false  // 🛡️ Explicitly initialize for type stability
         }
 
         const newItems = [...localItems, newItem]
@@ -254,13 +255,24 @@ export default function EditableDailyChecklist({
 
     // 🆕 排序邏輯：1. 私人項目最優先, 2. 已勾選項目次優先, 3. 保持穩定原始順序
     const sortedItems = useMemo(() => {
+        // 🛡️ FIX: Create stable index map to avoid object reference issues with indexOf
+        const indexMap = new Map(localItems.map((item, i) => [item.id, i]))
+
         return [...localItems].sort((a, b) => {
             // 第一層：私人項目 (is_private) 最置頂
-            if (a.is_private !== b.is_private) return a.is_private ? -1 : 1
+            // 🛡️ FIX: Use !! for explicit boolean coercion to handle undefined !== false
+            const aPrivate = !!a.is_private
+            const bPrivate = !!b.is_private
+            if (aPrivate !== bPrivate) return aPrivate ? -1 : 1
+
             // 第二層：已勾選 (checked)
-            if (a.checked !== b.checked) return a.checked ? -1 : 1
-            // 第三層：保持穩定順序 (依據在 localItems 中的位置)
-            return localItems.indexOf(a) - localItems.indexOf(b)
+            // 🛡️ FIX: Use !! for explicit boolean coercion
+            const aChecked = !!a.checked
+            const bChecked = !!b.checked
+            if (aChecked !== bChecked) return aChecked ? -1 : 1
+
+            // 第三層：保持穩定順序 (依據 ID 在原始陣列中的位置)
+            return (indexMap.get(a.id) ?? 0) - (indexMap.get(b.id) ?? 0)
         })
     }, [localItems])
 
