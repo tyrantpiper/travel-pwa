@@ -59,15 +59,22 @@ export const useTripStore = create<TripState>()(
             setActiveTripTitle: (title) => set({ activeTripTitle: title }),
             setFocusedDay: (day) => set({ focusedDay: day }),
 
-            // Initialize from legacy localStorage (for migration)
+            // Initialize from legacy localStorage (for migration & resilience)
             initializeFromStorage: () => {
                 if (typeof window !== 'undefined') {
-                    const userId = localStorage.getItem('user_uuid')
+                    // 🛡️ Identity Calibration: Ensure the primary user_uuid is used as the SSO
+                    const legacyId = localStorage.getItem('user_uuid')
+                    const { userId } = useTripStore.getState()
+
+                    if (legacyId && userId !== legacyId) {
+                        console.log('🏗️ [Calibration] Restoring primary identity from localStorage:', legacyId)
+                        set({ userId: legacyId })
+                    }
+
                     const activeTripId = localStorage.getItem('active_trip_id')
                     const activeTripTitle = localStorage.getItem('active_trip_title')
 
                     set({
-                        userId,
                         activeTripId,
                         activeTripTitle
                     })

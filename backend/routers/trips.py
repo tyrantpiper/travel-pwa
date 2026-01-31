@@ -161,7 +161,14 @@ async def get_trips(
             trips_data = res.data or []
             print(f"📊 Dashboard: Using optimized user_trips_view")
         except Exception as view_err:
-            print(f"⚠️ [Fallback] user_trips_view missing or error: {view_err}")
+            # 🛡️ Zero-Regression Fallback: If view is broken (e.g. missing column), 
+            # switch to robust table join to ensure itineraries remain visible.
+            error_msg = str(view_err)
+            print(f"⚠️ [Resilience Fallback] user_trips_view issue: {error_msg}")
+            
+            # Explicitly log if it's the known column missing error (42703)
+            if "42703" in error_msg:
+                print("🚨 Detectable Pathogen: Missing column in trip_members. Activating surgical fallback.")
             # 🔄 Fallback Logic: 同時抓取成員表與創立表
             members_res = supabase.table("trip_members").select("itinerary_id").eq("user_id", user_id).execute()
             member_ids = [m['itinerary_id'] for m in members_res.data] if members_res.data else []
