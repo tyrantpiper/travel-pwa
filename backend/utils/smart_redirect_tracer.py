@@ -47,7 +47,12 @@ class SmartRedirectTracer:
         visited = set()  # Prevent infinite loops
         
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.timeout)) as client:
+            # 🛡️ v35.52: Stealth Identity - Spoofing iPhone Safari to bypass Google's bot detection
+            headers = {
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+                "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+            async with httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(self.timeout)) as client:
                 for hop in range(self.max_hops):
                     # Loop detection
                     if current_url in visited:

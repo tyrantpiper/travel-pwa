@@ -87,7 +87,8 @@ async def geocode_resolve_link(request: Request, body: dict):
     if res_type == "map":
         url_match = re.search(r'(https?://[^\s]+)', url)
         if url_match:
-            new_url = url_match.group(1)
+            # ✂️ Surgical Strip: Remove trailing punctuation often found in mobile shares
+            new_url = url_match.group(1).rstrip('.,!?:;"\'。，！？')
             if new_url != url:
                 log_debug(f"🧹 Sanitization: Extracted clean URL from input blob: {new_url[:50]}...")
                 url = new_url
