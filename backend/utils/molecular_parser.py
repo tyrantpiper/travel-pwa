@@ -84,6 +84,33 @@ class MolecularParser:
         
         return None
     
+    def extract_identifiers(self, url: str) -> Optional[Dict]:
+        """
+        🆕 v35.50: Side-car method to extract Place IDs (!1s, !1d) 
+        without affecting legacy coordinate parsing (Zero Regression).
+        """
+        decoded = unquote(unquote(url)).replace('%21', '!')
+        
+        # Pattern 1: !1s(Hex composed ID) -> 0x...:0x...
+        match = re.search(r'!1s(0x[0-9a-f]+:0x[0-9a-f]+)', decoded)
+        if match:
+            full_hex = match.group(1)
+            try:
+                # CID is the second part of the hex pair
+                parts = full_hex.split(':')
+                if len(parts) == 2:
+                    cid_hex = parts[1]
+                    cid_decimal = str(int(cid_hex, 16))
+                    return {
+                        'place_id': full_hex,
+                        'cid': cid_decimal,
+                        'method': 'google_place_id'
+                    }
+            except Exception:
+                pass
+        
+        return None
+    
     def extract_place_name(self, url: str) -> Optional[str]:
         """
         Extract place name from URL (fallback when no coordinates found).

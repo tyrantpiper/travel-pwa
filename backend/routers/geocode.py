@@ -14,6 +14,7 @@ from services.geocode_service import (
     geocode_place # 🆕 用於 Tier 3 Fallback
 )
 from services.link_resolver import resolve_google_maps_link # 🆕 Link-to-Pin 核心
+import re
 from utils.limiter import limiter
 
 router = APIRouter(prefix="/api/geocode", tags=["geocode"])
@@ -80,6 +81,16 @@ async def geocode_resolve_link(request: Request, body: dict):
     
     if not url:
         return {"success": False, "error": "No URL provided"}
+        
+    # 🛡️ Phase 1: Input Sanitization (針對 iPhone 分享雜訊)
+    # 提取第一個 http/https 連結，過濾掉店名與地址雜訊
+    if res_type == "map":
+        url_match = re.search(r'(https?://[^\s]+)', url)
+        if url_match:
+            new_url = url_match.group(1)
+            if new_url != url:
+                log_debug(f"🧹 Sanitization: Extracted clean URL from input blob: {new_url[:50]}...")
+                url = new_url
         
     if res_type == "media":
         # 解析官網/IG/FB 首圖

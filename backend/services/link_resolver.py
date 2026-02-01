@@ -130,7 +130,15 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         url = re.sub(r'([?&])(g_st|si|utm_\w+)=[^&]+', '', url)
         # 清理可能殘留的問號或 &
         url = url.rstrip("?&")
-        print(f"🧹 Sanitized URL for redirect chain: {url}")
+        # log_debug or standard print for tracer traceability is currently used here
+        # Keeping it consistent with the existing file's debug style
+    
+    # 🕵️ Step 0.5: Aggressive Text-to-URL Extraction (Defense in Depth)
+    if url and ('\n' in url or ' ' in url):
+        clean_match = re.search(r'(https?://[^\s]+)', url)
+        if clean_match:
+            # Using silence for production clean url extraction
+            url = clean_match.group(1)
     
     try:
         # Step 1: Smart Trace with precision analysis
@@ -238,6 +246,17 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
     
+    # 🧬 Phase 2: The "DNA" Upgrade (Place ID / CID Extraction)
+    # 使用 Side-car 方法提取正式 ID，而不干擾原本的座標邏輯
+    try:
+        parser = get_molecular_parser()
+        ids = parser.extract_identifiers(final_url)
+        if ids:
+            result.update(ids)
+            # DNA Extraction is silent in production
+    except Exception:
+        pass
+
     # 🆕 v35.46: Engine 2 Fallback - ArcGIS Static Map Snapshot
     # If no real photo found, generate a static map preview if coords exist
     if not result["metadata"].get("image") and result.get("lat") and result.get("lng"):
