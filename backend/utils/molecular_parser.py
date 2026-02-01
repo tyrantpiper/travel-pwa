@@ -109,6 +109,20 @@ class MolecularParser:
             except Exception:
                 pass
         
+        # 🧪 v35.60: Hex-to-CID Bridge (Support for skid/ftid in search URLs)
+        # Often found in iPhone redirect-to-search links
+        match_skid = re.search(r'[?&](?:skid|ftid)=([0-9a-f]{10,})', decoded)
+        if match_skid:
+            try:
+                hex_val = match_skid.group(1)
+                cid_decimal = str(int(hex_val, 16))
+                return {
+                    'cid': cid_decimal,
+                    'method': 'hex_to_cid_bridge'
+                }
+            except (ValueError, TypeError):
+                pass
+        
         return None
     
     def extract_place_name(self, url: str) -> Optional[str]:

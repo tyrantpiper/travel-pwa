@@ -35,7 +35,7 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
     
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
         async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
@@ -246,6 +246,25 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
     
+    # 🎨 [Hybrid Precision] Visual Coordinate Mining
+    # 🛡️ v35.60: Fallback to static map center if coordinates are still missing (common for iPhone redirects)
+    if not result.get("lat") and result["metadata"].get("image"):
+        img_url = result["metadata"]["image"]
+        # Extract center=lat,lng or center=lng,lat from Google Static Map URL
+        # Pattern handles both comma and %2C encodings
+        visual_match = re.search(r'center=([-0-9.]+)(?:%2C|,)([-0-9.]+)', img_url)
+        if visual_match:
+            try:
+                v_lat, v_lng = float(visual_match.group(1)), float(visual_match.group(2))
+                # Validation: Standard check to ensure it's not a generic IP-centered map (like 23.5, 121 for TW)
+                # But typically any static map from OG tags is specifically tailored to the POI.
+                result["lat"] = v_lat
+                result["lng"] = v_lng
+                result["method"] = f"{result.get('method', 'visual_mining')}+visual_center"
+                print(f"🎯 [VisualMining] Extracted precision from static map meta: ({v_lat}, {v_lng})")
+            except (ValueError, TypeError):
+                pass
+
     # 🧬 Phase 2: The "DNA" Upgrade (Place ID / CID Extraction)
     # 使用 Side-car 方法提取正式 ID，而不干擾原本的座標邏輯
     try:
@@ -253,9 +272,19 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         ids = parser.extract_identifiers(final_url)
         if ids:
             result.update(ids)
-            # DNA Extraction is silent in production
     except Exception:
         pass
+        
+    # 📉 [Precision Auditor] Log failures for persistent optimization
+    if not result.get("lat"):
+        # Log to a persistent file for "carpet-bombing" optimization
+        try:
+            with open("semantic_fallback_audit.log", "a", encoding="utf-8") as audit_f:
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                audit_f.write(f"[{timestamp}] FAIL | URL: {final_url} | Metadata: {result.get('metadata', {}).get('title')} \n")
+        except:
+            pass
 
     # 🆕 v35.46: Engine 2 Fallback - ArcGIS Static Map Snapshot
     # If no real photo found, generate a static map preview if coords exist

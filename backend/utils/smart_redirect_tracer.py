@@ -47,9 +47,9 @@ class SmartRedirectTracer:
         visited = set()  # Prevent infinite loops
         
         try:
-            # 🛡️ v35.52: Stealth Identity - Spoofing iPhone Safari to bypass Google's bot detection
+            # 🛡️ v35.60: Standardized Identity - Using Windows Chrome for highest compliance and redirect stability
             headers = {
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
             }
             async with httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(self.timeout)) as client:
@@ -67,6 +67,9 @@ class SmartRedirectTracer:
                         coords['url'] = current_url
                         all_coords.append(coords)
                         print(f"🔍 Hop {hop}: Found coords ({coords['lat']}, {coords['lng']}) - Precision: {coords['precision']}")
+                    else:
+                        # 🛡️ v35.60: Even if no coords, keep track of the most "advanced" URL to help Visual Mining
+                        pass
                     
                     # Trace next hop (NO auto-follow)
                     try:
