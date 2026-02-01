@@ -907,16 +907,33 @@ export function ItineraryView() {
     }
 
     const handleUpdateActivity = useCallback(async (id: string, updates: Partial<Activity>): Promise<boolean> => {
+        // 🚀 Optimistic Update: Immediately reflect changes in UI
+        if (currentTrip?.days) {
+            const optimisticData = {
+                ...currentTrip,
+                days: currentTrip.days.map(d => ({
+                    ...d,
+                    activities: d.activities?.map(a =>
+                        a.id === id ? { ...a, ...updates } : a
+                    ) || []
+                }))
+            }
+            reloadTripDetail(optimisticData, false)
+        }
+
         try {
             await itemsApi.update(id, updates, userId || "")
+            // Finish by revalidating with server data
             await reloadTripDetail()
             return true
         } catch (e) {
             console.error("🔥 handleUpdateActivity error:", e)
             toast.error(e instanceof Error ? `更新失敗: ${e.message}` : "更新失敗")
+            // 🛡️ Rollback to last known good state from server
+            await reloadTripDetail()
             return false
         }
-    }, [reloadTripDetail, userId])
+    }, [currentTrip, reloadTripDetail, userId])
 
 
     const handleDeleteItem = useCallback(async (id: string) => {

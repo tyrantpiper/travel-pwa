@@ -338,7 +338,9 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
     const addLink = () => setLinks([...links, { name: "", desc: "", link: "" }])
     const removeLink = (idx: number) => setLinks(links.filter((_, i) => i !== idx))
     const updateLink = (idx: number, field: keyof SubItem, val: string) => {
-        const newLinks = [...links]; newLinks[idx][field] = val; setLinks(newLinks)
+        setLinks(prev => prev.map((link, i) =>
+            i === idx ? { ...link, [field]: val } : link
+        ))
     }
 
     // 🆕 核心解析邏輯 (神經網絡連動)

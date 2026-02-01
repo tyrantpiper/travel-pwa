@@ -123,6 +123,15 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     final_url = url
     smart_tracer = get_smart_tracer()
     
+    # 🛡️ Step 0: Sanitization (針對 iOS 分享連結進行淨化)
+    # 目的：移除 g_st 等參數以強制 Google 回傳帶座標的 Desktop 版 URL
+    if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
+        # 移除 g_st (share type), si, utm 等追蹤參數
+        url = re.sub(r'([?&])(g_st|si|utm_\w+)=[^&]+', '', url)
+        # 清理可能殘留的問號或 &
+        url = url.rstrip("?&")
+        print(f"🧹 Sanitized URL for redirect chain: {url}")
+    
     try:
         # Step 1: Smart Trace with precision analysis
         if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
@@ -197,6 +206,34 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
             result["method"] = f"{result['method']}+query"
         except Exception:
             pass
+
+    # 🕵️ Step 3.5: HTML Deep Mining (最後一道防線)
+    # 只有當 (1) 沒座標 (2) 是 Google Maps 連結 時才啟動
+    if not result["lat"] and result.get("resolved_url") and "google.com/maps" in result["resolved_url"]:
+        try:
+            print(f"🕵️ [DeepMine] 啟動 HTML 深度搜查: {result['resolved_url']}")
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
+            }
+            async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+                resp = await client.get(result['resolved_url'], headers=headers)
+                if resp.status_code == 200:
+                    body_text = resp.text
+                    # 尋找座標模式 [緯度, 經度]
+                    # 限縮在亞洲區域的精度範圍 (緯度 20-50, 經度 120-150)
+                    candidates = re.findall(r'\[\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*\]', body_text)
+                    for lat_str, lng_str in candidates:
+                        lat_f, lng_f = float(lat_str), float(lng_str)
+                        if 20.0 <= lat_f <= 50.0 and 120.0 <= lng_f <= 155.0:
+                            result["lat"] = lat_f
+                            result["lng"] = lng_f
+                            result["method"] = f"{result['method']}+html_mining"
+                            print(f"✅ [DeepMine] 成功挖掘座標: ({lat_f}, {lng_f})")
+                            break
+        except Exception as e:
+            # 異常吞噬：失敗則跳過，確保不影響後續視覺抓取
+            print(f"⚠️ [DeepMine] HTML 搜查略過: {e}")
 
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)

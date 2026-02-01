@@ -55,8 +55,11 @@ const MemoizedTimelineCard = memo(({ activity, index, isLast, onEdit, onDelete, 
         JSON.stringify(prev.activity.preview_metadata) === JSON.stringify(next.activity.preview_metadata) &&  // 🆕 Image Hunter
         prev.activity.cost === next.activity.cost &&
         prev.activity.link_url === next.activity.link_url &&
+        prev.activity.website_link === next.activity.website_link &&
         prev.activity.reservation_code === next.activity.reservation_code &&
         prev.activity.hide_navigation === next.activity.hide_navigation &&
+        prev.activity.is_private === next.activity.is_private &&
+        prev.activity.is_highlight === next.activity.is_highlight &&
         JSON.stringify(prev.activity.sub_items) === JSON.stringify(next.activity.sub_items) &&
         JSON.stringify(prev.activity.tags) === JSON.stringify(next.activity.tags) &&
         prev.index === next.index &&
