@@ -228,17 +228,33 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 resp = await client.get(result['resolved_url'], headers=headers)
                 if resp.status_code == 200:
                     body_text = resp.text
-                    # 尋找座標模式 [緯度, 經度]
-                    # 限縮在亞洲區域的精度範圍 (緯度 20-50, 經度 120-150)
-                    candidates = re.findall(r'\[\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*\]', body_text)
-                    for lat_str, lng_str in candidates:
-                        lat_f, lng_f = float(lat_str), float(lng_str)
+                    # 🛡️ v35.70: Target structured Protobuf state instead of generic float arrays
+                    # Pattern: window.APP_INITIALIZATION_STATE=[[[lat, lng, ...]]]
+                    init_match = re.search(r'window\.APP_INITIALIZATION_STATE=\[\[\[(-?\d+\.\d+),(-?\d+\.\d+)', body_text)
+                    if init_match:
+                        lat_f, lng_f = float(init_match.group(2)), float(init_match.group(1)) # Swapped in proto!
+                        # Reverse check: Google often lists Lng first in these internal arrays
+                        if not (20.0 <= lat_f <= 50.0 and 120.0 <= lng_f <= 155.0):
+                            # Try other way
+                            lat_f, lng_f = float(init_match.group(1)), float(init_match.group(2))
+                        
                         if 20.0 <= lat_f <= 50.0 and 120.0 <= lng_f <= 155.0:
                             result["lat"] = lat_f
                             result["lng"] = lng_f
-                            result["method"] = f"{result['method']}+html_mining"
-                            print(f"✅ [DeepMine] 成功挖掘座標: ({lat_f}, {lng_f})")
-                            break
+                            result["method"] = f"{result['method']}+proto_mining"
+                            print(f"✅ [ProtoMine] Extracted precision from state: ({lat_f}, {lng_f})")
+                        
+                    # Fallback to generic array mining ONLY if still no lat
+                    if not result["lat"]:
+                        candidates = re.findall(r'\[\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*\]', body_text)
+                        for lat_str, lng_str in candidates:
+                            lat_f, lng_f = float(lat_str), float(lng_str)
+                            # Tighten bounds: ONLY accept if it looks like Japan (avoid trans-continental swaps)
+                            if 30.0 <= lat_f <= 46.0 and 128.0 <= lng_f <= 146.0:
+                                result["lat"] = lat_f
+                                result["lng"] = lng_f
+                                result["method"] = f"{result['method']}+html_mining_sanitized"
+                                break
         except Exception as e:
             # 異常吞噬：失敗則跳過，確保不影響後續視覺抓取
             print(f"⚠️ [DeepMine] HTML 搜查略過: {e}")
@@ -246,26 +262,23 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
     
-    # 🎨 [Hybrid Precision] Visual Coordinate Mining
-    # 🛡️ v35.60: Fallback to static map center if coordinates are still missing (common for iPhone redirects)
-    if not result.get("lat") and result["metadata"].get("image"):
-        img_url = result["metadata"]["image"]
-        # Extract center=lat,lng or center=lng,lat from Google Static Map URL
-        # Pattern handles both comma and %2C encodings
-        visual_match = re.search(r'center=([-0-9.]+)(?:%2C|,)([-0-9.]+)', img_url)
-        if visual_match:
-            try:
-                v_lat, v_lng = float(visual_match.group(1)), float(visual_match.group(2))
-                # Validation: Standard check to ensure it's not a generic IP-centered map (like 23.5, 121 for TW)
-                # But typically any static map from OG tags is specifically tailored to the POI.
-                result["lat"] = v_lat
-                result["lng"] = v_lng
-                result["method"] = f"{result.get('method', 'visual_mining')}+visual_center"
-                print(f"🎯 [VisualMining] Extracted precision from static map meta: ({v_lat}, {v_lng})")
-            except (ValueError, TypeError):
-                pass
-
-    # 🧬 Phase 2: The "DNA" Upgrade (Place ID / CID Extraction)
+    # 🛡️ [Region Guard] Safety First Protocol
+    # v35.70: Categorical check to prevent IP-localized "drift" (Zero-Regression)
+    if result.get("lat") and result.get("lng"):
+        # Check if the coordinates are consistent with the metadata (e.g., Japan vs. others)
+        metadata_text = f"{result['metadata'].get('title', '')} {result['metadata'].get('description', '')}".lower()
+        
+        # Japan Safety Check (Primary target region)
+        is_japan_meta = any(token in metadata_text for token in ["japan", "tokyo", "osaka", "kyoto", "hokkaido", "airport", " hotel", "日本", "東京"])
+        is_japan_geo = 20.0 <= result["lat"] <= 50.0 and 120.0 <= result["lng"] <= 155.0
+        
+        if is_japan_meta and not is_japan_geo:
+            print(f"🚨 [RegionGuard] Geo-Drift detected! Meta indicates Japan but coords are at ({result['lat']}, {result['lng']}). PURGING COORDS.")
+            result["lat"] = None
+            result["lng"] = None
+            result["method"] = f"{result.get('method', 'unknown')}+drift_purged"
+        
+    # Phase 2: The "DNA" Upgrade (Place ID / CID Extraction)
     # 使用 Side-car 方法提取正式 ID，而不干擾原本的座標邏輯
     try:
         parser = get_molecular_parser()
