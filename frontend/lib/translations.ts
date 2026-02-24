@@ -140,7 +140,8 @@ export const translations = {
         recovery_key_desc: "Copy this code before switching devices or deleting the app.",
         code_copied: "Code copied!",
         language: "Language",
-        explorer: "Explorer"
+        explorer: "Explorer",
+        usage_guide: "Usage Guide"
     },
     zh: {
         // Common
@@ -283,7 +284,8 @@ export const translations = {
         recovery_key_desc: "更換手機或刪除 APP 前，請務必複製此代碼。",
         code_copied: "✅ 引繼碼已複製！請妥善保存。",
         language: "語言",
-        explorer: "探險家"
+        explorer: "探險家",
+        usage_guide: "使用說明"
     }
 }
 

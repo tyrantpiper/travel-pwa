@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
-    ChevronDown, ChevronUp  // 🆕 捐贈功能圖示
+    ChevronDown, ChevronUp,  // 🆕 捐贈功能圖示
+    BookOpen  // 🆕 使用說明圖示
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,7 @@ import { TaskCard } from "@/components/onboarding/TaskCard"
 import { debugLog } from "@/lib/debug"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
+import { UsageGuideDialog } from "@/components/UsageGuideDialog"
 
 
 
@@ -46,6 +48,7 @@ export function ProfileView() {
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
     const [isDeleting, setIsDeleting] = useState(false)
     const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
+    const [usageGuideOpen, setUsageGuideOpen] = useState(false)
 
     // 🆕 捐贈功能 state（獨立區塊，不影響現有邏輯）
     const [donationProgress, setDonationProgress] = useState({ current: 0, goal: 2000 })
@@ -869,6 +872,8 @@ export function ProfileView() {
                         <Separator />
                         <MenuItem icon={User} label={t('account_settings')} />
                         <Separator />
+                        <MenuItem icon={BookOpen} label={t('usage_guide')} onClick={() => setUsageGuideOpen(true)} />
+                        <Separator />
                         <MenuItem icon={Smartphone} label={t('app_version')} value="v1.0.0" />
                         <Separator />
                         <MenuItem icon={CreditCard} label={t('default_currency')} value="TWD (NT$)" />
@@ -928,6 +933,9 @@ export function ProfileView() {
                             </DialogContent>
                         </Dialog>
                     </div>
+
+                    {/* 📖 使用說明 Dialog */}
+                    <UsageGuideDialog open={usageGuideOpen} onOpenChange={setUsageGuideOpen} />
 
                     <Button variant="outline" className="w-full h-12 text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 mt-4" onClick={handleLogout}>
                         <LogOut className="w-4 h-4 mr-2" /> {t('logout')}
