@@ -293,6 +293,9 @@ class UpdateExpenseRequest(BaseModel):
     image_url: Optional[str] = None
     category: Optional[str] = None
     expense_date: Optional[str] = None
+    exchange_rate: Optional[float] = None     # 🛡️ Bug #3 Fix: 防止編輯時靜默丟失
+    card_name: Optional[str] = None           # 🛡️ Bug #3 Fix
+    cashback_rate: Optional[float] = None     # 🛡️ Bug #3 Fix
 
 
 # === AI 聊天模型 ===

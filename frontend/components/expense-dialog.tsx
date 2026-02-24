@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, ComponentType } from "react"
+import { useState, useEffect, useRef, ComponentType } from "react"
 import {
     Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
@@ -18,6 +18,7 @@ import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
 import { useHaptic } from "@/lib/hooks"
 import { getExchangeRate } from "@/lib/currency"
+import { expensesApi } from "@/lib/api"
 
 // Shared Constants (Sync with ToolsView)
 const PAYMENT_METHODS = [
@@ -113,9 +114,18 @@ export function ExpenseDialog({
     const [inputCurrency, setInputCurrency] = useState("JPY")
     const [inputRate, setInputRate] = useState(0.22)
 
+    // 🛡️ Guard: 防止 useEffect 在 dialog 開啟中重複初始化
+    const formInitializedRef = useRef(false)
+    // 🛡️ 編輯模式下跳過匯率自動 fetch（使用原始存儲匯率）
+    const skipRateFetchRef = useRef(false)
+
     // Reset form when dialog opens or editItem changes
     useEffect(() => {
         if (open) {
+            // 🛡️ Bug #1 Fix: 如果表單已初始化，跳過重複初始化（防止 activeTrip 變化覆蓋用戶選擇）
+            if (formInitializedRef.current) return
+            formInitializedRef.current = true
+
             if (editItem) {
                 setTitle(editItem.title)
                 setAmountJPY(editItem.amount.toString())
@@ -125,10 +135,16 @@ export function ExpenseDialog({
                 setCardName(editItem.card_name || "")
                 setCashback(editItem.cashback_rate?.toString() || "")
                 setReceiptUrl(editItem.image_url || "")
-                // 🆕 Safe date parsing
-                const dbDate = editItem.expense_date || editItem.created_at?.split('T')[0]
+                // 🆕 Safe date parsing — 🛡️ 防禦 ISO 時間戳
+                const rawDate = editItem.expense_date || editItem.created_at || ''
+                const dbDate = rawDate.split('T')[0]
                 setExpenseDate(dbDate || formatLocalDate(new Date()))
                 setInputCurrency(editItem.currency || "JPY")
+                // 🛡️ Bug #4 Fix: 復原存儲匯率，跳過自動 fetch
+                if (editItem.exchange_rate) {
+                    skipRateFetchRef.current = true
+                    setInputRate(editItem.exchange_rate)
+                }
             } else {
                 setTitle("")
                 setAmountJPY("")
@@ -142,8 +158,8 @@ export function ExpenseDialog({
                 // 🆕 Smart Initialization for Date Drift Fix
                 const todayStr = formatLocalDate(new Date())
                 if (activeTrip?.start_date) {
-                    const start = activeTrip.start_date
-                    const end = activeTrip.end_date || start
+                    const start = (activeTrip.start_date || '').split('T')[0]
+                    const end = (activeTrip.end_date || activeTrip.start_date || '').split('T')[0]
 
                     // If today is before trip or after trip, default to Trip Start
                     if (todayStr < start || todayStr > end) {
@@ -158,11 +174,19 @@ export function ExpenseDialog({
 
                 setInputCurrency(selectedCurrency || "JPY")
             }
+        } else {
+            // 🛡️ Dialog 關閉時重置 flag，確保下次開啟正常初始化
+            formInitializedRef.current = false
         }
     }, [open, editItem, selectedCurrency, activeTrip])
 
     // Update rate when inputCurrency changes
     useEffect(() => {
+        // 🛡️ Bug #4 Fix: 編輯模式首次載入時跳過（使用原始匯率）
+        if (skipRateFetchRef.current) {
+            skipRateFetchRef.current = false
+            return
+        }
         const updateRate = async () => {
             const r = await getExchangeRate(inputCurrency)
             setInputRate(r)
@@ -196,7 +220,7 @@ export function ExpenseDialog({
         const payload = {
             itinerary_id: activeTripId,
             title,
-            amount_jpy: parseInt(amountJPY),
+            amount_jpy: parseFloat(amountJPY) || 0,  // 🛡️ Bug #6 Fix: parseFloat 保留非日幣小數
             exchange_rate: inputRate,
             currency: inputCurrency,
             payment_method: method,
@@ -210,27 +234,17 @@ export function ExpenseDialog({
             expense_date: expenseDate || formatLocalDate(new Date())
         }
 
-        const url = editItem ? `${API_BASE}/api/expenses/${editItem.id}` : `${API_BASE}/api/expenses`
-        const methodType = editItem ? "PATCH" : "POST"
-
+        // 🛡️ Bug #2 Fix: 使用 expensesApi（含 offlineFetch 離線佇列）替代原生 fetch
         try {
-            const res = await fetch(url, {
-                method: methodType,
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-User-ID": userId || "" // 🆕 Phase 8: Add Identity Header
-                },
-                body: JSON.stringify(payload)
-            })
-            if (res.ok) {
-                haptic.success()
-                toast.success(editItem ? "Updated" : "Saved")
-                onOpenChange(false)
-                onSaveSuccess(payload.expense_date)
+            if (editItem) {
+                await expensesApi.update(editItem.id, payload, userId || undefined)
             } else {
-                const errorData = await res.json().catch(() => ({}))
-                throw new Error(errorData.detail || "API Error")
+                await expensesApi.create(payload, userId || undefined)
             }
+            haptic.success()
+            toast.success(editItem ? "Updated" : "Saved")
+            onOpenChange(false)
+            onSaveSuccess(payload.expense_date)
         } catch (e) {
             haptic.error()
             toast.error(e instanceof Error ? `儲存失敗: ${e.message}` : "儲存失敗")
@@ -309,8 +323,10 @@ export function ExpenseDialog({
                             >
                                 {(() => {
                                     // 🆕 Caution: Use '/' replacement to force local timezone parsing (Fixes Phase 8 weekday drift)
-                                    const startDate = new Date(String(activeTrip.start_date!).replace(/-/g, '/'))
-                                    const endDate = activeTrip.end_date ? new Date(String(activeTrip.end_date).replace(/-/g, '/')) : null
+                                    const startClean = (String(activeTrip.start_date!) || '').split('T')[0]
+                                    const endClean = activeTrip.end_date ? (String(activeTrip.end_date) || '').split('T')[0] : null
+                                    const startDate = new Date(startClean.replace(/-/g, '/'))
+                                    const endDate = endClean ? new Date(endClean.replace(/-/g, '/')) : null
                                     const totalDays = activeTrip.days?.length ||
                                         (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1 : 7)
 

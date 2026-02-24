@@ -79,13 +79,15 @@ async def get_expenses(
         filtered = []
         for exp in all_expenses:
             # 🆕 Phase 10.5: Map DB column to frontend field name
-            exp['expense_date'] = exp.get('incurred_at')
+            # 🛡️ 正規化：timestamptz 回傳 '2026-02-03T00:00:00+00:00'，截斷為 'YYYY-MM-DD'
+            raw_date = exp.get('incurred_at') or ''
+            exp['expense_date'] = str(raw_date).split('T')[0] if raw_date else None
             
             # 如果是公帳 -> 顯示
             if exp['is_public']:
                 filtered.append(exp)
             # 如果是私帳 -> 檢查是否為本人
-            elif exp['created_by'] == user_id:
+            elif str(exp['created_by']) == user_id:
                 filtered.append(exp)
                 
         return filtered
@@ -108,7 +110,7 @@ async def update_expense(
             raise HTTPException(status_code=404, detail="Expense not found")
         
         exp_data = exp_res.data[0]
-        if user_id and exp_data['created_by'] != user_id:
+        if user_id and str(exp_data['created_by']) != user_id:
              # 如果不是本人，必須是行程成員才能修改公帳 (或乾脆禁止非本人修改)
              if not exp_data['is_public']:
                  raise HTTPException(status_code=403, detail="您沒有權限修改此費用")
@@ -148,7 +150,7 @@ async def delete_expense(
     try:
         # 🛡️ 權限檢查
         exp_res = supabase.table("expenses").select("created_by").eq("id", expense_id).execute()
-        if exp_res.data and user_id and exp_res.data[0]['created_by'] != user_id:
+        if exp_res.data and user_id and str(exp_res.data[0]['created_by']) != user_id:
              raise HTTPException(status_code=403, detail="您只能刪除自己建立的費用")
 
         supabase.table("expenses").delete().eq("id", expense_id).execute()

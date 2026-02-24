@@ -316,9 +316,12 @@ export function ToolsView() {
         try {
             if (activeTrip?.start_date) {
                 // Use T00:00:00 to force local timezone interpretation
-                const start = new Date(activeTrip.start_date + 'T00:00:00')
-                const end = activeTrip.end_date
-                    ? new Date(activeTrip.end_date + 'T00:00:00')
+                // 🛡️ 正規化：防止 ISO 時間戳拼接雙 T
+                const startStr = (activeTrip.start_date || '').split('T')[0]
+                const endStr = (activeTrip.end_date || '').split('T')[0]
+                const start = new Date(startStr + 'T00:00:00')
+                const end = endStr
+                    ? new Date(endStr + 'T00:00:00')
                     : new Date(start.getTime() + ((activeTrip.days?.length || 7) - 1) * 24 * 60 * 60 * 1000)
 
                 if (!isNaN(start.getTime())) {
@@ -460,7 +463,9 @@ export function ToolsView() {
 
     const formatDateDisplay = (dateStr: string) => {
         if (!dateStr) return "Invalid Date"
-        const d = new Date(dateStr + 'T00:00:00') // Force local timezone
+        // 🛡️ 防禦 ISO 時間戳：先截斷再拼接（避免雙 T）
+        const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+        const d = new Date(cleanDate + 'T00:00:00') // Force local timezone
 
         // 🆕 Phase 12: NaN Guard
         if (isNaN(d.getTime())) {
