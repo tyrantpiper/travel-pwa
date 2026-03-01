@@ -19,6 +19,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { useHaptic } from "@/lib/hooks"
 import { getExchangeRate } from "@/lib/currency"
 import { expensesApi } from "@/lib/api"
+import { debugLog } from "@/lib/debug"
 
 // Shared Constants (Sync with ToolsView)
 const PAYMENT_METHODS = [
@@ -85,8 +86,6 @@ interface ExpenseDialogProps {
     selectedCurrency: string | null
     onSaveSuccess: (targetDate: string) => void
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 export function ExpenseDialog({
     open,
@@ -163,7 +162,7 @@ export function ExpenseDialog({
 
                     // If today is before trip or after trip, default to Trip Start
                     if (todayStr < start || todayStr > end) {
-                        console.log(`[Expense] Today (${todayStr}) is outside trip range (${start} to ${end}). Defaulting to ${start}`)
+                        debugLog(`[Expense] Today (${todayStr}) is outside trip range (${start} to ${end}). Defaulting to ${start}`)
                         setExpenseDate(start)
                     } else {
                         setExpenseDate(todayStr)

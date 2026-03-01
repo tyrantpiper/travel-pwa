@@ -1,7 +1,7 @@
 {
     "name": "Tabidachi - 旅立ち",
     "short_name": "Tabidachi",
-    "description": "Your AI-powered travel planner for Japan trips.",
+    "description": "AI-powered travel planner with offline maps, real-time collaboration, and smart itinerary generation.",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait",
@@ -17,16 +17,43 @@
             "src": "/icon.png",
             "sizes": "192x192",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "/icon.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
         },
         {
             "src": "/icon.png",
             "sizes": "512x512",
             "type": "image/png",
-            "purpose": "any maskable"
+            "purpose": "any"
+        },
+        {
+            "src": "/icon.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
-    "screenshots": [],
+    "screenshots": [
+        {
+            "src": "/screenshot-mobile.png",
+            "sizes": "1170x2532",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Tabidachi - AI Travel Planner (Mobile)"
+        },
+        {
+            "src": "/screenshot-desktop.png",
+            "sizes": "1918x832",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Tabidachi - AI Travel Planner (Desktop)"
+        }
+    ],
     "shortcuts": [
         {
             "name": "New Trip",

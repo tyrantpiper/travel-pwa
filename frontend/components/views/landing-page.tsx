@@ -11,6 +11,7 @@ import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 
 import { toast } from "sonner"
 import { usersApi } from "@/lib/api"
+import { debugLog, debugWarn } from "@/lib/debug"
 
 function generateUUID() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -58,10 +59,10 @@ export function LandingPage() {
         // 🆕 Sync nickname to backend database (Nickname <-> RecoveryKey Binding)
         try {
             await usersApi.updateProfile(uuid, { name: nickname })
-            console.log("✅ [Profile] Nickname synced to backend:", nickname)
+            debugLog("✅ [Profile] Nickname synced to backend:", nickname)
         } catch (err) {
             // Non-blocking: sync failure shouldn't block login
-            console.warn("⚠️ [Profile] Failed to sync nickname to backend:", err)
+            debugWarn("⚠️ [Profile] Failed to sync nickname to backend:", err)
         }
 
         // 🆕 通知 ChatWidget 用戶已登入
@@ -97,7 +98,7 @@ export function LandingPage() {
                 if (data.nickname) fetchedName = data.nickname
                 if (data.avatar_url) fetchedAvatar = data.avatar_url
             } catch (err) {
-                console.warn("Profile fetch failed, using fallback", err)
+                debugWarn("Profile fetch failed, using fallback", err)
             }
 
             localStorage.setItem("user_uuid", recoverCode)
@@ -204,7 +205,7 @@ export function LandingPage() {
             </main>
 
             <footer className="py-6 text-center">
-                <p className="text-[10px] text-slate-300 dark:text-slate-600 uppercase tracking-widest">Designed for JPN Travel</p>
+                <p className="text-[10px] text-slate-300 dark:text-slate-600 uppercase tracking-widest">Your Smart Travel Companion</p>
             </footer>
         </div>
     )

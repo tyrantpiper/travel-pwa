@@ -1,11 +1,15 @@
-const CACHE_NAME = 'tabidachi-v4'
-const STATIC_CACHE = 'tabidachi-static-v4'
+const CACHE_NAME = 'tabidachi-v5'
+const STATIC_CACHE = 'tabidachi-static-v5'
 
 // 需要緩存的靜態資源
 const STATIC_ASSETS = [
     '/',
     '/manifest.json',
     '/icon.png',
+    '/favicon.ico',
+    '/data/landmarks.json',
+    '/data/regions-jp-kr.json',
+    '/data/brands.json',
 ]
 
 // 安裝事件 - 預緩存靜態資源

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useTripContext } from "@/lib/trip-context"
 import { itemsApi, poiApi } from "@/lib/api"
+import { debugLog } from "@/lib/debug"
 
 // 三源整合資料結構
 interface EnrichedPOI {
@@ -75,7 +76,7 @@ export default function POIPreviewCard({
                     setEnriched(data.poi)
                 }
             } catch (error) {
-                console.log("三源資料獲取失敗 (不影響主流程):", error)
+                debugLog("三源資料獲取失敗 (不影響主流程):", error)
             } finally {
                 setIsLoadingEnrich(false)
             }

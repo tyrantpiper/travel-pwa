@@ -18,6 +18,7 @@ import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPrevie
 import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
 import { useWeatherStore } from "@/lib/stores/weatherStore"
+import { debugLog } from "@/lib/debug"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
@@ -161,7 +162,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         }
 
         if (lean) {
-            console.log("🧠 Neural Connection Active: Itinerary context generated", {
+            debugLog("🧠 Neural Connection Active: Itinerary context generated", {
                 title: lean.title,
                 days: lean.total_days,
                 focused: lean.focused_day,
@@ -425,10 +426,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                     apiKey,
                     {
                         onStart: () => {
-                            console.log("🟢 SSE 連線建立")
+                            debugLog("🟢 SSE 連線建立")
                         },
                         onThinking: (status) => {
-                            console.log("🧠 AI 思考中:", status)
+                            debugLog("🧠 AI 思考中:", status)
                             // ThinkingIndicator 已經在 isLoading 時顯示
                         },
                         onText: (text) => {
@@ -450,7 +451,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                             })
                         },
                         onDone: (data) => {
-                            console.log("✅ SSE 完成:", data.model_used, "來源數:", data.sources?.length ?? 0)
+                            debugLog("✅ SSE 完成:", data.model_used, "來源數:", data.sources?.length ?? 0)
                             streamingRawParts = data.raw_parts
                             streamingSuccess = true
 

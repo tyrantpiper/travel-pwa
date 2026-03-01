@@ -11,6 +11,7 @@ import { geocodeApi } from "@/lib/api"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
+import { debugLog } from "@/lib/debug"
 
 // ViewState 類型
 interface ViewState {
@@ -178,7 +179,7 @@ export default function FullscreenMapModal({
                     setResults(mapped)
                     setIsTyping(false)
                     l1Success = true  // 🆕 標記 L1 成功
-                    console.log(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
+                    debugLog(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
                     // 🆕 不再 return，讓 L2 仍可補充結果
                 }
             }
@@ -188,7 +189,7 @@ export default function FullscreenMapModal({
         const timer = setTimeout(async () => {
             // 🆕 如果 L1 已找到結果，跳過 L2 避免覆蓋
             if (l1Success) {
-                console.log(`🏕️ L1 已命中，跳過 L2 API`)
+                debugLog(`🏕️ L1 已命中，跳過 L2 API`)
                 return
             }
 
@@ -224,12 +225,12 @@ export default function FullscreenMapModal({
                         initialViewState.longitude
                     )
                     setResults(reranked)
-                    console.log(`🔄 P6 Re-ranked ${reranked.length} results`)
+                    debugLog(`🔄 P6 Re-ranked ${reranked.length} results`)
                 }
             } catch (e) {
                 // 🆕 P5: 忽略 AbortError (正常取消行為)
                 if (e instanceof Error && e.name === 'AbortError') {
-                    console.log(`🚫 L2 請求已取消: ${currentQuery}`)
+                    debugLog(`🚫 L2 請求已取消: ${currentQuery}`)
                     return
                 }
                 if (currentQuery === query) {
@@ -324,7 +325,7 @@ export default function FullscreenMapModal({
                 } catch { /* 部分圖層可能不支援 */ }
             }
         })
-        console.log(`🌍 全螢幕地圖: 已將 ${chineseLayerCount} 個標籤圖層中文化`)
+        debugLog(`🌍 全螢幕地圖: 已將 ${chineseLayerCount} 個標籤圖層中文化`)
     }, [])
 
     // 切換衛星模式

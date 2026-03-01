@@ -13,6 +13,7 @@ import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
 import { cn } from "@/lib/utils"
+import { debugLog, debugWarn } from "@/lib/debug"
 
 // Activity 類型定義
 interface Activity {
@@ -116,7 +117,7 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
             )
 
             if (validStops.length < 2) {
-                console.warn("⚠️ [Route Debug] 少於 2 個有效座標，跳過路線計算")
+                debugWarn("⚠️ [Route Debug] 少於 2 個有效座標，跳過路線計算")
                 setRoute(null)
                 setRouteInfo(null)
                 setLoading(false)
@@ -128,7 +129,7 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
             const latSpan = Math.max(...lats) - Math.min(...lats)
 
             if (latSpan > 5) {
-                console.warn("⚠️ [Route Debug] 跨區域路線 (緯度差:", latSpan.toFixed(2), "度)，使用直線連接")
+                debugWarn("⚠️ [Route Debug] 跨區域路線 (緯度差:", latSpan.toFixed(2), "度)，使用直線連接")
                 // 🆕 繪製直線連接所有點 (虛線表示非步行路線)
                 const straightLineRoute: GeoJSON.Feature = {
                     type: "Feature",
@@ -312,7 +313,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 if (mapped.length > 0) {
                     setResults(mapped)
                     setIsTyping(false)
-                    console.log(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
+                    debugLog(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
                     return  // 本地命中，不繼續 API
                 }
             }
@@ -364,7 +365,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
     // 飛到指定位置
     const flyTo = useCallback((result: SearchResult) => {
-        console.log("✈️ FlyTo triggered:", result)
+        debugLog("✈️ FlyTo triggered:", result)
         addToHistory(result)
         setQuery(result.name)
         setIsSearchOpen(false)
@@ -611,7 +612,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 } catch { /* 部分圖層可能不支援 */ }
             }
         })
-        console.log(`🌍 已將 ${chineseLayerCount} 個標籤圖層中文化`)
+        debugLog(`🌍 已將 ${chineseLayerCount} 個標籤圖層中文化`)
 
         // 🆕 POI Hover 游標優化 (移至 onLoad)
         const updateCursor = () => {

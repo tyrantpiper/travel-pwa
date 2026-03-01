@@ -6,6 +6,7 @@ import { ItineraryView } from "@/components/views/itinerary-view"
 import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
 import { useServiceWorker } from "@/lib/hooks"
+import { debugLog } from "@/lib/debug"
 
 // 🚀 [2026 Smart Hybrid Loading] 
 // 將非核心視圖轉為動態載入，減少初始 Bundle
@@ -42,7 +43,7 @@ export function AppShell() {
         const preheatTimer = setTimeout(() => {
             if (!shouldPreheat) {
                 setShouldPreheat(true)
-                console.log("🚀 [AppShell] Stealth preheat initiated (Background)")
+                debugLog("🚀 [AppShell] Stealth preheat initiated (Background)")
             }
         }, 2000)
 
