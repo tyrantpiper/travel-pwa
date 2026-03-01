@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="../docs/screenshots/weather-itinerary.png" width="180" />
-  <img src="../docs/screenshots/timeline-cards.png" width="180" />
-  <img src="../docs/screenshots/route-map.png" width="180" />
-  <img src="../docs/screenshots/ai-chat.png" width="180" />
-  <img src="../docs/screenshots/expense-tracker.png" width="180" />
+  <img src="docs/screenshots/weather-itinerary.png" width="180" />
+  <img src="docs/screenshots/timeline-cards.png" width="180" />
+  <img src="docs/screenshots/route-map.png" width="180" />
+  <img src="docs/screenshots/ai-chat.png" width="180" />
+  <img src="docs/screenshots/expense-tracker.png" width="180" />
 </p>
 
 <h1 align="center">Tabidachi 旅立ち</h1>
