@@ -45,7 +45,10 @@ describe('tripsApi', () => {
                 expect.stringContaining('/api/trip/create-manual'),
                 expect.objectContaining({
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: expect.objectContaining({
+                        'Content-Type': 'application/json',
+                        'X-User-ID': 'user-123'
+                    }),
                 })
             )
             expect(result).toMatchObject({ id: 'trip-123', title: 'Test Trip' })
@@ -80,7 +83,12 @@ describe('tripsApi', () => {
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/join-trip'),
-                expect.anything()
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: expect.objectContaining({
+                        'X-User-ID': 'user-123'
+                    })
+                })
             )
             expect(result).toMatchObject({ success: true })
         })
@@ -93,11 +101,16 @@ describe('tripsApi', () => {
                 json: async () => ({ deleted: true })
             })
 
-            await tripsApi.delete('trip-123')
+            await tripsApi.delete('trip-123', 'user-123')
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/trips/trip-123'),
-                { method: 'DELETE' }
+                expect.objectContaining({
+                    method: 'DELETE',
+                    headers: expect.objectContaining({
+                        'X-User-ID': 'user-123'
+                    })
+                })
             )
         })
     })
@@ -122,6 +135,7 @@ describe('itemsApi', () => {
 
             await itemsApi.create({
                 trip_id: 'trip-123',
+                user_id: 'user-123',
                 day: 1,
                 time: '10:00',
                 place: 'Tokyo Tower',
@@ -130,7 +144,12 @@ describe('itemsApi', () => {
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/items'),
-                expect.objectContaining({ method: 'POST' })
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: expect.objectContaining({
+                        'X-User-ID': 'user-123'
+                    })
+                })
             )
         })
     })
@@ -147,11 +166,16 @@ describe('itemsApi', () => {
                 })
             })
 
-            const result = await itemsApi.update('item-123', { place: 'Updated Place' })
+            const result = await itemsApi.update('item-123', { place: 'Updated Place' }, 'user-123')
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/items/item-123'),
-                expect.objectContaining({ method: 'PUT' })
+                expect.objectContaining({
+                    method: 'PATCH',
+                    headers: expect.objectContaining({
+                        'X-User-ID': 'user-123'
+                    })
+                })
             )
             expect(result.place_name).toBe('Updated Place')
         })
@@ -164,11 +188,16 @@ describe('itemsApi', () => {
                 json: async () => ({ deleted: true })
             })
 
-            await itemsApi.delete('item-123')
+            await itemsApi.delete('item-123', 'user-123')
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/items/item-123'),
-                { method: 'DELETE' }
+                expect.objectContaining({
+                    method: 'DELETE',
+                    headers: expect.objectContaining({
+                        'X-User-ID': 'user-123'
+                    })
+                })
             )
         })
     })
@@ -190,7 +219,12 @@ describe('geocodeApi', () => {
 
             expect(mockFetch).toHaveBeenCalledWith(
                 expect.stringContaining('/api/geocode/search'),
-                expect.objectContaining({ method: 'POST' })
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: expect.objectContaining({
+                        'Content-Type': 'application/json'
+                    })
+                })
             )
             expect(result.results).toHaveLength(1)
         })

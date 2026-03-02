@@ -36,7 +36,7 @@ export interface WeatherResult {
  */
 type Season = 'summer' | 'winter' | 'spring_autumn'
 
-const getSeasonConfig = (month: number, dayLength: number) => {
+export const getSeasonConfig = (month: number, dayLength: number) => {
     // 根據日照長度和月份判斷季節
     // 夏季: 日長 > 13 小時 (5-8月)
     // 冬季: 日長 < 11 小時 (11-2月)
@@ -188,7 +188,7 @@ export const generateHourlyCurve = (
  * 基於系集預報成員的標準差 (Standard Deviation)
  * SD 越小，信心越高。
  */
-const calculateConfidence = (stdDev: number, range: number): number => {
+export const calculateConfidence = (stdDev: number, range: number): number => {
     if (range === 0) return 100
     // 一般來說，SD < 1.0 為極高信心，SD > 3.0 為低信心
     const normalized = Math.max(0, 1 - (stdDev / 4.0))
