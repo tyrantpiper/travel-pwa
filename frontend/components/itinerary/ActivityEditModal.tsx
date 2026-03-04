@@ -18,12 +18,12 @@ import { X, Loader2, CheckCircle2, AlertCircle } from "lucide-react"
 import { extractCoordsFromUrl, isGoogleMapsUrl } from "../../lib/location-utils"
 
 const ACTIVITY_CATEGORIES = [
-    { id: 'sightseeing', icon: '🎯', label: '景點' },
-    { id: 'food', icon: '🍽️', label: '美食' },
-    { id: 'hotel', icon: '🏨', label: '住宿' },
-    { id: 'transport', icon: '🚃', label: '交通' },
-    { id: 'shopping', icon: '🛍️', label: '購物' },
-    { id: 'activity', icon: '🎭', label: '活動' },
+    { id: 'sightseeing', icon: '🎯', label: '景點', labelEn: 'Sightseeing' },
+    { id: 'food', icon: '🍽️', label: '美食', labelEn: 'Food' },
+    { id: 'hotel', icon: '🏨', label: '住宿', labelEn: 'Hotel' },
+    { id: 'transport', icon: '🚃', label: '交通', labelEn: 'Transport' },
+    { id: 'shopping', icon: '🛍️', label: '購物', labelEn: 'Shopping' },
+    { id: 'activity', icon: '🎭', label: '活動', labelEn: 'Activity' },
 ]
 
 const TYPE_LABELS: { [key: string]: string } = {
@@ -66,7 +66,8 @@ export function ActivityEditModal({
     const [isResolvingLink, setIsResolvingLink] = useState(false)
     const [resolveStatus, setResolveStatus] = useState<'idle' | 'success' | 'fallback' | 'error'>('idle')
     const haptic = useHaptic()
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
+    const zh = lang === 'zh'
     const originalUrlRef = useRef<string>("")
 
     // 🕵️ 奈米級追蹤：掛載時捕獲原始網址，並重置人工狀態
@@ -107,7 +108,7 @@ export function ActivityEditModal({
                 type: item.type || "place",
                 source: item.source
             })))
-        } catch { toast.error('搜尋失敗') }
+        } catch { toast.error(zh ? '搜尋失敗' : 'Search failed') }
         finally { setIsSearching(false) }
     }
 
@@ -122,14 +123,14 @@ export function ActivityEditModal({
             if (extracted.lat && extracted.lng) {
                 updateCoords(extracted.lat, extracted.lng)
                 setResolveStatus('success')
-                toast.success("已從連結自動提取座標")
+                toast.success(zh ? "已從連結自動提取座標" : "Coords extracted from link")
                 // 🚀 Decoupling: Continue to backend to fetch metadata (images) if possible
             }
         }
 
         // 🌐 Tier 2: Backend Neural Engine (Scraper + Geocoder)
         if (type === "map" && !isGoogleMapsUrl(url)) {
-            toast.info("此連結不包含可識別座標，請使用搜尋功能")
+            toast.info(zh ? "此連結不包含可識別座標，請使用搜尋功能" : "This link has no coordinates, use search instead")
             return
         }
 
@@ -154,7 +155,7 @@ export function ActivityEditModal({
                         preview_metadata: newMetadata
                     })
                     setResolveStatus(result.method?.includes('jit') ? 'fallback' : 'success')
-                    toast.success(result.method?.includes('jit') ? "已透過地名語意自動定位" : "已完成座標解析")
+                    toast.success(result.method?.includes('jit') ? (zh ? "已透過地名語意自動定位" : "Located via semantic analysis") : (zh ? "已完成座標解析" : "Coordinate resolved"))
                 } else if (type === "media") {
                     const meta = result.metadata || {}
                     // 🧠 Quantum Merge: Ensure og_image/title is stored without deleting map_image
@@ -168,11 +169,11 @@ export function ActivityEditModal({
                         }
                     })
                     setResolveStatus('success')
-                    toast.success("官網首圖解析成功！")
+                    toast.success(zh ? "官網首圖解析成功！" : "Website image parsed!")
                 }
             } else {
                 setResolveStatus('error')
-                toast.error("解析失敗：" + (result.error || "請檢查網址"))
+                toast.error((zh ? "解析失敗：" : "Parse failed: ") + (result.error || (zh ? "請檢查網址" : "Check URL")))
             }
         } catch (e) {
             console.error("Link Resolution Error:", e)
@@ -306,7 +307,7 @@ export function ActivityEditModal({
                                 <Input
                                     value={editItem.place || ""}
                                     onChange={(e) => setEditItem({ ...editItem, place: e.target.value })}
-                                    placeholder="輸入商家/景點名稱..."
+                                    placeholder={zh ? "輸入商家/景點名稱..." : "Search place name..."}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSearchPlace()}
                                 />
                                 <Button
@@ -333,7 +334,7 @@ export function ActivityEditModal({
                                             >
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200">
-                                                        {icon} {loc.type || '地點'}
+                                                        {icon} {loc.type || (zh ? '地點' : 'Place')}
                                                     </span>
                                                     <span className="font-bold text-sm text-slate-800">{loc.name}</span>
                                                 </div>
@@ -354,7 +355,7 @@ export function ActivityEditModal({
                     {/* POI Search */}
                     {hasCoordsForPOI ? (
                         <div className="border-t border-dashed pt-4 mt-2">
-                            <Label className="text-xs text-slate-500 mb-2 block">📍 附近搜索</Label>
+                            <Label className="text-xs text-slate-500 mb-2 block">📍 {zh ? '附近搜索' : 'Nearby Search'}</Label>
                             <POISearch
                                 centerLat={Number(editItem.lat) || dailyLoc?.lat || 35.6895}
                                 centerLng={Number(editItem.lng) || dailyLoc?.lng || 139.6917}
@@ -366,15 +367,15 @@ export function ActivityEditModal({
                                         lng: poi.lng,
                                         isManualCoords: true, // 🚩 選擇 POI 視同人工座標
                                         link_url: editItem.link_url || poi.website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poi.name)}`,
-                                        desc: poi.opening_hours ? `營業: ${poi.opening_hours}` : (editItem.desc || "")
+                                        desc: poi.opening_hours ? `${zh ? '營業' : 'Hours'}: ${poi.opening_hours}` : (editItem.desc || "")
                                     })
-                                    toast.success(`已選擇: ${poi.name}`)
+                                    toast.success(zh ? `已選擇: ${poi.name}` : `Selected: ${poi.name}`)
                                 }}
                             />
                         </div>
                     ) : (
                         <div className="text-xs text-slate-400 text-center py-2 border-t border-dashed mt-2">
-                            💡 先搜索地點以啟用附近 POI 搜索
+                            💡 {zh ? '先搜索地點以啟用附近 POI 搜索' : 'Search a place first to enable nearby POI search'}
                         </div>
                     )}
 
@@ -423,7 +424,7 @@ export function ActivityEditModal({
                                     {!isResolvingLink && resolveStatus === 'fallback' && (
                                         <div className="flex items-center gap-1 text-[9px] text-amber-600 font-bold">
                                             <AlertCircle className="w-3 h-3" />
-                                            語意定位
+                                            {zh ? '語意定位' : 'Semantic'}
                                         </div>
                                     )}
                                 </div>
@@ -446,7 +447,7 @@ export function ActivityEditModal({
                                     onClick={() => handleResolveLink("map")}
                                     className="h-9 px-3 bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-none transition-all active:scale-95"
                                 >
-                                    {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析座標"}
+                                    {isResolvingLink ? <Loader2 className="w-3 h-3 animate-spin" /> : (zh ? "解析座標" : "Resolve")}
                                 </Button>
                             </div>
                         </div>
@@ -502,7 +503,7 @@ export function ActivityEditModal({
                                     )}
                                 >
                                     <span>{cat.icon}</span>
-                                    <span>{cat.label}</span>
+                                    <span>{zh ? cat.label : cat.labelEn}</span>
                                 </button>
                             ))}
                         </div>
@@ -533,7 +534,7 @@ export function ActivityEditModal({
                             <div className="flex gap-2">
                                 <Input
                                     id="activity-tag-input"
-                                    placeholder="新增標籤"
+                                    placeholder={zh ? "新增標籤" : "Add tag"}
                                     className="text-sm flex-1"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -586,7 +587,7 @@ export function ActivityEditModal({
                                             onClick={() => {
                                                 haptic.tap()
                                                 setEditItem({ ...editItem, preview_metadata: {} })
-                                                toast.info("已清除連結預覽")
+                                                toast.info(zh ? "已清除連結預覽" : "Link preview cleared")
                                             }}
                                         >
                                             <X className="w-3 h-3" /> Clear Preview
@@ -631,10 +632,10 @@ export function ActivityEditModal({
                         <div className="flex items-center justify-between space-x-2 border rounded-lg p-3 bg-slate-50/50 dark:bg-slate-800/50">
                             <div className="space-y-0.5">
                                 <div className="flex items-center gap-1.5">
-                                    <Label className="text-sm font-medium">不須導航</Label>
+                                    <Label className="text-sm font-medium">{zh ? '不須導航' : 'No Navigation'}</Label>
                                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400">Manual</span>
                                 </div>
-                                <p className="text-[10px] text-slate-500">隱藏卡片上的地圖按鈕</p>
+                                <p className="text-[10px] text-slate-500">{zh ? '隱藏卡片上的地圖按鈕' : 'Hide map button on card'}</p>
                             </div>
                             <input
                                 type="checkbox"
@@ -666,7 +667,7 @@ export function ActivityEditModal({
 
                     <DialogFooter>
                         <Button onClick={onSave} disabled={isSaving}>
-                            {isSaving ? "儲存中..." : (isAddMode ? "Add" : "Save")}
+                            {isSaving ? (zh ? "儲存中..." : "Saving...") : (isAddMode ? "Add" : "Save")}
                         </Button>
                     </DialogFooter>
                 </div>

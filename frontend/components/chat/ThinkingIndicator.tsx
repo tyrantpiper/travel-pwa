@@ -2,6 +2,7 @@
 
 import { Loader2, Globe } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface ThinkingIndicatorProps {
     phase: "thinking" | "searching"
@@ -22,6 +23,8 @@ export default function ThinkingIndicator({
     onToggle
 }: ThinkingIndicatorProps) {
     const isThinking = phase === "thinking"
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
 
     return (
         <div
@@ -59,8 +62,8 @@ export default function ThinkingIndicator({
                     isThinking ? "text-purple-700" : "text-blue-700"
                 )}>
                     {isThinking
-                        ? "🧠 AI 正在進行深度規劃..."
-                        : "🌏 正在連線 Google 確認最新資訊..."
+                        ? (zh ? "🧠 AI 正在進行深度規劃..." : "🧠 AI is planning...")
+                        : (zh ? "🌏 正在連線 Google 確認最新資訊..." : "🌏 Verifying with Google...")
                     }
                 </p>
 
@@ -71,8 +74,8 @@ export default function ThinkingIndicator({
                         isThinking ? "text-purple-600" : "text-blue-600"
                     )}>
                         {isThinking
-                            ? "使用 Gemini 3 Flash Preview 進行推理中"
-                            : "透過 Google Search Grounding 驗證資訊時效性"
+                            ? (zh ? "使用 Gemini 3 Flash Preview 進行推理中" : "Reasoning with Gemini 3 Flash Preview")
+                            : (zh ? "透過 Google Search Grounding 驗證資訊時效性" : "Verifying with Google Search Grounding")
                         }
                     </p>
                 )}

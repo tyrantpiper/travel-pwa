@@ -39,6 +39,7 @@ import { UsageGuideDialog } from "@/components/UsageGuideDialog"
 
 export function ProfileView() {
     const { lang, setLang, t } = useLanguage()
+    const zh = lang === 'zh'
     const { isDark, toggleDark, accentColor, setAccentColor, currentTheme } = useTheme()
     const [isEditing, setIsEditing] = useState(false)
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
@@ -109,7 +110,7 @@ export function ProfileView() {
         const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
 
         if (storedKey && isMounted) {
-            setApiKey(devKey ? "(開發者模式)" : storedKey)
+            setApiKey(devKey ? (zh ? "(開發者模式)" : "(Dev Mode)") : storedKey)
             setHasApiKey(true)
             if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
                 localStorage.setItem("user_gemini_key", storedKey)
@@ -128,7 +129,7 @@ export function ProfileView() {
         return () => {
             isMounted = false
         }
-    }, [])
+    }, [zh])
 
     // 🆕 捐贈進度讀取（獨立 useEffect，不影響現有邏輯）
     useEffect(() => {
@@ -272,7 +273,7 @@ export function ProfileView() {
             if (!res.ok) throw new Error(t('profile_delete_failed'))
 
             const data = await res.json()
-            toast.success(`已刪除 ${data.deleted?.trips || 0} 個行程、${data.deleted?.expenses || 0} 筆消費`)
+            toast.success(zh ? `已刪除 ${data.deleted?.trips || 0} 個行程、${data.deleted?.expenses || 0} 筆消費` : `Deleted ${data.deleted?.trips || 0} trips and ${data.deleted?.expenses || 0} expenses`)
 
             // 清除 localStorage 並重新載入
             localStorage.clear()
@@ -793,20 +794,20 @@ export function ProfileView() {
                                                 <div className="flex gap-3">
                                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">1</div>
                                                     <div>
-                                                        前往 <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold inline-flex items-center">Google AI Studio <ExternalLink className="w-3 h-3 ml-0.5" /></a> 並登入 Google 帳號。
+                                                        {zh ? '前往' : 'Go to'} <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold inline-flex items-center">Google AI Studio <ExternalLink className="w-3 h-3 ml-0.5" /></a> {zh ? '並登入 Google 帳號。' : 'and sign in with Google.'}
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-3">
                                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">2</div>
-                                                    <div>點擊左側選單的 <b>Get API key</b>。</div>
+                                                    <div>{zh ? '點擊左側選單的' : 'Click'} <b>Get API key</b>{zh ? '。' : ' in the left menu.'}</div>
                                                 </div>
                                                 <div className="flex gap-3">
                                                     <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">3</div>
-                                                    <div>點擊 <b>Create API key</b>，複製 <code>AIza...</code> 開頭的代碼。</div>
+                                                    <div>{zh ? '點擊' : 'Click'} <b>Create API key</b>{zh ? '，複製' : ', copy the code starting with'} <code>AIza...</code> {zh ? '開頭的代碼。' : '.'}</div>
                                                 </div>
                                                 <div className="bg-amber-50 text-amber-700 p-2 rounded border border-amber-100 flex items-start gap-2 mt-2">
                                                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                    <span>完全免費！每日可用 1,500 次。</span>
+                                                    <span>{zh ? '完全免費！每日可用 1,500 次。' : 'Completely free! 1,500 calls/day.'}</span>
                                                 </div>
                                             </AccordionContent>
                                         </AccordionItem>
@@ -818,7 +819,7 @@ export function ProfileView() {
                                         清除
                                     </Button>
                                     <Button onClick={handleSaveApiKey} className="bg-slate-900 text-white hover:bg-slate-800 flex-1 sm:flex-none">
-                                        <Key className="w-4 h-4 mr-2" /> 儲存設定
+                                        <Key className="w-4 h-4 mr-2" /> {zh ? '儲存設定' : 'Save'}
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>

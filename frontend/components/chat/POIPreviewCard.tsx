@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { useTripContext } from "@/lib/trip-context"
 import { itemsApi, poiApi } from "@/lib/api"
 import { debugLog } from "@/lib/debug"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // 三源整合資料結構
 interface EnrichedPOI {
@@ -52,6 +53,8 @@ export default function POIPreviewCard({
     onDismiss
 }: POIPreviewCardProps) {
     const { activeTripId, mutate, userId } = useTripContext()
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
     const [isAdding, setIsAdding] = useState(false)
     const [isAdded, setIsAdded] = useState(false)
     const [enriched, setEnriched] = useState<EnrichedPOI | null>(null)
@@ -96,23 +99,23 @@ export default function POIPreviewCard({
     }
 
     const categoryLabels: Record<string, string> = {
-        food: "🍜 美食",
-        restaurant: "🍜 餐廳",
-        sightseeing: "🏯 景點",
-        shopping: "🛍️ 購物",
-        transport: "🚃 交通",
-        hotel: "🏨 住宿",
+        food: zh ? "🍜 美食" : "🍜 Food",
+        restaurant: zh ? "🍜 餐廳" : "🍜 Restaurant",
+        sightseeing: zh ? "🏯 景點" : "🏯 Sightseeing",
+        shopping: zh ? "🛍️ 購物" : "🛍️ Shopping",
+        transport: zh ? "🚃 交通" : "🚃 Transport",
+        hotel: zh ? "🏨 住宿" : "🏨 Hotel",
     }
 
     const colorClass = categoryColors[poiData.category || "sightseeing"] || categoryColors.sightseeing
-    const categoryLabel = categoryLabels[poiData.category || "sightseeing"] || "📍 地點"
+    const categoryLabel = categoryLabels[poiData.category || "sightseeing"] || (zh ? "📍 地點" : "📍 Place")
 
     /**
      * 加入行程 (Optimistic UI)
      */
     const handleAddToItinerary = async () => {
         if (!activeTripId) {
-            toast.error("請先選擇一個行程")
+            toast.error(zh ? "請先選擇一個行程" : "Please select a trip first")
             return
         }
 
@@ -137,7 +140,7 @@ export default function POIPreviewCard({
 
             // 成功
             setIsAdded(true)
-            toast.success(`✅ 已加入：${poiData.place_name}`)
+            toast.success(zh ? `✅ 已加入：${poiData.place_name}` : `✅ Added: ${poiData.place_name}`)
 
             // 刷新行程列表
             mutate()
@@ -145,7 +148,7 @@ export default function POIPreviewCard({
 
         } catch (error) {
             console.error("Add to itinerary failed:", error)
-            toast.error("加入失敗，請稍後再試")
+            toast.error(zh ? "加入失敗，請稍後再試" : "Failed to add, please try again")
             setIsAdding(false)
         }
     }
@@ -246,7 +249,7 @@ export default function POIPreviewCard({
                         className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
                     >
                         <ExternalLink className="w-3 h-3" />
-                        官方網站
+                        {zh ? '官方網站' : 'Official Site'}
                     </a>
                 )}
 
@@ -254,7 +257,7 @@ export default function POIPreviewCard({
                 {isLoadingEnrich && (
                     <p className="text-[10px] text-slate-400 flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
-                        載入更多資訊...
+                        {zh ? '載入更多資訊...' : 'Loading more info...'}
                     </p>
                 )}
             </div>
@@ -270,7 +273,7 @@ export default function POIPreviewCard({
                 {poiData.lat && poiData.lng && (
                     <span className="flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        座標已取得
+                        {zh ? '座標已取得' : 'Coords ready'}
                     </span>
                 )}
             </div>
@@ -293,7 +296,7 @@ export default function POIPreviewCard({
                     onClick={handlePreviewOnMap}
                 >
                     <Map className="w-3 h-3 mr-1" />
-                    在地圖上預覽
+                    {zh ? '在地圖上預覽' : 'Preview on Map'}
                 </Button>
 
                 <Button
@@ -310,15 +313,15 @@ export default function POIPreviewCard({
                     {isAdding ? (
                         <>
                             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            加入中...
+                            {zh ? '加入中...' : 'Adding...'}
                         </>
                     ) : isAdded ? (
                         <>
                             <Check className="w-3 h-3 mr-1" />
-                            已加入
+                            {zh ? '已加入' : 'Added'}
                         </>
                     ) : (
-                        "✅ 加入行程"
+                        zh ? "✅ 加入行程" : "✅ Add to Trip"
                     )}
                 </Button>
             </div>

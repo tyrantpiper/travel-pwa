@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // Types
 interface NoteItem {
@@ -76,7 +77,7 @@ function IconPicker({ value, onChange }: { value: string, onChange: (val: string
             <PopoverTrigger asChild>
                 <button
                     className="w-12 h-9 text-lg flex items-center justify-center bg-transparent border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    title="選擇或輸入圖標"
+                    title="Select or enter icon"
                 >
                     {value || "⚠️"}
                 </button>
@@ -103,7 +104,7 @@ function IconPicker({ value, onChange }: { value: string, onChange: (val: string
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
                         <div className="flex gap-2">
                             <Input
-                                placeholder="貼上自定義 Emoji"
+                                placeholder="Paste custom emoji"
                                 className="h-8 text-xs flex-1"
                                 value={customValue}
                                 onChange={(e) => {
@@ -122,7 +123,7 @@ function IconPicker({ value, onChange }: { value: string, onChange: (val: string
                                 <Check className="w-3 h-3" />
                             </Button>
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">可以直接由貼上或輸入表情符號</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Paste or type an emoji</p>
                     </div>
                 </div>
             </PopoverContent>
@@ -142,6 +143,8 @@ export default function EditableDailyTips({
     readOnly = false,
     userId
 }: EditableDailyTipsProps) {
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
     const haptic = useHaptic()
 
     // Local state (initialized from props, synced via key prop from parent)
@@ -254,14 +257,14 @@ export default function EditableDailyTips({
 
     // Notes
     const handleAddNote = async () => {
-        if (!newNote.title.trim()) { toast.error("請輸入標題"); return }
+        if (!newNote.title.trim()) { toast.error(zh ? "請輸入標題" : "Please enter a title"); return }
         setSaving(true); haptic.tap()
         const updated = [...localNotes, newNote]
         if (await onUpdate("notes", updated)) {
             setLocalNotes(updated)
             setNewNote({ icon: "⚠️", title: "", content: "" })
             setAddingNote(false)
-            toast.success("已新增提醒")
+            toast.success(zh ? "已新增提醒" : "Reminder added")
         }
         setSaving(false)
     }
@@ -271,7 +274,7 @@ export default function EditableDailyTips({
         const updated = localNotes.filter((_, i) => i !== idx)
         if (await onUpdate("notes", updated)) {
             setLocalNotes(updated)
-            toast.success("已移除")
+            toast.success(zh ? "已移除" : "Removed")
         }
     }
 
@@ -290,9 +293,9 @@ export default function EditableDailyTips({
             setLocalNotes(editNotesData)
             setEditingNotes(false)
             setEditNotesData([])
-            toast.success("已儲存修改")
+            toast.success(zh ? "已儲存修改" : "Changes saved")
         } else {
-            toast.error("儲存失敗")
+            toast.error(zh ? "儲存失敗" : "Save failed")
         }
         setSaving(false)
     }
@@ -310,14 +313,14 @@ export default function EditableDailyTips({
     }
 
     const handleAddCost = async () => {
-        if (!newCost.item.trim() || !newCost.amount.trim()) { toast.error("請輸入項目和金額"); return }
+        if (!newCost.item.trim() || !newCost.amount.trim()) { toast.error(zh ? "請輸入項目和金額" : "Please enter item and amount"); return }
         setSaving(true); haptic.tap()
         const updated = [...localCosts, newCost]
         if (await onUpdate("costs", updated)) {
             setLocalCosts(updated)
             setNewCost({ item: "", amount: "", currency: DEFAULT_CURRENCY, note: "" })
             setAddingCost(false)
-            toast.success("已新增花費")
+            toast.success(zh ? "已新增花費" : "Cost added")
         }
         setSaving(false)
     }
@@ -363,7 +366,7 @@ export default function EditableDailyTips({
             )
             if (await onUpdate("costs", updated)) {
                 setLocalCosts(updated)
-                toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+                toast.success(updated[idx].is_private ? (zh ? "已設為私人" : "Set to private") : (zh ? "已設為公開" : "Set to public"))
             }
         } finally {
             setProcessingCosts(prev => {
@@ -389,9 +392,9 @@ export default function EditableDailyTips({
             setLocalCosts(editCostsData)
             setEditingCosts(false)
             setEditCostsData([])
-            toast.success("已儲存修改")
+            toast.success(zh ? "已儲存修改" : "Changes saved")
         } else {
-            toast.error("儲存失敗")
+            toast.error(zh ? "儲存失敗" : "Save failed")
         }
         setSaving(false)
     }
@@ -410,14 +413,14 @@ export default function EditableDailyTips({
 
     // Tickets
     const handleAddTicket = async () => {
-        if (!newTicket.name.trim() || !newTicket.price.trim()) { toast.error("請輸入票券名稱和價格"); return }
+        if (!newTicket.name.trim() || !newTicket.price.trim()) { toast.error(zh ? "請輸入票券名稱和價格" : "Please enter ticket name and price"); return }
         setSaving(true); haptic.tap()
         const updated = [...localTickets, newTicket]
         if (await onUpdate("tickets", updated)) {
             setLocalTickets(updated)
             setNewTicket({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
             setAddingTicket(false)
-            toast.success("已新增票券")
+            toast.success(zh ? "已新增票券" : "Ticket added")
         }
         setSaving(false)
     }
@@ -463,7 +466,7 @@ export default function EditableDailyTips({
             )
             if (await onUpdate("tickets", updated)) {
                 setLocalTickets(updated)
-                toast.success(updated[idx].is_private ? "已設為私人" : "已設為公開")
+                toast.success(updated[idx].is_private ? (zh ? "已設為私人" : "Set to private") : (zh ? "已設為公開" : "Set to public"))
             }
         } finally {
             setProcessingTickets(prev => {
@@ -489,9 +492,9 @@ export default function EditableDailyTips({
             setLocalTickets(editTicketsData)
             setEditingTickets(false)
             setEditTicketsData([])
-            toast.success("已儲存修改")
+            toast.success(zh ? "已儲存修改" : "Changes saved")
         } else {
-            toast.error("儲存失敗")
+            toast.error(zh ? "儲存失敗" : "Save failed")
         }
         setSaving(false)
     }
@@ -515,27 +518,27 @@ export default function EditableDailyTips({
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                         <AlertCircle className="w-4 h-4" />
-                        <h4 className="text-sm font-bold">每日重點提醒</h4>
+                        <h4 className="text-sm font-bold">{zh ? '每日重點提醒' : 'Daily Reminders'}</h4>
                     </div>
                     {!readOnly && !editingNotes && (
                         <div className="flex gap-1">
                             {localNotes.length > 0 && (
                                 <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-100" onClick={handleStartEditNotes}>
-                                    <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                    <Pencil className="w-3 h-3 mr-1" /> {zh ? '編輯' : 'Edit'}
                                 </Button>
                             )}
                             <Button variant="ghost" size="sm" className="h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-100" onClick={() => setAddingNote(true)}>
-                                <Plus className="w-3 h-3 mr-1" /> 新增
+                                <Plus className="w-3 h-3 mr-1" /> {zh ? '新增' : 'Add'}
                             </Button>
                         </div>
                     )}
                     {editingNotes && (
                         <div className="flex gap-1">
                             <Button size="sm" className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={handleSaveNotes} disabled={saving}>
-                                {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                                {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} {zh ? '儲存' : 'Save'}
                             </Button>
                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditNotes}>
-                                取消
+                                {zh ? '取消' : 'Cancel'}
                             </Button>
                         </div>
                     )}
@@ -551,14 +554,14 @@ export default function EditableDailyTips({
                                     onChange={(val) => handleUpdateEditNote(idx, 'icon', val)}
                                 />
                                 <Input
-                                    placeholder="標題"
+                                    placeholder={zh ? "標題" : "Title"}
                                     className="flex-1 h-9 text-sm"
                                     value={note.title}
                                     onChange={(e) => handleUpdateEditNote(idx, 'title', e.target.value)}
                                 />
                             </div>
                             <Input
-                                placeholder="內容..."
+                                placeholder={zh ? "內容..." : "Content..."}
                                 className="h-9 text-sm"
                                 value={note.content}
                                 onChange={(e) => handleUpdateEditNote(idx, 'content', e.target.value)}
@@ -584,7 +587,7 @@ export default function EditableDailyTips({
 
                     {/* 空狀態提示 */}
                     {localNotes.length === 0 && !addingNote && !editingNotes && (
-                        <p className="text-xs text-amber-600/60 dark:text-amber-400/60 italic text-center py-2">尚無提醒，點擊「新增」添加</p>
+                        <p className="text-xs text-amber-600/60 dark:text-amber-400/60 italic text-center py-2">{zh ? '尚無提醒，點擊「新增」添加' : 'No reminders yet. Click "Add" to create one.'}</p>
                     )}
 
                     {/* 新增表單 */}
@@ -595,12 +598,12 @@ export default function EditableDailyTips({
                                     value={newNote.icon || "⚠️"}
                                     onChange={(val) => setNewNote({ ...newNote, icon: val })}
                                 />
-                                <Input placeholder="標題" className="flex-1 h-9 text-sm" value={newNote.title} onChange={(e) => setNewNote({ ...newNote, title: e.target.value })} />
+                                <Input placeholder={zh ? "標題" : "Title"} className="flex-1 h-9 text-sm" value={newNote.title} onChange={(e) => setNewNote({ ...newNote, title: e.target.value })} />
                             </div>
-                            <Input placeholder="內容..." className="h-9 text-sm" value={newNote.content} onChange={(e) => setNewNote({ ...newNote, content: e.target.value })} />
+                            <Input placeholder={zh ? "內容..." : "Content..."} className="h-9 text-sm" value={newNote.content} onChange={(e) => setNewNote({ ...newNote, content: e.target.value })} />
                             <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => setAddingNote(false)}>取消</Button>
-                                <Button size="sm" onClick={handleAddNote} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white"><Check className="w-3 h-3 mr-1" /> 確定</Button>
+                                <Button variant="ghost" size="sm" onClick={() => setAddingNote(false)}>{zh ? '取消' : 'Cancel'}</Button>
+                                <Button size="sm" onClick={handleAddNote} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white"><Check className="w-3 h-3 mr-1" /> {zh ? '確定' : 'OK'}</Button>
                             </div>
                         </div>
                     )}
@@ -613,27 +616,27 @@ export default function EditableDailyTips({
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Wallet className="w-4 h-4" />
-                            <h4 className="text-sm font-bold">預估花費</h4>
+                            <h4 className="text-sm font-bold">{zh ? '預估花費' : 'Estimated Costs'}</h4>
                         </div>
                         {!readOnly && !editingCosts && (
                             <div className="flex gap-1">
                                 {localCosts.length > 0 && (
                                     <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={handleStartEditCosts}>
-                                        <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                        <Pencil className="w-3 h-3 mr-1" /> {zh ? '編輯' : 'Edit'}
                                     </Button>
                                 )}
                                 <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100" onClick={() => setAddingCost(true)}>
-                                    <Plus className="w-3 h-3 mr-1" /> 新增
+                                    <Plus className="w-3 h-3 mr-1" /> {zh ? '新增' : 'Add'}
                                 </Button>
                             </div>
                         )}
                         {editingCosts && (
                             <div className="flex gap-1">
                                 <Button size="sm" className="h-7 text-xs bg-slate-600 hover:bg-slate-700 text-white" onClick={handleSaveCosts} disabled={saving}>
-                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} {zh ? '儲存' : 'Save'}
                                 </Button>
                                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditCosts}>
-                                    取消
+                                    {zh ? '取消' : 'Cancel'}
                                 </Button>
                             </div>
                         )}
@@ -645,7 +648,7 @@ export default function EditableDailyTips({
                             <div key={idx} className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-slate-200 dark:border-slate-600 space-y-2">
                                 <div className="flex gap-2">
                                     <Input
-                                        placeholder="項目"
+                                        placeholder={zh ? "項目" : "Item"}
                                         className="flex-1 h-8 text-xs"
                                         value={cost.item}
                                         onChange={(e) => handleUpdateEditCost(idx, 'item', e.target.value)}
@@ -659,7 +662,7 @@ export default function EditableDailyTips({
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <Input
-                                            placeholder="金額"
+                                            placeholder={zh ? "金額" : "Amount"}
                                             className="flex-1 h-8 text-xs"
                                             type="number"
                                             value={cost.amount}
@@ -668,7 +671,7 @@ export default function EditableDailyTips({
                                     </div>
                                 </div>
                                 <Input
-                                    placeholder="備註 (選填)"
+                                    placeholder={zh ? "備註 (選填)" : "Note (optional)"}
                                     className="h-8 text-xs"
                                     value={cost.note || ""}
                                     onChange={(e) => handleUpdateEditCost(idx, 'note', e.target.value)}
@@ -706,7 +709,7 @@ export default function EditableDailyTips({
                                                         ? "text-amber-500 hover:text-amber-600"
                                                         : "text-slate-300 hover:text-slate-500"
                                                 )}
-                                                title={cost.is_private ? "設為公開" : "設為私人"}
+                                                title={cost.is_private ? (zh ? "設為公開" : "Make public") : (zh ? "設為私人" : "Make private")}
                                             >
                                                 {processingCosts.has(idx) ? (
                                                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -739,7 +742,7 @@ export default function EditableDailyTips({
                         {/* Auto Sum Footer */}
                         {localCosts.length > 0 && (
                             <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs text-slate-500">
-                                <span className="flex items-center gap-1"><Calculator className="w-3 h-3" /> 小計</span>
+                                <span className="flex items-center gap-1"><Calculator className="w-3 h-3" /> {zh ? '小計' : 'Subtotal'}</span>
                                 <div className="flex gap-2">
                                     {Object.entries(costsTotal).map(([curr, total]) => (
                                         <span key={curr} className="font-mono font-bold text-slate-700 dark:text-slate-300">{curr} {total.toLocaleString()}</span>
@@ -749,22 +752,22 @@ export default function EditableDailyTips({
                         )}
 
                         {localCosts.length === 0 && !addingCost && (
-                            <p className="text-xs text-slate-400 italic text-center py-2">尚無花費記錄</p>
+                            <p className="text-xs text-slate-400 italic text-center py-2">{zh ? '尚無花費記錄' : 'No costs recorded'}</p>
                         )}
 
                         {addingCost && (
                             <div className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-slate-200 dark:border-slate-600 space-y-2 animate-in fade-in zoom-in-95 duration-200">
                                 <div className="flex gap-2">
-                                    <Input placeholder="項目" className="flex-1 h-8 text-xs" value={newCost.item} onChange={(e) => setNewCost({ ...newCost, item: e.target.value })} />
+                                    <Input placeholder={zh ? "項目" : "Item"} className="flex-1 h-8 text-xs" value={newCost.item} onChange={(e) => setNewCost({ ...newCost, item: e.target.value })} />
                                     <div className="flex gap-1 w-32">
                                         <select className="h-8 text-xs bg-slate-50 border rounded w-[4.5rem]" value={newCost.currency} onChange={e => setNewCost({ ...newCost, currency: e.target.value })}>
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
-                                        <Input placeholder="金額" className="flex-1 h-8 text-xs" type="number" value={newCost.amount} onChange={(e) => setNewCost({ ...newCost, amount: e.target.value })} />
+                                        <Input placeholder={zh ? "金額" : "Amount"} className="flex-1 h-8 text-xs" type="number" value={newCost.amount} onChange={(e) => setNewCost({ ...newCost, amount: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Input placeholder="備註 (選填)" className="flex-1 h-8 text-xs" value={newCost.note} onChange={(e) => setNewCost({ ...newCost, note: e.target.value })} />
+                                    <Input placeholder={zh ? "備註 (選填)" : "Note (optional)"} className="flex-1 h-8 text-xs" value={newCost.note} onChange={(e) => setNewCost({ ...newCost, note: e.target.value })} />
                                     <Button size="sm" className="h-8 px-2" onClick={handleAddCost} disabled={saving}><Check className="w-3 h-3" /></Button>
                                     <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setAddingCost(false)}><X className="w-3 h-3" /></Button>
                                 </div>
@@ -778,27 +781,27 @@ export default function EditableDailyTips({
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
                             <Ticket className="w-4 h-4" />
-                            <h4 className="text-sm font-bold">交通票券</h4>
+                            <h4 className="text-sm font-bold">{zh ? '交通票券' : 'Transport Tickets'}</h4>
                         </div>
                         {!readOnly && !editingTickets && (
                             <div className="flex gap-1">
                                 {localTickets.length > 0 && (
                                     <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={handleStartEditTickets}>
-                                        <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                        <Pencil className="w-3 h-3 mr-1" /> {zh ? '編輯' : 'Edit'}
                                     </Button>
                                 )}
                                 <Button variant="ghost" size="sm" className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={() => setAddingTicket(true)}>
-                                    <Plus className="w-3 h-3 mr-1" /> 新增
+                                    <Plus className="w-3 h-3 mr-1" /> {zh ? '新增' : 'Add'}
                                 </Button>
                             </div>
                         )}
                         {editingTickets && (
                             <div className="flex gap-1">
                                 <Button size="sm" className="h-7 text-xs bg-blue-500 hover:bg-blue-600 text-white" onClick={handleSaveTickets} disabled={saving}>
-                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                                    {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} {zh ? '儲存' : 'Save'}
                                 </Button>
                                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEditTickets}>
-                                    取消
+                                    {zh ? '取消' : 'Cancel'}
                                 </Button>
                             </div>
                         )}
@@ -810,7 +813,7 @@ export default function EditableDailyTips({
                             <div key={idx} className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-blue-200 dark:border-blue-600 space-y-2">
                                 <div className="flex gap-2">
                                     <Input
-                                        placeholder="票券名稱"
+                                        placeholder={zh ? "票券名稱" : "Ticket name"}
                                         className="flex-1 h-8 text-xs"
                                         value={ticket.name}
                                         onChange={(e) => handleUpdateEditTicket(idx, 'name', e.target.value)}
@@ -824,7 +827,7 @@ export default function EditableDailyTips({
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <Input
-                                            placeholder="價格"
+                                            placeholder={zh ? "價格" : "Price"}
                                             className="flex-1 h-8 text-xs"
                                             type="number"
                                             value={ticket.price}
@@ -833,7 +836,7 @@ export default function EditableDailyTips({
                                     </div>
                                 </div>
                                 <Input
-                                    placeholder="備註 (選填)"
+                                    placeholder={zh ? "備註 (選填)" : "Note (optional)"}
                                     className="h-8 text-xs"
                                     value={ticket.note || ""}
                                     onChange={(e) => handleUpdateEditTicket(idx, 'note', e.target.value)}
@@ -869,7 +872,7 @@ export default function EditableDailyTips({
                                                             ? "text-amber-500 hover:text-amber-600"
                                                             : "text-blue-300 hover:text-blue-500"
                                                     )}
-                                                    title={ticket.is_private ? "設為公開" : "設為私人"}
+                                                    title={ticket.is_private ? (zh ? "設為公開" : "Make public") : (zh ? "設為私人" : "Make private")}
                                                 >
                                                     {processingTickets.has(idx) ? (
                                                         <Loader2 className="w-3 h-3 animate-spin" />
@@ -904,7 +907,7 @@ export default function EditableDailyTips({
                         {/* Auto Sum Footer */}
                         {localTickets.length > 0 && (
                             <div className="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-xs text-slate-500">
-                                <span className="flex items-center gap-1"><Calculator className="w-3 h-3" /> 小計</span>
+                                <span className="flex items-center gap-1"><Calculator className="w-3 h-3" /> {zh ? '小計' : 'Subtotal'}</span>
                                 <div className="flex gap-2">
                                     {Object.entries(ticketsTotal).map(([curr, total]) => (
                                         <span key={curr} className="font-mono font-bold text-blue-700 dark:text-blue-300">{curr} {total.toLocaleString()}</span>
@@ -914,22 +917,22 @@ export default function EditableDailyTips({
                         )}
 
                         {localTickets.length === 0 && !addingTicket && (
-                            <p className="text-xs text-blue-400/60 italic text-center py-2">尚無票券記錄</p>
+                            <p className="text-xs text-blue-400/60 italic text-center py-2">{zh ? '尚無票券記錄' : 'No tickets recorded'}</p>
                         )}
 
                         {addingTicket && (
                             <div className="bg-white dark:bg-slate-700 rounded-lg p-2 border border-blue-200 dark:border-blue-700 space-y-2 animate-in fade-in zoom-in-95 duration-200">
                                 <div className="flex gap-2">
-                                    <Input placeholder="票券名稱" className="flex-1 h-8 text-xs" value={newTicket.name} onChange={(e) => setNewTicket({ ...newTicket, name: e.target.value })} />
+                                    <Input placeholder={zh ? "票券名稱" : "Ticket name"} className="flex-1 h-8 text-xs" value={newTicket.name} onChange={(e) => setNewTicket({ ...newTicket, name: e.target.value })} />
                                     <div className="flex gap-1 w-32">
                                         <select className="h-8 text-xs bg-slate-50 border rounded w-[4.5rem]" value={newTicket.currency} onChange={e => setNewTicket({ ...newTicket, currency: e.target.value })}>
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
-                                        <Input placeholder="金額" className="flex-1 h-8 text-xs" type="number" value={newTicket.price} onChange={(e) => setNewTicket({ ...newTicket, price: e.target.value })} />
+                                        <Input placeholder={zh ? "金額" : "Amount"} className="flex-1 h-8 text-xs" type="number" value={newTicket.price} onChange={(e) => setNewTicket({ ...newTicket, price: e.target.value })} />
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Input placeholder="備註 (選填)" className="flex-1 h-8 text-xs" value={newTicket.note} onChange={(e) => setNewTicket({ ...newTicket, note: e.target.value })} />
+                                    <Input placeholder={zh ? "備註 (選填)" : "Note (optional)"} className="flex-1 h-8 text-xs" value={newTicket.note} onChange={(e) => setNewTicket({ ...newTicket, note: e.target.value })} />
                                     <Button size="sm" className="h-8 px-2 bg-blue-500 hover:bg-blue-600" onClick={handleAddTicket} disabled={saving}><Check className="w-3 h-3" /></Button>
                                     <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => setAddingTicket(false)}><X className="w-3 h-3" /></Button>
                                 </div>

@@ -22,7 +22,8 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon, showPreview = true }: ImageUploadProps) {
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
+    const zh = lang === 'zh'
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [previewOpen, setPreviewOpen] = useState(false)
@@ -43,7 +44,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
             if (!cloudName || !apiKey) {
                 console.error("Missing Cloudinary env vars:", { cloudName: !!cloudName, apiKey: !!apiKey })
-                toast.error(`環境變數缺失！請確認 .env.local 並重啟前端。`)
+                toast.error(zh ? `環境變數缺失！請確認 .env.local 並重啟前端。` : `Missing env vars! Check .env.local and restart.`)
                 setLoading(false)
                 return
             }
@@ -60,7 +61,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             if (!res.ok) {
                 const errText = await res.text()
                 console.error("Sign API error:", errText)
-                toast.error(`簽名 API 錯誤: ${res.status}`)
+                toast.error(zh ? `簽名 API 錯誤: ${res.status}` : `Sign API error: ${res.status}`)
                 setLoading(false)
                 return
             }
@@ -92,10 +93,10 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                         toast.success(t('img_upload_success'))
                     } else {
                         console.error("Cloudinary error:", result)
-                        toast.error(`Cloudinary 錯誤: ${result.error?.message || JSON.stringify(result)}`)
+                        toast.error(zh ? `Cloudinary 錯誤: ${result.error?.message || JSON.stringify(result)}` : `Cloudinary error: ${result.error?.message || JSON.stringify(result)}`)
                     }
                 } else {
-                    toast.error(`上傳失敗: ${xhr.status}`)
+                    toast.error(zh ? `上傳失敗: ${xhr.status}` : `Upload failed: ${xhr.status}`)
                 }
                 setLoading(false)
                 setProgress(0)
@@ -145,7 +146,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                             className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-0.5 border border-dashed border-slate-300 hover:border-red-400 px-1.5 py-0.5 rounded transition-colors"
                         >
                             <Trash2 className="w-3 h-3" />
-                            移除
+                            {zh ? '移除' : 'Remove'}
                         </button>
                     </div>
                 )}

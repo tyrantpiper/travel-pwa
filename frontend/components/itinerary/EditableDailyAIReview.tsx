@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { tripsApi } from "@/lib/api"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface EditableDailyAIReviewProps {
     tripId: string
@@ -32,6 +33,8 @@ export default function EditableDailyAIReview({
     onUpdate
 }: EditableDailyAIReviewProps) {
     const [isLoading, setIsLoading] = useState(false)
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
     const [loadingAction, setLoadingAction] = useState<"generate" | "clear" | null>(null)
     const [isExpanded, setIsExpanded] = useState(false)  // 🆕 Collapsible state
 
@@ -44,11 +47,11 @@ export default function EditableDailyAIReview({
 
         try {
             await tripsApi.generateAIReview(tripId, day, userId)
-            toast.success(`Day ${day} AI 審核完成!`)
+            toast.success(zh ? `Day ${day} AI 審核完成!` : `Day ${day} AI review complete!`)
             await onUpdate()
         } catch (error) {
             console.error("AI Review failed:", error)
-            toast.error(error instanceof Error ? error.message : "AI 審核失敗")
+            toast.error(error instanceof Error ? error.message : (zh ? "AI 審核失敗" : "AI review failed"))
         } finally {
             setIsLoading(false)
             setLoadingAction(null)
@@ -64,11 +67,11 @@ export default function EditableDailyAIReview({
 
         try {
             await tripsApi.clearAIReview(tripId, day, userId)
-            toast.success("已清除審核報告")
+            toast.success(zh ? "已清除審核報告" : "Review cleared")
             await onUpdate()
         } catch (error) {
             console.error("Clear failed:", error)
-            toast.error("清除失敗")
+            toast.error(zh ? "清除失敗" : "Clear failed")
         } finally {
             setIsLoading(false)
             setLoadingAction(null)
@@ -141,7 +144,7 @@ export default function EditableDailyAIReview({
                     ) : (
                         <>
                             <span className="text-xl mr-2">🕵️</span>
-                            生成 AI 深度審核報告
+                            {zh ? '生成 AI 深度審核報告' : 'Generate AI Review'}
                         </>
                     )}
                 </Button>
@@ -158,7 +161,7 @@ export default function EditableDailyAIReview({
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <h3 className="text-base font-bold text-indigo-900 flex items-center gap-2">
-                    <span className="text-lg">🕵️</span> AI 深度審核報告
+                    <span className="text-lg">🕵️</span> {zh ? 'AI 深度審核報告' : 'AI Review Report'}
                     <ChevronDown
                         className={cn(
                             "w-4 h-4 text-indigo-500 transition-transform duration-200",
@@ -174,7 +177,7 @@ export default function EditableDailyAIReview({
                         className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-100 touch-manipulation"
                         onClick={handleGenerate}
                         disabled={isLoading}
-                        title="重新審核"
+                        title={zh ? "重新審核" : "Re-review"}
                     >
                         {isLoading && loadingAction === "generate" ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -189,7 +192,7 @@ export default function EditableDailyAIReview({
                         className="h-8 w-8 p-0 text-red-500 hover:bg-red-100 touch-manipulation"
                         onClick={handleClear}
                         disabled={isLoading}
-                        title="清除審核"
+                        title={zh ? "清除審核" : "Clear review"}
                     >
                         {isLoading && loadingAction === "clear" ? (
                             <Loader2 className="w-4 h-4 animate-spin" />

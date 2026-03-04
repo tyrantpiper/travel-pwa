@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { ChecklistItem } from "@/lib/itinerary-types"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // Types moved to @/lib/itinerary-types
 
@@ -28,6 +29,8 @@ export default function EditableDailyChecklist({
     readOnly = false,
     userId
 }: EditableDailyChecklistProps) {
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
     const haptic = useHaptic()
     const [localItems, setLocalItems] = useState<ChecklistItem[]>(items || [])
 
@@ -90,17 +93,17 @@ export default function EditableDailyChecklist({
                 if (!success) {
                     // 回滾
                     setLocalItems(localItems)
-                    toast.error("更新失敗")
+                    toast.error(zh ? "更新失敗" : "Update failed")
                 }
             } catch {
                 setLocalItems(localItems)
-                toast.error("更新失敗")
+                toast.error(zh ? "更新失敗" : "Update failed")
             } finally {
                 setIsUpdating(false)
                 pendingUpdatesCount.current--  // 🆕 Clear pending flag
             }
         }, 500)
-    }, [localItems, onUpdate, readOnly, isUpdating, haptic])
+    }, [localItems, onUpdate, readOnly, isUpdating, haptic, zh])
 
     // 新增項目
     const addItem = async () => {
@@ -125,13 +128,13 @@ export default function EditableDailyChecklist({
             const success = await onUpdate(newItems)
             if (!success) {
                 setLocalItems(localItems)
-                toast.error("新增失敗")
+                toast.error(zh ? "新增失敗" : "Failed to add")
             } else {
-                toast.success("已新增項目")
+                toast.success(zh ? "已新增項目" : "Item added")
             }
         } catch {
             setLocalItems(localItems)
-            toast.error("新增失敗")
+            toast.error(zh ? "新增失敗" : "Failed to add")
         } finally {
             setIsUpdating(false)
             pendingUpdatesCount.current--  // 🆕 Clear pending flag
@@ -154,11 +157,11 @@ export default function EditableDailyChecklist({
             const success = await onUpdate(newItems)
             if (!success) {
                 setLocalItems(localItems)
-                toast.error("刪除失敗")
+                toast.error(zh ? "刪除失敗" : "Delete failed")
             }
         } catch {
             setLocalItems(localItems)
-            toast.error("刪除失敗")
+            toast.error(zh ? "刪除失敗" : "Delete failed")
         } finally {
             setIsUpdating(false)
             pendingUpdatesCount.current--  // 🆕 Clear pending flag
@@ -193,14 +196,14 @@ export default function EditableDailyChecklist({
             const success = await onUpdate(newItems)
             if (!success) {
                 setLocalItems(localItems)
-                toast.error("更新失敗")
+                toast.error(zh ? "更新失敗" : "Update failed")
             } else {
                 const item = newItems.find(i => i.id === id)
-                toast.success(item?.is_private ? "已設為私人" : "已設為公開")
+                toast.success(item?.is_private ? (zh ? "已設為私人" : "Set to private") : (zh ? "已設為公開" : "Set to public"))
             }
         } catch {
             setLocalItems(localItems)
-            toast.error("更新失敗")
+            toast.error(zh ? "更新失敗" : "Update failed")
         } finally {
             setIsUpdating(false)
             pendingUpdatesCount.current--  // 🆕 Clear pending flag
@@ -226,12 +229,12 @@ export default function EditableDailyChecklist({
                 setLocalItems(editData)
                 setIsEditing(false)
                 setEditData([])
-                toast.success("已儲存修改")
+                toast.success(zh ? "已儲存修改" : "Changes saved")
             } else {
-                toast.error("儲存失敗")
+                toast.error(zh ? "儲存失敗" : "Save failed")
             }
         } catch {
-            toast.error("儲存失敗")
+            toast.error(zh ? "儲存失敗" : "Save failed")
         } finally {
             setIsUpdating(false)
         }
@@ -283,7 +286,7 @@ export default function EditableDailyChecklist({
                 <div className="flex items-center gap-2">
                     <ListChecks className="w-4 h-4 text-indigo-500" />
                     <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
-                        行前清單
+                        {zh ? '行前清單' : 'Pre-trip Checklist'}
                     </span>
                     {totalCount > 0 && (
                         <span className="text-xs text-indigo-500 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/50 px-2 py-0.5 rounded-full">
@@ -300,7 +303,7 @@ export default function EditableDailyChecklist({
                                 onClick={handleStartEdit}
                                 className="h-7 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
                             >
-                                <Pencil className="w-3 h-3 mr-1" /> 編輯
+                                <Pencil className="w-3 h-3 mr-1" /> {zh ? '編輯' : 'Edit'}
                             </Button>
                         )}
                         <Button
@@ -316,10 +319,10 @@ export default function EditableDailyChecklist({
                 {isEditing && (
                     <div className="flex gap-1">
                         <Button size="sm" className="h-7 text-xs bg-indigo-500 hover:bg-indigo-600 text-white" onClick={handleSaveEdit} disabled={isUpdating}>
-                            {isUpdating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} 儲存
+                            {isUpdating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />} {zh ? '儲存' : 'Save'}
                         </Button>
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleCancelEdit}>
-                            取消
+                            {zh ? '取消' : 'Cancel'}
                         </Button>
                     </div>
                 )}
@@ -339,7 +342,7 @@ export default function EditableDailyChecklist({
             <div className="space-y-1">
                 {localItems.length === 0 && !isAdding && !isEditing && (
                     <div className="text-center py-4 text-indigo-400 dark:text-indigo-500 text-sm">
-                        尚無清單項目
+                        {zh ? '尚無清單項目' : 'No checklist items yet'}
                     </div>
                 )}
 
@@ -411,7 +414,7 @@ export default function EditableDailyChecklist({
                                                 item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
                                                 }`}
                                             disabled={processingItems.has(item.id) || isUpdating}
-                                            title={item.is_private ? "設為公開" : "設為私人"}
+                                            title={item.is_private ? (zh ? "設為公開" : "Make public") : (zh ? "設為私人" : "Make private")}
                                         >
                                             {processingItems.has(item.id) ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -457,7 +460,7 @@ export default function EditableDailyChecklist({
                                     setNewItemText("")
                                 }
                             }}
-                            placeholder="輸入待辦事項..."
+                            placeholder={zh ? "輸入待辦事項..." : "Enter a to-do item..."}
                             className="flex-1 h-8 text-sm border-0 focus-visible:ring-0 bg-transparent"
                             autoFocus
                         />

@@ -40,7 +40,8 @@ export function TripMembersSheet({
     currentUserId,
     onMemberKicked
 }: TripMembersSheetProps) {
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
+    const zh = lang === 'zh'
     const [isOpen, setIsOpen] = useState(false)
     const [kickingUserId, setKickingUserId] = useState<string | null>(null)
     const [confirmKick, setConfirmKick] = useState<TripMember | null>(null)
@@ -51,11 +52,11 @@ export function TripMembersSheet({
         setKickingUserId(member.user_id)
         try {
             await tripsApi.kickMember(tripId, member.user_id, currentUserId)
-            toast.success(`已將 ${member.user_name} 移出行程`)
+            toast.success(zh ? `已將 ${member.user_name} 移出行程` : `Removed ${member.user_name} from trip`)
             setConfirmKick(null)
             onMemberKicked()
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "踢出失敗")
+            toast.error(error instanceof Error ? error.message : (zh ? "踢出失敗" : "Failed to remove"))
         } finally {
             setKickingUserId(null)
         }
@@ -117,13 +118,13 @@ export function TripMembersSheet({
                                         <div>
                                             <p className="font-medium text-slate-900 flex items-center gap-1.5">
                                                 {member.user_name}
-                                                {isMe && <span className="text-xs text-blue-500">(我)</span>}
+                                                {isMe && <span className="text-xs text-blue-500">{zh ? '(我)' : '(Me)'}</span>}
                                                 {isThisCreator && (
                                                     <Crown className="w-4 h-4 text-amber-500" />
                                                 )}
                                             </p>
                                             {isThisCreator && (
-                                                <p className="text-xs text-slate-500">行程創建者</p>
+                                                <p className="text-xs text-slate-500">{zh ? '行程創建者' : 'Trip Creator'}</p>
                                             )}
                                         </div>
                                     </div>
@@ -161,11 +162,11 @@ export function TripMembersSheet({
             <AlertDialog open={!!confirmKick} onOpenChange={() => setConfirmKick(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>確認移除成員？</AlertDialogTitle>
+                        <AlertDialogTitle>{zh ? '確認移除成員？' : 'Remove Member?'}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            確定要將 <strong>{confirmKick?.user_name}</strong> 從此行程中移除嗎？
+                            {zh ? '確定要將' : 'Are you sure you want to remove'} <strong>{confirmKick?.user_name}</strong> {zh ? '從此行程中移除嗎？' : 'from this trip?'}
                             <br />
-                            對方將無法再查看此行程。
+                            {zh ? '對方將無法再查看此行程。' : 'They will no longer be able to view this trip.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -174,7 +175,7 @@ export function TripMembersSheet({
                             onClick={() => confirmKick && handleKick(confirmKick)}
                             className="bg-red-500 hover:bg-red-600"
                         >
-                            確認移除
+                            {zh ? '確認移除' : 'Confirm Remove'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -10,6 +10,7 @@ import { TimelineCardOverlay } from "@/components/itinerary/TimelineCardOverlay"
 import { Button } from "@/components/ui/button"
 import { Activity, Trip } from "@/lib/itinerary-types"
 import { POIBasicData } from "@/components/POIDetailDrawer"
+import { useLanguage } from "@/lib/LanguageContext"
 import dynamic from "next/dynamic"
 
 type DndSensorDescriptor = SensorDescriptor<SensorOptions>;
@@ -53,6 +54,8 @@ export function ItineraryTimeline({
     onAddPOI,
     currentTrip
 }: ItineraryTimelineProps) {
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
 
     // 預先計算每個項目的 realIndex
     const realIndices: number[] = [];
@@ -114,8 +117,8 @@ export function ItineraryTimeline({
                         /* 🆕 穩定空狀態：防止卡片倏忽消失 */
                         <div className="py-20 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 mb-6">
                             <div className="text-4xl mb-4 opacity-50">🎑</div>
-                            <p className="text-sm font-medium">今天尚未安排行程</p>
-                            <p className="text-xs opacity-60 mt-1">點擊下方按鈕開始規劃冒險</p>
+                            <p className="text-sm font-medium">{zh ? '今天尚未安排行程' : 'No activities planned for today'}</p>
+                            <p className="text-xs opacity-60 mt-1">{zh ? '點擊下方按鈕開始規劃冒險' : 'Click the button below to start planning'}</p>
                         </div>
                     )}
                 </SortableContext>
@@ -143,7 +146,7 @@ export function ItineraryTimeline({
                     disabled={!isOnline}
                     onClick={onAddActivity}
                 >
-                    <Plus className="w-4 h-4 mr-2" />{isOnline ? "Add Activity" : "✈️ 離線模式"}
+                    <Plus className="w-4 h-4 mr-2" />{isOnline ? "Add Activity" : (zh ? "✈️ 離線模式" : "✈️ Offline Mode")}
                 </Button>
             </div>
 

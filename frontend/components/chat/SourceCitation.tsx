@@ -1,6 +1,7 @@
 "use client"
 
 import { ExternalLink } from "lucide-react"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface GroundingSource {
     title: string
@@ -18,11 +19,13 @@ interface SourceCitationProps {
  * 點擊可開啟原始來源網頁
  */
 export default function SourceCitation({ sources }: SourceCitationProps) {
+    const { lang } = useLanguage()
+    const zh = lang === 'zh'
     if (!sources || sources.length === 0) return null
 
     return (
         <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-100">
-            <span className="text-[10px] text-slate-400 mr-1">來源：</span>
+            <span className="text-[10px] text-slate-400 mr-1">{zh ? '來源：' : 'Sources:'}</span>
             {sources.map((source, idx) => (
                 <a
                     key={idx}
