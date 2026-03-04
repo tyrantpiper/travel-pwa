@@ -19,6 +19,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover", // 🆕 Enables env(safe-area-inset-*) for notch/home-bar devices
   interactiveWidget: "resizes-content", // 🆕 Improves PWA keyboard handling
 }
 

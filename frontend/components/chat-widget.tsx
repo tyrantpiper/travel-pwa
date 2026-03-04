@@ -65,6 +65,13 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
     "沖繩": { lat: 26.2124, lng: 127.6809 },
 }
 
+/** 🆕 Read device safe area bottom inset from CSS env() bridge */
+function getSafeAreaBottom(): number {
+    if (typeof window === 'undefined') return 0
+    const val = getComputedStyle(document.documentElement).getPropertyValue('--sab').trim()
+    return parseInt(val, 10) || 0
+}
+
 export default function ChatWidget() {
     const { t } = useLanguage()
     // 🔒 登錄狀態檢查 - 未登錄時不顯示聊天氣泡
@@ -217,14 +224,48 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
     const dragRef = useRef<HTMLDivElement>(null)
     const dragOffset = useRef<Position>({ x: 0, y: 0 })
 
-    // Load saved position
+    // Load saved position + clamp to current viewport
     useEffect(() => {
         const saved = localStorage.getItem("chat_widget_position")
         if (saved) {
             try {
                 const pos = JSON.parse(saved)
+                // 🆕 Clamp to current viewport on load
+                const buttonSize = 56
+                const margin = 16
+                const safeBottom = getSafeAreaBottom()
+                const minY = 80 + safeBottom
+                const maxY = window.innerHeight - buttonSize - margin
+                pos.y = Math.max(minY, Math.min(pos.y, maxY))
                 setPosition(pos)
             } catch { }
+        }
+    }, [])
+
+    // 🆕 Re-clamp position on viewport resize / orientation change
+    useEffect(() => {
+        const reclamp = () => {
+            setPosition(prev => {
+                const buttonSize = 56
+                const margin = 16
+                const safeBottom = getSafeAreaBottom()
+                const minY = 80 + safeBottom
+                const maxY = window.innerHeight - buttonSize - margin
+                const clampedY = Math.max(minY, Math.min(prev.y, maxY))
+                if (clampedY !== prev.y) {
+                    const newPos = { x: prev.x, y: clampedY }
+                    localStorage.setItem("chat_widget_position", JSON.stringify(newPos))
+                    return newPos
+                }
+                return prev
+            })
+        }
+
+        window.addEventListener('resize', reclamp)
+        window.addEventListener('orientationchange', reclamp)
+        return () => {
+            window.removeEventListener('resize', reclamp)
+            window.removeEventListener('orientationchange', reclamp)
         }
     }, [])
 
@@ -250,7 +291,8 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
 
         const buttonSize = 56
         const margin = 16 // margin from edge
-        const minY = 80 // minimum distance from bottom (above bottom nav)
+        const safeBottom = getSafeAreaBottom()
+        const minY = 80 + safeBottom // 🆕 minimum distance includes safe area
         const maxY = window.innerHeight - buttonSize - margin // maximum Y (near top of screen)
 
         // Calculate position from bottom-right
