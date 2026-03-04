@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { GeocodeResult, DailyLocation, Trip, LocationInfo } from "@/lib/itinerary-types"
 import { geocodeApi } from "@/lib/api"
 import { COUNTRY_REGIONS } from "@/lib/constants"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface LocationEditDialogProps {
     isOpen: boolean
@@ -29,6 +30,7 @@ export function LocationEditDialog({
     currentTrip,
     biasLoc,    // 🆕 Smart Geocoding Bias
 }: LocationEditDialogProps) {
+    const { t } = useLanguage()
     const [searchCountry, setSearchCountry] = useState("")
     const [dailyLocSearchRegion, setDailyLocSearchRegion] = useState("")
     const [newLocName, setNewLocName] = useState("")
@@ -52,11 +54,11 @@ export function LocationEditDialog({
             const results = data.results || []
             setLocSearchResults(results)
             if (results.length === 0) {
-                toast.error("找不到該地點")
+                toast.error(t('loc_not_found'))
             }
         } catch (err) {
             console.error("Search failed:", err)
-            toast.error("地圖服務暫時無法使用")
+            toast.error(t('loc_service_unavailable'))
         } finally {
             setIsLocSearching(false)
         }
@@ -75,9 +77,9 @@ export function LocationEditDialog({
                 }
             })
             onOpenChange(false)
-            toast.success(`已將地點設定為 ${loc.name}`)
+            toast.success(t('loc_set_success', { name: loc.name }))
         } catch {
-            toast.error("設定地點失敗")
+            toast.error(t('loc_set_failed'))
         } finally {
             setIsSelectingLocation(false)
         }
@@ -99,9 +101,9 @@ export function LocationEditDialog({
                 }
             })
             onOpenChange(false)
-            toast.success("已手動套用座標")
+            toast.success(t('loc_cleared'))
         } else {
-            toast.warning("請輸入有效的座標數字")
+            toast.warning(t('loc_invalid_coords'))
         }
     }
 
@@ -109,16 +111,16 @@ export function LocationEditDialog({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>修改第 {day} 天的天氣地點</DialogTitle>
+                    <DialogTitle>{t('loc_edit_title', { day: String(day) })}</DialogTitle>
                     <DialogDescription>
-                        設定此日期對應的地理位置以獲取準確的天氣資訊。
+                        {t('loc_edit_desc')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     {/* 當前座標顯示 */}
                     {dailyLocs[day] && (
                         <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
-                            <div className="text-xs text-slate-500 mb-1">📍 目前地點</div>
+                            <div className="text-xs text-slate-500 mb-1">{t('loc_current')}</div>
                             <div className="font-bold text-slate-800 dark:text-slate-200">{dailyLocs[day].name}</div>
                             <div className="text-xs text-slate-400 font-mono">
                                 {dailyLocs[day].lat?.toFixed(4)}, {dailyLocs[day].lng?.toFixed(4)}
@@ -140,7 +142,7 @@ export function LocationEditDialog({
                                     }}
                                 >
                                     <div>
-                                        <div className="text-xs text-amber-600 font-bold">⚡ 從活動同步</div>
+                                        <div className="text-xs text-amber-600 font-bold">{t('loc_auto_sync')}</div>
                                         <div className="text-sm text-slate-700 dark:text-slate-300">{activityLoc.place}</div>
                                         <div className="text-xs text-slate-400 font-mono">{activityLoc.lat?.toFixed(4)}, {activityLoc.lng?.toFixed(4)}</div>
                                     </div>
@@ -152,7 +154,7 @@ export function LocationEditDialog({
 
                     {/* 搜尋區域 */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-500">🔍 搜尋地點</label>
+                        <label className="text-xs font-bold text-slate-500">{t('loc_search')}</label>
                         <div className="flex gap-2">
                             <div className="w-1/3 space-y-2">
                                 <select
@@ -209,7 +211,7 @@ export function LocationEditDialog({
 
                             <div className="flex-1 flex gap-2">
                                 <Input
-                                    placeholder="輸入地點..."
+                                    placeholder={t('loc_search_placeholder')}
                                     value={newLocName}
                                     onChange={e => setNewLocName(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleSearchLocation()}
@@ -262,11 +264,11 @@ export function LocationEditDialog({
                     )}
 
                     <div className="space-y-2 pt-2 border-t border-dashed">
-                        <label className="text-xs font-bold text-slate-500">📌 自定義輸入座標 (手動預估)</label>
+                        <label className="text-xs font-bold text-slate-500">{t('loc_manual_title')}</label>
                         <div className="flex gap-2">
-                            <Input placeholder="緯度 (lat)" className="font-mono text-xs h-8" id="manual-lat" />
-                            <Input placeholder="經度 (lng)" className="font-mono text-xs h-8" id="manual-lng" />
-                            <Button size="sm" variant="secondary" onClick={handleManualLocation}>套用</Button>
+                            <Input placeholder={t('loc_lat_ph')} className="font-mono text-xs h-8" id="manual-lat" />
+                            <Input placeholder={t('loc_lng_ph')} className="font-mono text-xs h-8" id="manual-lng" />
+                            <Button size="sm" variant="secondary" onClick={handleManualLocation}>{t('loc_apply')}</Button>
                         </div>
                     </div>
                 </div>

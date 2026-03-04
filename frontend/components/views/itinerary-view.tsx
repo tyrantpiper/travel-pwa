@@ -126,12 +126,12 @@ export function ItineraryView() {
                 image_url: poi.photo_url || poi.image_url
             })
 
-            toast.success("已加入行程")
+            toast.success(t('iv_added_to_trip'))
             // 立即重整
             await reloadTripDetail()
         } catch (error) {
             console.error(error)
-            toast.error("加入失敗")
+            toast.error(t('iv_add_to_trip_failed'))
         }
     }
 
@@ -172,7 +172,7 @@ export function ItineraryView() {
 
         if (!over || active.id === over.id) return
         if (!isOnline) {
-            toast.error("✈️ 離線模式下無法調整順序")
+            toast.error("✈️ " + t('iv_offline_reorder'))
             return
         }
 
@@ -190,7 +190,7 @@ export function ItineraryView() {
             newOrder
         })
         setIsReorderDialogOpen(true)
-    }, [currentDayData, isOnline])
+    }, [currentDayData, isOnline, t])
 
     const handleDragCancel = useCallback(() => {
         setActiveId(null)
@@ -214,18 +214,18 @@ export function ItineraryView() {
             // 🔒 Standardized: Use itemsApi.reorder with userId
             await itemsApi.reorder(items, adjustTimes, userId || "")
 
-            toast.success(adjustTimes ? "順序與時間已更新" : "順序已更新")
+            toast.success(adjustTimes ? t('iv_reorder_with_time') : t('iv_reorder_done'))
             await reloadTripDetail()
 
         } catch (e) {
             console.error("Reorder error:", e)
-            toast.error("排序更新失敗")
+            toast.error(t('iv_reorder_failed'))
         } finally {
             setPendingReorder(null)
             setIsReorderDialogOpen(false)
             setIsReordering(false)
         }
-    }, [pendingReorder, activeTripId, reloadTripDetail, isReordering, userId])
+    }, [pendingReorder, activeTripId, reloadTripDetail, isReordering, userId, t])
 
 
     // 🆕 2026: Store-based GC is now handled by the weatherStore itself
@@ -287,7 +287,7 @@ export function ItineraryView() {
             if (currentDayData?.activities) {
                 for (const activity of currentDayData.activities) {
                     if (activity.lat && activity.lng) {
-                        return { lat: activity.lat, lng: activity.lng, name: activity.place || "當前行程地點" }
+                        return { lat: activity.lat, lng: activity.lng, name: activity.place || t('iv_current_location') }
                     }
                 }
             }
@@ -297,7 +297,7 @@ export function ItineraryView() {
                 if (d.activities) {
                     for (const activity of d.activities) {
                         if (activity.lat && activity.lng) {
-                            return { lat: activity.lat, lng: activity.lng, name: `行程參考地點: ${activity.place || ""}` }
+                            return { lat: activity.lat, lng: activity.lng, name: t('iv_estimated_location', { place: activity.place || "" }) }
                         }
                     }
                 }
@@ -318,22 +318,39 @@ export function ItineraryView() {
         // 常見城市座標對照表（含時區）
         const CITY_COORDS: { [key: string]: { lat: number, lng: number, name: string, timezone: string } } = {
             "東京": { lat: 35.6895, lng: 139.6917, name: "東京", timezone: "Asia/Tokyo" },
+            "Tokyo": { lat: 35.6895, lng: 139.6917, name: "Tokyo", timezone: "Asia/Tokyo" },
             "大阪": { lat: 34.6937, lng: 135.5023, name: "大阪", timezone: "Asia/Tokyo" },
+            "Osaka": { lat: 34.6937, lng: 135.5023, name: "Osaka", timezone: "Asia/Tokyo" },
             "京都": { lat: 35.0116, lng: 135.7681, name: "京都", timezone: "Asia/Tokyo" },
+            "Kyoto": { lat: 35.0116, lng: 135.7681, name: "Kyoto", timezone: "Asia/Tokyo" },
             "台北": { lat: 25.0330, lng: 121.5654, name: "台北", timezone: "Asia/Taipei" },
+            "Taipei": { lat: 25.0330, lng: 121.5654, name: "Taipei", timezone: "Asia/Taipei" },
             "高雄": { lat: 22.6273, lng: 120.3014, name: "高雄", timezone: "Asia/Taipei" },
+            "Kaohsiung": { lat: 22.6273, lng: 120.3014, name: "Kaohsiung", timezone: "Asia/Taipei" },
             "台中": { lat: 24.1477, lng: 120.6736, name: "台中", timezone: "Asia/Taipei" },
+            "Taichung": { lat: 24.1477, lng: 120.6736, name: "Taichung", timezone: "Asia/Taipei" },
             "台南": { lat: 22.9999, lng: 120.2269, name: "台南", timezone: "Asia/Taipei" },
+            "Tainan": { lat: 22.9999, lng: 120.2269, name: "Tainan", timezone: "Asia/Taipei" },
             "橫濱": { lat: 35.4437, lng: 139.6380, name: "橫濱", timezone: "Asia/Tokyo" },
+            "Yokohama": { lat: 35.4437, lng: 139.6380, name: "Yokohama", timezone: "Asia/Tokyo" },
             "札幌": { lat: 43.0618, lng: 141.3545, name: "札幌", timezone: "Asia/Tokyo" },
+            "Sapporo": { lat: 43.0618, lng: 141.3545, name: "Sapporo", timezone: "Asia/Tokyo" },
             "福岡": { lat: 33.5904, lng: 130.4017, name: "福岡", timezone: "Asia/Tokyo" },
+            "Fukuoka": { lat: 33.5904, lng: 130.4017, name: "Fukuoka", timezone: "Asia/Tokyo" },
             "名古屋": { lat: 35.1815, lng: 136.9066, name: "名古屋", timezone: "Asia/Tokyo" },
+            "Nagoya": { lat: 35.1815, lng: 136.9066, name: "Nagoya", timezone: "Asia/Tokyo" },
             "沖繩": { lat: 26.2124, lng: 127.6809, name: "沖繩", timezone: "Asia/Tokyo" },
+            "Okinawa": { lat: 26.2124, lng: 127.6809, name: "Okinawa", timezone: "Asia/Tokyo" },
             "首爾": { lat: 37.5665, lng: 126.9780, name: "首爾", timezone: "Asia/Seoul" },
+            "Seoul": { lat: 37.5665, lng: 126.9780, name: "Seoul", timezone: "Asia/Seoul" },
             "釜山": { lat: 35.1796, lng: 129.0756, name: "釜山", timezone: "Asia/Seoul" },
+            "Busan": { lat: 35.1796, lng: 129.0756, name: "Busan", timezone: "Asia/Seoul" },
             "香港": { lat: 22.3193, lng: 114.1694, name: "香港", timezone: "Asia/Hong_Kong" },
+            "Hong Kong": { lat: 22.3193, lng: 114.1694, name: "Hong Kong", timezone: "Asia/Hong_Kong" },
             "新加坡": { lat: 1.3521, lng: 103.8198, name: "新加坡", timezone: "Asia/Singapore" },
+            "Singapore": { lat: 1.3521, lng: 103.8198, name: "Singapore", timezone: "Asia/Singapore" },
             "曼谷": { lat: 13.7563, lng: 100.5018, name: "曼谷", timezone: "Asia/Bangkok" },
+            "Bangkok": { lat: 13.7563, lng: 100.5018, name: "Bangkok", timezone: "Asia/Bangkok" },
         }
 
         let activeLoc: { name: string, lat: number, lng: number } | null = null
@@ -342,7 +359,7 @@ export function ItineraryView() {
         // Priority 1: Use manually set daily location (search results)
         if (dailyLocs && dailyLocs[day]) {
             activeLoc = {
-                name: dailyLocs[day].name || "自定義地點",
+                name: dailyLocs[day].name || t('iv_custom_location'),
                 lat: dailyLocs[day].lat,
                 lng: dailyLocs[day].lng
             }
@@ -750,20 +767,20 @@ export function ItineraryView() {
             controller.abort()
             clearTimeout(prefetchTimer)
         }
-    }, [day, dailyLocs, currentTrip, activeTripId, weatherStore])
+    }, [day, dailyLocs, currentTrip, activeTripId, weatherStore, t])
 
     const handleLeaveTrip = async (tripId: string) => {
         if (leavingTripId) return // Prevent concurrent actions
-        if (!confirm(t('confirm_delete') ? "您確定要退出此行程嗎？" : "Are you sure you want to leave this trip?")) return
+        if (!confirm(t('iv_leave_confirm'))) return
 
         setLeavingTripId(tripId)
         try {
             await tripsApi.leave(tripId, userId || "")
-            toast.success("已成功退出行程")
+            toast.success(t('iv_left_trip'))
             reloadTrips() // 刷新列表，行程會立即消失
         } catch (e) {
             console.error(e)
-            toast.error("退出行程失敗")
+            toast.error(t('iv_leave_failed'))
         } finally {
             setLeavingTripId(null)
         }
@@ -784,7 +801,7 @@ export function ItineraryView() {
             await tripsApi.delete(deletingTripId, userId || undefined)
 
             haptic.success()
-            toast.success("行程已刪除")
+            toast.success(t('iv_trip_deleted'))
 
             // If we're deleting the active trip, clear selection
             if (activeTripId === deletingTripId) {
@@ -797,7 +814,7 @@ export function ItineraryView() {
         } catch (error) {
             console.error(error)
             haptic.error()
-            toast.error("刪除失敗")
+            toast.error(t('iv_delete_failed'))
         } finally {
             setIsDeleting(false)
         }
@@ -878,7 +895,7 @@ export function ItineraryView() {
 
             if (isAddMode) {
                 if (!currentTrip || !editItem) {
-                    toast.error("參數缺失，無法新增項目")
+                    toast.error(t('iv_missing_params'))
                     return
                 }
                 // 🔒 Fix: Pass user_id for auth header
@@ -886,21 +903,21 @@ export function ItineraryView() {
             } else {
                 if (!editItem || !editItem.id) {
                     console.error("❌ Edit failed: Missing ID", editItem)
-                    toast.error("系統辨識異常：缺少項目 ID")
+                    toast.error(t('iv_missing_id'))
                     return
                 }
                 // 🔒 Fix: Pass userId as 3rd argument for auth header
                 await itemsApi.update(editItem.id, activityData, userId || "")
             }
             haptic.success()
-            toast.success("已儲存變更")
+            toast.success(t('iv_saved'))
             setIsEditOpen(false)
             await reloadTripDetail()
         } catch (e) {
             console.error("🔥 Save activity error:", e)
             haptic.error()
             // 🆕 顯示更具體的錯誤
-            toast.error(e instanceof Error ? `儲存失敗: ${e.message}` : "儲存失敗，請檢查網路連線")
+            toast.error(e instanceof Error ? `${t('iv_save_failed_prefix')}${e.message}` : t('iv_save_failed'))
         } finally {
             setIsSavingActivity(false)
         }
@@ -928,12 +945,12 @@ export function ItineraryView() {
             return true
         } catch (e) {
             console.error("🔥 handleUpdateActivity error:", e)
-            toast.error(e instanceof Error ? `更新失敗: ${e.message}` : "更新失敗")
+            toast.error(e instanceof Error ? `${t('iv_update_failed_prefix')}${e.message}` : t('iv_update_failed_short'))
             // 🛡️ Rollback to last known good state from server
             await reloadTripDetail()
             return false
         }
-    }, [currentTrip, reloadTripDetail, userId])
+    }, [currentTrip, reloadTripDetail, userId, t])
 
 
     const handleDeleteItem = useCallback(async (id: string) => {
@@ -958,7 +975,7 @@ export function ItineraryView() {
             haptic.success()
         } catch (e) {
             console.error("🔥 Delete item error:", e)
-            toast.error(e instanceof Error ? e.message : "刪除失敗，已啟動自動復原")
+            toast.error(e instanceof Error ? e.message : t('iv_delete_item_failed'))
             await reloadTripDetail() // Revert UI
         }
     }, [t, currentTrip, reloadTripDetail, haptic, userId])
@@ -966,7 +983,7 @@ export function ItineraryView() {
     // ⚡ Memoized Handlers for SortableTimelineCard (Fixed: Stable References)
     const handleEditActivity = useCallback((item: Activity) => {
         if (!isOnline) {
-            toast.error("✈️ 離線模式下無法編輯")
+            toast.error("✈️ " + t('iv_offline_edit'))
             return
         }
         setIsAddMode(false)
@@ -993,19 +1010,19 @@ export function ItineraryView() {
         })
         originalUrlRef.current = item.link_url || "" // 🆕 捕獲初始網址
         setIsEditOpen(true)
-    }, [isOnline])
+    }, [isOnline, t])
 
     const handleDeleteActivity = useCallback((id: string) => {
         if (!isOnline) {
-            toast.error("✈️ 離線模式下無法刪除")
+            toast.error("✈️ " + t('iv_offline_delete'))
             return
         }
         handleDeleteItem(id)
-    }, [isOnline, handleDeleteItem])
+    }, [isOnline, handleDeleteItem, t])
 
     const handleDeleteDay = async (dayNum: number) => {
         if (!currentTrip) return
-        if (!confirm(`確定要刪除第 ${dayNum} 天的所有行程嗎？此操作無法復原！`)) return
+        if (!confirm(t('iv_delete_day_confirm', { day: String(dayNum) }))) return
         haptic.tap()
 
         try {
@@ -1014,7 +1031,7 @@ export function ItineraryView() {
             await tripsApi.deleteDay(currentTrip.id, dayNum, userId || "")
 
             haptic.success()
-            toast.success("已刪除")
+            toast.success(t('iv_day_deleted'))
 
             // 2. 調整當前選擇的日期
             if (day === dayNum && day > 1) setDay(day - 1)
@@ -1022,7 +1039,7 @@ export function ItineraryView() {
             // 3. 刷新資料
             reloadTripDetail()
         } catch {
-            toast.error("刪除失敗")
+            toast.error(t('iv_delete_failed'))
         }
     }
 
@@ -1074,7 +1091,7 @@ export function ItineraryView() {
             })
 
             reloadTripDetail(() => optimisticTrip, false)
-            toast.success(`已成功新增第 ${newDay} 天`)
+            toast.success(t('iv_day_added', { day: String(newDay) }))
         }
 
         try {
@@ -1082,7 +1099,7 @@ export function ItineraryView() {
             const data = await tripsApi.addDay(currentTrip.id, position === "before" ? "before:1" : "end", userId || "", cloneContent)
 
             if (!isOptimistic) {
-                toast.success(cloneContent ? `已新增第 ${data.new_day} 天 (包含克隆內容)` : `已新增第 ${data.new_day} 天`)
+                toast.success(cloneContent ? t('iv_day_added_clone', { day: String(data.new_day) }) : t('iv_day_added', { day: String(data.new_day) }))
             }
 
             await reloadTripDetail()
@@ -1091,7 +1108,7 @@ export function ItineraryView() {
 
         } catch (e) {
             console.error(e)
-            toast.error("新增失敗")
+            toast.error(t('iv_add_failed'))
             reloadTripDetail()
         } finally {
             setIsAddingDay(false)
@@ -1158,7 +1175,7 @@ export function ItineraryView() {
                                 <h1 className="text-3xl font-serif text-slate-900 dark:text-slate-100 mb-2">{t('my_trips')}</h1>
                                 <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
                             </div>
-                            <ZenRenew onRefresh={async () => { await reloadTrips() }} successMessage={t('update_success') || "已更新"} />
+                            <ZenRenew onRefresh={async () => { await reloadTrips() }} successMessage={t('update_success')} errorMessage={t('update_failed')} />
                         </header>
 
                         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1195,17 +1212,17 @@ export function ItineraryView() {
                                         <AlertCircle className="w-5 h-5" />
                                         {t('confirm_delete')}
                                     </DialogTitle>
-                                    <DialogDescription>確定要刪除此行程嗎？此操作無法恢復。</DialogDescription>
+                                    <DialogDescription>{t('iv_delete_desc')}</DialogDescription>
                                 </DialogHeader>
                                 <div className="py-4">
                                     <p className="text-slate-600">
-                                        確定要刪除行程 <span className="font-bold text-slate-900">{trips.find((t: Trip) => t.id === deletingTripId)?.title}</span> 嗎？
+                                        {t('iv_delete_trip_prefix')}<span className="font-bold text-slate-900">{trips.find((tr: Trip) => tr.id === deletingTripId)?.title}</span>{t('iv_delete_trip_suffix')}
                                     </p>
                                 </div>
                                 <div className="flex justify-end gap-3">
                                     <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
                                     <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
-                                        {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />刪除中...</> : t('delete')}
+                                        {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('iv_deleting')}</> : t('delete')}
                                     </Button>
                                 </div>
                             </DialogContent>
@@ -1244,7 +1261,7 @@ export function ItineraryView() {
                         await reloadTripDetail()
                     } catch (e) {
                         console.error("🔥 Location sync failed:", e)
-                        toast.error("更新地點失敗，請檢查網路")
+                        toast.error(t('iv_location_failed'))
                     }
                 }}
                 currentTrip={currentTrip}
@@ -1316,7 +1333,7 @@ export function ItineraryView() {
                             return true
                         } catch (e) {
                             console.error("Failed to update day data:", e)
-                            toast.error("更新失敗")
+                            toast.error(t('iv_update_failed_short'))
                             return false
                         }
                     }}
@@ -1357,7 +1374,7 @@ export function ItineraryView() {
                             return true
                         } catch (e) {
                             console.error("Failed to update checklist:", e)
-                            toast.error("更新失敗")
+                            toast.error(t('iv_update_failed_short'))
                             return false
                         }
                     }}
@@ -1405,9 +1422,9 @@ export function ItineraryView() {
             <AlertDialog open={isReorderDialogOpen} onOpenChange={setIsReorderDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>調整順序方式</AlertDialogTitle>
+                        <AlertDialogTitle>{t('iv_reorder_title')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            請選擇如何處理時間：
+                            {t('iv_reorder_desc')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
@@ -1416,7 +1433,7 @@ export function ItineraryView() {
                             onClick={() => handleReorderConfirm(false)}
                             disabled={isReordering}
                         >
-                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "🕐"} 保持原時間
+                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "🕐"} {t('iv_keep_time')}
                         </Button>
                         <Button
                             variant="secondary"
@@ -1424,9 +1441,9 @@ export function ItineraryView() {
                             onClick={() => handleReorderConfirm(true)}
                             disabled={isReordering}
                         >
-                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "⏱️"} 自動調整時間
+                            {isReordering ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "⏱️"} {t('iv_auto_time')}
                         </Button>
-                        <AlertDialogCancel className="w-full" disabled={isReordering}>取消</AlertDialogCancel>
+                        <AlertDialogCancel className="w-full" disabled={isReordering}>{t('cancel')}</AlertDialogCancel>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -1435,13 +1452,13 @@ export function ItineraryView() {
             <AlertDialog open={isClonePromptOpen} onOpenChange={setIsClonePromptOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>是否複製前一天的初始設定？</AlertDialogTitle>
+                        <AlertDialogTitle>{t('iv_clone_title')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            我們偵測到 Day {cloneSourceDay} 有設置<b>天氣地點、筆記或清單</b>。
+                            {t('iv_clone_desc_prefix', { day: String(cloneSourceDay) })}<b>{t('iv_clone_desc_bold')}</b>{t('iv_clone_desc_suffix')}
                             <br /><br />
-                            您是否想要將這些設定同步到新的一天，節省重複輸入的時間？
+                            {t('iv_clone_question')}
                             <br />
-                            <span className="text-xs text-slate-500">(註：具體行程活動不會被複製)</span>
+                            <span className="text-xs text-slate-500">{t('iv_clone_note')}</span>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -1449,14 +1466,14 @@ export function ItineraryView() {
                             disabled={isAddingDay}
                             onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, false)}
                         >
-                            {isAddingDay ? "處理中..." : "新增空白天數"}
+                            {isAddingDay ? t('iv_processing') : t('iv_add_blank')}
                         </AlertDialogCancel>
                         <AlertDialogAction
                             disabled={isAddingDay}
                             onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, true)}
                             className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400"
                         >
-                            {isAddingDay ? <><Loader2 className="w-4 h-4 mr-1" />處理中...</> : "是的，複製並新增"}
+                            {isAddingDay ? <><Loader2 className="w-4 h-4 mr-1" />{t('iv_processing')}</> : t('iv_clone_and_add')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

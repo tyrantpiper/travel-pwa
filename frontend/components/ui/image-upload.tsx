@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { compressImage } from "@/lib/image-utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface ImageUploadProps {
     value?: string
@@ -21,6 +22,7 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel", className, icon, showPreview = true }: ImageUploadProps) {
+    const { t } = useLanguage()
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [previewOpen, setPreviewOpen] = useState(false)
@@ -87,7 +89,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
                     const result = JSON.parse(xhr.responseText)
                     if (result.secure_url) {
                         onChange(result.secure_url)
-                        toast.success("圖片上傳成功！")
+                        toast.success(t('img_upload_success'))
                     } else {
                         console.error("Cloudinary error:", result)
                         toast.error(`Cloudinary 錯誤: ${result.error?.message || JSON.stringify(result)}`)
@@ -100,7 +102,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             }
 
             xhr.onerror = () => {
-                toast.error("圖片上傳失敗")
+                toast.error(t('img_upload_failed'))
                 setLoading(false)
                 setProgress(0)
             }
@@ -110,7 +112,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
         } catch (error) {
             console.error("Upload error:", error)
-            toast.error("圖片上傳失敗")
+            toast.error(t('img_upload_failed'))
             setLoading(false)
             setProgress(0)
         }
@@ -185,8 +187,8 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <VisuallyHidden>
-                        <DialogTitle>圖片預覽</DialogTitle>
-                        <DialogDescription>全螢幕預覽上傳的圖片內容</DialogDescription>
+                        <DialogTitle>{t('img_preview')}</DialogTitle>
+                        <DialogDescription>{t('img_preview_desc')}</DialogDescription>
                     </VisuallyHidden>
                     {value && (
                         <div className="relative w-full h-[80vh]">

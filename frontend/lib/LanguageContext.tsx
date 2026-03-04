@@ -1,14 +1,15 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { translations, TranslationKey } from './translations'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { translations, TranslationKey } from './i18n'
 
 type Language = 'en' | 'zh'
 
 interface LanguageContextType {
     lang: Language
     setLang: (lang: Language) => void
-    t: (key: TranslationKey) => string
+    t: (key: TranslationKey, params?: Record<string, string | number>) => string
+    formatDate: (date: Date) => string
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
@@ -27,14 +28,33 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         }
     }, [])
 
-    const setLang = (newLang: Language) => {
+    const setLang = useCallback((newLang: Language) => {
         setLangState(newLang)
         localStorage.setItem('app_language', newLang)
-    }
+        // Sync to cookie so Server Components (SSR) can read the language preference
+        document.cookie = `app_language=${newLang}; path=/; max-age=31536000; SameSite=Lax`
+    }, [])
 
-    const t = (key: TranslationKey): string => {
-        return translations[lang][key] || key
-    }
+    /**
+     * Translate a key with optional parameter interpolation.
+     * Usage: t('greeting', { name: 'Ryan' }) → "Hello, Ryan!"
+     * The dictionary value should contain `{name}` as placeholder.
+     */
+    const t = useCallback((key: TranslationKey, params?: Record<string, string | number>): string => {
+        const dict = translations[lang] as Record<string, string>
+        let result: string = dict[key] || key
+        if (params) {
+            Object.entries(params).forEach(([k, v]) => {
+                result = result.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v))
+            })
+        }
+        return result
+    }, [lang])
+
+    /** Format a Date according to the current app language (not OS locale). */
+    const formatDate = useCallback((date: Date): string => {
+        return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW')
+    }, [lang])
 
     // Prevent hydration mismatch
     if (!mounted) {
@@ -42,7 +62,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
 
     return (
-        <LanguageContext.Provider value={{ lang, setLang, t }}>
+        <LanguageContext.Provider value={{ lang, setLang, t, formatDate }}>
             {children}
         </LanguageContext.Provider>
     )
@@ -55,7 +75,11 @@ export function useLanguage() {
         return {
             lang: 'zh' as Language,
             setLang: () => { },
-            t: (key: TranslationKey) => translations.zh[key] || key
+            t: (key: TranslationKey) => {
+                const dict = translations.zh as Record<string, string>
+                return dict[key] || key
+            },
+            formatDate: (date: Date) => date.toLocaleDateString('zh-TW'),
         }
     }
     return context

@@ -39,15 +39,15 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
 }
 
 const CURRENCIES = [
-    { code: 'JPY', symbol: '¥', name: '日幣', flag: '🇯🇵' },
-    { code: 'USD', symbol: '$', name: '美元', flag: '🇺🇸' },
-    { code: 'EUR', symbol: '€', name: '歐元', flag: '🇪🇺' },
-    { code: 'KRW', symbol: '₩', name: '韓圓', flag: '🇰🇷' },
-    { code: 'CNY', symbol: '¥', name: '人民幣', flag: '🇨🇳' },
-    { code: 'THB', symbol: '฿', name: '泰銖', flag: '🇹🇭' },
-    { code: 'SGD', symbol: 'S$', name: '新幣', flag: '🇸🇬' },
-    { code: 'HKD', symbol: 'HK$', name: '港幣', flag: '🇭🇰' },
-    { code: 'TWD', symbol: 'NT$', name: '台幣', flag: '🇹🇼' },
+    { code: 'JPY', symbol: '¥', flag: '🇯🇵' },
+    { code: 'USD', symbol: '$', flag: '🇺🇸' },
+    { code: 'EUR', symbol: '€', flag: '🇪🇺' },
+    { code: 'KRW', symbol: '₩', flag: '🇰🇷' },
+    { code: 'CNY', symbol: '¥', flag: '🇨🇳' },
+    { code: 'THB', symbol: '฿', flag: '🇹🇭' },
+    { code: 'SGD', symbol: 'S$', flag: '🇸🇬' },
+    { code: 'HKD', symbol: 'HK$', flag: '🇭🇰' },
+    { code: 'TWD', symbol: 'NT$', flag: '🇹🇼' },
 ] as const
 
 interface Expense {
@@ -246,7 +246,7 @@ export function ExpenseDialog({
             onSaveSuccess(payload.expense_date)
         } catch (e) {
             haptic.error()
-            toast.error(e instanceof Error ? `儲存失敗: ${e.message}` : "儲存失敗")
+            toast.error(e instanceof Error ? `${t('exp_save_failed')}: ${e.message}` : t('exp_save_failed'))
         } finally {
             setIsSavingExpense(false)
         }
@@ -258,26 +258,26 @@ export function ExpenseDialog({
                 <DialogHeader>
                     <DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle>
                     <DialogDescription className="sr-only">
-                        填寫消費資訊，包括金額、幣別、分類與付款方式。
+                        {t('exp_dialog_desc')}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-5 py-2">
                     {/* 💰 Section 1: Amount Input (Hero Section) */}
                     <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                            💰 金額
+                            💰 {t('exp_amount')}
                         </Label>
 
                         <Select value={inputCurrency} onValueChange={setInputCurrency}>
                             <SelectTrigger className="h-11 w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-bold text-base">
-                                <SelectValue placeholder="選擇幣別" />
+                                <SelectValue placeholder={t('exp_select_currency')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {CURRENCIES.map(c => (
                                     <SelectItem key={c.code} value={c.code} className="py-2.5">
                                         <span className="mr-2 text-lg">{c.flag}</span>
                                         <span className="font-mono font-bold">{c.code}</span>
-                                        <span className="text-slate-400 ml-2">- {c.name}</span>
+                                        <span className="text-slate-400 ml-2">- {t(`currency_${c.code}`)}</span>
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -305,10 +305,10 @@ export function ExpenseDialog({
                     {/* 📝 Section 2: Basic Info */}
                     <div className="space-y-3">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                            📝 明細
+                            📝 {t('exp_details')}
                         </Label>
                         <Input
-                            placeholder="消費名稱"
+                            placeholder={t('exp_name_placeholder')}
                             value={title}
                             onChange={e => setTitle(e.target.value)}
                             className="h-11 text-base"
@@ -333,7 +333,8 @@ export function ExpenseDialog({
                                         const date = new Date(startDate)
                                         date.setDate(date.getDate() + i)
                                         const dateStr = formatLocalDate(date)
-                                        const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                                        const weekdays = [t('weekday_sun'), t('weekday_mon'), t('weekday_tue'), t('weekday_wed'), t('weekday_thu'), t('weekday_fri'), t('weekday_sat')]
+                                        const weekday = weekdays[date.getDay()]
                                         return (
                                             <option key={i} value={dateStr}>
                                                 📅 Day {i + 1} ({date.getMonth() + 1}/{date.getDate()} {weekday})
@@ -343,14 +344,14 @@ export function ExpenseDialog({
                                 })()}
                             </select>
                         ) : (
-                            <div className="text-xs text-slate-400 py-2 text-center bg-slate-50 rounded-lg">⚠️ 請先選擇行程</div>
+                            <div className="text-xs text-slate-400 py-2 text-center bg-slate-50 rounded-lg">{t('exp_select_trip_first')}</div>
                         )}
                     </div>
 
                     {/* 🏷️ Section 3: Category */}
                     <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                            🏷️ 分類
+                            🏷️ {t('exp_category')}
                         </Label>
                         <div className="grid grid-cols-3 gap-2">
                             {Object.entries(CATEGORIES).map(([key, info]) => (
@@ -373,7 +374,7 @@ export function ExpenseDialog({
                     {/* 💳 Section 4: Payment Method */}
                     <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                            💳 付款方式
+                            💳 {t('exp_payment')}
                         </Label>
                         <div className="grid grid-cols-4 gap-2">
                             {PAYMENT_METHODS.map(m => (
@@ -394,8 +395,8 @@ export function ExpenseDialog({
 
                         {(method === "JCB" || method === "VisaMaster") && (
                             <div className="flex gap-2 mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                <Input placeholder="卡片名稱" value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
-                                <Input placeholder="回饋%" value={cashback} onChange={e => setCashback(e.target.value)} className="w-20" />
+                                <Input placeholder={t('exp_card_name')} value={cardName} onChange={e => setCardName(e.target.value)} className="flex-1" />
+                                <Input placeholder={t('exp_cashback')} value={cashback} onChange={e => setCashback(e.target.value)} className="w-20" />
                             </div>
                         )}
                     </div>
@@ -403,7 +404,7 @@ export function ExpenseDialog({
                     {/* 📸 Section 5: Receipt */}
                     <div className="space-y-2">
                         <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                            📸 收據 / 照片
+                            📸 {t('exp_receipt')}
                         </Label>
                         <ImageUpload
                             value={receiptUrl}

@@ -9,6 +9,7 @@ import { Users, Crown, UserX, Loader2 } from "lucide-react"
 import { tripsApi } from "@/lib/api"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface TripMember {
     user_id: string
@@ -39,6 +40,7 @@ export function TripMembersSheet({
     currentUserId,
     onMemberKicked
 }: TripMembersSheetProps) {
+    const { t } = useLanguage()
     const [isOpen, setIsOpen] = useState(false)
     const [kickingUserId, setKickingUserId] = useState<string | null>(null)
     const [confirmKick, setConfirmKick] = useState<TripMember | null>(null)
@@ -81,7 +83,7 @@ export function TripMembersSheet({
                     <SheetHeader className="p-6 pb-4 border-b shrink-0">
                         <SheetTitle className="flex items-center gap-2">
                             <Users className="w-5 h-5" />
-                            行程成員 ({members.length})
+                            {t('members_title')} ({members.length})
                         </SheetTitle>
                     </SheetHeader>
 
@@ -148,7 +150,7 @@ export function TripMembersSheet({
                         {members.length === 0 && (
                             <div className="text-center py-8 text-slate-400">
                                 <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                <p>沒有成員</p>
+                                <p>{t('members_nobody')}</p>
                             </div>
                         )}
                     </div>
@@ -167,7 +169,7 @@ export function TripMembersSheet({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => confirmKick && handleKick(confirmKick)}
                             className="bg-red-500 hover:bg-red-600"

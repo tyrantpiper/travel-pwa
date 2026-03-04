@@ -12,6 +12,7 @@ import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
 import { debugLog } from "@/lib/debug"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // ViewState 類型
 interface ViewState {
@@ -111,6 +112,7 @@ export default function FullscreenMapModal({
     onAddPOI,
     tripTitle  // 🆕 行程標題
 }: FullscreenMapModalProps) {
+    const { t } = useLanguage()
     const mapRef = useRef<MapRef>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)  // 🆕 P5: 取消前一個請求
@@ -359,7 +361,7 @@ export default function FullscreenMapModal({
                 for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
                     if (props[key]) return props[key]
                 }
-                return '未知地點'
+                return t('map_location_point')
             }
 
             setSelectedPOI({
@@ -466,7 +468,7 @@ export default function FullscreenMapModal({
                         style={{ marginBottom: "env(safe-area-inset-bottom)" }}
                     >
                         <Search className="w-5 h-5 text-slate-400" />
-                        <span className="text-slate-500">搜尋地點或問 AI...</span>
+                        <span className="text-slate-500">{t('map_search_ai')}</span>
                     </button>
                 )}
 
@@ -494,7 +496,7 @@ export default function FullscreenMapModal({
                                         ref={inputRef}
                                         value={query}
                                         onChange={handleQueryChange}
-                                        placeholder="搜尋地點，或問 AI..."
+                                        placeholder={t('map_search_ai')}
                                         className="h-12 pl-12 pr-10 rounded-xl border-slate-200 text-base"
                                     />
                                     {query && (
@@ -517,7 +519,7 @@ export default function FullscreenMapModal({
                                 {/* 歷史紀錄 */}
                                 {showHistory && (
                                     <>
-                                        <div className="px-4 py-2 text-xs font-medium text-slate-400 uppercase">最近搜尋</div>
+                                        <div className="px-4 py-2 text-xs font-medium text-slate-400 uppercase">{t('map_recent_search')}</div>
                                         {history.map((h, i) => (
                                             <button
                                                 key={i}
@@ -535,7 +537,7 @@ export default function FullscreenMapModal({
                                 {isTyping && !isSearching && (
                                     <div className="px-4 py-4 flex items-center gap-2 text-slate-400 transition-opacity duration-200">
                                         <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-pulse" />
-                                        <span className="text-sm">等待輸入完成...</span>
+                                        <span className="text-sm">{t('map_enter_query')}</span>
                                     </div>
                                 )}
 
@@ -543,7 +545,7 @@ export default function FullscreenMapModal({
                                 {isSearching && (
                                     <div className="px-4 py-6 flex items-center justify-center gap-2 text-indigo-500 transition-opacity duration-200">
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>搜尋中...</span>
+                                        <span>{t('map_searching')}</span>
                                     </div>
                                 )}
 
@@ -567,7 +569,7 @@ export default function FullscreenMapModal({
                                 {/* 🆕 無結果提示 */}
                                 {showNoResults && (
                                     <div className="px-4 py-4 text-center text-slate-500 text-sm">
-                                        找不到「{query}」的結果
+                                        {t('map_no_results', { query })}
                                     </div>
                                 )}
 
@@ -602,7 +604,7 @@ export default function FullscreenMapModal({
                                     onClick={() => setShowSearch(false)}
                                     className="w-full py-3 text-slate-500 text-sm font-medium"
                                 >
-                                    取消
+                                    {t('cancel')}
                                 </button>
                             </div>
                         </motion.div>

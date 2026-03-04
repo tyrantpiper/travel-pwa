@@ -4,6 +4,7 @@ import { Sun, CloudRain, MapPin, Edit3, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DayWeather, LocationInfo } from "@/lib/itinerary-types"
 import { getNowInZone } from "@/lib/timezone"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface WeatherPanelProps {
     day: number
@@ -25,9 +26,10 @@ export function WeatherPanel({
     currentTimezone,
     onEditLocation
 }: WeatherPanelProps) {
+    const { t } = useLanguage()
 
     // 🆕 2026: WBGT (Heat Stress) Simplified Calculation for Japan
-    const calculateWBGT = (t: number, rh: number) => 0.735 * t + 0.0374 * rh + 0.00292 * t * rh - 4.06
+    const calculateWBGT = (temp: number, rh: number) => 0.735 * temp + 0.0374 * rh + 0.00292 * temp * rh - 4.06
 
     return (
         <div className="py-6 px-6 bg-stone-50/50 dark:bg-slate-900/50">
@@ -73,33 +75,33 @@ export function WeatherPanel({
                                     const currentWBGT = calculateWBGT(avgTemp, avgRH)
                                     const isHeatStrokeRisk = currentWBGT > 28
 
-                                    let advice = `今日氣溫預計為 ${minTemp}°C 至 ${maxTemp}°C。`
+                                    let advice = t('w_advice_range', { min: String(minTemp), max: String(maxTemp) })
 
                                     if (isHeatStrokeRisk) {
-                                        advice = `🔥 注意：中暑風險極高 (WBGT ${currentWBGT.toFixed(1)})，請盡量避免戶外劇烈運動，多補充水分。`
+                                        advice = t('w_advice_heatstroke', { wbgt: currentWBGT.toFixed(1) })
                                     } else if (isVolatile) {
-                                        advice = `⚠️ 預報變動大 (信心度 ${weatherConfidence}%)，建議行程保持彈性。`
+                                        advice = t('w_advice_unstable', { pct: String(weatherConfidence) })
                                     } else if (maxPrecip > 60) {
-                                        advice += "降雨機率高，建議準備雨具並規劃室內行程。"
+                                        advice += t('w_advice_rain')
                                     } else if (maxUV > 7) {
-                                        advice += "紫外線強烈，戶外活動請加強防曬與補水。"
+                                        advice += t('w_advice_uv')
                                     } else if (avgTemp > 28) {
-                                        advice += "體感悶熱，請注意防暑降溫，減少長途步行。"
+                                        advice += t('w_advice_humid')
                                     } else if (avgTemp < 10) {
-                                        advice += "氣溫較低，早晚溫差大，請注意保暖。"
+                                        advice += t('w_advice_cold')
                                     } else {
-                                        advice += "天氣穩定舒適，非常適合戶外探索！"
+                                        advice += t('w_advice_clear')
                                     }
 
-                                    if (isHighElev) advice += ` 目前海拔約 ${Math.round(elevation!)}m，空氣較涼且紫外線更高。`
+                                    if (isHighElev) advice += ' ' + t('w_advice_elevation', { elev: String(Math.round(elevation!)) })
 
                                     // 🕵️ Audit 5.0 Restore: Special location logic
                                     const locLower = resolvedLocation?.name.toLowerCase() || ""
                                     if (locLower.includes("market") || locLower.includes("市場")) {
-                                        advice += " 市場地面可能濕滑且清晨人多，請注意安全。"
+                                        advice += ' ' + t('w_advice_market')
                                     }
                                     if (locLower.includes("tower") || locLower.includes("skytree") || locLower.includes("塔") || locLower.includes("晴空塔")) {
-                                        advice += " 高層建築觀景台風力可能較大，建議穿著防風外套。"
+                                        advice += ' ' + t('w_advice_tower')
                                     }
 
                                     return advice
@@ -108,7 +110,7 @@ export function WeatherPanel({
                             {weatherMode === 'forecast' && (
                                 <div className="mt-2 flex items-center">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                                        🛰️ ECMWF 精準預報 (9km)
+                                        {t('w_ecmwf_badge')}
                                     </span>
                                 </div>
                             )}
@@ -147,7 +149,7 @@ export function WeatherPanel({
                         </div>
                         <div className="min-w-0 flex-1">
                             <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2 leading-tight">
-                                <span className="break-words">{resolvedLocation?.name || "未知地點"}</span>
+                                <span className="break-words">{resolvedLocation?.name || t('w_unknown_location')}</span>
                                 {resolvedLocation && (
                                     <span className="text-[9px] font-mono font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded inline-block">
                                         {resolvedLocation.lat.toFixed(2)}, {resolvedLocation.lng.toFixed(2)}
@@ -183,12 +185,12 @@ export function WeatherPanel({
                                 weatherMode === 'seasonal' ? 'bg-purple-500' :
                                     'bg-amber-500'
                             }`} />
-                        {weatherMode === 'live' && '即時天氣'}
-                        {weatherMode === 'forecast' && '精準預報 (ECMWF)'}
-                        {weatherMode === 'seasonal' && '季節預報'}
-                        {weatherMode === 'trend' && '歷史同期參考'}
+                        {weatherMode === 'live' && t('w_mode_live')}
+                        {weatherMode === 'forecast' && t('w_mode_forecast')}
+                        {weatherMode === 'seasonal' && t('w_mode_seasonal')}
+                        {weatherMode === 'trend' && t('w_mode_trend')}
                         {(weatherMode === 'seasonal' || weatherMode === 'trend') && (
-                            <span className="text-[7px] opacity-60">(觀望趨勢)</span>
+                            <span className="text-[7px] opacity-60">{t('w_reference_only')}</span>
                         )}
                     </span>
 
@@ -199,7 +201,7 @@ export function WeatherPanel({
                                 weatherConfidence >= 50 ? "bg-amber-50/80 border-amber-200 text-amber-600" :
                                     "bg-red-50/80 border-red-200 text-red-600"
                         )}>
-                            信心度 {weatherConfidence}%
+                            {t('w_confidence', { value: String(weatherConfidence) })}
                         </span>
                     )}
                 </div>
@@ -210,17 +212,17 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">👕</span>
                     <div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">穿衣</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{t('w_clothing')}</div>
                         <div className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             {weatherData.length > 0 ? (() => {
                                 const temps = weatherData.map(w => w.temp)
                                 const avgTemp = (Math.max(...temps) + Math.min(...temps)) / 2
-                                if (avgTemp > 28) return '短袖短褲'
-                                if (avgTemp > 22) return '短袖'
-                                if (avgTemp > 15) return '長袖'
-                                if (avgTemp > 10) return '薄外套'
-                                if (avgTemp > 5) return '厚外套'
-                                return '羽絨服'
+                                if (avgTemp > 28) return t('w_cloth_tank')
+                                if (avgTemp > 22) return t('w_cloth_tshirt')
+                                if (avgTemp > 15) return t('w_cloth_longsleeve')
+                                if (avgTemp > 10) return t('w_cloth_jacket')
+                                if (avgTemp > 5) return t('w_cloth_coat')
+                                return t('w_cloth_parka')
                             })() : '--'}
                         </div>
                     </div>
@@ -229,16 +231,16 @@ export function WeatherPanel({
                     <span className="text-lg">☔</span>
                     <div>
                         <div className="text-xs text-slate-500">
-                            {weatherData[0]?.isSeasonalEstimate ? '降雨趨勢' : '降雨機率'}
+                            {weatherData[0]?.isSeasonalEstimate ? t('w_rain_trend') : t('w_rain_prob')}
                         </div>
                         <div className="text-sm font-medium text-slate-700">
                             {weatherData.length > 0 ? (
                                 weatherData[0]?.isSeasonalEstimate ? (
                                     (() => {
                                         const trend = weatherData[0]?.precipTrend
-                                        if (trend === 'wet') return <span className="text-blue-600">濕潤 💦</span>
-                                        if (trend === 'unstable') return <span className="text-amber-600">不穩定 🌦️</span>
-                                        return <span className="text-green-600">乾燥 ☀️</span>
+                                        if (trend === 'wet') return <span className="text-blue-600">{t('w_trend_wet')}</span>
+                                        if (trend === 'unstable') return <span className="text-amber-600">{t('w_trend_unstable')}</span>
+                                        return <span className="text-green-600">{t('w_trend_dry')}</span>
                                     })()
                                 ) : (
                                     <>{Math.max(...weatherData.map(w => w.precipitation_probability ?? 0))}%</>
@@ -246,7 +248,7 @@ export function WeatherPanel({
                             ) : '--'}
                         </div>
                         {weatherData[0]?.isSeasonalEstimate && (
-                            <div className="text-[9px] text-slate-400 mt-0.5">趨勢估算僅供參考</div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">{t('w_trend_disclaimer')}</div>
                         )}
                     </div>
                 </div>
@@ -255,7 +257,7 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">💧</span>
                     <div>
-                        <div className="text-xs text-slate-500">濕度</div>
+                        <div className="text-xs text-slate-500">{t('w_humidity')}</div>
                         <div className="text-sm font-medium text-slate-700">
                             {weatherData.length > 0 ? `${weatherData[Math.floor(weatherData.length / 2)]?.humidity ?? '--'}%` : '--'}
                         </div>
@@ -264,7 +266,7 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">🌡️</span>
                     <div className="flex-1">
-                        <div className="text-xs text-slate-500">體感溫度</div>
+                        <div className="text-xs text-slate-500">{t('w_apparent')}</div>
                         <div className="text-sm font-medium text-slate-700 flex items-center justify-between">
                             {weatherData.length > 0 ? (() => {
                                 const avgApparent = weatherData[Math.floor(weatherData.length / 2)]?.apparent_temperature
@@ -272,12 +274,12 @@ export function WeatherPanel({
                                 const avgRH = weatherData[Math.floor(weatherData.length / 2)]?.humidity ?? 50
                                 if (avgApparent === undefined) return '-- °C'
                                 const wbgt = calculateWBGT(avgTemp, avgRH)
-                                let feeling = '舒適'
-                                if (avgApparent >= 35) feeling = '酷熱'
-                                else if (avgApparent >= 28) feeling = '悶熱'
-                                else if (avgApparent >= 20) feeling = '舒適'
-                                else if (avgApparent >= 10) feeling = '涼爽'
-                                else feeling = '寒冷'
+                                let feeling = t('w_comfort_pleasant')
+                                if (avgApparent >= 35) feeling = t('w_comfort_extreme')
+                                else if (avgApparent >= 28) feeling = t('w_comfort_hot')
+                                else if (avgApparent >= 20) feeling = t('w_comfort_pleasant')
+                                else if (avgApparent >= 10) feeling = t('w_comfort_cool')
+                                else feeling = t('w_comfort_cold')
                                 return (
                                     <>
                                         <span>{avgApparent}°C ({feeling})</span>
@@ -297,12 +299,12 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">☀️</span>
                     <div>
-                        <div className="text-xs text-slate-500">UV 指數</div>
+                        <div className="text-xs text-slate-500">{t('w_uv')}</div>
                         <div className="text-sm font-medium text-slate-700">
                             {weatherData.length > 0 ? (() => {
                                 const maxUV = Math.max(...weatherData.map(w => w.uvIndex ?? 0))
                                 if (!isFinite(maxUV)) return '--'
-                                return `${maxUV} (${maxUV > 7 ? '極強' : maxUV > 5 ? '強' : maxUV > 2 ? '中' : '弱'})`
+                                return `${maxUV} (${maxUV > 7 ? t('w_uv_extreme') : maxUV > 5 ? t('w_uv_high') : maxUV > 2 ? t('w_uv_moderate') : t('w_uv_low')})`
                             })() : '--'}
                         </div>
                     </div>
@@ -310,7 +312,7 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">🌬️</span>
                     <div>
-                        <div className="text-xs text-slate-500">最大風速</div>
+                        <div className="text-xs text-slate-500">{t('w_wind')}</div>
                         <div className="text-sm font-medium text-slate-700">
                             {weatherData.length > 0 ? (() => {
                                 const maxWind = Math.max(...weatherData.map(w => w.windSpeed ?? 0))
@@ -325,14 +327,14 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">👁️</span>
                     <div>
-                        <div className="text-xs text-slate-500">能見度</div>
+                        <div className="text-xs text-slate-500">{t('w_visibility')}</div>
                         <div className="text-sm font-medium text-slate-700">
                             {weatherData.length > 0 ? (() => {
                                 const avgVis = weatherData[Math.floor(weatherData.length / 2)]?.visibility
                                 if (avgVis === undefined || avgVis === null) return '--'
-                                if (avgVis >= 10000) return `${(avgVis / 1000).toFixed(0)} km (良好)`
-                                if (avgVis >= 5000) return `${(avgVis / 1000).toFixed(1)} km (普通)`
-                                return `${(avgVis / 1000).toFixed(1)} km (較差)`
+                                if (avgVis >= 10000) return `${(avgVis / 1000).toFixed(0)} km (${t('w_vis_good')})`
+                                if (avgVis >= 5000) return `${(avgVis / 1000).toFixed(1)} km (${t('w_vis_fair')})`
+                                return `${(avgVis / 1000).toFixed(1)} km (${t('w_vis_poor')})`
                             })() : '--'}
                         </div>
                     </div>
@@ -340,7 +342,7 @@ export function WeatherPanel({
                 <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2">
                     <span className="text-lg">🏔️</span>
                     <div>
-                        <div className="text-xs text-slate-500">海拔</div>
+                        <div className="text-xs text-slate-500">{t('w_elevation')}</div>
                         <div className="text-sm font-medium text-slate-700">
                             {elevation !== null ? `${Math.round(elevation)} m` : (
                                 <span className="inline-block w-8 h-3 bg-slate-200 animate-pulse rounded" />
@@ -359,19 +361,19 @@ export function WeatherPanel({
                         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 flex items-center gap-2 col-span-2">
                             <span className="text-lg">🍃</span>
                             <div className="flex-1">
-                                <div className="text-xs text-slate-500">空氣品質 (AQI)</div>
+                                <div className="text-xs text-slate-500">{t('w_aqi')}</div>
                                 <div className="text-sm font-medium text-slate-700">
                                     {hasData ? (() => {
                                         const maxAQI = Math.max(...validData.map(w => w.airQuality!))
-                                        let level = '良好'
+                                        let level = t('w_aqi_good')
                                         let color = 'text-green-600'
-                                        if (maxAQI > 300) { level = '極危險'; color = 'text-red-600' }
-                                        else if (maxAQI > 200) { level = '非常不健康'; color = 'text-red-500' }
-                                        else if (maxAQI > 150) { level = '不健康'; color = 'text-orange-500' }
-                                        else if (maxAQI > 100) { level = '對敏感人群不健康'; color = 'text-yellow-600' }
-                                        else if (maxAQI > 50) { level = '普通'; color = 'text-yellow-500' }
+                                        if (maxAQI > 300) { level = t('w_aqi_hazardous'); color = 'text-red-600' }
+                                        else if (maxAQI > 200) { level = t('w_aqi_very_unhealthy'); color = 'text-red-500' }
+                                        else if (maxAQI > 150) { level = t('w_aqi_unhealthy'); color = 'text-orange-500' }
+                                        else if (maxAQI > 100) { level = t('w_aqi_sensitive'); color = 'text-yellow-600' }
+                                        else if (maxAQI > 50) { level = t('w_aqi_moderate'); color = 'text-yellow-500' }
                                         return <span className={color}>{maxAQI} ({level})</span>
-                                    })() : <span className="text-slate-400">-- (暫無資料)</span>}
+                                    })() : <span className="text-slate-400">{t('w_aqi_nodata')}</span>}
                                 </div>
                             </div>
                         </div>

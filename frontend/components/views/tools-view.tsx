@@ -131,15 +131,15 @@ const CATEGORIES: Record<string, { label: string; icon: ComponentType<{ classNam
 
 // 🆕 v3.10: 支援多幣別
 const CURRENCIES = [
-    { code: 'JPY', symbol: '¥', name: '日幣', flag: '🇯🇵' },
-    { code: 'USD', symbol: '$', name: '美元', flag: '🇺🇸' },
-    { code: 'EUR', symbol: '€', name: '歐元', flag: '🇪🇺' },
-    { code: 'KRW', symbol: '₩', name: '韓圓', flag: '🇰🇷' },
-    { code: 'CNY', symbol: '¥', name: '人民幣', flag: '🇨🇳' },
-    { code: 'THB', symbol: '฿', name: '泰銖', flag: '🇹🇭' },
-    { code: 'SGD', symbol: 'S$', name: '新幣', flag: '🇸🇬' },
-    { code: 'HKD', symbol: 'HK$', name: '港幣', flag: '🇭🇰' },
-    { code: 'TWD', symbol: 'NT$', name: '台幣', flag: '🇹🇼' }, // Added TWD as base option
+    { code: 'JPY', symbol: '¥', flag: '🇯🇵' },
+    { code: 'USD', symbol: '$', flag: '🇺🇸' },
+    { code: 'EUR', symbol: '€', flag: '🇪🇺' },
+    { code: 'KRW', symbol: '₩', flag: '🇰🇷' },
+    { code: 'CNY', symbol: '¥', flag: '🇨🇳' },
+    { code: 'THB', symbol: '฿', flag: '🇹🇭' },
+    { code: 'SGD', symbol: 'S$', flag: '🇸🇬' },
+    { code: 'HKD', symbol: 'HK$', flag: '🇭🇰' },
+    { code: 'TWD', symbol: 'NT$', flag: '🇹🇼' },
 ] as const
 
 import { getExchangeRate } from "@/lib/currency"
@@ -473,7 +473,8 @@ export function ToolsView() {
             return dateStr || "Invalid Date"
         }
 
-        const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+        const weekdays = [t('weekday_sun'), t('weekday_mon'), t('weekday_tue'), t('weekday_wed'), t('weekday_thu'), t('weekday_fri'), t('weekday_sat')]
+        const weekday = weekdays[d.getDay()]
         const dayIndex = allDates.indexOf(dateStr)
         const dayLabel = dayIndex >= 0 ? `Day ${dayIndex + 1}` : ''
         return `${dayLabel} ${d.getMonth() + 1}/${d.getDate()} (${weekday})`
@@ -504,7 +505,7 @@ export function ToolsView() {
     const handleParse = async () => {
         if (!markdown.trim()) return
         setMdLoading(true)
-        setParseProgress("🤖 AI 正在解析行程...")
+        setParseProgress(t('tv_ai_parsing'))
         const userId = localStorage.getItem("user_uuid") || ""
 
         try {
@@ -513,9 +514,9 @@ export function ToolsView() {
                 markdown_text: markdown,
                 user_id: userId
             })
-            setParseProgress("🌍 正在地理編碼地點...")
+            setParseProgress(t('tv_ai_geocoding'))
             setMdResult(data)
-            toast.success(`✅ 成功解析 ${data.items?.length || 0} 個地點`)
+            toast.success(t('tv_ai_parsed', { count: String(data.items?.length || 0) }))
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Parse failed")
         } finally {
@@ -527,7 +528,7 @@ export function ToolsView() {
     const handleGenerate = async () => {
         if (!aiPrompt.trim()) return
         setAiLoading(true)
-        setGenerateProgress("🤖 AI 正在生成行程...")
+        setGenerateProgress(t('tv_ai_generating'))
         const userId = localStorage.getItem("user_uuid") || ""
 
         try {
@@ -536,9 +537,9 @@ export function ToolsView() {
                 prompt: aiPrompt,
                 user_id: userId
             })
-            setGenerateProgress("🌍 正在地理編碼地點...")
+            setGenerateProgress(t('tv_ai_geocoding'))
             setAiResult(data)
-            toast.success(`✅ 成功生成 ${data.data?.items?.length || 0} 個地點`)
+            toast.success(t('tv_ai_generated', { count: String(data.data?.items?.length || 0) }))
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Generate failed")
         } finally {
@@ -585,7 +586,7 @@ export function ToolsView() {
                     ai_review: result.ai_review
                 })
 
-                toast.success(`行程已建立！房間代碼: ${data.share_code}`)
+                toast.success(t('tv_trip_created', { code: data.share_code }))
                 setMarkdown("")
                 setMdResult(null)
                 setAiResult(null)
@@ -604,7 +605,7 @@ export function ToolsView() {
                     user_id: userId
                 })
 
-                toast.success(data.message || "匯入成功")
+                toast.success(data.message || t('tv_joined'))
                 setMarkdown("")
                 setMdResult(null)
                 setAiResult(null)
@@ -657,9 +658,9 @@ export function ToolsView() {
 
     const handleSaveCard = async () => {
         // 🛡️ Early validation BEFORE setting loading state
-        if (!newCardName.trim()) { toast.error("請輸入卡片名稱"); return }
+        if (!newCardName.trim()) { toast.error(t('tv_card_name_required')); return }
         if (isSavingCard) return // Prevent double-click
-        if (newCardIsPublic && !activeTripId) { toast.error("需要選擇行程才能共享卡片"); return }
+        if (newCardIsPublic && !activeTripId) { toast.error(t('tv_card_need_trip')); return }
 
         setIsSavingCard(true)
 
@@ -693,13 +694,13 @@ export function ToolsView() {
 
             await saveTripInfo(updatedShared)
 
-            toast.success(newCardIsPublic ? "卡片已儲存 (已共享)" : "卡片已儲存 (雲端私人同步)")
+            toast.success(newCardIsPublic ? t('tv_card_saved_public') : t('tv_card_saved_private'))
             setCardDialogOpen(false)
             setViewingCard(null)
             haptic.success()
         } catch (e) {
             console.error("Failed to save card:", e)
-            toast.error("儲存失敗，請稍後再試")
+            toast.error(t('tv_card_save_failed'))
             haptic.error()
         } finally {
             setIsSavingCard(false)
@@ -736,13 +737,13 @@ export function ToolsView() {
                 setLocalCards(updatedLocal)
                 saveCardsToLocalStorage(updatedLocal)
             }
-            toast.success("卡片已刪除")
+            toast.success(t('tv_card_deleted'))
             haptic.success()
         } catch {
             // Rollback on error
             setSharedCards(oldShared)
             setLocalCards(oldLocal)
-            toast.error("刪除失敗，請重試")
+            toast.error(t('tv_card_delete_failed'))
             haptic.error()
         } finally {
             setIsDeletingCard(false)
@@ -767,7 +768,8 @@ export function ToolsView() {
                                         setRate(r)
                                         await Promise.all([reloadExpenses(), tripMutate()])
                                     }}
-                                    successMessage="資料與匯率已更新"
+                                    successMessage={t('tv_receipt_synced')}
+                                    errorMessage={t('update_failed')}
                                     className="text-white/80 hover:text-white"
                                 />
                             </div>
@@ -780,7 +782,7 @@ export function ToolsView() {
                             {/* Custom Sliding Tab Strip */}
                             <div className="grid grid-cols-3 bg-white dark:bg-slate-800 shadow-md rounded-xl p-1 mb-4">
                                 {[
-                                    { value: 'cards', label: '💳 卡片' },
+                                    { value: 'cards', label: t('tv_cards') },
                                     { value: 'expense', label: t('expense') },
                                     { value: 'ai', label: t('ai_tools') }
                                 ].map((tab) => (
@@ -810,17 +812,17 @@ export function ToolsView() {
                                 <Card>
                                     <CardContent className="pt-4">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-semibold text-slate-900">我的信用卡</h3>
+                                            <h3 className="font-semibold text-slate-900">{t('tv_my_cards')}</h3>
                                             <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900">
-                                                <Plus className="w-4 h-4 mr-1" /> 新增
+                                                <Plus className="w-4 h-4 mr-1" /> {t('tv_add_card')}
                                             </Button>
                                         </div>
 
                                         {creditCards.length === 0 ? (
                                             <div className="text-center py-8 text-slate-400 text-sm">
                                                 <CreditCard className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                                <p>尚未新增任何卡片</p>
-                                                <p className="text-xs mt-1">點擊「新增」開始記錄回饋資訊</p>
+                                                <p>{t('tv_no_cards')}</p>
+                                                <p className="text-xs mt-1">{t('tv_no_cards_hint')}</p>
                                             </div>
                                         ) : (
                                             <div className="space-y-3">
@@ -830,7 +832,7 @@ export function ToolsView() {
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteCard(card.id) }}
                                                             className="absolute -top-3 -right-3 z-10 w-10 h-10 bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-full flex items-center justify-center shadow-lg opacity-100 transition-all scale-100 active:scale-90 touch-manipulation"
-                                                            aria-label="刪除卡片"
+                                                            aria-label={t('tv_delete_card')}
                                                         >
                                                             <Trash2 className="w-4 h-4 text-white" />
                                                         </button>
@@ -845,19 +847,19 @@ export function ToolsView() {
                                                                     <div className="flex gap-1 mt-1.5 mb-2 shrink-0">
                                                                         {card.is_public ? (
                                                                             <div className="text-[10px] bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1 border border-blue-500/30">
-                                                                                <Users className="w-3 h-3" /> 共享
+                                                                                <Users className="w-3 h-3" /> {t('tv_shared_card')}
                                                                             </div>
                                                                         ) : (
                                                                             <div className="text-[10px] bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-500/30">
-                                                                                <User className="w-3 h-3" /> 私人儲存
+                                                                                <User className="w-3 h-3" /> {t('tv_private_card')}
                                                                             </div>
                                                                         )}
                                                                     </div>
 
                                                                     <p className="text-slate-300 text-sm flex items-center gap-1">
-                                                                        回饋 <span className="text-green-400 font-bold">{card.rewardRate}%</span>
+                                                                        {t('tv_reward_rate')} <span className="text-green-400 font-bold">{card.rewardRate}%</span>
                                                                         {card.rewardLimit > 0 && (
-                                                                            <span className="ml-2 bg-slate-900/40 px-2 py-0.5 rounded-md border border-white/10 shrink-0">上限 ${card.rewardLimit.toLocaleString()}</span>
+                                                                            <span className="ml-2 bg-slate-900/40 px-2 py-0.5 rounded-md border border-white/10 shrink-0">{t('tv_reward_limit')} ${card.rewardLimit.toLocaleString()}</span>
                                                                         )}
                                                                     </p>
                                                                 </div>
@@ -892,7 +894,7 @@ export function ToolsView() {
                                         className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
                                         onClick={() => setExpenseView('daily')}
                                     >
-                                        <List className="w-4 h-4 mr-2" /> 每日
+                                        <List className="w-4 h-4 mr-2" /> {t('tv_list')}
                                     </Button>
                                 </div>
 
@@ -907,9 +909,9 @@ export function ToolsView() {
                                                 ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
                                             )}
                                         >
-                                            {filter === 'all' && <>全部</>}
-                                            {filter === 'public' && <><Users className="w-3 h-3" /> 公帳</>}
-                                            {filter === 'private' && <><User className="w-3 h-3" /> 私帳</>}
+                                            {filter === 'all' && <>{t('tv_filter_all')}</>}
+                                            {filter === 'public' && <><Users className="w-3 h-3" /> {t('tv_filter_public')}</>}
+                                            {filter === 'private' && <><User className="w-3 h-3" /> {t('tv_filter_private')}</>}
                                         </button>
                                     ))}
                                 </div>
@@ -970,7 +972,7 @@ export function ToolsView() {
                                                         />
                                                     </div>
                                                     {totalCashback > 0 && (
-                                                        <p className="text-sm text-green-600 font-medium mt-1">💰 回饋 -{totalCashback.toLocaleString()} TWD</p>
+                                                        <p className="text-sm text-green-600 font-medium mt-1">💰 {t('tv_cashback_return', { amount: totalCashback.toLocaleString() })}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -1006,12 +1008,12 @@ export function ToolsView() {
                                         <div className="text-3xl mb-2">📭</div>
                                         <p className="text-sm mb-3">
                                             {expenseView === 'daily'
-                                                ? `${formatDateDisplay(selectedDate)} 還沒有記帳`
-                                                : '暫無記錄'
+                                                ? t('tv_no_expense_date', { date: formatDateDisplay(selectedDate) })
+                                                : t('tv_no_expenses')
                                             }
                                         </p>
                                         <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
-                                            <Plus className="w-4 h-4 mr-1" /> 新增支出
+                                            <Plus className="w-4 h-4 mr-1" /> {t('tv_add_expense')}
                                         </Button>
                                     </div>
                                 )}
@@ -1025,24 +1027,23 @@ export function ToolsView() {
                                             <div className="bg-amber-100 p-2 rounded-full">
                                                 <Key className="w-4 h-4 text-amber-600" />
                                             </div>
-                                            <h3 className="font-semibold text-amber-800">設定 AI 功能</h3>
+                                            <h3 className="font-semibold text-amber-800">{t('tv_setup_ai')}</h3>
                                         </div>
                                         <p className="text-sm text-amber-700">
-                                            使用 <b>AI 行程產生器</b> 與 <b>文字/Markdown 匯入</b> 前，請先設定 Gemini API Key
+                                            {t('tv_setup_ai_desc')}
                                         </p>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs text-amber-600">💡 完全免費！</span>
+                                            <span className="text-xs text-amber-600">{t('tv_setup_ai_hint')}</span>
                                             <Button
                                                 size="sm"
                                                 className="bg-amber-500 hover:bg-amber-600 text-white"
                                                 onClick={() => {
-                                                    // Navigate to profile (need to use custom event or context)
                                                     const event = new CustomEvent('navigate-to-profile')
                                                     window.dispatchEvent(event)
-                                                    toast.info("請在 Profile 頁面設定 AI API Key")
+                                                    toast.info(t('tv_go_profile'))
                                                 }}
                                             >
-                                                前往 Profile 設定 →
+                                                {t('tv_go_profile')}
                                             </Button>
                                         </div>
                                     </div>
@@ -1051,7 +1052,7 @@ export function ToolsView() {
                                 {hasApiKey && (
                                     <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
                                         <CheckCircle2 className="w-4 h-4" />
-                                        <span>AI 功能已啟用</span>
+                                        <span>{t('tv_ai_ready')}</span>
                                     </div>
                                 )}
 
@@ -1075,13 +1076,13 @@ export function ToolsView() {
                                                     <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
 
                                                     <div className="space-y-1">
-                                                        <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                        <Label className="text-xs text-slate-500">{t('tools_storage')}</Label>
                                                         <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
                                                             <SelectTrigger className="w-full bg-white">
-                                                                <SelectValue placeholder="選擇儲存位置" />
+                                                                <SelectValue placeholder={t('tools_storage_ph')} />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                                <SelectItem value="new">{t('tv_create_new_trip')}</SelectItem>
                                                                 {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
                                                                 {trips.map((trip: Trip) => (
                                                                     <SelectItem key={trip.id} value={trip.id}>
@@ -1093,7 +1094,7 @@ export function ToolsView() {
                                                     </div>
 
                                                     <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
-                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('confirm_import'))}
                                                     </Button>
                                                 </div>
                                             )}
@@ -1125,16 +1126,16 @@ export function ToolsView() {
                                             <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
                                             {mdResult?.items && (
                                                 <div className="p-4 bg-stone-100 rounded-xl space-y-3">
-                                                    <p className="text-sm text-green-600 font-medium">✅ 已解析 {mdResult.items.length} 個地點</p>
+                                                    <p className="text-sm text-green-600 font-medium">✅ {t('tv_ai_parsed', { count: String(mdResult.items.length) })}</p>
 
                                                     <div className="space-y-1">
-                                                        <Label className="text-xs text-slate-500">儲存位置</Label>
+                                                        <Label className="text-xs text-slate-500">{t('tv_save_to')}</Label>
                                                         <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
                                                             <SelectTrigger className="w-full bg-white">
-                                                                <SelectValue placeholder="選擇儲存位置" />
+                                                                <SelectValue placeholder={t('tv_save_to')} />
                                                             </SelectTrigger>
                                                             <SelectContent>
-                                                                <SelectItem value="new">✨ 建立新行程 (New Trip)</SelectItem>
+                                                                <SelectItem value="new">{t('tv_create_new_trip')}</SelectItem>
                                                                 {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
                                                                 {trips.map((trip: Trip) => (
                                                                     <SelectItem key={trip.id} value={trip.id}>
@@ -1146,7 +1147,7 @@ export function ToolsView() {
                                                     </div>
 
                                                     <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
-                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />處理中...</> : (selectedImportTripId === "new" ? t('save_trip') : "確認匯入")}
+                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('tv_joined'))}
                                                     </Button>
                                                 </div>
                                             )}
@@ -1162,20 +1163,20 @@ export function ToolsView() {
             } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>確定刪除此卡片？</AlertDialogTitle>
+                        <AlertDialogTitle>{t('tv_confirm_delete_card')}</AlertDialogTitle>
                         <AlertDialogDescription>
-                            刪除後將無法恢復。如果是共享卡片，其他成員也將無法看到。
+                            {t('tv_confirm_delete_card_desc')}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeletingCard}>取消</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeletingCard}>{t('cancel')}</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmDeleteCard}
                             disabled={isDeletingCard}
                             className="bg-red-500 hover:bg-red-600"
                         >
                             {isDeletingCard ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                            刪除
+                            {t('delete')}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -1212,11 +1213,11 @@ export function ToolsView() {
                                     <div className="flex gap-2">
                                         {viewingCard.is_public ? (
                                             <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-500/30 text-blue-100 px-3 py-1 rounded-full border border-blue-400/40 flex items-center gap-1.5 backdrop-blur-md">
-                                                <Users className="w-3 h-3" /> {t('shared') || "公開共享"}
+                                                <Users className="w-3 h-3" /> {t('tv_shared_card')}
                                             </span>
                                         ) : (
                                             <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/30 text-amber-100 px-3 py-1 rounded-full border border-amber-400/40 flex items-center gap-1.5 backdrop-blur-md">
-                                                <User className="w-3 h-3" /> {t('private') || "私人儲存"}
+                                                <User className="w-3 h-3" /> {t('tv_private_card')}
                                             </span>
                                         )}
                                     </div>
@@ -1225,7 +1226,7 @@ export function ToolsView() {
                                         {viewingCard.name}
                                     </SheetTitle>
                                     <SheetDescription className="sr-only">
-                                        查看信用卡詳情，包括回饋比例與各項設定。
+                                        {t('tv_card_detail_title')}
                                     </SheetDescription>
                                 </div>
                             </SheetHeader>
@@ -1234,14 +1235,14 @@ export function ToolsView() {
                             <div className="p-8 space-y-8 flex-1 overflow-y-auto overscroll-contain pb-32">
                                 <div className="grid grid-cols-2 gap-5">
                                     <div className="bg-white/5 border border-white/10 rounded-3xl p-5 hover:bg-white/10 transition-colors">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">回饋趴數</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('tools_reward_preview')}</p>
                                         <p className="text-3xl font-black text-emerald-400 tracking-tight">
                                             {viewingCard.rewardRate}
                                             <span className="text-sm font-bold ml-1 opacity-70">%</span>
                                         </p>
                                     </div>
                                     <div className="bg-white/5 border border-white/10 rounded-3xl p-5 hover:bg-white/10 transition-colors">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">回饋上限</p>
+                                        <p className="text-[10px] font-bold text-slate-440 uppercase tracking-widest mb-2">{t('tv_reward_limit')}</p>
                                         <div className="flex items-baseline gap-1">
                                             {viewingCard.rewardLimit > 0 ? (
                                                 <>
@@ -1249,7 +1250,7 @@ export function ToolsView() {
                                                     <p className="text-3xl font-black tracking-tight">{viewingCard.rewardLimit.toLocaleString()}</p>
                                                 </>
                                             ) : (
-                                                <span className="text-slate-500 text-xl font-bold italic tracking-tight">無上限</span>
+                                                <span className="text-slate-500 text-xl font-bold italic tracking-tight">{t('tv_no_limit')}</span>
                                             )}
                                         </div>
                                     </div>
@@ -1259,7 +1260,7 @@ export function ToolsView() {
                                     <div className="bg-white/5 border border-white/10 rounded-3xl p-6 relative overflow-hidden">
                                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50" />
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            <FileText className="w-3 h-3 text-indigo-400" /> 備忘錄
+                                            <FileText className="w-3 h-3 text-indigo-400" /> {t('tv_card_memo')}
                                         </p>
                                         <div className="text-sm text-slate-100 leading-relaxed font-medium whitespace-pre-wrap">
                                             {viewingCard.notes}
@@ -1274,7 +1275,7 @@ export function ToolsView() {
                                         className="flex-[3] bg-white text-slate-900 hover:bg-slate-200 border-0 h-14 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-all"
                                         onClick={() => openEditCardDialog(viewingCard)}
                                     >
-                                        <Edit2 className="w-5 h-5 mr-2" /> 編輯資料
+                                        <Edit2 className="w-5 h-5 mr-2" /> {t('tv_edit_card')}
                                     </Button>
                                     <Button
                                         variant="destructive"
@@ -1297,44 +1298,44 @@ export function ToolsView() {
             < Dialog open={cardDialogOpen} onOpenChange={setCardDialogOpen} >
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{editingCard ? "編輯卡片" : "新增卡片"}</DialogTitle>
+                        <DialogTitle>{editingCard ? t('tv_edit_card_title') : t('tv_new_card')}</DialogTitle>
                         <DialogDescription className="sr-only">
-                            輸入信用卡名稱與回饋比例，並設定是否要與行程成員共享此卡片資訊。
+                            {t('tv_card_dialog_desc')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div>
-                            <Label>卡片名稱 *</Label>
+                            <Label>{t('tv_card_name_label')}</Label>
                             <Input
-                                placeholder="例：玉山 Pi 拍錢包"
+                                placeholder={t('tv_card_name_ph')}
                                 value={newCardName}
                                 onChange={(e) => setNewCardName(e.target.value)}
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Label>回饋趴數 (%)</Label>
+                                <Label>{t('tv_reward_rate_label')}</Label>
                                 <Input
                                     type="number"
-                                    placeholder="例：3.5"
+                                    placeholder={t('tv_reward_rate_ph')}
                                     value={newRewardRate}
                                     onChange={(e) => setNewRewardRate(e.target.value)}
                                 />
                             </div>
                             <div>
-                                <Label>回饋上限 (TWD)</Label>
+                                <Label>{t('tv_reward_limit_label')}</Label>
                                 <Input
                                     type="number"
-                                    placeholder="例：500"
+                                    placeholder={t('tv_reward_limit_ph')}
                                     value={newRewardLimit}
                                     onChange={(e) => setNewRewardLimit(e.target.value)}
                                 />
                             </div>
                         </div>
                         <div>
-                            <Label>備忘錄</Label>
+                            <Label>{t('tv_card_notes_label')}</Label>
                             <Textarea
-                                placeholder="例：海外消費限定、需登錄活動..."
+                                placeholder={t('tv_card_notes_ph')}
                                 value={newCardNotes}
                                 onChange={(e) => setNewCardNotes(e.target.value)}
                                 rows={3}
@@ -1343,12 +1344,12 @@ export function ToolsView() {
 
                         <div className="flex items-center justify-between bg-slate-100 p-3 rounded-xl">
                             <Label className="flex items-center gap-2 text-sm text-slate-700">
-                                {newCardIsPublic ? <><Users className="w-4 h-4 text-blue-500" /> 公開給行程成員</> : <><User className="w-4 h-4 text-amber-500" /> 僅存於此裝置</>}
+                                {newCardIsPublic ? <><Users className="w-4 h-4 text-blue-500" /> {t('tv_card_public')}</> : <><User className="w-4 h-4 text-amber-500" /> {t('tv_card_private')}</>}
                             </Label>
                             <Switch checked={newCardIsPublic} onCheckedChange={setNewCardIsPublic} />
                         </div>
                         <Button className="w-full bg-slate-900" onClick={handleSaveCard} disabled={isSavingCard}>
-                            {isSavingCard ? "儲存中..." : (editingCard ? "更新" : "新增")}
+                            {isSavingCard ? t('tv_card_saving') : (editingCard ? t('update') : t('tv_add_card'))}
                         </Button>
                     </div>
                 </DialogContent>
@@ -1358,6 +1359,7 @@ export function ToolsView() {
 }
 
 const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
+    const { t } = useLanguage()
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
     const CatIcon = catInfo.icon
@@ -1380,7 +1382,7 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: 
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                         {item.card_name ? <span className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400 px-1.5 rounded">{methodInfo.label}</span>}
-                        <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400")}>{item.is_public ? "公帳" : "私帳"}</span>
+                        <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400")}>{item.is_public ? t('tv_filter_public') : t('tv_filter_private')}</span>
                         <span>{item.creator_name}</span>
                     </div>
                 </div>

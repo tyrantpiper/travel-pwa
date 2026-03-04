@@ -4,6 +4,8 @@ import { useRef, forwardRef, useImperativeHandle, useState, useCallback } from "
 import { Bold, Italic } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
+import { TranslationKey } from "@/lib/i18n"
 
 // 格式類型定義
 type FormatType = "bold" | "italic" | "color-r" | "color-b" | "color-g" | "color-y"
@@ -18,12 +20,12 @@ const FORMAT_CONFIG: Record<FormatType, { prefix: string; suffix: string }> = {
     "color-y": { prefix: "<y>", suffix: "</y>" },
 }
 
-// 顏色選項
-const COLOR_OPTIONS = [
-    { key: "r", format: "color-r" as FormatType, color: "#ef4444", label: "紅", className: "bg-red-500" },
-    { key: "b", format: "color-b" as FormatType, color: "#3b82f6", label: "藍", className: "bg-blue-500" },
-    { key: "g", format: "color-g" as FormatType, color: "#22c55e", label: "綠", className: "bg-green-500" },
-    { key: "y", format: "color-y" as FormatType, color: "#fbbf24", label: "黃底", className: "bg-yellow-400" },
+// 顏色選項 (moved inside component to use translation hook)
+const COLOR_OPTIONS_FACTORY = (t: (key: TranslationKey) => string) => [
+    { key: "r", format: "color-r" as FormatType, color: "#ef4444", label: t('rt_red'), className: "bg-red-500" },
+    { key: "b", format: "color-b" as FormatType, color: "#3b82f6", label: t('rt_blue'), className: "bg-blue-500" },
+    { key: "g", format: "color-g" as FormatType, color: "#22c55e", label: t('rt_green'), className: "bg-green-500" },
+    { key: "y", format: "color-y" as FormatType, color: "#fbbf24", label: t('rt_yellow'), className: "bg-yellow-400" },
 ]
 
 interface RichTextareaProps {
@@ -36,6 +38,7 @@ interface RichTextareaProps {
 
 export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
     ({ value, onChange, placeholder, className, minHeight = "80px" }, ref) => {
+        const { t } = useLanguage()
         const textareaRef = useRef<HTMLTextAreaElement>(null)
 
         // 🆕 啟用中的格式狀態
@@ -184,7 +187,7 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
                 {/* 工具列 */}
                 <div
                     role="toolbar"
-                    aria-label="文字格式工具列"
+                    aria-label={t('rt_format_toolbar')}
                     className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200"
                 >
                     {/* 粗體 */}
@@ -192,14 +195,14 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
                         type="button"
                         onClick={handleBold}
                         aria-pressed={activeFormats.has("bold")}
-                        aria-label="粗體"
+                        aria-label={t('rt_bold')}
                         className={cn(
                             "p-1.5 rounded transition-all duration-150",
                             activeFormats.has("bold")
                                 ? "bg-amber-100 ring-2 ring-amber-400 scale-110"
                                 : "hover:bg-white hover:shadow-sm"
                         )}
-                        title="粗體"
+                        title={t('rt_bold')}
                     >
                         <Bold className={cn(
                             "w-4 h-4 transition-colors",
@@ -212,14 +215,14 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
                         type="button"
                         onClick={handleItalic}
                         aria-pressed={activeFormats.has("italic")}
-                        aria-label="斜體"
+                        aria-label={t('rt_italic')}
                         className={cn(
                             "p-1.5 rounded transition-all duration-150",
                             activeFormats.has("italic")
                                 ? "bg-amber-100 ring-2 ring-amber-400 scale-110"
                                 : "hover:bg-white hover:shadow-sm"
                         )}
-                        title="斜體"
+                        title={t('rt_italic')}
                     >
                         <Italic className={cn(
                             "w-4 h-4 transition-colors",
@@ -231,7 +234,7 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
                     <div className="w-px h-5 bg-slate-300 mx-1" />
 
                     {/* 顏色按鈕 */}
-                    {COLOR_OPTIONS.map((opt) => (
+                    {COLOR_OPTIONS_FACTORY(t).map((opt) => (
                         <button
                             key={opt.key}
                             type="button"

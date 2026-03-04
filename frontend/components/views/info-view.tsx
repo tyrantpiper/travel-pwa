@@ -224,7 +224,7 @@ export function InfoView() {
             setHotelSearchResults(data.results || [])
         } catch (e) {
             console.error("Hotel search failed:", e)
-            toast.error("搜尋失敗")
+            toast.error(t('info_search_failed'))
         } finally {
             setIsHotelSearching(false)
         }
@@ -241,7 +241,7 @@ export function InfoView() {
         setHotelSearchResults([])
         setHotelSearchQuery("")
         setSearchingHotelIdx(null)
-        toast.success(`已選擇: ${place.name}`)
+        toast.success(t('info_selected', { name: place.name }))
     }
 
     // 🧠 Magic Resolve for Hotel links
@@ -257,7 +257,7 @@ export function InfoView() {
         if (extracted.lat && extracted.lng) {
             updateHotelFields(idx, { lat: extracted.lat, lng: extracted.lng })
             setResolutionState({ idx, status: 'success' })
-            toast.success("已從連結提取座標")
+            toast.success(t('info_coords_extracted'))
             return
         }
 
@@ -270,10 +270,10 @@ export function InfoView() {
                 if (result.success && result.lat && result.lng) {
                     updateHotelFields(idx, { lat: result.lat, lng: result.lng })
                     setResolutionState({ idx, status: result.method.includes('jit') ? 'fallback' : 'success' })
-                    toast.success(result.method.includes('jit') ? "已透過地名完成定位" : "已解析縮網址座標")
+                    toast.success(result.method.includes('jit') ? t('info_resolved_by_name') : t('info_resolved_url'))
                 } else {
                     setResolutionState({ idx, status: 'error' })
-                    toast.error("解析失敗，請手動搜尋地點")
+                    toast.error(t('info_resolve_failed'))
                 }
             } catch {
                 setResolutionState({ idx, status: 'error' })
@@ -281,7 +281,7 @@ export function InfoView() {
                 setIsResolvingHotel(false)
             }
         } else {
-            toast.info("此連結不包含可識別座標，請使用搜尋功能")
+            toast.info(t('info_link_no_coords'))
         }
     }
 
@@ -299,6 +299,8 @@ export function InfoView() {
                             </div>
                             <ZenRenew
                                 onRefresh={refreshInfo}
+                                successMessage={t('update_success')}
+                                errorMessage={t('update_failed')}
                                 className="text-white/80 hover:text-white"
                             />
                         </div>
@@ -389,7 +391,7 @@ export function InfoView() {
                                                             transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                                         />
                                                     )}
-                                                    {tab === 'outbound' ? '去程 OUT' : '回程 IN'}
+                                                    {tab === 'outbound' ? t('info_outbound_tab') : t('info_inbound_tab')}
                                                 </button>
                                             ))}
                                         </div>
@@ -480,7 +482,7 @@ export function InfoView() {
                                                                     <button
                                                                         onClick={() => removeHotel(idx)}
                                                                         className="absolute top-3 right-3 z-10 p-3 bg-red-50/90 dark:bg-red-950/40 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-full transition-all active:scale-90 shadow-sm border border-red-100/50 touch-manipulation"
-                                                                        aria-label="刪除住宿"
+                                                                        aria-label={t('info_delete_hotel_aria')}
                                                                     >
                                                                         <Trash2 className="w-5 h-5" />
                                                                     </button>
@@ -524,7 +526,7 @@ export function InfoView() {
                                                                                     onClick={() => handleResolveHotelLink(idx)}
                                                                                     className="h-8 px-3 bg-amber-100/80 hover:bg-amber-200 text-amber-700 border-none transition-all active:scale-95 text-[10px] font-bold"
                                                                                 >
-                                                                                    {isResolvingHotel && resolutionState.idx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : "解析"}
+                                                                                    {isResolvingHotel && resolutionState.idx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : t('info_resolve_btn')}
                                                                                 </Button>
                                                                             </div>
                                                                         </div>
@@ -566,7 +568,7 @@ export function InfoView() {
                                                                                 <div className="flex gap-1">
                                                                                     <Input
                                                                                         className="h-8 text-xs flex-1"
-                                                                                        placeholder="搜尋飯店..."
+                                                                                        placeholder={t('info_search_hotel_ph')}
                                                                                         value={hotelSearchQuery}
                                                                                         onChange={e => setHotelSearchQuery(e.target.value)}
                                                                                         onKeyDown={e => e.key === 'Enter' && handleSearchHotelPlace(idx)}
@@ -608,12 +610,12 @@ export function InfoView() {
                                                                                 )}
                                                                                 {/* 手動輸入經緯度 */}
                                                                                 <div className="flex gap-2 items-center">
-                                                                                    <span className="text-[10px] text-slate-400">📍 手動座標:</span>
+                                                                                    <span className="text-[10px] text-slate-400">📍 {t('info_manual_coords')}</span>
                                                                                     <Input
                                                                                         type="number"
                                                                                         step="any"
                                                                                         className="h-7 text-xs w-24 text-center font-mono"
-                                                                                        placeholder="緯度 Lat"
+                                                                                        placeholder={t('info_lat_ph')}
                                                                                         value={item.lat ?? ''}
                                                                                         onChange={e => updateHotel(idx, 'lat', e.target.value ? parseFloat(e.target.value) : null)}
                                                                                     />
@@ -621,7 +623,7 @@ export function InfoView() {
                                                                                         type="number"
                                                                                         step="any"
                                                                                         className="h-7 text-xs w-24 text-center font-mono"
-                                                                                        placeholder="經度 Lng"
+                                                                                        placeholder={t('info_lng_ph')}
                                                                                         value={item.lng ?? ''}
                                                                                         onChange={e => updateHotel(idx, 'lng', e.target.value ? parseFloat(e.target.value) : null)}
                                                                                     />
@@ -635,7 +637,7 @@ export function InfoView() {
                                                                                 ) : item.lat && item.lng ? (
                                                                                     <span className="text-sm text-slate-500">{item.lat.toFixed(4)}, {item.lng.toFixed(4)}</span>
                                                                                 ) : (
-                                                                                    <span className="text-sm text-slate-400 italic">未設定地點</span>
+                                                                                    <span className="text-sm text-slate-400 italic">{t('info_no_location')}</span>
                                                                                 )}
                                                                             </div>
                                                                         )}
@@ -680,7 +682,7 @@ export function InfoView() {
                                                                                 <Navigation2 className="w-3.5 h-3.5" /> Maps
                                                                             </a>
                                                                         ) : (
-                                                                            <div className="flex items-center gap-1.5 px-3 h-9 text-xs bg-slate-100 text-slate-400 rounded-md opacity-60" title="尚未設定地點">
+                                                                            <div className="flex items-center gap-1.5 px-3 h-9 text-xs bg-slate-100 text-slate-400 rounded-md opacity-60" title={t('info_no_location_title')}>
                                                                                 <Navigation2 className="w-3.5 h-3.5" /> Maps
                                                                             </div>
                                                                         )}

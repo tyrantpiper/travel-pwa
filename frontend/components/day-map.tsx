@@ -14,6 +14,7 @@ import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
 import { cn } from "@/lib/utils"
 import { debugLog, debugWarn } from "@/lib/debug"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // Activity 類型定義
 interface Activity {
@@ -92,6 +93,7 @@ function useSearchHistory() {
 
 // 路線規劃 Hook (使用後端 /api/route 代理)
 function useRoute(markersKey: string, markers: MarkerData[], mode: string, optimize: boolean = false) {
+    const { t } = useLanguage()
     const [route, setRoute] = useState<GeoJSON.Feature | null>(null)
     const [routeInfo, setRouteInfo] = useState<{ distance: string; duration: string; source?: string } | null>(null)
     const [loading, setLoading] = useState(false)
@@ -141,8 +143,8 @@ function useRoute(markersKey: string, markers: MarkerData[], mode: string, optim
                 }
                 setRoute(straightLineRoute)
                 setRouteInfo({
-                    distance: "跨區域",
-                    duration: "含航班",
+                    distance: t('map_cross_region'),
+                    duration: t('map_includes_flight'),
                     source: "straight-line"
                 })
                 setLoading(false)
@@ -202,6 +204,7 @@ interface DayMapProps {
 }
 
 export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: DayMapProps) {
+    const { t } = useLanguage()
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
     const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
@@ -248,7 +251,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
-            alert("您的瀏覽器不支援定位功能")
+            alert(t('map_geolocation_unsupported'))
             return
         }
         setIsLocating(true)
@@ -270,9 +273,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 setIsLocating(false)
                 console.error("Geolocation error:", error)
                 if (error.code === error.PERMISSION_DENIED) {
-                    alert("定位權限被拒絕，請允許瀏覽器獲取您的位置")
+                    alert(t('map_geolocation_denied'))
                 } else {
-                    alert("無法獲取位置: " + error.message)
+                    alert(t('map_geolocation_failed') + error.message)
                 }
             },
             { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
@@ -662,7 +665,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
                     if (props[key]) return props[key]
                 }
-                return props.name || '未知地點'
+                return props.name || t('map_location_point')
             }
 
             const poiData: POIBasicData = {
@@ -702,7 +705,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             }`}
                     >
                         <Footprints className="w-3.5 h-3.5" />
-                        步行
+                        {t('map_walk')}
                     </button>
                     <button
                         onClick={() => setMode('drive')}
@@ -710,7 +713,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             }`}
                     >
                         <Car className="w-3.5 h-3.5" />
-                        開車
+                        {t('map_drive')}
                     </button>
                     <button
                         onClick={() => setMode('transit')}
@@ -718,7 +721,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             }`}
                     >
                         <Bus className="w-3.5 h-3.5" />
-                        大眾運輸
+                        {t('map_transit')}
                     </button>
                 </div>
 
@@ -728,7 +731,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         <div className="flex items-center gap-3 text-xs">
                             <span className="text-slate-500">📏 {routeInfo.distance}</span>
                             <span className="text-slate-500">⏱️ {routeInfo.duration}</span>
-                            {loading && <span className="text-amber-500 animate-pulse">載入中...</span>}
+                            {loading && <span className="text-amber-500 animate-pulse">{t('map_loading')}</span>}
                         </div>
                     )}
                     <button
@@ -737,12 +740,12 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             ? 'bg-blue-600 text-white border-blue-600'
                             : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
                             }`}
-                        title={mapMode === 'satellite' ? '切換到標準地圖' : '切換到衛星圖'}
+                        title={mapMode === 'satellite' ? t('map_switch_standard') : t('map_switch_satellite')}
                     >
                         {mapMode === 'satellite' ? (
-                            <><MapIcon className="w-3.5 h-3.5" /> 標準</>
+                            <><MapIcon className="w-3.5 h-3.5" /> {t('map_standard')}</>
                         ) : (
-                            <><Satellite className="w-3.5 h-3.5" /> 衛星</>
+                            <><Satellite className="w-3.5 h-3.5" /> {t('map_satellite')}</>
                         )}
                     </button>
                 </div>
@@ -754,7 +757,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 <button
                     onClick={() => setIsSearchOpen(true)}
                     className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-md rounded-lg p-3 shadow-md hover:bg-white transition-all"
-                    title="搜尋地點"
+                    title={t('map_search')}
                 >
                     <Search className="w-5 h-5 text-slate-600" />
                 </button>
@@ -774,11 +777,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             <button
                                 onClick={() => setIsSearchMinimized(!isSearchMinimized)}
                                 className="w-full py-3 flex justify-center items-center gap-2 hover:bg-slate-100 transition-colors cursor-pointer group"
-                                title={isSearchMinimized ? "展開搜尋結果" : "收起搜尋結果"}
+                                title={isSearchMinimized ? t('map_expand_search') : t('map_collapse_search')}
                             >
                                 <div className="w-12 h-1.5 bg-slate-300 rounded-full group-hover:bg-slate-400 transition-colors" />
                                 <span className="text-xs text-slate-400 group-hover:text-slate-600 transition-colors">
-                                    {isSearchMinimized ? "▲ 展開" : "▼ 收起"}
+                                    {isSearchMinimized ? t('map_expand') : t('map_collapse')}
                                 </span>
                             </button>
                             {/* 搜尋輸入區 */}
@@ -789,7 +792,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                         ref={inputRef}
                                         value={query}
                                         onChange={handleQueryChange}
-                                        placeholder="搜尋地點..."
+                                        placeholder={t('map_search_placeholder')}
                                         className="h-9 pl-9 pr-8 text-base shadow-none border-slate-200 focus-visible:ring-1"
                                         onFocus={() => setIsSearchMinimized(false)}
                                     />
@@ -810,7 +813,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     onClick={() => { setIsSearchOpen(false); setIsSearchMinimized(false); }}
                                     className="px-2 text-sm text-slate-500 font-medium"
                                 >
-                                    取消
+                                    {t('cancel')}
                                 </button>
                             </div>
 
@@ -821,19 +824,19 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     {query.length === 0 && history.length > 0 && (
                                         <>
                                             <div className="px-4 py-2 text-xs font-medium text-slate-400 uppercase bg-slate-50/50 flex justify-between items-center">
-                                                <span>最近搜尋</span>
+                                                <span>{t('map_recent_search')}</span>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation()
-                                                        if (confirm("確定要清除所有搜尋紀錄嗎？")) {
+                                                        if (confirm(t('map_clear_confirm'))) {
                                                             clearHistory()
                                                         }
                                                     }}
                                                     className="flex items-center gap-1 hover:text-red-500 transition-colors"
-                                                    title="清除紀錄"
+                                                    title={t('map_clear')}
                                                 >
                                                     <Trash className="w-3 h-3" />
-                                                    <span>清除</span>
+                                                    <span>{t('map_clear')}</span>
                                                 </button>
                                             </div>
                                             {history.map((h, i) => (
@@ -853,7 +856,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     {isTyping && !isSearching && (
                                         <div className="px-4 py-4 flex items-center gap-2 text-slate-400">
                                             <div className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-pulse" />
-                                            <span className="text-sm">等待輸入完成...</span>
+                                            <span className="text-sm">{t('map_enter_query')}</span>
                                         </div>
                                     )}
 
@@ -861,7 +864,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     {isSearching && (
                                         <div className="px-4 py-6 flex items-center justify-center gap-2 text-indigo-500">
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            <span className="text-sm">搜尋中...</span>
+                                            <span className="text-sm">{t('map_searching')}</span>
                                         </div>
                                     )}
 
@@ -891,7 +894,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                                 {/* 無結果提示 */}
                                                 {searchDone && noResults && (
                                                     <div className="px-4 py-4 text-center text-slate-500 text-sm">
-                                                        找不到「{query}」的結果
+                                                        {t('map_no_results', { query })}
                                                     </div>
                                                 )}
 
@@ -948,7 +951,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         onClick={handleLocateMe}
                         disabled={isLocating}
                         className="absolute top-28 right-2 z-10 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 disabled:opacity-50 transition-all"
-                        title="定位我的位置"
+                        title={t('map_my_location')}
                     >
                         {isLocating ? (
                             <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
@@ -1013,7 +1016,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     e.originalEvent.stopPropagation()
                                     if (isCluster) {
                                         setSelectedPOI({
-                                            name: `${cluster.length} 個行程於此`,
+                                            name: t('map_cluster', { count: String(cluster.length) }),
                                             type: "cluster",
                                             lat: m.lat,
                                             lng: m.lng,
@@ -1150,7 +1153,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     rel="noopener noreferrer"
                                     className="block mt-2 text-xs text-blue-500 hover:underline"
                                 >
-                                    📍 在 Google Maps 開啟導航
+                                    📍 {t('map_open_gmaps_nav')}
                                 </a>
 
                                 {/* 🆕 2026 Bridge: See More (Open Detail Drawer) */}
@@ -1158,7 +1161,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     onClick={() => {
                                         const marker = popupInfo
                                         setSelectedPOI({
-                                            name: marker.place || '行程地點',
+                                            name: marker.place || t('map_current_point'),
                                             type: marker.category || 'sightseeing',
                                             lat: marker.lat,
                                             lng: marker.lng,
@@ -1170,7 +1173,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     }}
                                     className="w-full mt-3 py-2 px-3 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100 transition-colors border border-indigo-100/50"
                                 >
-                                    <span>✨ 查看更多內容</span>
+                                    <span>✨ {t('map_view_more')}</span>
                                 </button>
                             </div>
                         </Popup>

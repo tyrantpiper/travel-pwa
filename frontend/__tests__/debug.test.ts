@@ -1,22 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // We need to test debug functions with different NODE_ENV values
 describe('debug utilities', () => {
-    let originalEnv: string | undefined
-
     beforeEach(() => {
-        originalEnv = process.env.NODE_ENV
         vi.restoreAllMocks()
     })
 
-    // Restore env after each test
+    // vi.unstubAllEnvs() automatically restores original env values
     afterEach(() => {
-        process.env.NODE_ENV = originalEnv
+        vi.unstubAllEnvs()
     })
 
     describe('debugLog', () => {
         it('should call console.log in development', async () => {
-            process.env.NODE_ENV = 'development'
+            vi.stubEnv('NODE_ENV', 'development')
             // Re-import to pick up new env
             const spy = vi.spyOn(console, 'log').mockImplementation(() => { })
             const { debugLog } = await import('@/lib/debug')
@@ -25,7 +22,7 @@ describe('debug utilities', () => {
         })
 
         it('should NOT call console.log in production', async () => {
-            process.env.NODE_ENV = 'production'
+            vi.stubEnv('NODE_ENV', 'production')
             const spy = vi.spyOn(console, 'log').mockImplementation(() => { })
             // debugLog checks NODE_ENV at call time
             const { debugLog } = await import('@/lib/debug')
@@ -37,7 +34,7 @@ describe('debug utilities', () => {
 
     describe('debugWarn', () => {
         it('should call console.warn in development', async () => {
-            process.env.NODE_ENV = 'development'
+            vi.stubEnv('NODE_ENV', 'development')
             const spy = vi.spyOn(console, 'warn').mockImplementation(() => { })
             const { debugWarn } = await import('@/lib/debug')
             debugWarn('warning!')
@@ -47,7 +44,7 @@ describe('debug utilities', () => {
 
     describe('debugError', () => {
         it('should ALWAYS call console.error regardless of environment', async () => {
-            process.env.NODE_ENV = 'production'
+            vi.stubEnv('NODE_ENV', 'production')
             const spy = vi.spyOn(console, 'error').mockImplementation(() => { })
             const { debugError } = await import('@/lib/debug')
             debugError('critical error')

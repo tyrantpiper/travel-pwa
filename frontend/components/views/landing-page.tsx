@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { AppShell } from "@/components/views/app-shell"
 import { WelcomeWizard } from "@/components/onboarding/WelcomeWizard"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
+import { useLanguage } from "@/lib/LanguageContext"
 
 import { toast } from "sonner"
 import { usersApi } from "@/lib/api"
@@ -24,6 +25,7 @@ function generateUUID() {
 }
 
 export function LandingPage() {
+    const { t } = useLanguage()
     const [mounted, setMounted] = useState(false)
     const [isLoggedIn, setIsLoggedIn] = useState(false)
     const [nickname, setNickname] = useState("")
@@ -48,7 +50,7 @@ export function LandingPage() {
     }, [])
 
     const handleLogin = async () => {
-        if (!nickname.trim()) { toast.warning("Please enter nickname"); return }
+        if (!nickname.trim()) { toast.warning(t('landing_please_enter_nickname')); return }
         let uuid = localStorage.getItem("user_uuid")
         if (!uuid) {
             uuid = generateUUID()
@@ -79,10 +81,10 @@ export function LandingPage() {
     const handleRecover = async () => {
         const cleanCode = recoverCode.trim()
         if (!cleanCode || cleanCode === "null" || cleanCode === "undefined") {
-            toast.warning("Please enter a valid recovery code")
+            toast.warning(t('landing_invalid_code'))
             return
         }
-        if (cleanCode.length < 10) { toast.error("Invalid code format"); return }
+        if (cleanCode.length < 10) { toast.error(t('landing_invalid_code')); return }
 
         // 🆕 Async fetch profile
         const toastId = toast.loading("Verifying identity...")
@@ -162,17 +164,17 @@ export function LandingPage() {
                     </div>
                 </div>
 
-                <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-2 tracking-tight">Tabidachi</h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-10 tracking-[0.3em] uppercase font-medium">Travel Planner</p>
+                <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-2 tracking-tight">{t('landing_title')}</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-10 tracking-[0.3em] uppercase font-medium">{t('landing_subtitle')}</p>
 
                 <div className="w-full max-w-xs space-y-6">
 
                     {!showRecover ? (
                         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Your Nickname</label>
+                                <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">{t('landing_nickname_label')}</label>
                                 <Input
-                                    placeholder="E.g. Ryan"
+                                    placeholder={t('landing_nickname_placeholder')}
                                     className="h-14 bg-white dark:bg-slate-800 border-stone-200 dark:border-slate-700 text-lg text-center rounded-2xl shadow-sm focus-visible:ring-slate-900 dark:focus-visible:ring-slate-500 dark:text-white dark:placeholder:text-slate-500"
                                     value={nickname}
                                     onChange={(e) => setNickname(e.target.value)}
@@ -181,23 +183,23 @@ export function LandingPage() {
                             </div>
 
                             <Button onClick={handleLogin} className="w-full h-14 rounded-2xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-xl shadow-slate-200/50 dark:shadow-black/20 transition-all hover:scale-[1.02] text-lg font-medium">
-                                Start Journey <ArrowRight className="ml-2 w-5 h-5" />
+                                {t('landing_start_journey')} <ArrowRight className="ml-2 w-5 h-5" />
                             </Button>
 
                             <div className="pt-6">
-                                <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-stone-200 dark:border-slate-700" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-stone-50 dark:bg-slate-900 px-2 text-stone-400 dark:text-slate-500">Or</span></div></div>
-                                <Button variant="ghost" className="w-full mt-4 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-slate-800" onClick={() => setShowRecover(true)}><History className="w-4 h-4 mr-2" /> Use Recovery Code</Button>
+                                <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t border-stone-200 dark:border-slate-700" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-stone-50 dark:bg-slate-900 px-2 text-stone-400 dark:text-slate-500">{t('landing_or')}</span></div></div>
+                                <Button variant="ghost" className="w-full mt-4 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-slate-800" onClick={() => setShowRecover(true)}><History className="w-4 h-4 mr-2" /> {t('landing_use_recovery')}</Button>
                             </div>
                         </div>
                     ) : (
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-lg border border-stone-100 dark:border-slate-700 animate-in zoom-in-95 duration-300">
                             <div className="text-center mb-4">
                                 <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-2"><ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></div>
-                                <h3 className="font-bold text-slate-800 dark:text-white">Account Recovery</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter your backup UUID</p>
+                                <h3 className="font-bold text-slate-800 dark:text-white">{t('landing_account_recovery')}</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('landing_enter_uuid')}</p>
                             </div>
                             <Input className="h-10 text-xs font-mono bg-stone-50 dark:bg-slate-900 dark:border-slate-600 dark:text-white mb-4 text-center" placeholder="xxxxxxxx-xxxx-xxxx..." value={recoverCode} onChange={e => setRecoverCode(e.target.value)} />
-                            <div className="flex gap-2"><Button variant="outline" className="flex-1 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700" onClick={() => setShowRecover(false)}>Cancel</Button><Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRecover}>Recover</Button></div>
+                            <div className="flex gap-2"><Button variant="outline" className="flex-1 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700" onClick={() => setShowRecover(false)}>{t('cancel')}</Button><Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleRecover}>{t('landing_recover')}</Button></div>
                         </div>
                     )}
 

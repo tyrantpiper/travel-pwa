@@ -55,7 +55,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
     // 🆕 移除：有 sub_items 就隱藏（這是錯誤的互斥邏輯）
     const hideMapBtn =
         activity.hide_navigation ||
-        ["家中", "家裡", "機上", "飛機上", "等待登機"].some(k => (activity.place || "").includes(k)) ||
+        ["家中", "家裡", "機上", "飛機上", "等待登機", "home", "on plane", "boarding"].some(k => (activity.place || "").toLowerCase().includes(k)) ||
         (activity.category === 'transport' && !activity.link_url && !activity.lat) ||
         isHeader;
 
@@ -71,10 +71,10 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         if (isHeader) return <Lightbulb className="w-3.5 h-3.5" />
         const cat = activity.category ? activity.category.toLowerCase().trim() : "sightseeing"
         const title = (activity.place || "").toLowerCase()
-        if (cat === "food" || title.includes("餐廳")) return <Utensils className="w-3.5 h-3.5" />
-        if (cat === "transport" || title.includes("車站") || title.includes("機場")) return <Train className="w-3.5 h-3.5" />
-        if (cat === "shopping" || title.includes("百貨") || title.includes("超市")) return <ShoppingBag className="w-3.5 h-3.5" />
-        if (cat === "hotel" || title.includes("飯店") || title.includes("民宿")) return <Bed className="w-3.5 h-3.5" />
+        if (cat === "food" || title.includes("餐廳") || title.includes("restaurant") || title.includes("cafe")) return <Utensils className="w-3.5 h-3.5" />
+        if (cat === "transport" || title.includes("車站") || title.includes("機場") || title.includes("station") || title.includes("airport")) return <Train className="w-3.5 h-3.5" />
+        if (cat === "shopping" || title.includes("百貨") || title.includes("超市") || title.includes("department") || title.includes("market") || title.includes("mall")) return <ShoppingBag className="w-3.5 h-3.5" />
+        if (cat === "hotel" || title.includes("飯店") || title.includes("民宿") || title.includes("hotel") || title.includes("hostel")) return <Bed className="w-3.5 h-3.5" />
         return <Camera className="w-3.5 h-3.5" />
     }
 
@@ -155,10 +155,10 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-[140px]">
                             <DropdownMenuItem onClick={() => onEdit(activity)} className="py-3">
-                                <Edit className="w-4 h-4 mr-2" /> 編輯全部
+                                <Edit className="w-4 h-4 mr-2" /> {t('tc_edit_all')}
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-red-600 py-3" onClick={() => onDelete(activity.id || '')}>
-                                <Trash2 className="w-4 h-4 mr-2" /> 刪除
+                                <Trash2 className="w-4 h-4 mr-2" /> {t('delete')}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -182,7 +182,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 </div>
 
                 <p className="text-sm text-slate-600 dark:text-slate-300 mb-3 leading-relaxed font-light whitespace-pre-wrap line-clamp-3">
-                    {activity.desc || "點擊新增備忘錄..."}
+                    {activity.desc || t('tc_add_memo_hint')}
                 </p>
 
                 {/* 附屬表格 */}
@@ -217,13 +217,13 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     {!hideMapBtn && (
                         <Button variant="outline" size="sm" className="h-11 min-w-[44px] text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300" onClick={openGoogleMap}>
-                            <MapPin className="w-3 h-3 mr-1" /> 導航
+                            <MapPin className="w-3 h-3 mr-1" /> {t('tc_navigate')}
                         </Button>
                     )}
 
                     {/* 👇 改成此地備忘錄 */}
                     <Button variant="ghost" size="sm" className="h-11 min-w-[44px] text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
-                        <StickyNote className="w-3 h-3 mr-1" /> 此地備忘錄
+                        <StickyNote className="w-3 h-3 mr-1" /> {t('tc_local_memo')}
                     </Button>
                 </div>
             </>
@@ -266,9 +266,9 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
             <Dialog open={showPhotoPreview} onOpenChange={setShowPhotoPreview}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
-                        <DialogTitle>圖片預覽</DialogTitle>
+                        <DialogTitle>{t('tc_photo_preview')}</DialogTitle>
                         <DialogDescription>
-                            全螢幕預覽活動圖片
+                            {t('tc_photo_preview_desc')}
                         </DialogDescription>
                     </DialogHeader>
                     <PhotoGalleryPreview
@@ -326,7 +326,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
             })
 
             if (success) {
-                toast.success("已儲存")
+                toast.success(t('tc_saved'))
                 setIsEditing(false)
             }
         } finally {
@@ -364,7 +364,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                         lng: data.lng,
                         preview_metadata: { ...activity.preview_metadata, map_image: data.metadata?.image }
                     })
-                    toast.success("座標與地圖預覽已更新")
+                    toast.success(t('tc_map_updated'))
                 } else if (type === "media") {
                     // 解析首圖並存入 metadata
                     const meta = data.metadata || {}
@@ -374,13 +374,13 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                     })
 
                     // 🔄 如果抓到首圖，自動詢問是否加入藝廊 (或是直接展示)
-                    toast.success("首圖解析成功！")
+                    toast.success(t('tc_photo_parsed'))
                 }
             } else {
-                toast.error("無法解析網址：" + (data.error || "未知錯誤"))
+                toast.error(t('tc_resolve_failed_prefix') + (data.error || t('tc_resolve_unknown')))
             }
         } catch (error) {
-            toast.error("解析發生錯誤")
+            toast.error(t('tc_resolve_error'))
             console.error(error)
         } finally {
             setSaving(false)
@@ -394,7 +394,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-serif font-bold text-slate-900 dark:text-white">{activity.place || "Details"}</DialogTitle>
                         <DialogDescription className="sr-only">
-                            活動詳細資訊與個人備忘錄
+                            {t('tc_detail_desc')}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -408,7 +408,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                     <Info className="w-3 h-3" /> Info & Guide
                                 </h4>
                                 <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm whitespace-pre-wrap">
-                                    {activity.desc || "暫無簡介。"}
+                                    {activity.desc || t('tc_no_desc')}
                                 </div>
                             </div>
 
@@ -416,11 +416,11 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                             <div className="grid grid-cols-2 gap-3">
                                 {activity.link_url && (
                                     <div className="col-span-2 p-3 bg-amber-50/30 dark:bg-amber-900/10 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
-                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">📍 導航 / 地點連結</div>
+                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">📍 {t('tc_nav_link_label')}</div>
                                         <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono mb-2">{activity.link_url}</div>
                                         {activity.website_link && (
                                             <>
-                                                <div className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold mb-1 tracking-wider border-t border-amber-100/50 pt-2">🔗 官網 / 媒體連結</div>
+                                                <div className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold mb-1 tracking-wider border-t border-amber-100/50 pt-2">🔗 {t('tc_website_label')}</div>
                                                 <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono">{activity.website_link}</div>
                                             </>
                                         )}
@@ -428,13 +428,13 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                 )}
                                 {activity.reservation_code && (
                                     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
-                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">預約代碼</div>
+                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">{t('tc_reservation_code')}</div>
                                         <div className="text-xs font-bold text-slate-700 dark:text-slate-200">{activity.reservation_code}</div>
                                     </div>
                                 )}
                                 {activity.cost !== undefined && activity.cost !== null && (
                                     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700">
-                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">預估花費</div>
+                                        <div className="text-[10px] text-slate-400 uppercase font-bold mb-1 tracking-wider">{t('tc_estimated_cost')}</div>
                                         <div className="text-xs font-bold text-slate-700 dark:text-slate-200">¥{formatCurrency(activity.cost)}</div>
                                     </div>
                                 )}
@@ -459,13 +459,13 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                                 onClick={() => handleResolveLink("media")}
                                                 disabled={saving || !mediaLink}
                                             >
-                                                {saving ? "..." : "解析美照"}
+                                                {saving ? "..." : t('tc_parse_photo')}
                                             </Button>
                                         </div>
                                     </div>
 
                                     <div className="space-y-2 p-3 bg-amber-50/50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800">
-                                        <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold">📍 導航 / 地點連結 (Google Maps)</Label>
+                                        <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold">📍 {t('tc_nav_link_gmaps')}</Label>
                                         <div className="flex gap-2">
                                             <Input
                                                 className="h-9 text-xs flex-1"
@@ -480,7 +480,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                                 onClick={() => handleResolveLink("map")}
                                                 disabled={saving || !activity.link_url}
                                             >
-                                                {saving ? "..." : "解析坐標"}
+                                                {saving ? "..." : t('tc_parse_coords')}
                                             </Button>
                                         </div>
                                     </div>
@@ -496,7 +496,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                 </h4>
                                 {!isEditing && (
                                     <button onClick={() => setIsEditing(true)} className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-                                        <Edit className="w-3 h-3" /> 編輯
+                                        <Edit className="w-3 h-3" /> {t('edit')}
                                     </button>
                                 )}
                             </div>
@@ -507,29 +507,29 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                     <RichTextarea
                                         value={note}
                                         onChange={setNote}
-                                        placeholder="輸入私人備忘..."
+                                        placeholder={t('tc_memo_placeholder')}
                                         className="bg-yellow-50/30"
                                         minHeight="80px"
                                     />
 
                                     {/* 連結編輯 */}
                                     <div className="space-y-2">
-                                        <Label className="text-[10px] text-slate-400 uppercase">相關連結 / 預約資訊</Label>
+                                        <Label className="text-[10px] text-slate-400 uppercase">{t('tc_links_label')}</Label>
                                         {links.map((link, i) => (
                                             <div key={i} className="space-y-1 p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700 relative">
                                                 <button onClick={() => removeLink(i)} className="absolute top-1 right-1 text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
-                                                <Input className="h-7 text-xs" placeholder="標題 (e.g. 訂位連結)" value={link.name || ""} onChange={e => updateLink(i, 'name', e.target.value)} />
-                                                <Input className="h-7 text-xs" placeholder="註解 (e.g. 記得先付訂金)" value={link.desc || ""} onChange={e => updateLink(i, 'desc', e.target.value)} />
+                                                <Input className="h-7 text-xs" placeholder={t('tc_link_name_ph')} value={link.name || ""} onChange={e => updateLink(i, 'name', e.target.value)} />
+                                                <Input className="h-7 text-xs" placeholder={t('tc_link_desc_ph')} value={link.desc || ""} onChange={e => updateLink(i, 'desc', e.target.value)} />
                                                 <Input className="h-7 text-xs font-mono text-blue-600" placeholder="https://..." value={link.link || ""} onChange={e => updateLink(i, 'link', e.target.value)} />
                                             </div>
                                         ))}
-                                        <Button size="sm" variant="outline" onClick={addLink} className="w-full h-7 text-xs">+ 新增連結</Button>
+                                        <Button size="sm" variant="outline" onClick={addLink} className="w-full h-7 text-xs">{t('tc_add_link')}</Button>
                                     </div>
 
                                     <div className="flex gap-2 justify-end pt-2 border-t border-slate-100 dark:border-slate-700">
-                                        <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving}>取消</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={saving}>{t('cancel')}</Button>
                                         <Button size="sm" onClick={handleSave} disabled={saving} className="bg-amber-500 hover:bg-amber-600 text-white">
-                                            {saving ? "儲存中..." : "儲存變更"}
+                                            {saving ? t('saving') : t('tc_save_changes')}
                                         </Button>
                                     </div>
                                 </div>
@@ -541,7 +541,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                         className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed bg-yellow-50/50 dark:bg-amber-900/20 p-4 rounded-xl border border-dashed border-amber-200 dark:border-amber-700 cursor-text hover:bg-yellow-50 dark:hover:bg-amber-900/30 transition-colors"
                                         onClick={() => setIsEditing(true)}
                                     >
-                                        {note ? <RichDisplay text={note} /> : <span className="text-slate-400 italic flex items-center gap-2"><Plus className="w-3 h-3" /> 新增備忘...</span>}
+                                        {note ? <RichDisplay text={note} /> : <span className="text-slate-400 italic flex items-center gap-2"><Plus className="w-3 h-3" /> {t('tc_add_memo')}</span>}
                                     </div>
 
                                     {/* Links 顯示 (如果有) */}

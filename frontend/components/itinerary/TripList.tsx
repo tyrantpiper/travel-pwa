@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { Trip, Activity } from "@/lib/itinerary-types"
 import { generateTripPDF, downloadPDF, TripPDFData } from "@/lib/pdf-generator"
 import { tripsApi } from "@/lib/api"
+import { useLanguage } from "@/lib/LanguageContext"
 
 
 
@@ -22,6 +23,7 @@ interface TripListProps {
 }
 
 export function TripList({
+    // i18n
     trips,
     userId,
     isTripsLoading,
@@ -30,10 +32,11 @@ export function TripList({
     onLeaveTrip,
     leavingTripId
 }: TripListProps) {
+    const { t } = useLanguage()
 
     // PDF Generation Handler
     const handleDownloadPDF = async (trip: Trip) => {
-        const toastId: string | number = toast.loading("生成 PDF 中...")
+        const toastId: string | number = toast.loading(t('trip_pdf_loading'))
         try {
             // 🔒 Standardized: Use tripsApi.get to include userId/Auth header for private trips
             const fullTrip = await tripsApi.get(trip.id, userId || "")
@@ -68,11 +71,11 @@ export function TripList({
             })
             toast.dismiss(toastId)
             downloadPDF(blobUrl, `${trip.title || "trip"}.pdf`)
-            toast.success("PDF 下載成功！")
+            toast.success(t('trip_pdf_success'))
         } catch (err) {
             console.error(err)
             toast.dismiss(toastId)
-            toast.error("PDF 生成失敗")
+            toast.error(t('trip_pdf_failed'))
         }
     }
 
@@ -90,8 +93,8 @@ export function TripList({
         return (
             <div className="text-center py-20 bg-white/50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
                 <div className="text-slate-400 mb-2 text-lg">📭</div>
-                <p className="text-slate-500">尚無行程</p>
-                <p className="text-xs text-slate-400 mt-1">建立新行程並開始你的冒險</p>
+                <p className="text-slate-500">{t('trip_no_trips')}</p>
+                <p className="text-xs text-slate-400 mt-1">{t('trip_create_hint')}</p>
             </div>
         )
     }
@@ -154,7 +157,7 @@ export function TripList({
                                         disabled={leavingTripId === trip.id}
                                         onClick={(e) => { e.stopPropagation(); onLeaveTrip(trip.id) }}
                                     >
-                                        {leavingTripId === trip.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />} 退出
+                                        {leavingTripId === trip.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />} {t('trip_leave')}
                                     </Button>
                                 )}
                             </div>

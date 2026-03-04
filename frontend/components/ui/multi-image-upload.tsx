@@ -19,6 +19,7 @@ import { toast } from "sonner"
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { compressImage } from "@/lib/image-utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // 🆕 DND-Kit imports
 import {
@@ -52,6 +53,7 @@ export function MultiImageUpload({
     folder = "ryan_travel/spots",
     className
 }: MultiImageUploadProps) {
+    const { t } = useLanguage()
     const [loading, setLoading] = useState(false)
     const [progress, setProgress] = useState(0)
     const [previewIndex, setPreviewIndex] = useState<number | null>(null)
@@ -97,7 +99,7 @@ export function MultiImageUpload({
                 setPhotoItems(newItems) // 立即更新 UI
                 const newUrls = newItems.map(item => item.url)
                 onChange(newUrls) // 同步回父組件
-                toast.success("排序已更新")
+                toast.success(t('img_order_saved'))
             }
         }
     }
@@ -162,16 +164,16 @@ export function MultiImageUpload({
                     onChange(newUrls)
                     // 同步更新內部狀態以便立即顯示
                     setPhotoItems(prev => [...prev, { id: `photo-new-${Date.now()}`, url: newUrl }])
-                    toast.success("圖片上傳成功")
+                    toast.success(t('img_uploaded'))
                 } else {
-                    toast.error("上傳失敗")
+                    toast.error(t('img_upload_failed'))
                 }
                 setLoading(false)
                 setProgress(0)
             }
 
             xhr.onerror = () => {
-                toast.error("上傳失敗")
+                toast.error(t('img_upload_failed'))
                 setLoading(false)
                 setProgress(0)
             }
@@ -181,7 +183,7 @@ export function MultiImageUpload({
 
         } catch (err) {
             console.error("Upload error:", err)
-            toast.error("上傳發生錯誤")
+            toast.error(t('img_upload_error'))
             setLoading(false)
         }
 
@@ -275,8 +277,8 @@ export function MultiImageUpload({
             <Dialog open={previewIndex !== null} onOpenChange={() => setPreviewIndex(null)}>
                 <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
                     <DialogHeader className="sr-only">
-                        <DialogTitle>圖片預覽</DialogTitle>
-                        <DialogDescription>全螢幕預覽多張上傳的小徑照片，支援左右切換與縮放。</DialogDescription>
+                        <DialogTitle>{t('img_preview')}</DialogTitle>
+                        <DialogDescription>Image Preview</DialogDescription>
                     </DialogHeader>
                     {previewIndex !== null && values[previewIndex] && (
                         <div className="relative w-full h-[80vh]">

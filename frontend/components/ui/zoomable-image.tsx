@@ -18,6 +18,7 @@ import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pa
 import Image from "next/image"
 import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface ZoomableImageProps {
     src: string
@@ -33,27 +34,28 @@ interface ZoomableImageProps {
 // 縮放控制按鈕元件
 function ZoomControls({ onClose }: { onClose?: () => void }) {
     const { zoomIn, zoomOut, resetTransform } = useControls()
+    const { t } = useLanguage()
 
     return (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-2 z-10">
             <button
                 onClick={() => zoomOut()}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-colors"
-                aria-label="縮小"
+                aria-label={t('zoom_out')}
             >
                 <ZoomOut className="w-5 h-5" />
             </button>
             <button
                 onClick={() => resetTransform()}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-colors"
-                aria-label="重置"
+                aria-label={t('zoom_reset')}
             >
                 <RotateCcw className="w-5 h-5" />
             </button>
             <button
                 onClick={() => zoomIn()}
                 className="p-2 text-white hover:bg-white/20 rounded-full transition-colors"
-                aria-label="放大"
+                aria-label={t('zoom_in')}
             >
                 <ZoomIn className="w-5 h-5" />
             </button>
@@ -64,7 +66,7 @@ function ZoomControls({ onClose }: { onClose?: () => void }) {
                         onClick={onClose}
                         className="px-3 py-1 text-white text-sm hover:bg-white/20 rounded-full transition-colors"
                     >
-                        關閉
+                        {t('close')}
                     </button>
                 </>
             )}

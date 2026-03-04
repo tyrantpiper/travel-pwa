@@ -45,7 +45,7 @@ export function ItineraryHeader({
             <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4 sm:gap-2">
                 <div className="w-full sm:w-auto">
                     <button onClick={onBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
-                        <ArrowLeft className="w-3 h-3" /> BACK
+                        <ArrowLeft className="w-3 h-3" /> {t('back')}
                     </button>
                     <TripSwitcher className="w-full sm:w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                 </div>
@@ -67,7 +67,7 @@ export function ItineraryHeader({
                             />
                         )}
                     </div>
-                    <ZenRenew onRefresh={onRefresh} successMessage={t('update_success') || "已更新"} />
+                    <ZenRenew onRefresh={onRefresh} successMessage={t('update_success')} errorMessage={t('update_failed')} />
                 </div>
             </div>
 
@@ -75,8 +75,8 @@ export function ItineraryHeader({
                 <button
                     onClick={() => onAddDay("before")}
                     className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                    title="在開頭新增一天"
-                    aria-label="在開頭新增一天"
+                    title={t('iv_add_day_before')}
+                    aria-label={t('iv_add_day_before')}
                 >
                     +
                 </button>
@@ -118,7 +118,7 @@ export function ItineraryHeader({
                                                 active:scale-95 active:bg-red-100
                                                 transition-transform duration-100"
                                     >
-                                        刪除這一天
+                                        {t('iv_delete_this_day')}
                                     </button>
                                 )}
                             </div>
@@ -129,8 +129,8 @@ export function ItineraryHeader({
                 <button
                     onClick={() => onAddDay("end")}
                     className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                    title="在結尾新增一天"
-                    aria-label="在結尾新增一天"
+                    title={t('iv_add_day_end')}
+                    aria-label={t('iv_add_day_end')}
                 >
                     +
                 </button>

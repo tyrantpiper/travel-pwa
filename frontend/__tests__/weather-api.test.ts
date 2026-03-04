@@ -13,6 +13,12 @@ describe('weather-api: getSeasonConfig', () => {
         expect(config.season).toBe('summer')
         expect(config.decayMod).toBeLessThan(1.0)
     })
+
+    it('season config label should be a valid ascii string without CJK characters', () => {
+        const config = getSeasonConfig(1, 10)
+        expect(/[\u4e00-\u9fa5]/.test(config.label)).toBe(false)
+        expect(config.label).toBe('winter')
+    })
 })
 
 describe('weather-api: calculateConfidence', () => {

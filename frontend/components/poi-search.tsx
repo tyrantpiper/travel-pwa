@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { poiApi } from "@/lib/api"
+import { useLanguage } from "@/lib/LanguageContext"
 
 
 // POI 類別定義
@@ -17,6 +18,16 @@ const POI_CATEGORIES = [
     { id: "pharmacy", name: "藥局", icon: "💊" },
     { id: "popular", name: "熱門", icon: "🔥" }
 ]
+
+// Category name lookup for i18n
+const CATEGORY_KEYS: Record<string, string> = {
+    department_store: 'ps_department',
+    restaurant: 'ps_restaurant',
+    convenience: 'ps_convenience',
+    supermarket: 'ps_supermarket',
+    pharmacy: 'ps_pharmacy',
+    popular: 'ps_popular'
+}
 
 interface POI {
     id: string
@@ -41,6 +52,7 @@ interface POISearchProps {
 }
 
 export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POISearchProps) {
+    const { t } = useLanguage()
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
     const [pois, setPois] = useState<POI[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -84,7 +96,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                 process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
 
             if (!apiKey) {
-                setAiRecommendation("請先在設定中輸入 Gemini API Key")
+                setAiRecommendation(t('ps_no_api_key'))
                 return
             }
 
@@ -98,7 +110,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
             setAiRecommendation(data.recommendation)
         } catch (e) {
             console.error("AI recommend error:", e)
-            setAiRecommendation("AI 推薦失敗，請稍後再試")
+            setAiRecommendation(t('ps_ai_failed'))
         } finally {
             setIsAiLoading(false)
         }
@@ -124,7 +136,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                             }`}
                     >
                         <span>{cat.icon}</span>
-                        <span>{cat.name}</span>
+                        <span>{t(CATEGORY_KEYS[cat.id] as Parameters<typeof t>[0]) || cat.name}</span>
                     </button>
                 ))}
             </div>
@@ -135,14 +147,14 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                     {isLoading ? (
                         <div className="flex items-center justify-center py-8 text-slate-400">
                             <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                            <span>搜索中...</span>
+                            <span>{t('ps_searching')}</span>
                         </div>
                     ) : (
                         <>
                             {/* AI 推薦按鈕 */}
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-xs text-slate-500">
-                                    找到 {pois.length} 個結果
+                                    {t('ps_result_count', { count: String(pois.length) })}
                                 </span>
                                 <Button
                                     variant="ghost"
@@ -156,7 +168,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                                     ) : (
                                         <Sparkles className="w-4 h-4 mr-1" />
                                     )}
-                                    AI 推薦
+                                    {t('ps_ai_recommend')}
                                 </Button>
                             </div>
 

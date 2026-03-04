@@ -5,6 +5,7 @@ import { Share2, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface ShareButtonProps {
     publicId: string
@@ -13,6 +14,7 @@ interface ShareButtonProps {
 }
 
 export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps) {
+    const { t } = useLanguage()
     const [isCopied, setIsCopied] = useState(false)
     const [isSharing, setIsSharing] = useState(false)
 
@@ -28,7 +30,7 @@ export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps
                 try {
                     await navigator.share({
                         title: `${tripTitle} | Tabidachi`,
-                        text: `查看我的行程規劃：${tripTitle}`,
+                        text: t('share_trip_text', { title: tripTitle }),
                         url: shareUrl,
                     })
                     return
@@ -45,10 +47,10 @@ export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps
             // 2. Fallback: Clipboard Copy (or if navigator.share failed/unsupported)
             await navigator.clipboard.writeText(shareUrl)
             setIsCopied(true)
-            toast.success("連結已複製到剪貼簿")
+            toast.success(t('share_copied'))
             setTimeout(() => setIsCopied(false), 2000)
         } catch {
-            toast.error("無法分享或複製連結")
+            toast.error(t('share_failed'))
         } finally {
             setIsSharing(false)
         }
@@ -63,7 +65,7 @@ export function ShareButton({ publicId, tripTitle, className }: ShareButtonProps
                 "h-11 w-11 p-0 rounded-full border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm active:scale-90 transition-all text-slate-600 dark:text-slate-300",
                 className
             )}
-            title="分享行程"
+            title={t('share_title')}
         >
             {isCopied ? (
                 <Check className="w-5 h-5 text-emerald-500" />

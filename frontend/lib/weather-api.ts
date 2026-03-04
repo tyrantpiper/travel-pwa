@@ -55,17 +55,17 @@ export const getSeasonConfig = (month: number, dayLength: number) => {
         summer: {
             decayMod: 0.7,      // 夏季: 緩慢衰減 (濕度高)
             peakDelay: 0.5,     // 最高溫延後 0.5 小時
-            label: '夏季模式'
+            label: 'summer'
         },
         winter: {
             decayMod: 1.5,      // 冬季: 快速衰減 (輻射冷卻強)
             peakDelay: -0.5,    // 最高溫提早 0.5 小時
-            label: '冬季模式'
+            label: 'winter'
         },
         spring_autumn: {
             decayMod: 1.0,      // 春秋: 標準
             peakDelay: 0,
-            label: '春秋模式'
+            label: 'spring_autumn'
         }
     }
 

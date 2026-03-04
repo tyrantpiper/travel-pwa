@@ -54,7 +54,7 @@ export function TripSwitcher({
 
     const handleSave = async () => {
         if (!newTitle.trim() || !activeTripId) {
-            toast.warning("標題不能為空")
+            toast.warning(t('ts_title_required'))
             return
         }
         if (newTitle.trim() === activeTrip?.title) {
@@ -68,11 +68,11 @@ export function TripSwitcher({
             await tripsApi.updateTitle(activeTripId, newTitle.trim(), userId || "")
 
             mutate()
-            toast.success("標題已更新")
+            toast.success(t('ts_title_updated'))
             setIsEditing(false)
         } catch (e) {
             console.error("Update title error:", e)
-            toast.error("更新失敗")
+            toast.error(t('update_failed'))
         } finally {
             setIsSaving(false)
         }
@@ -98,7 +98,7 @@ export function TripSwitcher({
             animate={{ opacity: 1 }}
             onClick={startEdit}
             className="p-1.5 rounded-full text-slate-400/50 hover:text-amber-600 hover:bg-amber-50/50 transition-colors"
-            title="編輯行程名稱"
+            title={t('ts_edit_title')}
         >
             <Edit3 className="w-3.5 h-3.5" />
         </motion.button>
@@ -129,7 +129,7 @@ export function TripSwitcher({
                                 setTimeout(() => { if (!isSaving) handleCancel() }, 150)
                             }}
                             className="h-7 text-inherit font-inherit border-none focus:ring-0 bg-transparent p-0 selection:bg-amber-100 min-w-[120px]"
-                            placeholder="輸入行程名稱..."
+                            placeholder={t('ts_title_placeholder')}
                             disabled={isSaving}
                         />
                         <div className="flex gap-1 shrink-0 ml-2 border-l pl-2 border-amber-200">
@@ -178,7 +178,7 @@ export function TripSwitcher({
                                             )}
                                         </div>
                                         <span className="truncate tracking-tight font-serif drop-shadow-sm">
-                                            {activeTrip?.title || "選擇行程"}
+                                            {activeTrip?.title || t('ts_select_trip')}
                                         </span>
                                     </div>
                                     <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-20" />

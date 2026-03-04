@@ -19,6 +19,7 @@ import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
 import { useWeatherStore } from "@/lib/stores/weatherStore"
 import { debugLog } from "@/lib/debug"
+import { useLanguage } from "@/lib/LanguageContext"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
@@ -65,6 +66,7 @@ const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
 }
 
 export default function ChatWidget() {
+    const { t } = useLanguage()
     // 🔒 登錄狀態檢查 - 未登錄時不顯示聊天氣泡
     const [isLoggedIn, setIsLoggedIn] = useState(false)
 
@@ -186,7 +188,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
     const [messages, setMessages] = useState<Message[]>([
         hydrateMessage({
             role: "model",
-            displayContent: "👋哈囉！我是 Ryan，你的 AI 旅遊達人！\n\n💡 **我能幫你：**\n• 翻譯、推薦美食、查詢交通\n• 解決旅途中的疑難雜症\n• 🩺 **行程健檢**：跟我說「幫我看這行程順不順？」\n\n有什麼我可以幫忙的嗎？😎"
+            displayContent: "__GREETING__"
         })
     ])
     const [input, setInput] = useState("")
@@ -320,7 +322,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         // Check for API key
         const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || ""
         if (!apiKey) {
-            const errorMsg = "⚠️ 請先設定 AI API Key！\n\n前往 **Profile** 頁面 → 點擊 **AI API Key** 進行設定。\n\n💡 完全免費！"
+            const errorMsg = t('ai_apikey_missing')
             setMessages(prev => [
                 ...prev,
                 hydrateMessage({ role: "user", displayContent: input }),
@@ -339,7 +341,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         // 🆕 建立使用者訊息 (新格式)
         const userMessage: Message = {
             role: "user",
-            displayContent: userMsg + (currentImage ? " [圖片已上傳]" : ""),
+            displayContent: userMsg + (currentImage ? t('ai_image_uploaded') : ""),
             rawParts: [{ text: userMsg }]
         }
 
@@ -357,7 +359,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         // 預熱觸發摘要（背景執行，不阻塞）
         if (messages.length >= PREHEAT_THRESHOLD && messages.length < MAX_HISTORY && !memorySummary && !isSummarizing) {
             setIsSummarizing(true)
-            toast.info("🧠 正在整理記憶...", { duration: 2000 })
+            toast.info(t('ai_summarizing'), { duration: 2000 })
 
             const toSummarize = messages.slice(0, messages.length - KEEP_RECENT)
             const targetUserId = contextUserId || localStorage.getItem("user_uuid") || ""
@@ -379,10 +381,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 .then(data => {
                     if (data.summary) {
                         setMemorySummary(data.summary)
-                        toast.success("🧠 記憶整理完成！")
+                        toast.success(t('ai_summarized'))
                     }
                 })
-                .catch(err => console.error("摘要失敗:", err))
+                .catch(err => console.error(t('ai_summary_failed'), err))
                 .finally(() => setIsSummarizing(false))
         }
 
@@ -391,7 +393,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         if (messages.length > MAX_HISTORY) {
             if (memorySummary) {
                 // 有摘要：注入摘要 + 最近 N 條
-                toast.success("🧠 使用記憶摘要繼續對話~")
+                toast.success(t('ai_using_memory'))
                 const recentMessages = messages.slice(-KEEP_RECENT)
                 const summaryMessage = {
                     role: "model" as const,
@@ -401,7 +403,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 historySource = [summaryMessage, ...recentMessages]
             } else {
                 // 無摘要：Fallback 到簡單截斷
-                toast.info("💬 對話記錄已達上限，保留最近 25 條訊息~")
+                toast.info(t('ai_history_limit'))
                 historySource = messages.slice(-MAX_HISTORY)
             }
         }
@@ -522,7 +524,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 setLastFailedMessage(userMsg)
                 setMessages(prev => [
                     ...prev,
-                    hydrateMessage({ role: "model", displayContent: "🔥 連線中斷！點擊下方重試按鈕。" })
+                    hydrateMessage({ role: "model", displayContent: t('ai_connection_error') })
                 ])
             }
         }
@@ -563,7 +565,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-sm">Ryan AI Assistant</h3>
-                                    <p className="text-[10px] text-blue-100 opacity-80">你的 AI 旅遊達人</p>
+                                    <p className="text-[10px] text-blue-100 opacity-80">{t('ai_subtitle')}</p>
                                 </div>
                             </div>
                             <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-full text-white/80 hover:text-white transition-colors">
@@ -596,7 +598,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                     return null
                                                 })()}
                                                 <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent}</ReactMarkdown>
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent === "__GREETING__" ? t('ai_greet_msg') : msg.displayContent}</ReactMarkdown>
                                                 </div>
                                                 {/* 來源標籤 */}
                                                 {msg.groundingSources && msg.groundingSources.length > 0 && (
@@ -605,7 +607,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                 {/* 🆕 v3.7.1: 三源引用標籤 */}
                                                 {msg.sources && msg.sources.length > 0 && (
                                                     <div className="mt-2 pt-2 border-t border-slate-200">
-                                                        <p className="text-[10px] text-slate-400 mb-1">📚 資料來源</p>
+                                                        <p className="text-[10px] text-slate-400 mb-1">📚 {t('ai_sources')}</p>
                                                         <div className="flex flex-wrap gap-1">
                                                             {msg.sources.map((source, sidx) => (
                                                                 <a
@@ -645,7 +647,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                             }}
                                             className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
                                         >
-                                            <X className="w-3 h-3" /> 停止生成
+                                            <X className="w-3 h-3" /> {t('ai_stop')}
                                         </button>
                                     </div>
                                 </div>
@@ -662,7 +664,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                         }}
                                         className="text-sm bg-blue-50 text-blue-600 px-4 py-2 rounded-full hover:bg-blue-100 transition-colors flex items-center gap-2"
                                     >
-                                        🔄 重新發送
+                                        🔄 {t('ai_retry')}
                                     </button>
                                 </div>
                             )}
@@ -700,7 +702,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                     <ImageIcon className="w-5 h-5" />
                                 </Button>
                                 <Input
-                                    placeholder="問問 Ryan..."
+                                    placeholder={t('ai_ask_placeholder')}
                                     className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}

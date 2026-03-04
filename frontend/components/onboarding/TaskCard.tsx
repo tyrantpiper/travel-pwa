@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface Task {
     id: string
@@ -31,6 +32,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
+    const { t } = useLanguage()
     const [isExpanded, setIsExpanded] = useState(true)
     const [showCelebration, setShowCelebration] = useState(false)
     const { trips } = useTripContext()
@@ -47,32 +49,32 @@ export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
         return [
             {
                 id: "nickname",
-                label: "設定暱稱",
+                label: t('tc_set_nickname'),
                 icon: User,
                 completed: hasNickname,
             },
             {
                 id: "trip",
-                label: "建立第一個行程",
+                label: t('tc_create_trip'),
                 icon: Calendar,
                 completed: hasTrip,
             },
             {
                 id: "apikey",
-                label: "設定 AI API Key",
+                label: t('tc_setup_ai'),
                 icon: Sparkles,
                 completed: hasApiKey,
                 action: onNavigateToApiKey,
             },
             {
                 id: "expense",
-                label: "新增第一筆消費",
+                label: t('tc_add_expense'),
                 icon: DollarSign,
                 // 🔧 TODO: Add expense check when expense API is available
                 completed: false,
             },
         ]
-    }, [trips, onNavigateToApiKey])
+    }, [trips, onNavigateToApiKey, t])
 
     const completedCount = tasks.filter(t => t.completed).length
     const progress = (completedCount / tasks.length) * 100
@@ -116,14 +118,14 @@ export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
             >
                 <div className="flex items-center gap-2">
                     <span className="text-lg">🎯</span>
-                    <span className="font-bold text-slate-700">新手任務</span>
+                    <span className="font-bold text-slate-700">{t('tc_title')}</span>
                     {allCompleted && (
                         <motion.span
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             className="text-xs px-2 py-0.5 bg-emerald-500 text-white rounded-full"
                         >
-                            完成！
+                            {t('tc_done')}
                         </motion.span>
                     )}
                 </div>
@@ -196,7 +198,7 @@ export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
                                     </span>
                                     {task.action && !task.completed && (
                                         <span className="ml-auto text-xs text-blue-500 font-medium">
-                                            前往設定 →
+                                            {t('tc_go_setup')}
                                         </span>
                                     )}
                                 </div>
@@ -222,8 +224,8 @@ export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
                             className="text-center"
                         >
                             <PartyPopper className="w-12 h-12 text-amber-500 mx-auto mb-2" />
-                            <p className="font-bold text-lg text-slate-700">太棒了！</p>
-                            <p className="text-sm text-slate-500">你已完成所有新手任務</p>
+                            <p className="font-bold text-lg text-slate-700">{t('tc_congrats')}</p>
+                            <p className="text-sm text-slate-500">{t('tc_all_done')}</p>
                         </motion.div>
                     </motion.div>
                 )}

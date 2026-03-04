@@ -18,7 +18,7 @@ type RefreshState = "idle" | "loading" | "success" | "error"
 
 const REFRESH_TIMEOUT = 15000 // 15s Safety Timeout
 
-export function ZenRenew({ onRefresh, className, successMessage = "已更新", errorMessage = "更新失敗" }: ZenRenewProps) {
+export function ZenRenew({ onRefresh, className, successMessage = "Updated", errorMessage = "Failed" }: ZenRenewProps) {
     const [state, setState] = useState<RefreshState>("idle")
     const haptic = useHaptic()
     const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -72,8 +72,8 @@ export function ZenRenew({ onRefresh, className, successMessage = "已更新", e
                 "relative flex items-center justify-center w-11 h-11 transition-all active:scale-90", // 44px hit target
                 className
             )}
-            title="重新整理"
-            aria-label="重新整理"
+            title="Refresh"
+            aria-label="Refresh"
         >
             <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-900/5 dark:bg-white/5 backdrop-blur-sm">
                 <AnimatePresence>

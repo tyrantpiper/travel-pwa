@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
 import { poiApi } from "@/lib/api"
+import { useLanguage } from "@/lib/LanguageContext"
 
 export interface ClusterItem {
     id?: string;
@@ -68,6 +69,7 @@ export default function POIDetailDrawer({
     onSelectClusterItem
 }: POIDetailDrawerProps) {
     const haptic = useHaptic()
+    const { t } = useLanguage()
     const [aiData, setAiData] = useState<POIEnrichData | null>(null)
     const [aiLoading, setAiLoading] = useState(false)
     const [aiError, setAiError] = useState<string | null>(null)
@@ -175,7 +177,7 @@ export default function POIDetailDrawer({
 
             setAiData(data)
         } catch {
-            setAiError("無法取得 AI 分析，請稍後再試")
+            setAiError(t('poi_ai_failed'))
         } finally {
             setAiLoading(false)
         }
@@ -211,7 +213,7 @@ export default function POIDetailDrawer({
                         >
                             <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full group-hover:bg-slate-400 transition-colors" />
                             <span className="text-xs text-slate-400 mt-1 group-hover:text-slate-600 transition-colors">
-                                {isMinimized ? "▲ 展開" : "▼ 收起"}
+                                {isMinimized ? t('poi_expand') : t('poi_collapse')}
                             </span>
                         </button>
 
@@ -274,7 +276,7 @@ export default function POIDetailDrawer({
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-[10px] text-slate-400 text-center italic">點擊上方行程以查看具體位置或快速加入</p>
+                                <p className="text-[10px] text-slate-400 text-center italic">{t('poi_tap_to_view')}</p>
                             </div>
                         ) : (
                             <div className={`px-6 pb-6 space-y-4 overflow-y-auto ${isInternal ? 'max-h-[240px]' : 'max-h-[calc(85vh-100px)]'}`}>
@@ -339,7 +341,7 @@ export default function POIDetailDrawer({
                                 {/* 🆕 時間選擇器 */}
                                 <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
                                     <Clock className="w-5 h-5 text-indigo-500" />
-                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">加入時間</span>
+                                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{t('poi_add_time')}</span>
                                     <input
                                         type="time"
                                         value={selectedTime}
@@ -356,7 +358,7 @@ export default function POIDetailDrawer({
                                         className="flex-1 gap-2"
                                     >
                                         <Navigation className="w-4 h-4" />
-                                        導航
+                                        {t('tc_navigate')}
                                     </Button>
                                     <Button
                                         onClick={handleShare}
@@ -364,14 +366,14 @@ export default function POIDetailDrawer({
                                         className="flex-1 gap-2"
                                     >
                                         <Share2 className="w-4 h-4" />
-                                        分享
+                                        {t('share')}
                                     </Button>
                                     <Button
                                         onClick={handleAddToItinerary}
                                         className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
                                     >
                                         <Plus className="w-4 h-4" />
-                                        加入行程
+                                        {t('poi_add_to_trip')}
                                     </Button>
                                 </div>
 
@@ -385,7 +387,7 @@ export default function POIDetailDrawer({
                                             className="w-full gap-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
                                         >
                                             <Sparkles className="w-4 h-4" />
-                                            ✨ 分析此地點
+                                            ✨ {t('poi_explore')}
                                         </Button>
                                     )}
 
@@ -393,7 +395,7 @@ export default function POIDetailDrawer({
                                         <div className="space-y-3 animate-pulse">
                                             <div className="flex items-center gap-2 text-purple-500">
                                                 <Loader2 className="w-4 h-4 animate-spin" />
-                                                <span className="text-sm">AI 正在分析網路評價與熱門菜單...</span>
+                                                <span className="text-sm">{t('poi_ai_analyzing')}</span>
                                             </div>
                                             <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
                                             <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
@@ -413,7 +415,7 @@ export default function POIDetailDrawer({
                                             <div className="flex items-center gap-2">
                                                 <Sparkles className="w-4 h-4 text-purple-500" />
                                                 <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                                                    AI 懶人包
+                                                    {t('poi_ai_suggestion')}
                                                 </span>
                                                 {aiData.rating && (
                                                     <span className="ml-auto text-sm font-bold text-amber-600">
@@ -427,7 +429,7 @@ export default function POIDetailDrawer({
                                             {aiData.must_try && aiData.must_try.length > 0 && (
                                                 <div>
                                                     <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-1">
-                                                        🍽️ 必點推薦
+                                                        🍽️ {t('poi_take_photo')}
                                                     </p>
                                                     <ul className="text-sm text-slate-600 dark:text-slate-400 list-disc list-inside">
                                                         {aiData.must_try.map((item, i) => (
@@ -450,7 +452,7 @@ export default function POIDetailDrawer({
                                         className="flex-1 gap-2 text-slate-600"
                                     >
                                         <ImageIcon className="w-4 h-4" />
-                                        看網友照片
+                                        {t('poi_more_photos')}
                                     </Button>
                                     <Button
                                         onClick={() => {
@@ -463,7 +465,7 @@ export default function POIDetailDrawer({
                                         className="flex-1 gap-2 text-slate-600"
                                     >
                                         <ExternalLink className="w-4 h-4" />
-                                        在 Google Maps 開啟
+                                        {t('poi_open_gmaps')}
                                     </Button>
                                 </div>
                             </div>

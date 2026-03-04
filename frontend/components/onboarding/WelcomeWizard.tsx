@@ -8,13 +8,14 @@
  * - Skip button on API Key step to avoid user drop-off
  * - Unique keys for parallel exit/enter animations
  */
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Calendar, Sparkles, Compass, ChevronRight, ChevronLeft,
     X, ExternalLink, Rocket
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useLanguage } from "@/lib/LanguageContext"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { cn } from "@/lib/utils"
 
@@ -22,37 +23,7 @@ interface WelcomeWizardProps {
     onComplete: () => void
 }
 
-// Step configuration
-const STEPS = [
-    {
-        id: "create-trip",
-        icon: Calendar,
-        title: "建立你的第一個行程",
-        subtitle: "開始規劃精彩旅程",
-        description: "點擊左上角「新增行程」建立行程，或使用 AI 自動生成完整行程規劃。",
-        color: "from-blue-500 to-indigo-600",
-        emoji: "🗓️"
-    },
-    {
-        id: "setup-ai",
-        icon: Sparkles,
-        title: "啟用 AI 助手",
-        subtitle: "解鎖智能規劃功能",
-        description: "設定 Gemini API Key 即可使用 AI 行程規劃、翻譯、推薦等功能。完全免費！",
-        color: "from-amber-400 to-orange-500",
-        emoji: "🤖",
-        skipable: true  // 🆕 可跳過
-    },
-    {
-        id: "explore",
-        icon: Compass,
-        title: "探索更多功能",
-        subtitle: "你的旅行好幫手",
-        description: "費用追蹤、PDF 匯出、即時天氣、地圖導航...所有旅行所需功能一應俱全！",
-        color: "from-emerald-400 to-teal-500",
-        emoji: "🎯"
-    }
-]
+// (STEPS moved into component body as useMemo — t() is a hook and cannot be called at module level)
 
 // Animation variants
 const slideVariants = {
@@ -71,8 +42,41 @@ const slideVariants = {
 }
 
 export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
+    const { t } = useLanguage()
     const { currentStep, nextStep, prevStep, completeOnboarding, skipOnboarding } = useOnboardingStore()
     const [direction, setDirection] = useState(0)
+
+    // Steps defined inside component so t() i18n works (hooks can't be called at module level)
+    const STEPS = useMemo(() => [
+        {
+            id: "create-trip",
+            icon: Calendar,
+            title: t('wz_step1_title'),
+            subtitle: t('wz_step1_subtitle'),
+            description: t('wz_step1_desc'),
+            color: "from-blue-500 to-indigo-600",
+            emoji: "🗓️"
+        },
+        {
+            id: "setup-ai",
+            icon: Sparkles,
+            title: t('wz_step2_title'),
+            subtitle: t('wz_step2_subtitle'),
+            description: t('wz_step2_desc'),
+            color: "from-amber-400 to-orange-500",
+            emoji: "🤖",
+            skipable: true
+        },
+        {
+            id: "explore",
+            icon: Compass,
+            title: t('wz_step3_title'),
+            subtitle: t('wz_step3_subtitle'),
+            description: t('wz_step3_desc'),
+            color: "from-emerald-400 to-teal-500",
+            emoji: "🎯"
+        }
+    ], [t])
 
     const step = STEPS[currentStep]
     const isLastStep = currentStep === STEPS.length - 1
@@ -182,11 +186,11 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
                                     rel="noreferrer"
                                     className="inline-flex items-center gap-2 text-sm text-amber-400 hover:text-amber-300 transition-colors"
                                 >
-                                    前往 Google AI Studio 獲取 Key
+                                    {t('wz_get_key')}
                                     <ExternalLink className="w-4 h-4" />
                                 </a>
                                 <p className="text-xs text-white/40">
-                                    可稍後在 Profile → AI API Key 設定
+                                    {t('wz_setup_later')}
                                 </p>
                             </div>
                         )}
@@ -205,7 +209,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
                             className="flex-1 h-14 rounded-2xl bg-white/10 border-white/20 text-white hover:bg-white/20"
                         >
                             <ChevronLeft className="w-5 h-5 mr-1" />
-                            上一步
+                            {t('wz_prev')}
                         </Button>
                     )}
 
@@ -218,12 +222,12 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
                     >
                         {isLastStep ? (
                             <>
-                                開始旅程
+                                {t('wz_start')}
                                 <Rocket className="w-5 h-5 ml-2" />
                             </>
                         ) : (
                             <>
-                                下一步
+                                {t('wz_next')}
                                 <ChevronRight className="w-5 h-5 ml-1" />
                             </>
                         )}
@@ -236,7 +240,7 @@ export function WelcomeWizard({ onComplete }: WelcomeWizardProps) {
                         onClick={handleSkipToNext}
                         className="w-full text-center text-sm text-white/40 hover:text-white/60 transition-colors py-2"
                     >
-                        稍後再說，先看看其他功能
+                        {t('wz_skip')}
                     </button>
                 )}
             </div>
