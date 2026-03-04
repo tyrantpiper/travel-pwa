@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+test-output.*
+test-tap.txt
+tmp.test
 
 # next.js
 /.next/
