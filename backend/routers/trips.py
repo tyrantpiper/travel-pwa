@@ -198,6 +198,17 @@ async def get_trips(
             trip['credit_cards'] = trip.get('credit_cards') or content.get('credit_cards', [])
             trip['is_sample'] = content.get('is_sample', False)  # 🎓 Sample trip flag
             trips.append(trip)
+            
+        # 📌 Feature: 行程強制置頂 (Pin Sample Itinerary)
+        # 規則: 1. `is_sample` 為 True 的排最前面 2. 其次依 `created_at` 降冪排序 (最新的在前)
+        # 防呆: `created_at` 可能為 None (極端髒資料)，以空字串 "" 墊底處理，避免 TypeError 崩潰
+        trips.sort(
+            key=lambda t: (
+                bool(t.get('is_sample')), 
+                t.get('created_at') or ""
+            ), 
+            reverse=True
+        )
         
         print(f"✅ 找到 {len(trips)} 個行程")
         return trips
