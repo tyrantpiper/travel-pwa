@@ -1,8 +1,9 @@
 "use client"
 
-import { createContext, useContext, useEffect, ReactNode, useTransition } from "react"
+import { createContext, useContext, useEffect, useRef, ReactNode, useTransition } from "react"
 import { useTrips } from "./hooks"
 import { useTripStore } from "./stores/tripStore"
+import { sampleTripApi } from "./api"
 
 interface TripContextType {
     activeTripId: string | null
@@ -78,6 +79,28 @@ export function TripProvider({ children }: { children: ReactNode }) {
             mutate()
         }
     }, [userId, mutate])
+
+    // 🎓 Auto-seed sample trip for onboarding (new + existing users)
+    const hasSeedAttempted = useRef(false)
+    useEffect(() => {
+        if (!userId || isLoading || hasSeedAttempted.current) return
+        if (typeof window === "undefined") return
+        if (localStorage.getItem("sample_trip_seeded") === "true") return
+
+        hasSeedAttempted.current = true
+        sampleTripApi.seed(userId).then((res) => {
+            if (res.status === "success" || res.status === "skipped") {
+                localStorage.setItem("sample_trip_seeded", "true")
+            }
+            if (res.status === "success") {
+                console.log("🎓 [Sample Trip] Seeded successfully:", res.trip_id)
+                mutate() // Refresh trip list to show sample trip
+            }
+        }).catch((err) => {
+            console.warn("⚠️ [Sample Trip] Seed failed (non-critical):", err)
+            hasSeedAttempted.current = false // Allow retry on next render
+        })
+    }, [userId, isLoading, mutate])
 
     // 當 trips 載入完成，驗證 activeTripId 是否有效
     useEffect(() => {

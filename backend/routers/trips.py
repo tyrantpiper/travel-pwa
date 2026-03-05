@@ -196,6 +196,7 @@ async def get_trips(
             trip['day_checklists'] = trip.get('day_checklists') or content.get('day_checklists', {})
             trip['ai_review'] = trip.get('ai_review') or content.get('ai_review', "")
             trip['credit_cards'] = trip.get('credit_cards') or content.get('credit_cards', [])
+            trip['is_sample'] = content.get('is_sample', False)  # 🎓 Sample trip flag
             trips.append(trip)
         
         print(f"✅ 找到 {len(trips)} 個行程")

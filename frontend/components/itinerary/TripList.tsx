@@ -132,23 +132,35 @@ export function TripList({
                                     {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}
                                 </p>
                             </div>
-                            <div className="absolute top-3 right-12 bg-slate-800/90 px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1">
-                                <Hash className="w-3 h-3" /> {trip.share_code}
-                            </div>
+                            {trip.is_sample ? (
+                                <div className="absolute top-3 right-12 bg-gradient-to-r from-indigo-500/80 to-purple-500/80 dark:from-indigo-400/70 dark:to-purple-400/70 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs text-white font-semibold flex items-center gap-1 shadow-md">
+                                    {t('sample_trip_badge')}
+                                </div>
+                            ) : (
+                                <div className="absolute top-3 right-12 bg-slate-800/90 px-2 py-1 rounded text-xs text-white font-mono flex items-center gap-1">
+                                    <Hash className="w-3 h-3" /> {trip.share_code}
+                                </div>
+                            )}
                         </div>
                         <div className="p-4 bg-white dark:bg-slate-800 flex justify-between items-center rounded-b-lg">
                             <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400 px-2 py-1 rounded-full">
                                 By {trip.creator_name || 'Guest'}
                             </span>
                             <div className="flex items-center gap-2">
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 gap-1 px-2 h-7"
-                                    onClick={(e) => { e.stopPropagation(); handleDownloadPDF(trip) }}
-                                >
-                                    <Download className="w-3 h-3" /> PDF
-                                </Button>
+                                {trip.is_sample ? (
+                                    <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium px-2 h-7 flex items-center">
+                                        {t('sample_trip_explore')}
+                                    </span>
+                                ) : (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 gap-1 px-2 h-7"
+                                        onClick={(e) => { e.stopPropagation(); handleDownloadPDF(trip) }}
+                                    >
+                                        <Download className="w-3 h-3" /> PDF
+                                    </Button>
+                                )}
                                 {userId && trip.created_by !== userId && (
                                     <Button
                                         variant="ghost"

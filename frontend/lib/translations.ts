@@ -141,7 +141,9 @@ export const translations = {
         code_copied: "Code copied!",
         language: "Language",
         explorer: "Explorer",
-        usage_guide: "Usage Guide"
+        usage_guide: "Usage Guide",
+        sample_trip_badge: "🎓 Sample",
+        sample_trip_explore: "Tap to explore →"
     },
     zh: {
         // Common
@@ -285,7 +287,9 @@ export const translations = {
         code_copied: "✅ 引繼碼已複製！請妥善保存。",
         language: "語言",
         explorer: "探險家",
-        usage_guide: "使用說明"
+        usage_guide: "使用說明",
+        sample_trip_badge: "🎓 範例",
+        sample_trip_explore: "點擊探索 →"
     }
 }
 

@@ -157,6 +157,7 @@ export interface Trip {
     day_checklists?: Record<number, ChecklistItem[]>
     ai_review?: string
     day_ai_reviews?: Record<number, string>  // 🆕 每日 AI 審核
+    is_sample?: boolean  // 🎓 Sample/demo trip flag
 }
 
 export interface GeocodeResult {

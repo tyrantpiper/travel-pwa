@@ -873,3 +873,18 @@ export const poiApi = {
         return res.json()
     }
 }
+
+/**
+ * 🎓 Sample Trip API Functions
+ * Handles onboarding sample/demo trip seeding
+ */
+export const sampleTripApi = {
+    /** Seed a sample trip for onboarding (idempotent) */
+    seed: async (userId: string): Promise<{ status: string; trip_id?: string; reason?: string }> => {
+        const res = await fetch(`${API_HOST}/api/trips/seed-sample`, {
+            method: "POST",
+            headers: { "X-User-ID": userId },
+        })
+        return res.json()
+    },
+}

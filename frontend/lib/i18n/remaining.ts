@@ -561,6 +561,8 @@ export const remainingTranslations = {
         trip_pdf_success: "PDF downloaded!",
         trip_pdf_failed: "PDF generation failed",
         trip_leave: "Leave",
+        sample_trip_badge: "🎓 Sample",
+        sample_trip_explore: "Tap to explore →",
 
     },
     zh: {
@@ -1114,5 +1116,7 @@ export const remainingTranslations = {
         clear: "清除",
 
         save_settings: "儲存設定",
+        sample_trip_badge: "🎓 範例",
+        sample_trip_explore: "點擊探索 →",
     },
 } as const
