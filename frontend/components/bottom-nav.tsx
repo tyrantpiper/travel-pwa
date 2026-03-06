@@ -23,7 +23,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
     return (
         <div
             className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-[100]"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)' }}
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 4px)' }}
         >
             <div className="flex justify-around items-center h-16">
                 {tabs.map((tab) => (
