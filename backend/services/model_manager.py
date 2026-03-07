@@ -116,14 +116,17 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
         "PLANNING": types.GenerateContentConfig(
             temperature=1.0,
             max_output_tokens=2048,
+            media_resolution="media_resolution_high",
         ),
         "VERIFY": types.GenerateContentConfig(
             temperature=1.0,
             max_output_tokens=1024,
+            media_resolution="media_resolution_high",
         ),
         "DIAGNOSIS": types.GenerateContentConfig(
             temperature=1.0,
             max_output_tokens=4096,
+            media_resolution="media_resolution_high",
         ),
         "EXTRACTION": types.GenerateContentConfig(
             temperature=1.0,
@@ -145,6 +148,7 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
     return configs.get(intent_type, types.GenerateContentConfig(
         temperature=1.0,
         max_output_tokens=1024,
+        media_resolution="media_resolution_high",
     ))
 
 

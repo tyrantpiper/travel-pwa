@@ -556,26 +556,8 @@ async def chat_with_ryan(
             )
             print(f"📅 注入行程上下文: {body.current_itinerary.get('title', '?')}")
         
-        # 處理當前訊息 (包含圖片 + POI 上下文 + 行程上下文 + 記憶上下文)
+        # 處理當前訊息 (包含 POI 上下文 + 行程上下文 + 記憶上下文)
         enhanced_message = body.message + poi_context + itinerary_context + memory_context
-        
-        # 🆕 處理圖片 (如果有)
-        if body.image:
-            import base64
-            from io import BytesIO
-            from PIL import Image
-            
-            try:
-                if "base64," in body.image:
-                    image_data = base64.b64decode(body.image.split("base64,")[1])
-                else:
-                    image_data = base64.b64decode(body.image)
-                    
-                image = Image.open(BytesIO(image_data))
-                enhanced_message = f"[使用者上傳了一張圖片]\n{enhanced_message}"
-                # Note: 圖片功能需要特殊處理，暫時保持備註
-            except Exception as img_err:
-                print(f"⚠️ Image processing error: {img_err}")
         
         # 🆕 v3.5: 偵測診斷意圖
         from services.model_manager import detect_diagnosis_intent
@@ -598,14 +580,41 @@ async def chat_with_ryan(
 請使用批判性思維指出問題，並提供具體改善建議。
 """
             enhanced_message = diagnosis_prompt + enhanced_message
+            
+        final_message = enhanced_message
+        
+        # 🆕 處理圖片 (如果有的話，改用 Multi-modal list 格式傳給新版 SDK)
+        if body.image:
+            import base64
+            from io import BytesIO
+            from PIL import Image
+            
+            try:
+                if "base64," in body.image:
+                    image_data = base64.b64decode(body.image.split("base64,")[1])
+                else:
+                    image_data = base64.b64decode(body.image)
+                    
+                image = Image.open(BytesIO(image_data))
+                
+                # 如果只有附圖沒有文字，加上預設的分析提示
+                if not enhanced_message.strip():
+                    enhanced_message = "請幫我分析這張圖片，並依據它提供旅遊建議"
+                
+                # Google GenAI SDK 支援直接傳入 [PIL.Image, str]
+                final_message = [image, enhanced_message]
+                print("📸 成功載入圖片，切換為 Multi-modal 混合請求")
+            except Exception as img_err:
+                print(f"⚠️ Image processing error: {img_err}")
+                final_message = f"[系統提示：使用者上傳了一張圖片，但系統解析失敗]\n{enhanced_message}"
         
         # 🆕 調用 Model Manager (含思想簽名 Round-Trip)
         result = await call_with_fallback(
             api_key=api_key,
             history=full_history,
-            message=enhanced_message,
+            message=final_message,
             thought_signatures=body.thought_signatures,
-            intent_type=intent_type  # 🆕 動態意圖
+            intent_type=intent_type  
         )
         
         # 🆕 v3.8: 非同步學習使用者偏好 (Adaptive Memory)
