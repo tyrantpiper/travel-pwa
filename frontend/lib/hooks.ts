@@ -4,8 +4,16 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 
+import { toast } from "sonner"
+
 export const fetcherWithUserId = ([url, uid]: [string, string]) =>
-    fetch(API_BASE + url, { headers: { "X-User-ID": uid } }).then(r => r.json())
+    fetch(API_BASE + url, { headers: { "X-User-ID": uid } })
+        .then(r => r.json())
+        .catch(err => {
+            console.error("fetcher error:", err);
+            toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)");
+            throw err;
+        })
 
 export function useTrips(userId: string | null) {
     const { data, error, mutate } = useSWR(
@@ -32,7 +40,12 @@ export function useTripDetail(tripId: string | null, userId?: string | null, ref
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
                 headers: { "X-User-ID": uid }
-            }).then(r => r.json()),
+            }).then(r => r.json())
+                .catch(err => {
+                    console.error("fetcher error:", err);
+                    toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)");
+                    throw err;
+                }),
         {
             revalidateOnFocus: false,
             revalidateOnMount: true,

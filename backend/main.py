@@ -20,6 +20,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks, Request
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+from google import genai
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -252,8 +253,8 @@ async def generate_itinerary(
     print(f"💊 收到處方需求: 去 {prefs.destination}")
     
     try:
-        # 🆕 使用新版 Client API
-        client = genai.Client(api_key=api_key)
+        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
+        from services.model_manager import call_extraction
         
         prompt = f"""
         你是 Ryan，一位幽默的藥師兼旅遊達人。請為我規劃 {prefs.destination} 的 {prefs.days} 天行程。
@@ -272,15 +273,8 @@ async def generate_itinerary(
         }}
         """
         
-        response = client.models.generate_content(
-            model=PRIMARY_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                max_output_tokens=8192
-            )
-        )
-        text = response.text.replace("```json", "").replace("```", "").strip()
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
+        text = raw_text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
         
     except Exception as e:
@@ -699,57 +693,91 @@ async def stream_chat_generator(
         last_heartbeat = asyncio.get_event_loop().time()
         heartbeat_interval = 15  # 15秒心跳
         
-        # 串流生成
-        model_name = "gemini-3-flash-preview"
+        # 🆕 v5.0: 路由陣列式降級 + Google Search Grounding + 引文提取
+        from utils.ai_config import DAILY_ROUTING
+        from services.model_manager import sanitize_config_for_model
+        from google.genai import errors as genai_errors
+        
         full_text = ""
         raw_parts = []
+        model_name = DAILY_ROUTING[0]
+        last_chunk = None
         
-        try:
-            # 使用 async streaming API
-            async for chunk in await client.aio.models.generate_content_stream(
-                model=model_name,
-                contents=chat_history + [types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=message)]
-                )]
-            ):
-                # 心跳檢查
-                current_time = asyncio.get_event_loop().time()
-                if current_time - last_heartbeat > heartbeat_interval:
-                    yield ": heartbeat\n\n"
-                    last_heartbeat = current_time
+        # 構建串流 config（含 Google Search Grounding）
+        stream_config = types.GenerateContentConfig(
+            max_output_tokens=2048,
+            temperature=1.0,
+            tools=[{"google_search": {}}],
+        )
+        
+        contents = chat_history + [types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=message)]
+        )]
+        
+        # 嘗試路由陣列中的每個模型
+        stream_success = False
+        for i, candidate_model in enumerate(DAILY_ROUTING):
+            try:
+                safe_config = sanitize_config_for_model(stream_config, candidate_model)
+                model_name = candidate_model
+                label = "🧠 Primary" if i == 0 else f"🔄 Fallback #{i}"
+                print(f"{label} Stream: {candidate_model}")
                 
-                # 發送文字 chunk
-                if hasattr(chunk, 'text') and chunk.text:
-                    full_text += chunk.text
-                    yield f'event: text\ndata: {json.dumps({"text": chunk.text})}\n\n'
-                    await asyncio.sleep(0)
-            
-            raw_parts = [{"text": full_text}]
-            
-        except Exception as gen_error:
-            # 模型可能不支援 Streaming，嘗試降級
-            print(f"⚠️ Streaming 失敗，嘗試降級: {gen_error}")
-            model_name = "gemini-2.5-pro"
-            yield f'event: thinking\ndata: {json.dumps({"status": "fallback"})}\n\n'
-            
-            # 非串流 fallback
-            response = await client.aio.models.generate_content(
-                model=model_name,
-                contents=chat_history + [types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=message)]
-                )]
-            )
-            full_text = response.text if hasattr(response, 'text') else ""
-            yield f'event: text\ndata: {json.dumps({"text": full_text})}\n\n'
-            raw_parts = [{"text": full_text}]
+                async for chunk in await client.aio.models.generate_content_stream(
+                    model=candidate_model,
+                    contents=contents,
+                    config=safe_config,
+                ):
+                    last_chunk = chunk  # 持續記錄最後 chunk（含 grounding_metadata）
+                    
+                    # 心跳檢查
+                    current_time = asyncio.get_event_loop().time()
+                    if current_time - last_heartbeat > heartbeat_interval:
+                        yield ": heartbeat\n\n"
+                        last_heartbeat = current_time
+                    
+                    # 發送文字 chunk
+                    if hasattr(chunk, 'text') and chunk.text:
+                        full_text += chunk.text
+                        yield f'event: text\ndata: {json.dumps({"text": chunk.text})}\n\n'
+                        await asyncio.sleep(0)
+                
+                stream_success = True
+                break  # 成功，跳出降級迴圈
+                
+            except (genai_errors.APIError, Exception) as gen_error:
+                print(f"⚠️ {candidate_model} 串流失敗: {gen_error}")
+                yield f'event: thinking\ndata: {json.dumps({"status": "fallback", "model": candidate_model})}\n\n'
+                full_text = ""  # 重置，避免拼接到殘片
+                last_chunk = None
+                continue
         
-        # 發送完成事件 (🆕 v3.7.1: 包含來源 URLs)
+        if not stream_success:
+            yield f'event: error\ndata: {json.dumps({"message": "所有模型均不可用", "code": 503})}\n\n'
+            return
+        
+        raw_parts = [{"text": full_text}]
+        
+        # 🆕 v5.0: 從最後一個 chunk 提取 grounding_metadata（引文來源）
+        citations = []
+        if last_chunk and hasattr(last_chunk, 'candidates') and last_chunk.candidates:
+            candidate = last_chunk.candidates[0]
+            if hasattr(candidate, 'grounding_metadata') and candidate.grounding_metadata:
+                gm = candidate.grounding_metadata
+                if hasattr(gm, 'grounding_chunks') and gm.grounding_chunks:
+                    for gc in gm.grounding_chunks:
+                        if hasattr(gc, 'web') and gc.web:
+                            citations.append({
+                                "title": gc.web.title if hasattr(gc.web, 'title') else "Source",
+                                "uri": gc.web.uri if hasattr(gc.web, 'uri') else ""
+                            })
+        
+        # 發送完成事件（含引文來源）
         done_data = {
             "model_used": model_name,
             "raw_parts": raw_parts,
-            "sources": sources or []  # 🆕 v3.7.1: 來源 URLs
+            "sources": citations or sources or [],
         }
         yield f'event: done\ndata: {json.dumps(done_data)}\n\n'
         

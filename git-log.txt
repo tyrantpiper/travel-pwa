@@ -1,0 +1,10 @@
+﻿786cabd style: resize bottom navigation to native iOS height (50px) for optimal UX
+c826fc6 style: refine bottom navigation safe area padding to 1px
+ddb2ccb style: refine bottom navigation safe area padding to 4px
+dfb6f80 style: elevate bottom navigation to improve safe area UX on iOS
+027b621 fix: resolve vs code hanging on python interpreter discovery by removing conflicting .python-version
+bc59b0e fix: restore stable python env and pin sample trip to top
+65c8ac5 feat: implement sample itinerary for onboarding (Taipei Explorer)
+9baf528 fix(chat): solve chat bubble disappearing in tablet landscape via dynamic orientation re-clamp
+2033bd3 feat(i18n): localize 142 hardcoded Chinese strings across 11 components with zh? bilingual ternary
+7cc7819 chore: add test artifacts to .gitignore

@@ -13,7 +13,7 @@ Stop-Process -Name "python" -ErrorAction SilentlyContinue
 # Let's trust the user wants a restart.
 
 Write-Host "Starting Backend Server (Keep Open)..."
-$backendCmd = "cd /d ""$ScriptDir\..\backend"" && python -m uvicorn main:app --reload"
+$backendCmd = "cd /d ""$ScriptDir\..\backend"" && ""$ScriptDir\..\.venv\Scripts\python.exe"" -m uvicorn main:app --reload"
 Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$backendCmd" -WindowStyle Normal
 
 Write-Host "Starting Frontend Server (Keep Open)..."

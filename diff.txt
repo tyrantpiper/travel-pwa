@@ -1,0 +1,22 @@
+﻿diff --git a/backend/routers/trips.py b/backend/routers/trips.py
+index bfe45bd..25e1c5c 100644
+--- a/backend/routers/trips.py
++++ b/backend/routers/trips.py
+@@ -198,6 +198,17 @@ async def get_trips(
+             trip['credit_cards'] = trip.get('credit_cards') or content.get('credit_cards', [])
+             trip['is_sample'] = content.get('is_sample', False)  # ?? Sample trip flag
+             trips.append(trip)
++            
++        # ?? Feature: 銵?撘瑕蝵桅? (Pin Sample Itinerary)
++        # 閬?: 1. `is_sample` ??True ???? 2. ?嗆活靘?`created_at` ??? (??啁??典?)
++        # ?脣?: `created_at` ?航??None (璆萇垢擃???嚗誑蝛箏?銝?"" 憓???嚗??TypeError 撏拇蔑
++        trips.sort(
++            key=lambda t: (
++                bool(t.get('is_sample')), 
++                t.get('created_at') or ""
++            ), 
++            reverse=True
++        )
+         
+         print(f"???曉 {len(trips)} ??蝔?)
+         return trips

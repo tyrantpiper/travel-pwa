@@ -19,6 +19,7 @@ from models.base import (
 )
 from utils.deps import get_gemini_key, get_verified_user
 from utils.ai_config import PRIMARY_MODEL
+from services.model_manager import call_extraction
 from services.geocode_service import geocode_place
 import uuid
 
@@ -242,7 +243,6 @@ async def parse_markdown(
         """
         
         # 使用統一的 Model Manager
-        from services.model_manager import call_extraction
         raw_text = await call_extraction(api_key, prompt, intent_type="EXTRACTION")
         
         # 清理回傳的文字 (去除 ```json 等標記)
@@ -330,7 +330,6 @@ async def generate_trip(
         """
         
         # 使用統一的 Model Manager
-        from services.model_manager import call_extraction
         raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
         
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
@@ -385,20 +384,10 @@ async def ai_generate(
         ⚠️ 再次提醒：day_number 不可超過使用者指定的天數！
         """
         
-        # 直接使用 Client + JSON Mode
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=PRIMARY_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                max_output_tokens=8192
-            )
-        )
-        raw_text = response.text
-        
-        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
-        parsed_data = json.loads(cleaned_text)
+        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
+        raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+        parsed_data = json.loads(raw_text)
         
         # 🌍 🆕 Parallel Geocoding with Concurrency Throttle (Semaphore)
         if "items" in parsed_data:
@@ -433,7 +422,6 @@ async def ai_generate(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 from utils.deps import get_supabase
-from services.model_manager import call_extraction
 
 
 @router.post("/trips/{trip_id}/days/{day}/ai-review")

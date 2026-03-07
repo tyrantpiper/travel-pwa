@@ -291,8 +291,6 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
     
     # Step 2: AI 增強 (中文優化顯示)
     try:
-        client = genai.Client(api_key=api_key)
-        
         prompt = f"""根據座標 ({lat:.6f}, {lng:.6f}) 和地名 "{base_result.get('name', 'Unknown')}"，
 地址：{base_result.get('address', '')}
 
@@ -304,17 +302,9 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
 嚴格按以下 JSON 格式回傳，不要額外說明：
 {{"display_name": "...", "type": "...", "description": "..."}}"""
 
-        response = await client.aio.models.generate_content(
-            model=WORKHORSE_MODEL,  # gemma-3-27b-it
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0,
-                max_output_tokens=150
-            )
-        )
-        
-        # 解析 JSON
-        text = response.text.strip()
+        from services.model_manager import call_extraction_server
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        text = raw.strip()
         # 處理可能的 markdown 包裝
         if text.startswith("```"):
             text = text.split("```")[1]
@@ -775,7 +765,6 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
         return None
     
     try:
-        client = genai.Client(api_key=api_key)
         prompt = f"""判斷這個旅遊行程的目的地國家。
 
 行程標題：「{trip_title}」
@@ -784,16 +773,10 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
 如果無法判斷或是多國行程，回覆 NONE。
 只輸出代碼，不要其他文字。"""
 
-        response = await client.aio.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0,
-                max_output_tokens=10
-            )
-        )
+        from services.model_manager import call_extraction_server
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
         
-        result = response.text.strip().upper()
+        result = raw.strip().upper()
         if result in COUNTRY_BOUNDS:
             print(f"🧠 Trip title '{trip_title}' → Country: {result}")
             return result
@@ -827,7 +810,7 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
         return [query]
     
     try:
-        client = genai.Client(api_key=api_key)
+        from services.model_manager import call_extraction_server
         country_name = country_info["name"]
         
         # 🆕 針對日本的特殊 prompt
@@ -859,16 +842,9 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
 Senso-ji
 淺草寺"""
 
-        response = await client.aio.models.generate_content(
-            model=WORKHORSE_MODEL,  # gemma-3-27b-it (多語言專家)
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0,
-                max_output_tokens=100
-            )
-        )
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
         
-        lines = [line.strip() for line in response.text.strip().split("\n") if line.strip()]
+        lines = [line.strip() for line in raw.strip().split("\n") if line.strip()]
         if lines:
             # 確保原始查詢也在列表中
             if query not in lines:
@@ -929,7 +905,6 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
         return None
         
     try:
-        client = genai.Client(api_key=api_key)
         prompt = f"""用戶正在搜尋旅遊地點，請推測目標國家。
 搜尋關鍵字：「{query}」
 
@@ -943,12 +918,9 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
 如果無法確定，回覆 NONE。
 只輸出代碼，不要其他文字。"""
 
-        response = await client.aio.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0, max_output_tokens=10)
-        )
-        result = response.text.strip().upper()
+        from services.model_manager import call_extraction_server
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        result = raw.strip().upper()
         if result in COUNTRY_BOUNDS:
             print(f"🧠 Query '{query}' → Country: {result}")
             return result

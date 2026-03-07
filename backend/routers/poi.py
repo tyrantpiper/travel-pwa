@@ -200,22 +200,18 @@ async def ai_recommend_poi(request: POIRecommendRequest):
             request.user_preferences
         )
         
-        # Step 3: 使用新版 Client API
-        client = genai.Client(api_key=request.api_key)
+        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
+        from services.model_manager import call_extraction
+        from utils.ai_config import DAILY_ROUTING
         
-        config = types.GenerateContentConfig(
-            max_output_tokens=300,
-            temperature=0.7
-        )
-        
-        response = client.models.generate_content(
-            model=LITE_MODEL,
-            contents=prompt,
-            config=config
+        recommendation_text = await call_extraction(
+            request.api_key, prompt,
+            intent_type="POI_ENRICH",
+            routing_strategy=DAILY_ROUTING,
         )
         
         return {
-            "recommendation": response.text,
+            "recommendation": recommendation_text,
             "pois_count": len(request.pois),
             "token_optimized": True
         }

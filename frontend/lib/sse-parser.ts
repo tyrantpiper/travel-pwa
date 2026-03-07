@@ -104,8 +104,12 @@ export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): void {
                 break
 
             case "error":
-                const errorData = JSON.parse(event.data)
-                handlers.onError?.(errorData)
+                try {
+                    const errorData = JSON.parse(event.data)
+                    handlers.onError?.(errorData)
+                } catch {
+                    handlers.onError?.({ message: event.data || "Unknown SSE streaming error", code: 500 })
+                }
                 break
 
             case "heartbeat":

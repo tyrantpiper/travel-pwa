@@ -1,24 +1,37 @@
+"""
+Test Suite for Model Manager v5.0
+==================================
+
+Tests the new routing-array based fallback, config sanitizer,
+and multi-tier degradation logic.
+"""
+
 import pytest
 import sys
 import os
 from unittest.mock import AsyncMock, patch, MagicMock
 
-# 確保 backend 目錄在 sys.path 中，這樣才能 import services
+# 確保 backend 目錄在 sys.path 中
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from services.model_manager import (
     call_with_fallback,
     call_extraction,
-    WORKHORSE_MODEL,
-    LITE_MODEL,
-    GEMINI_3_FLASH
+    call_verifier,
+    sanitize_config_for_model,
+    get_generation_config,
 )
+from utils.ai_config import DAILY_ROUTING, HEAVY_ROUTING, WORKHORSE_MODEL
+from google.genai import types
+
 
 # --- Fake Response Objects for Mocking ---
 
 class FakePart:
     def __init__(self, text):
         self.text = text
+        self.thought = None
+        self.function_call = None
 
 class FakeContent:
     def __init__(self, text):
@@ -34,113 +47,172 @@ class FakeResponse:
         self.text = text
         self.candidates = [FakeCandidate(text)]
 
-# --- Tests ---
+
+# ═══════════════════════════════════════════════════════════════
+# 🧪 Config Sanitizer Tests
+# ═══════════════════════════════════════════════════════════════
+
+def test_sanitize_removes_thinking_for_gemini_25():
+    """Gemini 2.5 不支援 thinking_config，必須被移除"""
+    config = types.GenerateContentConfig(
+        temperature=1.0,
+        max_output_tokens=1024,
+    )
+    # 手動設定 thinking_config (模擬 Gemini 3 配置)
+    config.thinking_config = types.ThinkingConfig(thinking_budget=1024)
+    
+    safe = sanitize_config_for_model(config, "gemini-2.5-flash")
+    assert safe.thinking_config is None
+
+
+def test_sanitize_removes_tools_for_gemma():
+    """Gemma 不支援 google_search 等工具，必須被移除"""
+    config = types.GenerateContentConfig(
+        temperature=1.0,
+        tools=[{"google_search": {}}],
+    )
+    
+    safe = sanitize_config_for_model(config, "gemma-3-27b-it")
+    assert safe.tools is None
+    assert safe.thinking_config is None  # 同時應被移除
+
+
+def test_sanitize_keeps_config_for_gemini_3():
+    """Gemini 3 應保留所有配置"""
+    config = types.GenerateContentConfig(
+        temperature=0.5,  # 會被強制為 1.0
+        tools=[{"google_search": {}}],
+    )
+    
+    safe = sanitize_config_for_model(config, "gemini-3-flash-preview")
+    assert safe.tools is not None
+    assert safe.temperature == 1.0  # 強制調高
+
+
+def test_sanitize_enforces_temperature_for_gemini_3():
+    """Gemini 3 的 temperature < 1.0 時應被強制為 1.0"""
+    config = types.GenerateContentConfig(temperature=0.3)
+    safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite-preview")
+    assert safe.temperature == 1.0
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🧪 call_with_fallback Tests
+# ═══════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
-@patch('services.model_manager.genai.Client')
-async def test_call_with_fallback_success_after_failure(mock_genai_client_class):
+@patch('services.model_manager.get_cached_client')
+async def test_call_with_fallback_routing_array(mock_get_client):
     """
-    測試: 當主模型 (GEMINI_3_FLASH) 拋出錯誤時，系統是否能無縫切換至備用模型 (WORKHORSE_MODEL)。
-    這不會消耗真實 Token 額度。
+    測試: 路由陣列降級 — 第一個模型失敗，自動嘗試第二個。
     """
-    # 建立一個 Mock 的 client 實例
     mock_client = MagicMock()
-    mock_genai_client_class.return_value = mock_client
-    
-    # Mock chats.create() 回傳一個 Mock chat
+    mock_get_client.return_value = mock_client
     mock_chat = MagicMock()
-    mock_client.chats.create.return_value = mock_chat
+    mock_client.aio.chats.create.return_value = mock_chat
     
-    # 模擬第一次呼叫送出 Exception，第二次呼叫送出 FakeResponse
-    # 注意: send_message 是同步呼叫 (Synchronous)
+    # 模擬：第一次失敗，第二次成功
+    mock_chat.send_message = AsyncMock()
     mock_chat.send_message.side_effect = [
-        Exception("429 Quota Exceeded"),          # 第一次呼叫: 爆炸
-        FakeResponse("我是降級後的備用模型回覆！") # 第二次呼叫: 成功
+        Exception("429 Quota Exceeded"),
+        FakeResponse("降級成功！")
     ]
     
-    # 執行函數
     result = await call_with_fallback(
         api_key="fake_key",
         history=[{"role": "user", "content": "你好"}],
         message="測試"
     )
     
-    # 斷言 1: 結果文本是否正確提取自第二次呼叫
-    assert result["text"] == "我是降級後的備用模型回覆！"
-    
-    # 斷言 2: 確認模型標籤被正確更新為降級模型
-    assert result["model_used"] == WORKHORSE_MODEL
-    
-    # 斷言 3: 確認 chats.create 被呼叫了剛好兩次 (第一次是主要，第二次是備用)
-    assert mock_client.chats.create.call_count == 2
-    
-    # 檢查調用參數，第二次呼叫必須使用的是 WORKHORSE_MODEL
-    second_call_kwargs = mock_client.chats.create.call_args_list[1].kwargs
-    assert second_call_kwargs['model'] == WORKHORSE_MODEL
+    # 結果來自第二個模型
+    assert result["text"] == "降級成功！"
+    assert result["model_used"] == DAILY_ROUTING[1]
+    assert mock_client.aio.chats.create.call_count == 2
 
 
 @pytest.mark.asyncio
-@patch('services.model_manager.genai.Client')
-async def test_call_extraction_double_fallback(mock_genai_client_class):
+@patch('services.model_manager.get_cached_client')
+async def test_call_with_fallback_total_collapse(mock_get_client):
     """
-    測試雙重降級防禦網:
-    Flash 失敗 -> Gemma 失敗 -> Lite 救場成功
-    """
-    mock_client = MagicMock()
-    mock_genai_client_class.return_value = mock_client
-    
-    # 模擬 generate_content 的三次呼叫狀態
-    # (Flash掛, Gemma掛, Lite成)
-    mock_client.models.generate_content.side_effect = [
-        Exception("503 Service Unavailable"),
-        Exception("Model Overloaded - Context too large"),
-        FakeResponse("我是最後一道防線 Lite 跑出來的資料！")
-    ]
-    
-    # 執行函數 (預期不會拋出錯誤，並且拿到 Lite 的字串)
-    result_text = await call_extraction(
-        api_key="fake_key",
-        prompt="請解析這些資料..."
-    )
-    
-    # 斷言 1: 最終拿到成功字串
-    assert result_text == "我是最後一道防線 Lite 跑出來的資料！"
-    
-    # 斷言 2: 確認 generate_content 確實被重試了總共三次
-    assert mock_client.models.generate_content.call_count == 3
-    
-    # 斷言 3: 驗證模型切換順序是否精準
-    calls = mock_client.models.generate_content.call_args_list
-    assert calls[0].kwargs['model'] == GEMINI_3_FLASH
-    assert calls[1].kwargs['model'] == WORKHORSE_MODEL
-    assert calls[2].kwargs['model'] == LITE_MODEL
-
-
-@pytest.mark.asyncio
-@patch('services.model_manager.genai.Client')
-async def test_call_with_fallback_total_collapse(mock_genai_client_class):
-    """
-    測試末日劇本 (Doomsday Scenario):
-    所有模型都失效時，系統必須拋出 Exception 給外層處理，而非靜默失敗。
+    測試末日劇本: 路由陣列中所有模型都失效 → 拋出 Exception。
     """
     mock_client = MagicMock()
-    mock_genai_client_class.return_value = mock_client
+    mock_get_client.return_value = mock_client
     mock_chat = MagicMock()
-    mock_client.chats.create.return_value = mock_chat
+    mock_client.aio.chats.create.return_value = mock_chat
     
-    # 主力跟備用全部都拋出 Exception
+    # 所有模型全部失敗
+    mock_chat.send_message = AsyncMock()
     mock_chat.send_message.side_effect = [
-        Exception("API 網路斷線"),
-        Exception("備用機房也斷線")
+        Exception("Model 1 掛了"),
+        Exception("Model 2 掛了"),
+        Exception("Model 3 也掛了"),
     ]
     
-    # 執行並斷言會拋出 Error
-    with pytest.raises(Exception, match="備用機房也斷線"):
+    with pytest.raises(Exception, match="Model 3 也掛了"):
         await call_with_fallback(
             api_key="fake_key",
             history=[],
             message="幫我生資料"
         )
     
-    # 確認呼叫了兩次後拋錯
-    assert mock_client.chats.create.call_count == 2
+    # 確認嘗試了所有 3 個模型
+    assert mock_client.aio.chats.create.call_count == len(DAILY_ROUTING)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🧪 call_extraction Tests
+# ═══════════════════════════════════════════════════════════════
+
+@pytest.mark.asyncio
+@patch('services.model_manager.get_cached_client')
+async def test_call_extraction_triple_fallback(mock_get_client):
+    """
+    測試三重降級: HEAVY_ROUTING[0] → [1] → [2]
+    """
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    
+    mock_client.aio.models.generate_content = AsyncMock()
+    mock_client.aio.models.generate_content.side_effect = [
+        Exception("503 Service Unavailable"),
+        Exception("Model Overloaded"),
+        FakeResponse("最後一道防線成功！")
+    ]
+    
+    result_text = await call_extraction(
+        api_key="fake_key",
+        prompt="請解析這些資料..."
+    )
+    
+    assert result_text == "最後一道防線成功！"
+    assert mock_client.aio.models.generate_content.call_count == 3
+    
+    # 驗證模型切換順序
+    calls = mock_client.aio.models.generate_content.call_args_list
+    assert calls[0].kwargs['model'] == HEAVY_ROUTING[0]
+    assert calls[1].kwargs['model'] == HEAVY_ROUTING[1]
+    assert calls[2].kwargs['model'] == HEAVY_ROUTING[2]
+
+
+@pytest.mark.asyncio
+@patch('services.model_manager.get_cached_client')
+async def test_call_extraction_custom_routing(mock_get_client):
+    """
+    測試自定義路由策略覆寫。
+    """
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    
+    mock_client.aio.models.generate_content = AsyncMock()
+    mock_client.aio.models.generate_content.return_value = FakeResponse("OK")
+    
+    await call_extraction(
+        api_key="fake_key",
+        prompt="test",
+        routing_strategy=DAILY_ROUTING  # 覆寫為 DAILY_ROUTING
+    )
+    
+    # 應使用 DAILY_ROUTING[0] 而非預設的 HEAVY_ROUTING[0]
+    call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
+    assert call_kwargs['model'] == DAILY_ROUTING[0]

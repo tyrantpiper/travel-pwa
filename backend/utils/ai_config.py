@@ -1,40 +1,52 @@
 """
-AI Configuration Constants (Optimized 2025)
---------------------------------------------
-Centralized AI model configuration with intelligent routing.
+AI Configuration Constants (Next-Gen Architecture v5.0)
+-------------------------------------------------------
+Centralized AI model configuration with intelligent multi-tier routing.
 
-Model Hierarchy:
-- CREATIVE: gemini-3-flash (20 RPD) - 創意規劃、對話
-- SEARCH: gemini-2.5-flash (20 RPD) - 網路搜尋驗證  
-- LITE: gemini-2.5-flash-lite (20 RPD) - 輕量備用
-- WORKHORSE: gemma-3-27b-it (14,400 RPD) - 大量任務、翻譯、摘要
+Routing Strategies:
+- DAILY_ROUTING:  日常對話、意圖解析、記憶萃取、POI 推薦、驗證
+  → 首選 gemini-3.1-flash-lite (500 RPD) → gemini-3-flash → gemini-2.5-flash
+- HEAVY_ROUTING:  行程生成、Markdown 重構、深度規劃
+  → 首選 gemini-3-flash (20 RPD) → gemini-3.1-flash-lite → gemini-2.5-flash
+- WORKHORSE_MODEL: 地理引擎（翻譯、國家判斷）
+  → gemma-3-27b-it (14,400 RPD, 零成本)
+
+Reference:
+  https://ai.google.dev/gemini-api/docs/models?hl=zh-tw
 """
 
-# ═══════════════════════════════════════════════════════════════
-# Gemini 系列 (Premium, 20 RPD each)
-# ═══════════════════════════════════════════════════════════════
-
-# 1. 創意模型 - 最聰明，用於規劃和對話
-CREATIVE_MODEL = "gemini-3-flash-preview"
-
-# 2. 搜尋模型 - 有 Google Search grounding
-SEARCH_MODEL = "gemini-2.5-flash"
-
-# 3. 輕量模型 - Gemini 系最後防線
-LITE_MODEL = "gemini-2.5-flash-lite"
+from typing import List
 
 # ═══════════════════════════════════════════════════════════════
-# Gemma 系列 (Workhorse, 14,400 RPD)
+# 🧭 Routing Strategies (Ordered: Primary → Fallback 1 → Fallback 2)
 # ═══════════════════════════════════════════════════════════════
 
-# 4. 工作馬模型 - 大量任務、翻譯、摘要、POI
-WORKHORSE_MODEL = "gemma-3-27b-it"
+DAILY_ROUTING: List[str] = [
+    "gemini-3.1-flash-lite-preview",  # 500 RPD, 極速、支援思考/搜尋/結構化
+    "gemini-3-flash-preview",          # 20 RPD, 全能型
+    "gemini-2.5-flash",                # 20 RPD, 穩定版兜底
+]
+
+HEAVY_ROUTING: List[str] = [
+    "gemini-3-flash-preview",          # 20 RPD, 強推理、大 context
+    "gemini-3.1-flash-lite-preview",   # 500 RPD, 降級備援
+    "gemini-2.5-flash",                # 20 RPD, 穩定版兜底
+]
 
 # ═══════════════════════════════════════════════════════════════
-# 向後兼容別名 (for existing code)
+# 🐴 Workhorse Model (Gemma 系列, 14,400 RPD, 零成本)
 # ═══════════════════════════════════════════════════════════════
 
-PRIMARY_MODEL = CREATIVE_MODEL          # 向後兼容
-SMART_NO_TOOL_MODEL = CREATIVE_MODEL    # 向後兼容
-REASONING_MODEL = WORKHORSE_MODEL       # gemini-2.5-pro 不可用，用 gemma 替代
-FALLBACK_MODEL = WORKHORSE_MODEL        # 最終 fallback
+WORKHORSE_MODEL: str = "gemma-3-27b-it"
+
+# ═══════════════════════════════════════════════════════════════
+# 🔗 Backward-Compatible Aliases (Phase 3 清除後可移除)
+# ═══════════════════════════════════════════════════════════════
+
+PRIMARY_MODEL = DAILY_ROUTING[0]
+CREATIVE_MODEL = HEAVY_ROUTING[0]
+SEARCH_MODEL = DAILY_ROUTING[2]        # gemini-2.5-flash
+LITE_MODEL = DAILY_ROUTING[0]           # 升級：原 2.5-flash-lite → 3.1-flash-lite
+SMART_NO_TOOL_MODEL = DAILY_ROUTING[0]
+REASONING_MODEL = WORKHORSE_MODEL
+FALLBACK_MODEL = WORKHORSE_MODEL

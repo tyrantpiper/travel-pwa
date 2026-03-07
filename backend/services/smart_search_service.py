@@ -17,7 +17,8 @@ from math import radians, cos, sin, sqrt, atan2
 from google import genai
 from google.genai import types
 
-from utils.ai_config import WORKHORSE_MODEL
+from services.model_manager import call_extraction
+from utils.ai_config import DAILY_ROUTING
 from services.poi_service import search_poi_combined
 from services.geocode_service import geocode_place
 
@@ -71,28 +72,22 @@ async def parse_intent(
 ) -> Dict:
     """
     使用 AI 解析用戶意圖（唯一的 AI 調用！）
+    🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
     """
-    client = genai.Client(api_key=api_key)
-    
     prompt = INTENT_PARSE_PROMPT.format(
         query=query,
         region=region or "未知"
     )
     
-    config = types.GenerateContentConfig(
-        temperature=0.1,  # 低溫度確保穩定
-        max_output_tokens=400
-    )
-    
     try:
-        response = client.models.generate_content(
-            model=WORKHORSE_MODEL,
-            contents=prompt,
-            config=config
+        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
+        raw_text = await call_extraction(
+            api_key, prompt,
+            intent_type="SUMMARIZE",  # 低 token、快速
+            routing_strategy=DAILY_ROUTING,
         )
         
-        text = response.text
-        json_match = re.search(r'\{[\s\S]*\}', text)
+        json_match = re.search(r'\{[\s\S]*\}', raw_text)
         if json_match:
             result = json.loads(json_match.group())
             print(f"✅ Intent parsed: {result}")

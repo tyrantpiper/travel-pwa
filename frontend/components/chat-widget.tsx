@@ -513,8 +513,22 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                             })
                         },
                         onError: (error) => {
-                            console.error("🔴 SSE 錯誤:", error)
-                            // Fallback 會在下面處理
+                            console.error("🔴 SSE 錯誤:", JSON.stringify(error, null, 2))
+                            // 若已經接收到文字，則強迫終止 Fallback 並保留半殘對話
+                            if (streamingText.trim().length > 0) {
+                                streamingSuccess = true
+                                streamingText += "\n\n[⚠️ 系統提示：連線異常，訊息中斷]"
+                                setMessages(prev => {
+                                    const updated = [...prev]
+                                    const lastMsg = updated[updated.length - 1]
+                                    if (lastMsg?.role === "model") {
+                                        lastMsg.displayContent = streamingText
+                                        lastMsg.rawParts = [{ text: streamingText }]
+                                        lastMsg.modelUsed = "error_recovered"
+                                    }
+                                    return updated
+                                })
+                            }
                         }
                     },
                     abortControllerRef.current?.signal,  // 🆕 傳入 AbortSignal
