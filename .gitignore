@@ -29,3 +29,5 @@ Thumbs.db
 
 # AI Agent Workspace
 .agent/
+
+backend/migrations/20260308_security_hardening.sql
