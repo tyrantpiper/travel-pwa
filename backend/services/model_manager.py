@@ -72,8 +72,8 @@ def sanitize_config_for_model(
         if hasattr(safe, 'thinking_config'):
             safe.thinking_config = None
 
-    # Rule 2: Gemma 不支援 google_search 等工具
-    if not model_name.startswith("gemini-"):
+    # Rule 2: Gemma 不支援 google_search 等工具, Gemini 3 preveiw 版由於搜尋配額限制(429 Error)，暫時禁用 tools
+    if not model_name.startswith("gemini-") or is_gemini_3:
         if hasattr(safe, 'tools'):
             safe.tools = None
 

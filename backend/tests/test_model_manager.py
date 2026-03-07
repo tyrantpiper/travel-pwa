@@ -78,14 +78,14 @@ def test_sanitize_removes_tools_for_gemma():
 
 
 def test_sanitize_keeps_config_for_gemini_3():
-    """Gemini 3 應保留所有配置"""
+    """Gemini 3 應被強制移除 google_search 以防止 429 Error"""
     config = types.GenerateContentConfig(
         temperature=0.5,  # 會被強制為 1.0
         tools=[{"google_search": {}}],
     )
     
     safe = sanitize_config_for_model(config, "gemini-3-flash-preview")
-    assert safe.tools is not None
+    assert safe.tools is None
     assert safe.temperature == 1.0  # 強制調高
 
 

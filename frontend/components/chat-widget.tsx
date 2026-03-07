@@ -218,6 +218,38 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         }
     }, [])
 
+    // ----------------------------------------------------------------------
+    // 🆕 修復：當使用者切換不同行程時，強制清除上一個行程的對話記憶與摘要
+    // ----------------------------------------------------------------------
+    const prevTripIdRef = useRef(activeTripId)
+
+    useEffect(() => {
+        if (activeTripId && prevTripIdRef.current !== activeTripId) {
+            // 🚨 關鍵補全：切斷前一個行程還在生成的 AI 回應
+            abortControllerRef.current?.abort()
+            setIsLoading(false)
+
+            // 重置對話清單為初始的打招呼訊息
+            setMessages([
+                hydrateMessage({
+                    role: "model",
+                    displayContent: "__GREETING__"
+                })
+            ])
+
+            // 清除長期的記憶摘要片段
+            setMemorySummary(null)
+
+            // 更新追蹤器
+            prevTripIdRef.current = activeTripId
+
+            // (選用) 切換時自動將可能開著的聊天氣泡關閉
+            if (isOpen) {
+                setIsOpen(false)
+            }
+        }
+    }, [activeTripId, isOpen])
+
     // Draggable state
     const [position, setPosition] = useState<Position>({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
