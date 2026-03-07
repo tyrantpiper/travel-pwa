@@ -586,24 +586,30 @@ async def chat_with_ryan(
         # 🆕 處理圖片 (如果有的話，改用 Multi-modal list 格式傳給新版 SDK)
         if body.image:
             import base64
-            from io import BytesIO
-            from PIL import Image
+            from google.genai import types
             
             try:
+                # 1. 提煉 MIME 格式 (如果前端有傳遞 "data:image/png;base64,")
+                mime_type = "image/jpeg" # 預設 Fallback
+                if "data:" in body.image and ";base64," in body.image:
+                    mime_type = body.image.split(";")[0].split(":")[1]
+                
+                # 2. 擷取純 Base64 字串並解碼成二進位資料
                 if "base64," in body.image:
                     image_data = base64.b64decode(body.image.split("base64,")[1])
                 else:
                     image_data = base64.b64decode(body.image)
                     
-                image = Image.open(BytesIO(image_data))
-                
                 # 如果只有附圖沒有文字，加上預設的分析提示
                 if not enhanced_message.strip():
                     enhanced_message = "請幫我分析這張圖片，並依據它提供旅遊建議"
                 
-                # Google GenAI SDK 支援直接傳入 [PIL.Image, str]
-                final_message = [image, enhanced_message]
-                print("📸 成功載入圖片，切換為 Multi-modal 混合請求")
+                # 3. 鑄造無敵的 SDK 原生物件 (types.Part.from_bytes)
+                image_part = types.Part.from_bytes(data=image_data, mime_type=mime_type)
+                
+                # Google GenAI SDK 支援直接傳入 [Part, str]
+                final_message = [image_part, enhanced_message]
+                print(f"📸 成功載入圖片 ({mime_type})，切換為 Multi-modal 原生請求")
             except Exception as img_err:
                 print(f"⚠️ Image processing error: {img_err}")
                 final_message = f"[系統提示：使用者上傳了一張圖片，但系統解析失敗]\n{enhanced_message}"
