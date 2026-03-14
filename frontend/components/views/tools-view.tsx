@@ -7,7 +7,7 @@ import {
     Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
     Sparkles, Upload, Image as ImageIcon, ChevronLeft, PieChart, List, Users, User,
-    Key, CheckCircle2
+    Key, CheckCircle2, Share2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
@@ -28,30 +29,17 @@ import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
 import { Virtuoso } from "react-virtuoso"
-import { useExpenses, useHaptic } from "@/lib/hooks"
+import { useExpenses, useHaptic, useTripDetail } from "@/lib/hooks"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
 import { expensesApi, tripsApi, aiApi } from "@/lib/api"
+import { ActuaryDialogCard } from "@/components/ActuaryDialogCard"
 import { useOfflineMutation } from "@/lib/sync-hooks"
 
-// Type definitions
-interface Expense {
-    id: string
-    title: string
-    amount: number
-    payment_method?: string
-    category?: string
-    is_public: boolean
-    image_url?: string
-    expense_date?: string
-    incurred_at?: string // 🆕 DB column name for compatibility
-    created_at?: string
-    exchange_rate?: number
-    cashback_rate?: number
-    currency?: string // 🆕 Added to match backend
-    trip_id?: string
-    card_name?: string
-    creator_name?: string
+interface TripMember {
+    user_id: string;
+    user_name: string;
+    user_avatar: string;
 }
 
 interface Trip {
@@ -59,11 +47,35 @@ interface Trip {
     title: string
     days?: unknown[]
     share_code?: string
-    credit_cards?: CreditCard[]  // 🆕 Type Safety
+    credit_cards?: CreditCard[]
     flight_info?: Record<string, unknown>
     hotel_info?: Record<string, unknown>
     start_date?: string
     end_date?: string
+    members?: TripMember[]
+}
+
+interface Expense {
+    id: string
+    title: string
+    total_amount?: number  // 🆕 Primary amount field from V23.1
+    amount: number         // Legacy/Fallback field
+    payment_method?: string
+    category?: string
+    is_public: boolean
+    image_url?: string
+    expense_date?: string
+    incurred_at?: string
+    created_at?: string
+    exchange_rate?: number
+    cashback_rate?: number
+    currency?: string
+    trip_id?: string
+    card_name?: string
+    creator_name?: string
+    payer_id?: string | null
+    items?: { original_name: string, translated_name?: string, amount: number }[] // 🆕 Replacing 'details'
+    details?: { name: string, price: number }[] // ⚠️ Legacy fallback
 }
 
 interface ParseResult {
@@ -107,6 +119,7 @@ interface CreditCard {
 interface ExpenseItemProps {
     item: Expense
     rate: number
+    members?: TripMember[]
     onEdit: (item: Expense) => void
     onDelete: (id: string) => void
 }
@@ -144,10 +157,30 @@ const CURRENCIES = [
 
 import { getExchangeRate } from "@/lib/currency"
 import { CountingNumber } from "@/components/ui/counting-number"
+import { type ParsedItinerary } from "@/lib/itinerary-types"
+import { type TranslationKey } from "@/lib/LanguageContext"
+
+// 🆕 v22.1: JSON 行程偵測工具
+function tryParseItinerary(text: string): ParsedItinerary | null {
+    if (!text || !text.includes('{"')) return null
+    try {
+        const cleanJson = text.replace(/```json|```/g, "").trim()
+        const data = JSON.parse(cleanJson)
+        if (data.items && Array.isArray(data.items)) return data as ParsedItinerary
+        if (data.data && data.data.items) return data.data as ParsedItinerary
+    } catch (error) { 
+        console.error("Failed to parse itinerary from text:", error)
+        return null 
+    }
+    return null
+}
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTrip, activeTripId, trips, mutate: tripMutate, userId } = useTripContext()  // 🔧 FIX: Restore full context
+    const { activeTrip, activeTripId, trips, mutate: tripMutate, userId } = useTripContext()
+    // 🔧 v7 FIX: 載入完整行程資料（含 members），解決成員列表為空的問題
+    const { trip: tripDetail } = useTripDetail(activeTripId, userId)
+    const tripMembers = tripDetail?.members || activeTrip?.members || []
     const { mutate } = useSWRConfig()
     const { mutate: offlineMutate } = useOfflineMutation() // 🆕 Resilience Hook
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
@@ -166,6 +199,26 @@ export function ToolsView() {
     }, [swrExpenses, activeTripId])
 
     const [rate, setRate] = useState(0.22)
+
+    // 🆕 v22.1: Listen for cross-module import events (from ChatWidget)
+    useEffect(() => {
+        const handleAiImport = (e: Event) => {
+            const customEvent = e as CustomEvent<{ content: string }>
+            const { content } = customEvent.detail
+            if (content) {
+                const itinerary = tryParseItinerary(content)
+                if (itinerary) {
+                    setAiResult(itinerary)
+                } else {
+                    setMarkdown(content)
+                }
+                setActiveSection('ai')
+                toast.info(t('ai_ready_to_import' as TranslationKey))
+            }
+        }
+        window.addEventListener('ai-import-itinerary', handleAiImport)
+        return () => window.removeEventListener('ai-import-itinerary', handleAiImport)
+    }, [t])
 
 
     // 🆕 Currency State
@@ -237,7 +290,42 @@ export function ToolsView() {
     const [newCardNotes, setNewCardNotes] = useState("")
     const [newCardIsPublic, setNewCardIsPublic] = useState(false) // 🆕
     const [isSavingCard, setIsSavingCard] = useState(false) // 🆕 Prevent double-click
+    const [actuaryOpen, setActuaryOpen] = useState(false) // 🆕 Phase 7: AI Actuary
+    const [isSharing, setIsSharing] = useState(false) // 🆕 Phase 8: Shared Ledger
     const scrollerRef = useRef<HTMLElement | null>(null) // 🆕 Ref for the actual scroller element
+
+    // 🆕 Phase 8: Shared Ledger Generation
+    const handleShareLedger = async () => {
+        if (!activeTripId) return
+        setIsSharing(true)
+        try {
+            const userId = localStorage.getItem("user_uuid") || ""
+            const res = await fetch(`${API_BASE}/api/trips/${activeTripId}/ledger-share`, {
+                method: "PATCH",
+                headers: { "x-user-id": userId }
+            })
+            if (!res.ok) throw new Error("Failed to generate code")
+
+            const { ledger_share_code } = await res.json()
+            const shareUrl = `${window.location.origin}/ledger/${ledger_share_code}`
+
+            if (navigator.share) {
+                await navigator.share({
+                    title: activeTrip?.name || "旅遊公帳",
+                    text: "點此查看我們的旅遊公帳明細 🧾",
+                    url: shareUrl
+                })
+            } else {
+                await navigator.clipboard.writeText(shareUrl)
+                toast.success(t('share_copied') || "連結已複製！傳給朋友吧 🎉")
+            }
+        } catch (e) {
+            console.error(e)
+            toast.error(t('share_failed') || "分享失敗，請重試")
+        } finally {
+            setIsSharing(false)
+        }
+    }
 
     useEffect(() => {
         // Check if user has API key (check localStorage, old key, and DEV key)
@@ -393,7 +481,9 @@ export function ToolsView() {
             // If currency differs and no stored rate, we have a problem (Risk identified in analysis).
             // For now: use stored rate -> current rate (if JPY) -> 0.22 fallback
             const usedRate = e.exchange_rate || (e.currency === selectedCurrency ? rate : (e.currency === 'JPY' ? 0.22 : 0))
-            return sum + (e.amount || 0) * usedRate
+            // 🛡️ 關鍵修復：優先讀取 total_amount，防止因為讀取到預設為 0 的 amount 而導致圓餅圖消失
+            const val = e.total_amount !== undefined ? e.total_amount : e.amount
+            return sum + (val || 0) * usedRate
         }, 0)
 
 
@@ -402,7 +492,9 @@ export function ToolsView() {
         const cashbackTotal = filteredExpenses.reduce((sum, e) => {
             if (e.cashback_rate && e.cashback_rate > 0) {
                 const usedRate = e.exchange_rate || rate
-                return sum + Math.round((e.amount * usedRate) * e.cashback_rate / 100)
+                // 🛡️ 關鍵修復：回饋計算也應使用標準化的總額
+                const val = e.total_amount !== undefined ? e.total_amount : e.amount
+                return sum + Math.round(((val || 0) * usedRate) * e.cashback_rate / 100)
             }
             return sum
         }, 0)
@@ -412,7 +504,9 @@ export function ToolsView() {
             const cat = e.category || 'general'
             // Category chart uses TWD value for standardized comparison
             const usedRate = e.exchange_rate || (e.currency === selectedCurrency ? rate : 0.22)
-            const amountTWD = (e.amount || 0) * usedRate
+            // 🛡️ 關鍵修復：對齊總額欄位
+            const val = e.total_amount !== undefined ? e.total_amount : e.amount
+            const amountTWD = (val || 0) * usedRate
             cats[cat] = (cats[cat] || 0) + amountTWD
         })
         const data = Object.entries(cats).map(([category, amount]) => ({
@@ -444,7 +538,9 @@ export function ToolsView() {
                 if (!totals[c]) {
                     totals[c] = { amount: 0, symbol: info?.symbol || '', flag: info?.flag || '' }
                 }
-                totals[c].amount += e.amount || 0
+                // 🛡️ 關鍵修復：外幣加總也應對齊
+                const val = e.total_amount !== undefined ? e.total_amount : e.amount
+                totals[c].amount += val || 0
             }
         })
 
@@ -533,13 +629,16 @@ export function ToolsView() {
 
         try {
             // 🛡️ Use standardized aiApi wrapper
-            const data = await aiApi.generateTrip({
+            const response = await aiApi.generateTrip({
                 prompt: aiPrompt,
                 user_id: userId
             })
             setGenerateProgress(t('tv_ai_geocoding'))
-            setAiResult(data)
-            toast.success(t('tv_ai_generated', { count: String(data.data?.items?.length || 0) }))
+            
+            // 🆕 v22.1: Align nested structure. API returns { status, data: { items, ... } }
+            const itineraryData = response.data || response
+            setAiResult(itineraryData)
+            toast.success(t('tv_ai_generated', { count: String(itineraryData.items?.length || 0) }))
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Generate failed")
         } finally {
@@ -878,23 +977,40 @@ export function ToolsView() {
                             </TabsContent>
 
                             <TabsContent value="expense" className="mt-4 space-y-4">
-                                {/* View Mode Toggle */}
-                                <div className="flex gap-2">
+                                {/* View Mode Toggle and Share Action */}
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex gap-2 flex-1 max-w-[220px]">
+                                        <Button
+                                            variant={expenseView === 'summary' ? 'default' : 'outline'}
+                                            size="sm"
+                                            className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
+                                            onClick={() => setExpenseView('summary')}
+                                        >
+                                            <PieChart className="w-4 h-4 mr-2" /> {t('total')}
+                                        </Button>
+                                        <Button
+                                            variant={expenseView === 'daily' ? 'default' : 'outline'}
+                                            size="sm"
+                                            className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
+                                            onClick={() => setExpenseView('daily')}
+                                        >
+                                            <List className="w-4 h-4 mr-2" /> {t('tv_list')}
+                                        </Button>
+                                    </div>
+
+                                    {/* Phase 8 Share Public Ledger */}
                                     <Button
-                                        variant={expenseView === 'summary' ? 'default' : 'outline'}
+                                        variant="ghost"
                                         size="sm"
-                                        className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
-                                        onClick={() => setExpenseView('summary')}
+                                        onClick={handleShareLedger}
+                                        disabled={isSharing || !activeTripId}
+                                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-transparent hover:border-indigo-100"
                                     >
-                                        <PieChart className="w-4 h-4 mr-2" /> {t('total')}
-                                    </Button>
-                                    <Button
-                                        variant={expenseView === 'daily' ? 'default' : 'outline'}
-                                        size="sm"
-                                        className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
-                                        onClick={() => setExpenseView('daily')}
-                                    >
-                                        <List className="w-4 h-4 mr-2" /> {t('tv_list')}
+                                        {isSharing
+                                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                                            : <Share2 className="w-4 h-4" />
+                                        }
+                                        <span className="ml-1 font-semibold">{t('share_ledger_btn') || "分享公帳"}</span>
                                     </Button>
                                 </div>
 
@@ -980,10 +1096,21 @@ export function ToolsView() {
                                     </CardContent>
                                 </Card>
 
-                                {/* Add Button - Now shown for both views */}
-                                <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900">
-                                    <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
-                                </Button>
+                                {/* Features Group: Add & AI Actuary */}
+                                <div className="space-y-2">
+                                    <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900 h-10">
+                                        <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
+                                    </Button>
+
+                                    <Button
+                                        onClick={() => setActuaryOpen(true)}
+                                        disabled={!activeTripId}
+                                        className="w-full gap-2 bg-gradient-to-r from-violet-500 hover:from-violet-600 to-indigo-500 hover:to-indigo-600 text-white font-bold h-11 rounded-xl shadow-lg border-0 transition-all active:scale-[0.98]"
+                                        variant="outline"
+                                    >
+                                        🤖 {t('actuary_btn') || "AI 一鍵精算"}
+                                    </Button>
+                                </div>
 
                                 {/* Expense List (Virtualized) */}
                                 <div className="space-y-2 h-[50vh]">
@@ -996,9 +1123,15 @@ export function ToolsView() {
                                         components={{
                                             Header: () => <div id="ptr-ghost-anchor" className="h-0" />
                                         }}
-                                        itemContent={(_, item) => (
-                                            <div className="pb-2">
-                                                <ExpenseItem item={item} rate={rate} onEdit={openEditDialog} onDelete={handleDeleteExpense} />
+                                        itemContent={(index, item) => (
+                                            <div className="px-5 py-2">
+                                                <ExpenseItem
+                                                    item={item}
+                                                    rate={rate}
+                                                    members={activeTrip?.members}
+                                                    onEdit={openEditDialog}
+                                                    onDelete={handleDeleteExpense}
+                                                />
                                             </div>
                                         )}
                                     />
@@ -1158,7 +1291,7 @@ export function ToolsView() {
                         </Tabs>
                     </div>
                 </div>
-            </div>
+            </div >
             < AlertDialog open={!!deletingCardId
             } onOpenChange={(open) => { if (!open) setDeletingCardId(null) }}>
                 <AlertDialogContent>
@@ -1187,7 +1320,7 @@ export function ToolsView() {
                 onOpenChange={setIsDialogOpen}
                 editItem={editItem}
                 activeTripId={activeTripId}
-                activeTrip={activeTrip}
+                activeTrip={activeTrip ? { ...activeTrip, members: tripMembers } : null}
                 selectedCurrency={selectedCurrency}
                 onSaveSuccess={(targetDate: string) => {
                     setSelectedDate(targetDate)
@@ -1354,60 +1487,108 @@ export function ToolsView() {
                     </div>
                 </DialogContent>
             </Dialog >
+
+            <ActuaryDialogCard
+                open={actuaryOpen}
+                onOpenChange={setActuaryOpen}
+                expenses={expenses.filter(e => e.is_public)}
+                members={tripMembers}
+            />
         </>
     )
 }
 
-const ExpenseItem = memo(function ExpenseItem({ item, rate, onEdit, onDelete }: ExpenseItemProps) {
+const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onDelete }: ExpenseItemProps) {
     const { t } = useLanguage()
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
     const CatIcon = catInfo.icon
     const usedRate = item.exchange_rate || rate
-    const cashback = item.cashback_rate ? (item.amount * usedRate * item.cashback_rate / 100) : 0
-    const finalTWD = Math.round(item.amount * usedRate - cashback)
+    const standardizedAmount = item.total_amount !== undefined ? item.total_amount : item.amount
+    const cashback = item.cashback_rate ? ((standardizedAmount || 0) * usedRate * item.cashback_rate / 100) : 0
+    const finalTWD = Math.round((standardizedAmount || 0) * usedRate - cashback)
+
+    // 🆕 Hybrid Payer Logic
+    const member = members?.find(m => m.user_id === item.payer_id)
+    const displayName = member ? member.user_name : (item.payer_id || null)
 
     return (
-        <div className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
-            <div className="flex items-center gap-3 overflow-hidden">
-                <div className={cn("p-2 rounded-full shrink-0", catInfo.color)}><CatIcon className="w-4 h-4" /></div>
-                <div className="min-w-0">
-                    <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm flex items-center gap-2">
-                        {item.title}
-                        {item.image_url && (
-                            <a href={item.image_url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-500">
-                                <ImageIcon className="w-3 h-3" />
-                            </a>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        {item.card_name ? <span className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400 px-1.5 rounded">{methodInfo.label}</span>}
-                        <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400")}>{item.is_public ? t('tv_filter_public') : t('tv_filter_private')}</span>
-                        <span>{item.creator_name}</span>
-                    </div>
-                </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-                <div className="text-right mr-2">
-                    {/* Smart Formatting */}
-                    {(item.currency && item.currency !== "TWD") ? (
-                        <div className="flex flex-col items-end">
-                            <div className="font-mono font-bold text-slate-900 text-sm flex items-center gap-1">
-                                <span className="text-[10px]">{CURRENCIES.find(c => c.code === item.currency)?.flag}</span>
-                                {item.amount.toLocaleString()}
-                            </div>
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                <span>≈ NT${finalTWD.toLocaleString()}</span>
-                            </div>
+        <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
+            <div className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-3 overflow-hidden">
+                    <div className={cn("p-2 rounded-full shrink-0", catInfo.color)}><CatIcon className="w-4 h-4" /></div>
+                    <div className="min-w-0">
+                        <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm flex items-center gap-2">
+                            {item.title}
+                            {item.image_url && (
+                                <a href={item.image_url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-500">
+                                    <ImageIcon className="w-3 h-3" />
+                                </a>
+                            )}
                         </div>
-                    ) : (
-                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">NT${item.amount.toLocaleString()}</div>
-                    )}
-                    {(item.cashback_rate ?? 0) > 0 && <span className="text-[10px] text-green-500 block text-right">(-{Math.round(cashback)})</span>}
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                            {/* 🆕 Payer Display */}
+                            {displayName && (
+                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded-full border border-slate-200 dark:border-slate-600">
+                                    {member ? (
+                                        <Avatar className="h-3 w-3">
+                                            <AvatarImage src={member.user_avatar} />
+                                            <AvatarFallback className="text-[6px] uppercase">{member.user_name[0]}</AvatarFallback>
+                                        </Avatar>
+                                    ) : (
+                                        <User className="w-2.5 h-2.5 text-slate-500" />
+                                    )}
+                                    <span className="font-bold truncate max-w-[60px]">{displayName}</span>
+                                </div>
+                            )}
+                            {item.card_name ? <span className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400 px-1.5 rounded">{methodInfo.label}</span>}
+                            <span className={cn("px-1.5 rounded", item.is_public ? "bg-blue-50 dark:bg-blue-900/30 text-blue-500 dark:text-blue-400" : "bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400")}>{item.is_public ? t('tv_filter_public') : t('tv_filter_private')}</span>
+                        </div>
+                    </div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-12 w-12 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-5 h-5" /></Button>
-                <Button variant="ghost" size="icon" className="h-12 w-12 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-5 h-5" /></Button>
+                <div className="flex items-center gap-1 shrink-0">
+                    <div className="text-right mr-2">
+                        {(item.currency && item.currency !== "TWD") ? (
+                            <div className="flex flex-col items-end">
+                                <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1">
+                                    <span className="text-[10px]">{CURRENCIES.find(c => c.code === item.currency)?.flag}</span>
+                                    {(item.total_amount ?? item.amount ?? 0).toLocaleString()}
+                                </div>
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                    {/* finalTWD is pre-calculated based on this amount */}
+                                    <span>≈ NT${finalTWD.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                NT${(item.total_amount ?? item.amount ?? 0).toLocaleString()}
+                            </div>
+                        )}
+                        {(item.cashback_rate ?? 0) > 0 && <span className="text-[10px] text-green-500 block text-right">(-{Math.round(cashback)})</span>}
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 touch-manipulation" onClick={() => onEdit(item)}><Edit2 className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 touch-manipulation" onClick={() => onDelete(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                </div>
             </div>
+
+            {/* 🆕 Sub-items Nested Display (Unified Schema) */}
+            {(item.items || item.details) && ((item.items?.length ?? 0) > 0 || (item.details?.length ?? 0) > 0) && (
+                <div className="mt-2 ml-7 pl-3 py-1 space-y-1 border-l-2 border-slate-100 dark:border-slate-700">
+                    {(item.items || []).map((detail, idx) => (
+                        <div key={`item-${idx}`} className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400">
+                            <span className="truncate pr-2 opacity-80">• {detail.translated_name || detail.original_name}</span>
+                            <span className="font-mono font-bold shrink-0">{detail.amount?.toLocaleString() ?? "0"}</span>
+                        </div>
+                    ))}
+                    {/* Legacy Fallback Rendering */}
+                    {(!item.items || item.items.length === 0) && (item.details || []).map((detail, idx) => (
+                        <div key={`legacy-${idx}`} className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400">
+                            <span className="truncate pr-2 opacity-80">• {detail.name}</span>
+                            <span className="font-mono font-bold shrink-0">{detail.price?.toLocaleString() ?? "0"}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     )
 })

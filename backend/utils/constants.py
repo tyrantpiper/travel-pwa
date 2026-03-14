@@ -21,3 +21,5 @@ CLONEABLE_FIELDS = [
     "day_notes", 
     "day_checklists"
 ]
+# 錯誤訊息：缺少 API Key 的導引文字
+GEMINI_KEY_REQUIRED_MSG = "請到下方導覽列的「個人檔案」頁面設定 Gemini API Key"

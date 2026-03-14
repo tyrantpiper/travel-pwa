@@ -30,6 +30,7 @@ export const coreTranslations = {
     confirm_delete: "Delete?",
     update_success: "Updated!",
     update_failed: "Update failed",
+    profile_api_key_required: "Please configure your Gemini API Key in the \"Profile\" tab.",
   },
   zh: {
     // Actions
@@ -58,5 +59,6 @@ export const coreTranslations = {
     confirm_delete: "確定刪除？",
     update_success: "已更新！",
     update_failed: "更新失敗",
+    profile_api_key_required: "請到下方導覽列的「個人檔案」頁面設定 Gemini API Key",
   },
 } as const

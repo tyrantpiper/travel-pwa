@@ -1,5 +1,11 @@
 "use client"
 
+// TODO: MLT (MapLibre Tile) upgrade path
+// When OpenFreeMap/Protomaps releases MLT tiles:
+// 1. Change source encoding: { type: "vector", encoding: "mlt", url: "..." }
+// 2. Expected: 6x smaller tiles, 2-3x faster render
+// See: https://maplibre.org/news/2026-01-23-mlt-release/
+
 import { useEffect, useState, useRef, useCallback } from "react"
 import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre"
@@ -9,12 +15,15 @@ import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
 import { cn } from "@/lib/utils"
 import { debugLog, debugWarn } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
+import { SearchResult } from "@/lib/itinerary-types"
+import { getDistanceKm } from "@/lib/location-utils"
 
 // Activity 類型定義
 interface Activity {
@@ -53,15 +62,6 @@ const routeColors = {
 
 // API 基礎路徑
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-// 搜尋結果類型
-interface SearchResult {
-    lat: number
-    lng: number
-    name: string
-    address?: string
-    type?: string
-}
 
 // 搜尋歷史 Hook
 const HISTORY_KEY = "map_search_history"
@@ -251,7 +251,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
-            alert(t('map_geolocation_unsupported'))
+            toast.error(t('map_geolocation_unsupported'))
             return
         }
         setIsLocating(true)
@@ -273,9 +273,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 setIsLocating(false)
                 console.error("Geolocation error:", error)
                 if (error.code === error.PERMISSION_DENIED) {
-                    alert(t('map_geolocation_denied'))
+                    toast.error(t('map_geolocation_denied'))
                 } else {
-                    alert(t('map_geolocation_failed') + error.message)
+                    toast.error(t('map_geolocation_failed') + error.message)
                 }
             },
             { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
@@ -317,7 +317,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     setResults(mapped)
                     setIsTyping(false)
                     debugLog(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
-                    return  // 本地命中，不繼續 API
+                    // 🆕 不再 return，讓 L2 仍可補充結果
                 }
             }
         }
@@ -344,7 +344,31 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 })
                 // 🆕 只在 query 仍然匹配時更新
                 if (currentQuery === query) {
-                    setResults(data.results || [])
+                    const rawResults = data.results || []
+
+                    setResults(prev => {
+                        const combined = [...prev]
+                        for (const r of rawResults) {
+                            const isDup = combined.some(existing =>
+                                // 🆕 優先用 osm_id 精準去重，無 osm_id 才用 50m 座標
+                                (r.osm_id && existing.osm_id && String(r.osm_id) === String(existing.osm_id)) ||
+                                (getDistanceKm(existing.lat ?? 0, existing.lng ?? 0, r.lat ?? 0, r.lng ?? 0) < 0.05)
+                            )
+                            if (!isDup) combined.push(r)
+                        }
+
+                        // 🆕 加入距離計算與排序 (優先以用戶位置排序，若無則按地圖中心)
+                        const center = mapRef.current?.getCenter()
+                        const targetLat = userLocation?.lat ?? center?.lat ?? dailyLoc?.lat ?? 0
+                        const targetLng = userLocation?.lng ?? center?.lng ?? dailyLoc?.lng ?? 0
+
+                        const withDistance = combined.map(r => ({
+                            ...r,
+                            _distKm: getDistanceKm(targetLat, targetLng, r.lat, r.lng)
+                        }))
+
+                        return withDistance.sort((a, b) => (a._distKm ?? 999) - (b._distKm ?? 999))
+                    })
                 }
             } catch {
                 if (currentQuery === query) {
@@ -682,7 +706,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             setSelectedPOI(poiData)
             setPoiDrawerOpen(true)
         }
-    }, [])
+    }, [t])
 
     // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
     const center = markers.length > 0
@@ -887,6 +911,13 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                                         <div className="min-w-0">
                                                             <div className="text-sm font-medium truncate">{r.name}</div>
                                                             {r.address && <div className="text-xs text-slate-500 truncate">{r.address}</div>}
+                                                            {r._distKm != null && (
+                                                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded-md font-medium">
+                                                                        📍 {r._distKm.toFixed(1)} km
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </button>
                                                 ))}

@@ -46,7 +46,7 @@ type StaticKeys = keyof typeof translations.en
  * - `currency_${code}` for expense currency names
  * - `cat_${key}` for expense category names
  */
-type DynamicKeys = `currency_${string}` | `cat_${string}`
+type DynamicKeys = `currency_${string}` | `cat_${string}` | `profile_pref_${string}`
 
 /** Union type — no `as any` needed anywhere in the codebase */
 export type TranslationKey = StaticKeys | DynamicKeys

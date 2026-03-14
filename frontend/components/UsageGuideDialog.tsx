@@ -68,7 +68,7 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                             <AccordionContent className="px-4 pb-4 space-y-3">
                                 <Step n={1}
                                     title={zh ? '建立新行程' : 'Create New Trip'}
-                                    desc={zh ? '在行程列表頁面點擊右上角「+」按鈕，填寫行程名稱與日期範圍，即可建立新行程。' : 'Tap the "+" button on the trip list page. Enter trip name and date range to create.'}
+                                    desc={zh ? '在行程列表頁面點擊「+」按鈕，填寫行程名稱與日期範圍，即可建立新行程。' : 'Tap the "+" button on the trip list page. Enter trip name and date range to create.'}
                                 />
                                 <Step n={2}
                                     title={zh ? 'AI 匯入行程' : 'AI Import Trip'}
@@ -88,7 +88,7 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                                 />
                                 <Step n={6}
                                     title={zh ? '分享行程' : 'Share Trip'}
-                                    desc={zh ? '點擊行程頁面右上角的分享按鈕 📤，可透過原生分享或複製公開連結分享給任何人瀏覽。' : 'Tap the share button 📤 at the top right. Share via native share or copy the public link.'}
+                                    desc={zh ? '點擊行程頁面頂端導覽列的分享按鈕 📤，可透過原生分享或複製公開連結分享。' : 'Tap the share button 📤 at the top. Share via native share or copy the public link.'}
                                 />
                                 <Tip>{zh ? '只有行程創建者可以刪除行程；其他成員可以選擇離開行程。' : 'Only the trip creator can delete a trip; other members can choose to leave.'}</Tip>
                             </AccordionContent>
@@ -278,7 +278,7 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                                 />
                                 <Step n={4}
                                     title={zh ? 'API Key 設定（免費）' : 'API Key Setup (Free)'}
-                                    desc={zh ? '前往 Profile → AI API Key → 按照指示到 Google AI Studio 免費取得 API Key。每日可用 1,500 次！' : 'Go to Profile → AI API Key → Follow steps to get a free key from Google AI Studio. 1,500 calls/day!'}
+                                    desc={zh ? '前往「個人檔案」→ 點擊「API 金鑰設定」圖示 → 按照指示取得 API Key。' : 'Go to Profile → Tap the "API Key Settings" icon → Follow steps to get a free key.'}
                                 />
                                 <Tip>{zh ? 'AI 助手會自動讀取你目前的行程資料，所以回答會根據你的行程量身定制！' : 'AI assistant auto-reads your current itinerary, so answers are tailored to your specific trip!'}</Tip>
                             </AccordionContent>

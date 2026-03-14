@@ -11,6 +11,7 @@ export interface LocationInfo extends Coordinate {
     admin1?: string
     admin2?: string
     source?: string
+    osm_id?: number | string
 }
 
 export interface PreviewMetadata {
@@ -172,4 +173,39 @@ export interface GeocodeResult {
     admin2?: string
     source?: string
     results?: GeocodeResult[]
+    osm_id?: number | string
+}
+
+// 🆕 Shared Search Result Type
+export interface SearchResult {
+    lat: number
+    lng: number
+    name: string
+    address?: string
+    type?: string
+    source?: string
+    osm_id?: number | string
+    city?: string
+    country?: string
+    wikipedia?: string
+    cross_country?: boolean
+    _distKm?: number | null
+}
+// 🆕 v22.1: Unified type for AI-generated/imported itineraries
+export interface ParsedItineraryItem {
+    day_number: number
+    time_slot: string
+    place_name: string
+    category?: string
+    desc?: string
+    lat?: number
+    lng?: number
+    [key: string]: unknown // For future extra fields
+}
+
+export interface ParsedItinerary {
+    title?: string
+    start_date?: string
+    end_date?: string
+    items: ParsedItineraryItem[]
 }

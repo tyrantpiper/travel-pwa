@@ -26,7 +26,7 @@ import { COUNTRY_REGIONS } from "@/lib/constants"
 import { tripsApi, geocodeApi } from "@/lib/api"
 import { useHaptic, useTripDetail } from "@/lib/hooks"
 import { FlightCard } from "./info/FlightCard"
-import { extractCoordsFromUrl, isGoogleMapsShortlink } from "@/lib/location-utils"
+import { extractCoordsFromUrl, isGoogleMapsShortlink, getDistanceKm } from "@/lib/location-utils"
 
 
 
@@ -57,6 +57,7 @@ interface PlaceSearchResult {
     lng?: number
     latitude?: number
     longitude?: number
+    osm_id?: number | string
 }
 
 export function InfoView() {
@@ -221,7 +222,20 @@ export function InfoView() {
                 country: hotelSearchCountry || undefined,  // 🆕 結構化國家過濾
                 region: hotelSearchRegion || undefined     // 🆕 結構化區域過濾
             })
-            setHotelSearchResults(data.results || [])
+            const rawResults = data.results || []
+            const deduped = rawResults.filter((r: PlaceSearchResult, idx: number, self: PlaceSearchResult[]) => {
+                if (r.osm_id) {
+                    return self.findIndex(x => x.osm_id && String(x.osm_id) === String(r.osm_id)) === idx
+                }
+                return !self.slice(0, idx).some(existing => {
+                    const eLat = existing.lat ?? 0;
+                    const eLng = existing.lng ?? 0;
+                    const rLat = r.lat ?? 0;
+                    const rLng = r.lng ?? 0;
+                    return getDistanceKm(eLat, eLng, rLat, rLng) < 0.05;
+                })
+            })
+            setHotelSearchResults(deduped)
         } catch (e) {
             console.error("Hotel search failed:", e)
             toast.error(t('info_search_failed'))

@@ -11,6 +11,8 @@ slowapi>=0.1.9
 aiofiles>=25.1.0
 orjson>=3.10.0
 beautifulsoup4
+Pillow
+pillow-heif
 
 # Production Server
 gunicorn

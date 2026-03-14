@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { translations, TranslationKey } from './i18n'
+import { translations, type TranslationKey } from './i18n'
+export type { TranslationKey }
 
 type Language = 'en' | 'zh'
 

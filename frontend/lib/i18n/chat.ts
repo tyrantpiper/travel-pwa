@@ -25,6 +25,10 @@ export const chatTranslations = {
         ai_history_limit:
             "💬 Chat history limit reached, keeping recent 25 messages~",
         ai_connection_error: "🔥 Connection lost! Click resend below.",
+        ai_itinerary_found: "Itinerary Found",
+        ai_sending_to_import: "Sending to import...",
+        ai_one_click_import: "Import Itinerary",
+        ai_ready_to_import: "Itinerary ready to import!",
     },
     zh: {
         ai_subtitle: "你的 AI 旅遊達人",
@@ -43,5 +47,9 @@ export const chatTranslations = {
         ai_using_memory: "🧠 使用記憶摘要繼續對話~",
         ai_history_limit: "💬 對話記錄已達上限，保留最近 25 條訊息~",
         ai_connection_error: "🔥 連線中斷！點擊下方重試按鈕。",
+        ai_itinerary_found: "發現行程",
+        ai_sending_to_import: "傳送至匯入工具...",
+        ai_one_click_import: "立即匯入行程",
+        ai_ready_to_import: "行程已準備好匯入！",
     },
 } as const

@@ -1,8 +1,9 @@
 """
 Pydantic Models for Ryan Travel API
 Extracted from main.py for better code organization
+V23.1 Strict Financial Standard
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 
 
@@ -13,7 +14,7 @@ class UserPreferences(BaseModel):
     destination: str
     days: int
     budget: str
-    interests: List[str]
+    interests: List[str] = Field(default_factory=list)
 
 
 class MarkdownImportRequest(BaseModel):
@@ -35,19 +36,159 @@ class SimplePromptRequest(BaseModel):
     prompt: str
 
 
+# === 記帳與財務模型 (V23.1 Standard) ===
+
+class ReceiptDiagnostics(BaseModel):
+    """診斷資訊模型"""
+    status: str = "pass"        # pass | warning
+    source: str = "ai"          # ai | user
+    code: Optional[str] = None
+    message: Optional[str] = None
+    mismatch_amount: float = 0.0
+
+
+class ExpenseItem(BaseModel):
+    """消費細目項目"""
+    original_name: str
+    translated_name: Optional[str] = None
+    amount: float
+
+
+class ReceiptExtraction(BaseModel):
+    """AI 收據解析結果模型 (與 API 保持一致)"""
+    title: str
+    date: str
+    currency: str
+    subtotal_amount: float
+    tax_amount: float = 0.0
+    tip_amount: float = 0.0
+    service_charge_amount: float = 0.0
+    discount_amount: float = 0.0
+    total_amount: float
+    category: str
+    items: List[ExpenseItem] = Field(default_factory=list)
+
+
+class ActuaryRequest(BaseModel):
+    """AI 精算師對話請求"""
+    expenses: List[dict] = Field(default_factory=list)
+    members: List[dict] = Field(default_factory=list)
+    message: str
+    history: List[dict] = Field(default_factory=list)
+
+
+class ReceiptRequest(BaseModel):
+    """收據解析/匯入請求"""
+    imageUrl: Optional[str] = None
+    image: Optional[str] = None      # 🆕 Base64 資料
+    mime_type: Optional[str] = None  # 🆕 圖片類型
+    user_id: Optional[str] = None
+    title: Optional[str] = None
+    amount_jpy: Optional[float] = None  # Legacy, stores any currency amount
+    currency: Optional[str] = "JPY"
+    exchange_rate: Optional[float] = None
+    payment_method: Optional[str] = None
+
+
+class ExpenseRequest(BaseModel):
+    """新增消費請求"""
+    itinerary_id: Optional[str] = None
+    title: Optional[str] = None
+    amount_jpy: Optional[float] = None   # Legacy compatibility
+    total_amount: Optional[float] = None # Modern naming
+    subtotal_amount: float = 0.0
+    tax_amount: float = 0.0
+    tip_amount: float = 0.0
+    service_charge_amount: float = 0.0
+    discount_amount: float = 0.0
+    currency: str = "JPY"
+    exchange_rate: Optional[float] = None
+    payment_method: Optional[str] = None
+    category: str = "其他"
+    is_public: bool = True
+    created_by: Optional[str] = None
+    creator_name: Optional[str] = None
+    card_name: Optional[str] = None
+    cashback_rate: float = 0.0
+    image_url: Optional[str] = None
+    expense_date: Optional[str] = None
+    items: List[ExpenseItem] = Field(default_factory=list) # Detailed breakdown
+    diagnostics: Optional[ReceiptDiagnostics] = None     # AI/Manual validation info
+    custom_icon: Optional[str] = None                    # Emoji or custom icon
+    notes: Optional[str] = None                          # User-provided notes/remarks
+    payer_id: Optional[str] = None                       # ID of the person who paid
+
+
+class UpdateExpenseRequest(BaseModel):
+    """更新消費請求"""
+    title: Optional[str] = None
+    amount_jpy: Optional[float] = None
+    total_amount: Optional[float] = None
+    subtotal_amount: Optional[float] = None
+    tax_amount: Optional[float] = None
+    tip_amount: Optional[float] = None
+    service_charge_amount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    currency: Optional[str] = None
+    is_public: Optional[bool] = None
+    payment_method: Optional[str] = None
+    image_url: Optional[str] = None
+    category: Optional[str] = None
+    expense_date: Optional[str] = None
+    exchange_rate: Optional[float] = None
+    card_name: Optional[str] = None
+    cashback_rate: Optional[float] = None
+    items: Optional[List[ExpenseItem]] = None
+    diagnostics: Optional[ReceiptDiagnostics] = None
+    custom_icon: Optional[str] = None
+    notes: Optional[str] = None
+    payer_id: Optional[str] = None
+
+
+class ExpenseResponse(BaseModel):
+    """消費回應模型 (與前端 API 閉環)"""
+    id: str
+    itinerary_id: str
+    title: str
+    total_amount: float     # API Unified Name
+    amount: float = 0.0     # Legacy Fallback (v23.1 Sync)
+    subtotal_amount: float
+    tax_amount: float
+    tip_amount: float
+    service_charge_amount: float
+    discount_amount: float
+    currency: str
+    category: str
+    is_public: bool
+    expense_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    exchange_rate: Optional[float] = None
+    items: List[ExpenseItem] = Field(default_factory=list)
+    diagnostics: ReceiptDiagnostics
+    details_schema_version: int
+    created_at: Optional[str] = None
+    created_by: Optional[str] = None
+    creator_name: Optional[str] = None
+    image_url: Optional[str] = None      # Receipt image URL
+    card_name: Optional[str] = None      # Credit card identifier
+    cashback_rate: float = 0.0           # Cashback percentage
+    custom_icon: Optional[str] = None     # Display icon
+    notes: Optional[str] = None           # Persistent remarks
+    payer_id: Optional[str] = None        # Payer UUID
+
+
 # === 地理編碼模型 ===
 
 class GeocodeSearchRequest(BaseModel):
     """地理編碼搜尋請求"""
     query: str
     limit: int = 5
-    tripTitle: str = None
+    tripTitle: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
-    # 🆕 結構化過濾參數 (取代字串拼接)
-    country: Optional[str] = None   # 國家名稱 (如 "Japan", "Taiwan")
-    region: Optional[str] = None    # 區域名稱 (如 "Tokyo 東京")
-    zoom: Optional[float] = None    # 🆕 P1: 地圖縮放層級 (用於動態 bias)
+    country: Optional[str] = None
+    region: Optional[str] = None
+    zoom: Optional[float] = None
 
 
 class GeocodeReverseRequest(BaseModel):
@@ -68,19 +209,19 @@ class ItineraryItem(BaseModel):
     desc: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
-    cost_amount: Optional[float] = 0
-    tags: Optional[List[str]] = []
-    reservation_code: Optional[str] = ""
-    sub_items: List[dict] = []
+    cost_amount: float = 0.0
+    tags: List[str] = Field(default_factory=list)
+    reservation_code: str = ""
+    sub_items: List[dict] = Field(default_factory=list)
     link_url: Optional[str] = None
-    website_link: Optional[str] = None   # 🆕 新增：官網、IG、FB 
-    image_url: Optional[str] = None      # 🆕 新增：單張圖片
-    image_urls: Optional[List[str]] = [] # 🆕 新增：多張圖片
-    preview_metadata: Optional[Dict[str, Any]] = {} # 🆕 新增：連結預覽元數據
-    hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
-    memo: Optional[str] = None           # 🆕 使用者私人備忘錄
-    is_private: Optional[bool] = False      # 🆕 新增：私密項目支援
-    is_highlight: Optional[bool] = False    # 🆕 新增：高亮項目 (琥珀邊框)
+    website_link: Optional[str] = None
+    image_url: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
+    preview_metadata: Dict[str, Any] = Field(default_factory=dict)
+    hide_navigation: bool = False
+    memo: Optional[str] = None
+    is_private: bool = False
+    is_highlight: bool = False
 
 
 class SaveItineraryRequest(BaseModel):
@@ -88,16 +229,16 @@ class SaveItineraryRequest(BaseModel):
     title: str
     creator_name: str
     user_id: str
-    items: List[ItineraryItem]
+    items: List[ItineraryItem] = Field(default_factory=list)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    daily_locations: Optional[dict] = {}
-    day_notes: Optional[dict] = {}
-    day_costs: Optional[dict] = {}
-    day_tickets: Optional[dict] = {}
-    day_checklists: Optional[dict] = {}
+    daily_locations: Dict[str, Any] = Field(default_factory=dict)
+    day_notes: Dict[str, Any] = Field(default_factory=dict)
+    day_costs: Dict[str, Any] = Field(default_factory=dict)
+    day_tickets: Dict[str, Any] = Field(default_factory=dict)
+    day_checklists: Dict[str, Any] = Field(default_factory=dict)
     ai_review: Optional[str] = None
-    public_id: Optional[str] = None  # 🆕 隨機公開 ID (取代 share_code 出現在 URL)
+    public_id: Optional[str] = None
 
 
 class JoinTripRequest(BaseModel):
@@ -128,17 +269,17 @@ class UpdateItemRequest(BaseModel):
     memo: Optional[str] = None
     sub_items: Optional[List[dict]] = None
     link_url: Optional[str] = None
-    website_link: Optional[str] = None   # 🆕 官網連結
+    website_link: Optional[str] = None
     reservation_code: Optional[str] = None
-    image_url: Optional[str] = None      # 向後相容
-    image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
-    preview_metadata: Optional[Dict[str, Any]] = None # 🆕 預覽元數據
+    image_url: Optional[str] = None
+    image_urls: Optional[List[str]] = None
+    preview_metadata: Optional[Dict[str, Any]] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
-    sort_order: Optional[int] = None  # 🆕 拖曳排序
-    hide_navigation: Optional[bool] = None # 🆕 新增：手動隱藏導航
-    is_private: Optional[bool] = None      # 🆕 新增：私密項目更新
-    is_highlight: Optional[bool] = None    # 🆕 新增：高亮項目更新
+    sort_order: Optional[int] = None
+    hide_navigation: Optional[bool] = None
+    is_private: Optional[bool] = None
+    is_highlight: Optional[bool] = None
 
 
 class CreateItemRequest(BaseModel):
@@ -151,47 +292,45 @@ class CreateItemRequest(BaseModel):
     notes: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
-    image_url: Optional[str] = None       # 向後相容
-    image_urls: Optional[List[str]] = None  # 🆕 多圖片 URLs
-    tags: Optional[List[str]] = None
+    image_url: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     memo: Optional[str] = None
     link_url: Optional[str] = None
-    website_link: Optional[str] = None   # 🆕 官網連結
+    website_link: Optional[str] = None
     reservation_code: Optional[str] = None
-    cost_amount: Optional[float] = 0
-    sub_items: Optional[List[dict]] = None
-    preview_metadata: Optional[Dict[str, Any]] = {}
-    hide_navigation: Optional[bool] = False # 🆕 新增：手動隱藏導航
-    is_private: Optional[bool] = False      # 🆕 新增：私密項目建立
-    is_highlight: Optional[bool] = False    # 🆕 新增：高亮項目建立
+    cost_amount: float = 0.0
+    sub_items: List[dict] = Field(default_factory=list)
+    preview_metadata: Dict[str, Any] = Field(default_factory=dict)
+    hide_navigation: bool = False
+    is_private: bool = False
+    is_highlight: bool = False
 
 
-# 🆕 拖曳排序請求
 class ReorderItemRequest(BaseModel):
     """單一項目的排序更新"""
     item_id: str
     sort_order: int
-    time_slot: Optional[str] = None  # 可選：同時更新時間
+    time_slot: Optional[str] = None
+
 
 class ReorderRequest(BaseModel):
     """批次排序更新請求"""
-    items: List[ReorderItemRequest]
-    adjust_times: bool = False  # 是否自動重分配時間
+    items: List[ReorderItemRequest] = Field(default_factory=list)
+    adjust_times: bool = False
 
 
 class ImportToTripRequest(BaseModel):
     """匯入到現有行程請求"""
     trip_id: str
-    items: List[ItineraryItem]
-    daily_locations: Optional[dict] = {}
-    day_notes: Optional[dict] = {}
-    day_costs: Optional[dict] = {}
-    day_tickets: Optional[dict] = {}
-    day_checklists: Optional[dict] = {}
+    items: List[ItineraryItem] = Field(default_factory=list)
+    daily_locations: Dict[str, Any] = Field(default_factory=dict)
+    day_notes: Dict[str, Any] = Field(default_factory=dict)
+    day_costs: Dict[str, Any] = Field(default_factory=dict)
+    day_tickets: Dict[str, Any] = Field(default_factory=dict)
+    day_checklists: Dict[str, Any] = Field(default_factory=dict)
     ai_review: Optional[str] = None
 
-
-# === Day 管理模型 ===
 
 class UpdateDayDataRequest(BaseModel):
     """更新每日資訊請求"""
@@ -199,19 +338,19 @@ class UpdateDayDataRequest(BaseModel):
     day_notes: Optional[dict] = None
     day_costs: Optional[dict] = None
     day_tickets: Optional[dict] = None
-    day_checklists: Optional[dict] = None  # 🆕 行前清單
-    day_ai_reviews: Optional[dict] = None  # 🆕 AI 深度審核報告
+    day_checklists: Optional[dict] = None
+    day_ai_reviews: Optional[dict] = None
 
 
 class AddDayRequest(BaseModel):
     """新增天數請求"""
-    position: str = "end"  # "end" 或 "before:N"
-    clone_content: bool = False  # 🆕 是否移植鄰近天數的內容
+    position: str = "end"
+    clone_content: bool = False
 
 
 class AppendItemsRequest(BaseModel):
     """追加細項到行程請求"""
-    items: List[ItineraryItem]
+    items: List[ItineraryItem] = Field(default_factory=list)
 
 
 class CloneTripRequest(BaseModel):
@@ -233,16 +372,12 @@ class UpdateLocationRequest(BaseModel):
     lng: float
 
 
-# === 行程資訊模型 ===
-
 class UpdateInfoRequest(BaseModel):
     """更新行程資訊請求（航班/飯店/卡片）"""
     flight_info: Optional[dict] = None
-    hotel_info: Optional[Any] = None  # 🔧 FIX: Accept both dict and list
-    credit_cards: Optional[list[dict]] = None  # 🆕 v3.8: 信用卡回饋資訊
+    hotel_info: Optional[Any] = None
+    credit_cards: Optional[List[dict]] = None
 
-
-# === 路線規劃模型 ===
 
 class RouteStop(BaseModel):
     """路線停靠點"""
@@ -253,57 +388,15 @@ class RouteStop(BaseModel):
 
 class RouteRequest(BaseModel):
     """路線規劃請求"""
-    stops: List[RouteStop]
+    stops: List[RouteStop] = Field(default_factory=list)
     mode: str = "walk"
     optimize: bool = False
 
 
-# === 記帳模型 ===
-
-class ExpenseRequest(BaseModel):
-    """新增消費請求"""
-    itinerary_id: Optional[str] = None
-    title: Optional[str] = None
-    amount_jpy: Optional[float] = None  # Note: Field named amount_jpy for legacy, stores any currency amount
-    currency: Optional[str] = "JPY"  # 🆕 Multi-currency support (default JPY for backward compat)
-    exchange_rate: Optional[float] = None
-    payment_method: Optional[str] = None
-    category: Optional[str] = None
-    is_public: Optional[bool] = None
-    created_by: Optional[str] = None
-    creator_name: Optional[str] = None
-    card_name: Optional[str] = None
-    cashback_rate: Optional[float] = 0
-    image_url: Optional[str] = None
-    expense_date: Optional[str] = None
-
-
-class UpdateTripTitleRequest(BaseModel):
-    """更新行程標題請求"""
-    title: str
-
-
-class UpdateExpenseRequest(BaseModel):
-    """更新消費請求"""
-    title: Optional[str] = None
-    amount_jpy: Optional[float] = None
-    currency: Optional[str] = None  # 🆕 Multi-currency support
-    is_public: Optional[bool] = None
-    payment_method: Optional[str] = None
-    image_url: Optional[str] = None
-    category: Optional[str] = None
-    expense_date: Optional[str] = None
-    exchange_rate: Optional[float] = None     # 🛡️ Bug #3 Fix: 防止編輯時靜默丟失
-    card_name: Optional[str] = None           # 🛡️ Bug #3 Fix
-    cashback_rate: Optional[float] = None     # 🛡️ Bug #3 Fix
-
-
-# === AI 聊天模型 ===
-
 class ChatRequest(BaseModel):
     """AI 聊天請求"""
     message: str
-    history: List[dict] = []
+    history: List[dict] = Field(default_factory=list)
     thought_signatures: Optional[List[dict]] = None
     image: Optional[str] = None
     location: Optional[dict] = None
@@ -313,10 +406,8 @@ class ChatRequest(BaseModel):
 
 class SummarizeRequest(BaseModel):
     """記憶摘要請求"""
-    history: List[Dict]
+    history: List[dict] = Field(default_factory=list)
 
-
-# === POI 模型 ===
 
 class POIAIEnrichRequest(BaseModel):
     """POI AI 增強請求"""
@@ -335,22 +426,20 @@ class POIEnrichRequest(BaseModel):
 
 class POIRecommendRequest(BaseModel):
     """POI AI 推薦請求"""
-    pois: List[dict]
+    pois: List[dict] = Field(default_factory=list)
     user_query: str
     api_key: str
     user_preferences: Optional[dict] = None
 
 
-# === Smart Search 模型 ===
-
 class SmartSearchRequest(BaseModel):
     """🧠 智能語意搜尋請求"""
-    query: str                          # 用戶自然語言輸入
-    lat: float                          # 當前位置
+    query: str
+    lat: float
     lng: float
-    region: Optional[str] = None        # 區域名（如 "新宿"）
-    trip_title: Optional[str] = None    # 行程標題（推斷國家）
-    api_key: str                        # BYOK
+    region: Optional[str] = None
+    trip_title: Optional[str] = None
+    api_key: str
     max_results: int = 3
 
 
@@ -358,19 +447,19 @@ class SmartSearchRecommendation(BaseModel):
     """單個推薦結果"""
     name: str
     reason: str
-    highlights: List[str] = []
+    highlights: List[str] = Field(default_factory=list)
     lat: Optional[float] = None
     lng: Optional[float] = None
     rating: Optional[float] = None
-    distance: Optional[int] = None      # 公尺
+    distance: Optional[int] = None
 
 
 class SmartSearchResponse(BaseModel):
     """智能搜尋回應"""
-    query_type: str                     # recommendation, nearby, specific
-    understood_intent: str              # AI 理解的意圖
-    recommendations: List[SmartSearchRecommendation]
-    source: str                         # gemma, poi_fallback, geocode_fallback
+    query_type: str
+    understood_intent: str
+    recommendations: List[SmartSearchRecommendation] = Field(default_factory=list)
+    source: str
 
 
 class UpdateProfileRequest(BaseModel):
@@ -382,3 +471,8 @@ class UpdateProfileRequest(BaseModel):
 class ResolveLinkRequest(BaseModel):
     """解析地圖連結請求"""
     url: str
+
+
+class UpdateTripTitleRequest(BaseModel):
+    """更新行程標題請求"""
+    title: str

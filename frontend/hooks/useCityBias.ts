@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { debugLog } from '@/lib/debug'
 
 /**
  * 城市資料結構
@@ -66,9 +67,9 @@ export function useCityBias() {
                 const data: CitiesData = await res.json()
                 setCities(data.cities)
                 setIsLoaded(true)
-                console.log(`🏙️ City bias loaded: ${data.cities.length} cities`)
+                debugLog(`🏙️ City bias loaded: ${data.cities.length} cities`)
             } catch (err) {
-                console.error('🏙️ City bias load error:', err)
+                debugLog(`🏙️ City bias load error: ${err}`, 'error')
                 setError(err instanceof Error ? err.message : 'Unknown error')
             } finally {
                 setIsLoading(false)
@@ -96,7 +97,7 @@ export function useCityBias() {
         }
 
         if (nearest) {
-            console.log(`🏙️ Nearest city: ${nearest.name} (${minDistance.toFixed(1)} km)`)
+            debugLog(`🏙️ Nearest city: ${nearest.name} (${minDistance.toFixed(1)} km)`)
         }
 
         return nearest

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { GeocodeResult, DailyLocation, Trip, LocationInfo } from "@/lib/itinerary-types"
 import { geocodeApi } from "@/lib/api"
+import { getDistanceKm } from "@/lib/location-utils"
 import { COUNTRY_REGIONS } from "@/lib/constants"
 import { useLanguage } from "@/lib/LanguageContext"
 
@@ -51,9 +52,21 @@ export function LocationEditDialog({
                 lng: biasLoc?.lng,
                 tripTitle: currentTrip?.title
             })
-            const results = data.results || []
-            setLocSearchResults(results)
-            if (results.length === 0) {
+            const rawResults = data.results || []
+            const deduped = rawResults.filter((r: GeocodeResult, idx: number, self: GeocodeResult[]) => {
+                if (r.osm_id) {
+                    return self.findIndex(x => x.osm_id && String(x.osm_id) === String(r.osm_id)) === idx
+                }
+                return !self.slice(0, idx).some(existing => {
+                    const eLat = existing.lat ?? 0;
+                    const eLng = existing.lng ?? 0;
+                    const rLat = r.lat ?? 0;
+                    const rLng = r.lng ?? 0;
+                    return getDistanceKm(eLat, eLng, rLat, rLng) < 0.05;
+                })
+            })
+            setLocSearchResults(deduped)
+            if (rawResults.length === 0) {
                 toast.error(t('loc_not_found'))
             }
         } catch (err) {

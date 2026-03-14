@@ -19,7 +19,8 @@ import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
 import { useWeatherStore } from "@/lib/stores/weatherStore"
 import { debugLog } from "@/lib/debug"
-import { useLanguage } from "@/lib/LanguageContext"
+import { useLanguage, type TranslationKey } from "@/lib/LanguageContext"
+import { type ParsedItinerary, type ParsedItineraryItem } from "@/lib/itinerary-types"
 
 // 🆕 Part 結構 (與 Gemini API 對應)
 interface Part {
@@ -27,6 +28,27 @@ interface Part {
     function_call?: { name: string; args: Record<string, unknown> }
     thought?: string  // 思想簽名 (加密)
     _raw?: string
+}
+
+// 🆕 v22.1: JSON 防漏閥與行程偵測
+function tryParseItinerary(text: string): ParsedItinerary | null {
+    if (!text || !text.includes('{"')) return null
+    try {
+        // 嘗試提取 JSON (處理可能存在的 Markdown 標籤)
+        const cleanJson = text.replace(/```json|```/g, "").trim()
+        const data = JSON.parse(cleanJson)
+        if (data.items && Array.isArray(data.items)) {
+            return data as ParsedItinerary
+        }
+        // 處理嵌套在 data 裡的情況
+        if (data.data && data.data.items) {
+            return data.data as ParsedItinerary
+        }
+    } catch (error) {
+        console.error("Failed to parse itinerary from chat content:", error)
+        return null
+    }
+    return null
 }
 
 // 🆕 來源標籤
@@ -251,7 +273,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
     }, [activeTripId, isOpen])
 
     // Draggable state
-    const [position, setPosition] = useState<Position>({ x: 0, y: 0 })
+    const [position, setPosition] = useState<Position>({ x: 16, y: 100 })
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef<HTMLDivElement>(null)
     const dragOffset = useRef<Position>({ x: 0, y: 0 })
@@ -394,7 +416,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         if ((!input.trim() && !selectedImage) || isLoading) return
 
         // Check for API key
-        const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || ""
+        const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
         if (!apiKey) {
             const errorMsg = t('ai_apikey_missing')
             setMessages(prev => [
@@ -643,7 +665,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         <>
             {/* Chat Window - Fixed Center */}
             {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-sm h-[70vh] max-h-[500px] flex flex-col border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Header - No longer draggable */}
                         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white">
@@ -686,8 +708,43 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                     return null
                                                 })()}
                                                 <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent === "__GREETING__" ? t('ai_greet_msg') : msg.displayContent}</ReactMarkdown>
+                                                    {(() => {
+                                                        const itinerary = tryParseItinerary(msg.displayContent)
+                                                        if (itinerary) {
+                                                            // 🛡️ JSON 防漏閥：將 JSON 轉為友善的 Markdown
+                                                            const summary = `### ✨ ${itinerary.title || t('ai_itinerary_found' as TranslationKey)}\n` +
+                                                                itinerary.items.slice(0, 5).map((it: ParsedItineraryItem) => `- Day ${it.day_number}: ${it.place_name} (${it.time_slot || ''})`).join('\n') +
+                                                                (itinerary.items.length > 5 ? `\n... (還有 ${itinerary.items.length - 5} 個地點)` : '')
+                                                            return <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
+                                                        }
+                                                        return <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent === "__GREETING__" ? t('ai_greet_msg') : msg.displayContent}</ReactMarkdown>
+                                                    })()}
                                                 </div>
+
+                                                {/* 🆕 v22.1: 一鍵匯入橋樑 */}
+                                                {(tryParseItinerary(msg.displayContent) || msg.displayContent.includes('| Day |') || msg.displayContent.includes('## Day 1')) && (
+                                                    <div className="mt-3">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="w-full h-9 rounded-xl border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-300 font-bold gap-2 shadow-sm transition-all active:scale-95"
+                                                            onClick={async () => {
+                                                                // 將內容傳遞給 ToolsView (透過事件)
+                                                                const event = new CustomEvent('ai-import-itinerary', {
+                                                                    detail: { content: msg.displayContent }
+                                                                })
+                                                                window.dispatchEvent(event)
+                                                                toast.success(t('ai_sending_to_import' as TranslationKey))
+                                                                // 自動開啟 ToolsView (假設有導航邏輯)
+                                                                const navEvent = new CustomEvent('navigate-to-tools')
+                                                                window.dispatchEvent(navEvent)
+                                                            }}
+                                                        >
+                                                            ✨ {t('ai_one_click_import' as TranslationKey) || "立即匯入行程"}
+                                                        </Button>
+                                                    </div>
+                                                )}
+
                                                 {/* 來源標籤 */}
                                                 {msg.groundingSources && msg.groundingSources.length > 0 && (
                                                     <SourceCitation sources={msg.groundingSources} />
@@ -818,7 +875,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             {/* Toggle Button - Edge Draggable */}
             <div
                 ref={dragRef}
-                className="fixed z-50"
+                className="fixed z-[110]"
                 style={{
                     right: position.x,
                     bottom: position.y,

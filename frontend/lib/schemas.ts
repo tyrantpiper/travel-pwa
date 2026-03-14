@@ -92,23 +92,52 @@ export const TripSchema = z.object({
 });
 
 // === Expenses ===
+export const ReceiptDiagnosticsSchema = z.object({
+    status: z.enum(["pass", "warning"]),
+    source: z.enum(["ai", "user"]).default("user"),
+    code: z.string().default(""),
+    message: z.string().default(""),
+    mismatch_amount: z.number().default(0),
+});
+
 export const ExpenseSchema = z.object({
     id: z.string(),
     itinerary_id: z.string(),
     title: z.string().default("Expense"),
-    amount: z.number().optional().default(0), // 🆕 新增
+    total_amount: z.number().optional(),      // 🆕 v23.1 Primary Amount
+    amount: z.number().optional(),            // Legacy Fallback
     amount_jpy: z.number().default(0),
     currency: z.string().default("JPY"),
     category: z.string().default("other"),
     payment_method: z.string().optional().nullable(),
     expense_date: z.string().optional().nullable(),
-    card_name: z.string().optional().nullable(), // 🆕 新增
-    exchange_rate: z.number().optional().nullable(), // 🆕 新增
-    cashback_rate: z.number().optional().default(0), // 🆕 新增
-    is_public: z.boolean().default(false), // 🆕 新增
+    card_name: z.string().optional().nullable(),
+    exchange_rate: z.number().optional().nullable(),
+    cashback_rate: z.number().optional().default(0),
+    is_public: z.boolean().default(false),
     created_by: z.string().optional(),
     creator_name: z.string().optional(),
+    // V23.1 Financial Nomenclature
+    items: z.array(z.object({
+        original_name: z.string(),
+        translated_name: z.string().optional(),
+        amount: z.number()
+    })).default([]),
+    subtotal_amount: z.number().default(0),
+    tax_amount: z.number().default(0),
+    tip_amount: z.number().default(0),
+    service_charge_amount: z.number().default(0),
+    discount_amount: z.number().default(0),
+    diagnostics: ReceiptDiagnosticsSchema.optional(),
+    
+    // Legacy mapping (kept for hydration safety)
+    details: z.array(z.any()).default([]), 
+    custom_icon: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    payer_id: z.string().optional().nullable(),
 });
+
+export type ReceiptDiagnostics = z.infer<typeof ReceiptDiagnosticsSchema>;
 
 // === API Responses ===
 export const GeocodeResultSchema = z.object({

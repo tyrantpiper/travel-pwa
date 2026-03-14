@@ -28,9 +28,9 @@ DAILY_ROUTING: List[str] = [
 ]
 
 HEAVY_ROUTING: List[str] = [
-    "gemini-3-flash-preview",          # 20 RPD, 強推理、大 context
-    "gemini-3.1-flash-lite-preview",   # 500 RPD, 降級備援
-    "gemini-2.5-flash",                # 20 RPD, 穩定版兜底
+    "gemini-3.1-flash-lite-preview",   # 500 RPD, 高額度優先 (解決部分金鑰 400 錯誤)
+    "gemini-3-flash-preview",          # 20 RPD, 次選
+    "gemini-2.5-flash",                # 穩定版兜底
 ]
 
 # ═══════════════════════════════════════════════════════════════

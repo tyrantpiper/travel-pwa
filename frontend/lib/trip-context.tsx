@@ -70,6 +70,22 @@ export function TripProvider({ children }: { children: ReactNode }) {
         }
     }, [activeTripId, userId, setActiveTripId, setUserId])
 
+    // 🆕 監聽登入狀態變化事件 (來自 LandingPage)
+    useEffect(() => {
+        const handleLoginStateChanged = () => {
+            if (typeof window === "undefined") return
+            const storedId = localStorage.getItem("user_uuid")
+            if (storedId && isValidUserId(storedId)) {
+                console.log("🔐 [TripProvider] Login state change detected, syncing identity:", storedId)
+                setUserId(storedId)
+            }
+        }
+        window.addEventListener('user-login-state-changed', handleLoginStateChanged)
+        return () => {
+            window.removeEventListener('user-login-state-changed', handleLoginStateChanged)
+        }
+    }, [setUserId])
+
     const { trips, isLoading, mutate } = useTrips(userId)
 
     // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，強制刷新 trips

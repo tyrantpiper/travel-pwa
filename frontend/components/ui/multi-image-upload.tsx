@@ -117,8 +117,8 @@ export function MultiImageUpload({
         setLoading(true)
         setProgress(0)
         try {
-            // 🆕 執行前端預壓縮 (2026 Optimization)
-            const compressedFile = await compressImage(file, { maxWidth: 1600, quality: 0.8 });
+            // 🆕 執行大解析度優化 (No more 1600px limit)
+            const compressedFile = await compressImage(file, { maxWidth: 8192, maxHeight: 8192, quality: 0.9 });
 
             const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
             const apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY

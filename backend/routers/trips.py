@@ -11,9 +11,12 @@ Note: This is a large router containing 17 endpoints.
 """
 
 import re
+import uuid
+import random
+import string
 import traceback
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Header
 
 from models.base import (
@@ -28,14 +31,17 @@ from models.base import (
     CreateItemRequest,
     UpdateItemRequest,
     AddDayRequest,
-    ReorderRequest  # 🆕 拖曳排序
+    ReorderRequest,
+    ExpenseResponse,      # 🆕 Data Parity
+    ReceiptDiagnostics    # 🆕 Data Parity
 )
+from .expenses import normalize_items  # 🆕 Data Parity
 from services.link_resolver import resolve_google_maps_link
 from utils.deps import get_supabase, get_verified_user
 from utils.helpers import generate_room_code, generate_public_id, ensure_user_exists
 from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
-router = APIRouter(prefix="/api", tags=["trips"])
+router = APIRouter(prefix="/api/trips", tags=["trips"])
 
 # ensure_user_exists moved to utils.helpers
 
@@ -44,7 +50,7 @@ router = APIRouter(prefix="/api", tags=["trips"])
 # 🆕 Public Share Endpoint (ISR-enabled, no auth required)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/trips/share/{public_id}")
+@router.get("/share/{public_id}")
 async def get_public_trip_by_public_id(
     public_id: str,
     supabase=Depends(get_supabase)
@@ -134,7 +140,7 @@ async def get_public_trip_by_public_id(
 # Trip CRUD Operations
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.get("/trips")
+@router.get("")
 async def get_trips(
     user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
@@ -219,7 +225,7 @@ async def get_trips(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/trips/{trip_id}")
+@router.get("/{trip_id}")
 async def get_trip_by_id(
     trip_id: str, 
     user_id: str = Depends(get_verified_user),
@@ -1571,7 +1577,7 @@ async def delete_day(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/trips/{trip_id}/days")
+@router.post("/{trip_id}/days")
 async def add_day(
     trip_id: str, 
     request: AddDayRequest, 
@@ -1737,4 +1743,135 @@ async def add_day(
         raise
     except Exception as e:
         print(f"🔥 Add Day Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 💰 Expenses Integration (Cross-Module Compatibility)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/{trip_id}/expenses")
+async def get_trip_expenses(
+    trip_id: str, 
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
+    """
+    📊 獲取行程的費用列表 (配合前端 API.TRIPS 路徑)
+    
+    邏輯：抓出 (該行程的所有公帳) OR (該行程中 我建立的私帳)
+    """
+    try:
+        print(f"💰 [Trips] Fetching expenses for trip {trip_id}, user {user_id}")
+        res = supabase.table("expenses").select("*").eq("itinerary_id", trip_id).execute()
+        all_expenses = res.data
+        
+        filtered = []
+        for exp in all_expenses:
+            # 🛡️ Authorization Partition
+            is_owner = str(exp.get('created_by')) == user_id
+            if not (exp.get('is_public') or is_owner):
+                continue
+
+            raw_date = exp.get('incurred_at') or ''
+            expense_date = str(raw_date).split('T')[0] if raw_date else None
+            
+            version = exp.get("details_schema_version", 1)
+            items = normalize_items(exp.get("details", []), version)
+            
+            expense_resp = ExpenseResponse(
+                id=str(exp["id"]),
+                itinerary_id=str(exp["itinerary_id"]),
+                title=exp.get("title", "Untitled"),
+                total_amount=exp.get("amount", 0.0),
+                amount=exp.get("amount", 0.0), # Sync for backward compatibility
+                subtotal_amount=exp.get("subtotal_amount", 0.0),
+                tax_amount=exp.get("tax_amount", 0.0),
+                tip_amount=exp.get("tip_amount", 0.0),
+                service_charge_amount=exp.get("service_charge_amount", 0.0),
+                discount_amount=exp.get("discount_amount", 0.0),
+                currency=exp.get("currency", "JPY"),
+                category=exp.get("category", "其他"),
+                is_public=exp.get("is_public", True),
+                expense_date=expense_date,
+                payment_method=exp.get("payment_method"),
+                exchange_rate=exp.get("exchange_rate"),
+                items=items,
+                diagnostics=ReceiptDiagnostics(
+                    status=exp.get("validation_status", "pass"),
+                    source="ai" if exp.get("validation_status") == "warning" else "user",
+                    code=exp.get("validation_code"),
+                    message=exp.get("validation_message"),
+                    mismatch_amount=exp.get("mismatch_amount", 0.0)
+                ),
+                details_schema_version=version,
+                created_at=str(exp.get("created_at")),
+                created_by=str(exp.get("created_by")),
+                creator_name=exp.get("creator_name"),
+                image_url=exp.get("image_url"),
+                card_name=exp.get("card_name"),
+                cashback_rate=exp.get("cashback_rate", 0.0),
+                custom_icon=exp.get("custom_icon"),
+                notes=exp.get("notes"),
+                payer_id=exp.get("payer_id")
+            )
+            filtered.append(expense_resp.dict())
+                
+        print(f"✅ [Trips] Returned {len(filtered)} standardized expenses")
+        return filtered
+    except Exception as e:
+        print(f"🔥 Fetch Trip Expenses Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{trip_id}/ledger-share")
+async def generate_ledger_share_code(
+    trip_id: str,
+    x_user_id: str = Header(None, alias="X-User-ID"),
+    supabase=Depends(get_supabase)
+):
+    """
+    🔗 為行程生成公帳分享碼 (Ledger Share Code)
+    
+    邏輯：
+    1. 驗證使用者是否為該行程成員
+    2. 生成 6 碼隨機字串 (大寫字母+數字)
+    3. 更新 itineraries 表的 ledger_share_code 欄位
+    """
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="未提供使用者 ID")
+        
+    try:
+        # 1. 權限檢查
+        member_check = supabase.table("trip_members")\
+            .select("user_id")\
+            .eq("itinerary_id", trip_id)\
+            .eq("user_id", x_user_id)\
+            .execute()
+            
+        if not member_check.data:
+            raise HTTPException(status_code=403, detail="您沒有權解操作此行程的分享功能")
+            
+        # 2. 生成新 UUID
+        share_code = str(uuid.uuid4())
+            
+        # 3. 更新資料庫
+        update_res = supabase.table("itineraries")\
+            .update({"ledger_share_code": share_code})\
+            .eq("id", trip_id)\
+            .execute()
+            
+        if not update_res.data:
+            raise HTTPException(status_code=404, detail="找不到此行程或更新失敗")
+            
+        print(f"✅ [Share] Generated Ledger Share Code: {share_code} for trip {trip_id}")
+        return {
+            "status": "success",
+            "ledger_share_code": share_code
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Ledger Share Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

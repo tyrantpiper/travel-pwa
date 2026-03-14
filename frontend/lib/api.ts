@@ -14,7 +14,8 @@ import {
     UserProfileSchema,
     GeocodeResponseSchema,
     AiParseResponseSchema,
-    AiGenerateResponseSchema
+    AiGenerateResponseSchema,
+    ReceiptDiagnostics // Added
 } from './schemas';
 import { SubItem, PreviewMetadata } from './itinerary-types';
 import { z } from "zod";
@@ -22,14 +23,14 @@ import { z } from "zod";
 // === API Endpoints ===
 export const API = {
     TRIPS: `${API_HOST}/api/trips`,
-    TRIP_CREATE_MANUAL: `${API_HOST}/api/trip/create-manual`,
-    TRIP_JOIN: `${API_HOST}/api/join-trip`,
-    SAVE_ITINERARY: `${API_HOST}/api/save-itinerary`,
-    LATEST_ITINERARY: `${API_HOST}/api/itinerary/latest`,
-    PARSE_MD: `${API_HOST}/api/parse-md`,
-    GENERATE_TRIP: `${API_HOST}/api/generate-trip`,
+    TRIP_CREATE_MANUAL: `${API_HOST}/api/trips/create-manual`,
+    TRIP_JOIN: `${API_HOST}/api/trips/join-trip`,
+    SAVE_ITINERARY: `${API_HOST}/api/trips/save-itinerary`,
+    LATEST_ITINERARY: `${API_HOST}/api/trips/itinerary/latest`,
+    PARSE_MD: `${API_HOST}/api/ai/parse-md`,
+    GENERATE_TRIP: `${API_HOST}/api/ai/generate-trip`,
     EXPENSES: `${API_HOST}/api/expenses`,
-    ITEMS: `${API_HOST}/api/items`,
+    ITEMS: `${API_HOST}/api/trips/items`,
     GEOCODE: `${API_HOST}/api/geocode/search`,
     POI: `${API_HOST}/api/poi`,
     CHAT: `${API_HOST}/api/chat`,
@@ -37,6 +38,8 @@ export const API = {
     USERS: `${API_HOST}/api/users`,
     APP: `${API_HOST}/api/app`,
     RESOLVE_LINK: `${API_HOST}/api/geocode/resolve-link`,
+    RECEIPT_PARSE: `${API_HOST}/api/ai/parse-receipt`,
+    ACTUARY: `${API_HOST}/api/ai/actuary`,
 }
 
 export { API_HOST }
@@ -152,6 +155,60 @@ export interface ImportToTripParams {
     ai_review?: string
     user_id?: string
 }
+
+export interface UserPreference {
+    id: string
+    user_id: string
+    category: string // 'diet', 'pace', 'interest', 'accommodation', 'other'
+    preference: string
+    confidence?: number
+    reasoning?: string
+    updated_at: string
+}
+
+// === Internal Helpers ===
+
+/**
+ * Robustly extracts error messages from various response formats
+ * Priority: detail -> error -> message -> text -> fallback
+ */
+async function extractError(res: Response, fallback: string): Promise<string> {
+    try {
+        const text = await res.text();
+        if (!text) return fallback;
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            // Not JSON - return the raw text if it looks like a message (not HTML)
+            if (text.trim().startsWith("<")) return fallback;
+            return text.slice(0, 200);
+        }
+
+        // 1. Check "detail" (FastAPI standard)
+        if (data.detail) {
+            if (typeof data.detail === "string") return data.detail;
+            if (Array.isArray(data.detail)) {
+                return data.detail.map((d: unknown) => typeof d === "string" ? d : JSON.stringify(d)).join(", ");
+            }
+            if (typeof data.detail === "object") {
+                return data.detail.message || JSON.stringify(data.detail);
+            }
+        }
+
+        // 2. Check "error" (Legacy/Proxy)
+        if (data.error) return typeof data.error === "string" ? data.error : JSON.stringify(data.error);
+
+        // 3. Check "message" (General standard)
+        if (data.message) return data.message;
+
+        return fallback;
+    } catch {
+        return fallback;
+    }
+}
+
 
 // === API Functions ===
 
@@ -338,7 +395,7 @@ export const tripsApi = {
             : ""
 
         if (!apiKey) {
-            throw new Error("請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)")
+            throw new Error("請到下方導覽列的「個人檔案」頁面設定 Gemini API Key")
         }
 
         const headers: Record<string, string> = {
@@ -347,7 +404,7 @@ export const tripsApi = {
         }
         if (userId) headers["X-User-ID"] = userId
 
-        const res = await fetch(`${API.TRIPS}/${tripId}/days/${day}/ai-review`, {
+        const res = await fetch(`${API_HOST}/api/ai/trips/${tripId}/days/${day}/ai-review`, {
             method: "POST",
             headers
         })
@@ -444,8 +501,8 @@ export const aiApi = {
             body: JSON.stringify({ markdown_text: params.markdown_text })
         })
         if (!res.ok) {
-            const data = await res.json().catch(() => ({ detail: "AI 解析失敗" }))
-            throw new Error(data.detail || "AI 解析失敗")
+            const errMsg = await extractError(res, "AI 解析失敗")
+            throw new Error(errMsg)
         }
         const data = await res.json()
         const parsed = AiParseResponseSchema.safeParse(data)
@@ -455,6 +512,61 @@ export const aiApi = {
         }
         return parsed.data
     },
+
+    /** 📸 Parse receipt image into structured expense data (Phase 5) */
+    parseReceipt: async (imageUrl: string, image?: string) => {
+        const apiKey = typeof window !== 'undefined'
+            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
+            : ""
+
+        // We forward the auth header so the Proxy can authenticate with the Backend FastAPI
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Gemini-API-Key": apiKey
+        }
+
+        const res = await fetch(API.RECEIPT_PARSE, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ imageUrl, image })
+        })
+
+        if (!res.ok) {
+            const errMsg = await extractError(res, "AI Receipt Parse Failed")
+            throw new Error(errMsg)
+        }
+        return await res.json()
+    },
+
+    /** 🤖 AI Actuary One-Click Split (Phase 7) */
+    actuaryChat: async (
+        expenses: unknown[],
+        members: unknown[],
+        message: string,
+        history: { role: string, content: string }[]
+    ) => {
+        const apiKey = typeof window !== 'undefined'
+            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
+            : ""
+
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "X-Gemini-API-Key": apiKey
+        }
+
+        const res = await fetch(API.ACTUARY, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ expenses, members, message, history })
+        })
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({ reply: "AI 精算師連線失敗，請稍後再試" }))
+            throw new Error(data.reply || "AI 精算師連線失敗，請稍後再試")
+        }
+        return await res.json()
+    },
+
 
     /** 🚀 Generate itinerary from prompt */
     generateTrip: async (params: AiGenerateParams) => {
@@ -474,8 +586,8 @@ export const aiApi = {
             body: JSON.stringify({ prompt: params.prompt })
         })
         if (!res.ok) {
-            const data = await res.json().catch(() => ({ detail: "AI 生成失敗" }))
-            throw new Error(data.detail || "AI 生成失敗")
+            const errMsg = await extractError(res, "AI 生成失敗")
+            throw new Error(errMsg)
         }
         const data = await res.json()
         const parsed = AiGenerateResponseSchema.safeParse(data)
@@ -723,6 +835,37 @@ export const geocodeApi = {
     },
 }
 
+export interface ExpensePayload {
+    title: string;
+    amount_jpy: number; // Total in JPY for quick listing
+    currency?: string;
+    category?: string;
+    payment_method?: string | null;
+    expense_date?: string | null;
+    card_name?: string | null;
+    exchange_rate?: number | null;
+    cashback_rate?: number;
+    is_public?: boolean;
+    image_url?: string | null;
+    itinerary_id?: string;
+    
+    // V23.1 Financial Standard
+    items?: { original_name: string, translated_name?: string, amount: number }[];
+    subtotal_amount?: number;
+    tax_amount?: number;
+    tip_amount?: number;
+    service_charge_amount?: number;
+    discount_amount?: number;
+    total_amount?: number;
+    diagnostics?: ReceiptDiagnostics;
+
+    // Legacy (Deprecated)
+    details?: { name: string, price: number }[];
+    custom_icon?: string | null;
+    notes?: string | null;
+    payer_id?: string | null;
+}
+
 /**
  * Expense API Functions
  */
@@ -744,7 +887,7 @@ export const expensesApi = {
     },
 
     /** Create a new expense */
-    create: async (data: Record<string, unknown>, userId?: string) => {
+    create: async (data: ExpensePayload, userId?: string) => {
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId
 
@@ -813,6 +956,25 @@ export const usersApi = {
             body: JSON.stringify(data)
         })
         if (!res.ok) throw new Error("Failed to update profile")
+        return res.json()
+    },
+
+    /** 🧠 Get AI memory preferences (Adaptive Memory) */
+    getPreferences: async (userId: string): Promise<UserPreference[]> => {
+        const res = await fetch(`${API.USERS}/me/preferences`, {
+            headers: { "X-User-ID": userId }
+        })
+        if (!res.ok) throw new Error("Failed to fetch preferences")
+        return res.json()
+    },
+
+    /** 🗑️ Delete a preference */
+    deletePreference: async (userId: string, prefId: string) => {
+        const res = await fetch(`${API.USERS}/me/preferences/${prefId}`, {
+            method: "DELETE",
+            headers: { "X-User-ID": userId }
+        })
+        if (!res.ok) throw new Error("Failed to delete preference")
         return res.json()
     },
 }

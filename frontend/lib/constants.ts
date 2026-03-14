@@ -30,7 +30,12 @@ export const MAP_STYLES = {
     VECTOR: process.env.NEXT_PUBLIC_MAP_STYLE_VECTOR || "https://tiles.openfreemap.org/styles/liberty",
 
     // Esri 衛星影像 (免費，需標註來源)
+    // Legacy Raster Tile: 不需要 Token，但僅地圖磚
     SATELLITE: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+
+    // Esri modern Basemap Styles API v2 (需要 ArcGIS API Token)
+    // Monthly 2M requests free: https://location.arcgis.com/
+    SATELLITE_V2: (token: string) => `https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/imagery?token=${token}`,
 
     // 3D 建築設定
     BUILDING_3D: {

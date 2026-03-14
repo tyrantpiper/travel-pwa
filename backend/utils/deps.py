@@ -3,35 +3,42 @@ from fastapi import Header, HTTPException, Request
 from supabase import create_client, Client
 
 
-async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key")):
+async def get_gemini_key(
+    x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key"),
+    auth_header: str = Header(None, alias="Authorization")
+):
     """
     🔒 BYOK (Bring Your Own Key) 模式
     
     驗證使用者提供的 Gemini API Key。
-    使用者必須在 HTTP Header 中提供有效的 API Key。
-    
-    Args:
-        x_gemini_api_key: 從 X-Gemini-API-Key header 讀取
-        
-    Returns:
-        str: 驗證通過的 API Key
-        
-    Raises:
-        HTTPException: 401 如果 Key 無效或未提供
+    支援雙重提取路徑：
+    1. 優先從 X-Gemini-API-Key 讀取 (標準)
+    2. 回落從 Authorization: Bearer <key> 讀取 (向後相容/相本轉發)
     """
+    final_key = x_gemini_api_key
+    
+    # 🔄 Fallback: 如果標準 Header 為空，試著從 Authorization 提取
+    if not final_key and auth_header:
+        if auth_header.startswith("Bearer "):
+            final_key = auth_header.split(" ")[1]
+            print(f"📡 [Auth] API Key extracted from Authorization header")
+        else:
+            final_key = auth_header
+            
     # 調試日誌
-    if x_gemini_api_key:
-        print(f"🔑 收到 API Key: {x_gemini_api_key[:10]}... (長度: {len(x_gemini_api_key)})")
+    if final_key:
+        print(f"🔑 收到 API Key: {final_key[:10]}... (長度: {len(final_key)})")
     
     # 🚫 沒有 Key 或格式不對，直接拒絕
-    if not x_gemini_api_key or len(x_gemini_api_key) < 39:
+    if not final_key or len(final_key) < 39:
         print(f"❌ API Key 驗證失敗：未提供或格式無效")
+        from utils.constants import GEMINI_KEY_REQUIRED_MSG
         raise HTTPException(
             status_code=401, 
-            detail="請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)"
+            detail=GEMINI_KEY_REQUIRED_MSG
         )
     
-    return x_gemini_api_key
+    return final_key
 
 
 def get_supabase(request: Request) -> Client:

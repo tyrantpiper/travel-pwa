@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
-    ChevronDown, ChevronUp,  // 🆕 捐贈功能圖示
+    ChevronDown, ChevronUp, Brain, // 🆕 AI 記憶圖示
     BookOpen  // 🆕 使用說明圖示
 } from "lucide-react"
 import Image from "next/image"
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { TranslationKey } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
 
@@ -33,6 +34,7 @@ import { TaskCard } from "@/components/onboarding/TaskCard"
 import { debugLog } from "@/lib/debug"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
+import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
 
 
@@ -69,6 +71,10 @@ export function ProfileView() {
         email: "",
         bio: "Explorer"
     })
+
+    // 🧠 AI Adaptive Memory Preferences
+    const [preferences, setPreferences] = useState<UserPreference[]>([])
+    const [isLoadPrefs, setIsLoadPrefs] = useState(false)
 
     useEffect(() => {
         let isMounted = true
@@ -124,6 +130,19 @@ export function ProfileView() {
             try {
                 setPoiPreferences(JSON.parse(savedPoiPrefs))
             } catch { /* ignore */ }
+        }
+
+        // 🧠 載入 AI 記憶偏好
+        if (userId) {
+            setIsLoadPrefs(true)
+            usersApi.getPreferences(userId)
+                .then(data => {
+                    if (isMounted) setPreferences(data)
+                })
+                .catch(err => console.error("Failed to load preferences:", err))
+                .finally(() => {
+                    if (isMounted) setIsLoadPrefs(false)
+                })
         }
 
         return () => {
@@ -747,6 +766,68 @@ export function ProfileView() {
                                 ))}
                             </div>
                         </div>
+                        <Separator />
+
+                        {/* 🧠 AI Adaptive Memory Section */}
+                        <div className="p-4 bg-white dark:bg-slate-800">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                                        <Brain className="w-5 h-5 text-blue-500 dark:text-blue-400" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-800 dark:text-white">{t('profile_ai_memory')}</span>
+                                        <span className="text-[10px] text-slate-400 font-medium">{t('profile_ai_memory_desc')}</span>
+                                    </div>
+                                </div>
+                                {isLoadPrefs && <Loader2 className="w-4 h-4 animate-spin text-slate-300" />}
+                            </div>
+
+                            {preferences.length === 0 ? (
+                                <div className="ml-11 py-2 text-[11px] text-slate-400 italic">
+                                    {isLoadPrefs ? t('loading') : t('profile_ai_memory_empty')}
+                                </div>
+                            ) : (
+                                <div className="ml-11 flex flex-wrap gap-2">
+                                    {preferences.map((pref) => (
+                                        <div
+                                            key={pref.id}
+                                            className="group relative flex items-center gap-2 px-3 py-1.5 bg-stone-50 dark:bg-slate-900/50 border border-stone-200 dark:border-slate-700 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-all"
+                                        >
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-blue-500/70">
+                                                        {t(`profile_pref_${pref.category}` as TranslationKey) || pref.category}
+                                                    </span>
+                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{pref.preference}</span>
+                                                </div>
+                                                {pref.reasoning && (
+                                                    <span className="text-[8px] text-slate-400 leading-tight max-w-[150px] truncate">{pref.reasoning}</span>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    const userId = localStorage.getItem("user_uuid")
+                                                    if (!userId) return
+                                                    try {
+                                                        await usersApi.deletePreference(userId, pref.id)
+                                                        setPreferences(prev => prev.filter(p => p.id !== pref.id))
+                                                        toast.success(t('update_success'))
+                                                    } catch {
+                                                        toast.error(t('profile_delete_failed'))
+                                                    }
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
+                                                title={t('profile_pref_delete')}
+                                            >
+                                                <Trash2 className="w-3 h-3 text-red-400" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
                         <Separator />
                         <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
                             <DialogTrigger asChild>

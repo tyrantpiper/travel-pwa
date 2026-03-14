@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock } from "lucide-react"
+import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair } from "lucide-react"
+import { toast } from "sonner"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { Input } from "@/components/ui/input"
 import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
@@ -13,22 +14,14 @@ import { useLocalGeocode } from "@/hooks/useLocalGeocode"
 import { useCityBias } from "@/hooks/useCityBias"
 import { debugLog } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
+import { SearchResult } from "@/lib/itinerary-types"
+import { getDistanceKm } from "@/lib/location-utils"
 
 // ViewState 類型
 interface ViewState {
     longitude: number
     latitude: number
     zoom: number
-}
-
-// 搜尋結果類型
-interface SearchResult {
-    lat: number
-    lng: number
-    name: string
-    address?: string
-    type?: string
-    source?: string
 }
 
 // 🆕 P6: 二次排序 (Re-ranking)
@@ -38,20 +31,12 @@ function rerankResults(
     centerLat: number,
     centerLng: number
 ): SearchResult[] {
-    // 簡易 Haversine 距離計算 (km)
-    const distance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-        const R = 6371
-        const dLat = (lat2 - lat1) * Math.PI / 180
-        const dLng = (lng2 - lng1) * Math.PI / 180
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    }
 
     const queryLower = query.toLowerCase()
 
     return results
         .map(r => {
-            const dist = distance(centerLat, centerLng, r.lat, r.lng)
+            const dist = getDistanceKm(centerLat, centerLng, r.lat, r.lng)
             const nameMatch = r.name.toLowerCase().includes(queryLower) ? 50 : 0
             const exactMatch = r.name.toLowerCase() === queryLower ? 100 : 0
             // 分數 = 完全匹配 + 部分匹配 + 距離分 (越近分越高)
@@ -130,6 +115,8 @@ export default function FullscreenMapModal({
     // POI Drawer 狀態
     const [poiDrawerOpen, setPoiDrawerOpen] = useState(false)
     const [selectedPOI, setSelectedPOI] = useState<POIBasicData | null>(null)
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [isLocating, setIsLocating] = useState(false)
 
     // 標記點
     const markers = activities.filter(a => a.lat && a.lng) as (Activity & { lat: number; lng: number })[]
@@ -161,7 +148,6 @@ export default function FullscreenMapModal({
         }
 
         const currentQuery = query  // 🆕 快照防止競態
-        let l1Success = false       // 🆕 追蹤 L1 是否已成功
 
         // 🏕️ L1: 本地即時搜尋 (毫秒級)
         if (localDataLoaded) {
@@ -180,20 +166,14 @@ export default function FullscreenMapModal({
                 if (mapped.length > 0) {
                     setResults(mapped)
                     setIsTyping(false)
-                    l1Success = true  // 🆕 標記 L1 成功
                     debugLog(`🏕️ L1 本地秒回: ${mapped.length} 筆結果`)
                     // 🆕 不再 return，讓 L2 仍可補充結果
                 }
             }
         }
 
-        // 🌐 L2: API 搜尋 (300ms debounce)
+        // 🆕 API 搜尋 (300ms debounce)
         const timer = setTimeout(async () => {
-            // 🆕 如果 L1 已找到結果，跳過 L2 避免覆蓋
-            if (l1Success) {
-                debugLog(`🏕️ L1 已命中，跳過 L2 API`)
-                return
-            }
 
             // 🆕 P5: 取消前一個尚未完成的請求
             abortControllerRef.current?.abort()
@@ -219,15 +199,42 @@ export default function FullscreenMapModal({
                     signal  // 🆕 P5: 傳遞 AbortSignal
                 })
                 if (currentQuery === query && !signal.aborted) {
-                    // 🆕 P6: 二次排序 (優先顯示精確匹配 + 距離近的結果)
+                    // 🆕 P6: 二次排序並合併 (優先顯示精確匹配 + 距離近的結果，去重 50m)
                     const reranked = rerankResults(
                         data.results || [],
                         currentQuery,
                         initialViewState.latitude,
                         initialViewState.longitude
                     )
-                    setResults(reranked)
-                    debugLog(`🔄 P6 Re-ranked ${reranked.length} results`)
+                    setResults(prev => {
+                        const combined = [...prev]
+                        for (const r of reranked) {
+                            const isDup = combined.some(existing =>
+                                // 🆕 優先用 osm_id 精準去重，無 osm_id 才用 50m 座標
+                                (r.osm_id && existing.osm_id && String(r.osm_id) === String(existing.osm_id)) ||
+                                (getDistanceKm(existing.lat ?? 0, existing.lng ?? 0, r.lat ?? 0, r.lng ?? 0) < 0.05)
+                            )
+                            if (!isDup) combined.push(r)
+                        }
+
+                        // 🆕 Step B: 加入距離計算與排序 (優先以用戶位置排序，若無則按地圖中心)
+                        const withDistance = combined.map(r => ({
+                            ...r,
+                            _distKm: userLocation
+                                ? getDistanceKm(userLocation.lat, userLocation.lng, r.lat, r.lng)
+                                : null
+                        }))
+
+                        const sorted = userLocation
+                            ? [...withDistance].sort((a, b) => (a._distKm ?? 999) - (b._distKm ?? 999))
+                            : [...withDistance].sort((a, b) =>
+                                getDistanceKm(initialViewState.latitude, initialViewState.longitude, a.lat, a.lng) -
+                                getDistanceKm(initialViewState.latitude, initialViewState.longitude, b.lat, b.lng)
+                            )
+
+                        return sorted
+                    })
+                    debugLog(`🔄 P6 Merged ${reranked.length} results (Deduped)`)
                 }
             } catch (e) {
                 // 🆕 P5: 忽略 AbortError (正常取消行為)
@@ -293,6 +300,39 @@ export default function FullscreenMapModal({
         })
         setPoiDrawerOpen(true)
     }, [addToHistory])
+
+    // 📍 定位功能
+    const handleLocateMe = useCallback(() => {
+        if (!("geolocation" in navigator)) {
+            toast.error(t('map_geolocation_unsupported'))
+            return
+        }
+        setIsLocating(true)
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords
+                setUserLocation({ lat: latitude, lng: longitude })
+                setIsLocating(false)
+
+                // 飛到用戶位置
+                mapRef.current?.flyTo({
+                    center: [longitude, latitude],
+                    zoom: 15,
+                    duration: 1000
+                })
+            },
+            (error) => {
+                setIsLocating(false)
+                console.error("Geolocation error:", error)
+                if (error.code === error.PERMISSION_DENIED) {
+                    toast.error(t('map_geolocation_denied'))
+                } else {
+                    toast.error(t('map_geolocation_failed') + error.message)
+                }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        )
+    }, [t])
 
     // 地圖載入
     const handleMapLoad = useCallback(() => {
@@ -373,7 +413,7 @@ export default function FullscreenMapModal({
             })
             setPoiDrawerOpen(true)
         }
-    }, [])
+    }, [t])
 
     if (!isOpen) return null
 
@@ -397,7 +437,7 @@ export default function FullscreenMapModal({
                     ref={mapRef}
                     initialViewState={initialViewState}
                     style={{ width: "100%", height: "100%" }}
-                    mapStyle={MAP_STYLES.VECTOR}
+                    mapStyle={mapMode === 'satellite' ? MAP_STYLES.SATELLITE : MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
                     onClick={handleMapClick}
                     attributionControl={false}
@@ -435,12 +475,26 @@ export default function FullscreenMapModal({
 
                     {/* 標記點 */}
                     {markers.map((m, i) => (
-                        <Marker key={i} longitude={m.lng} latitude={m.lat}>
+                        <Marker key={`marker-${i}`} longitude={m.lng} latitude={m.lat}>
                             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-lg border-2 border-white">
                                 {i + 1}
                             </div>
                         </Marker>
                     ))}
+
+                    {/* 📍 用戶位置藍點標記 */}
+                    {userLocation && (
+                        <Marker
+                            longitude={userLocation.lng}
+                            latitude={userLocation.lat}
+                            anchor="center"
+                        >
+                            <div className="relative">
+                                <div className="absolute -inset-3 bg-blue-400/30 rounded-full animate-ping" />
+                                <div className="w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg" />
+                            </div>
+                        </Marker>
+                    )}
                 </Map>
 
                 {/* 🔙 返回按鈕 (左上角，簡化) */}
@@ -458,6 +512,20 @@ export default function FullscreenMapModal({
                     className="absolute bottom-24 right-4 z-20 h-12 w-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-50 transition-colors"
                 >
                     {mapMode === 'satellite' ? <MapIcon className="w-5 h-5" /> : <Satellite className="w-5 h-5" />}
+                </button>
+
+                {/* 📍 定位按鈕 */}
+                <button
+                    onClick={handleLocateMe}
+                    disabled={isLocating}
+                    className="absolute bottom-40 right-4 z-20 h-12 w-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
+                    title={t('map_my_location') || "定位我的位置"}
+                >
+                    {isLocating ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                    ) : (
+                        <Crosshair className="w-5 h-5 text-blue-500" />
+                    )}
                 </button>
 
                 {/* 🔍 搜尋按鈕 (底部固定) */}
@@ -558,9 +626,26 @@ export default function FullscreenMapModal({
                                     >
                                         <MapPin className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" />
                                         <div className="min-w-0">
-                                            <div className="font-medium truncate">{r.name}</div>
+                                            <div className="font-medium truncate">
+                                                {r.name}
+                                                {r.cross_country && (
+                                                    <span className="text-[10px] text-amber-500 ml-1 font-medium">🌍</span>
+                                                )}
+                                            </div>
                                             {r.address && (
                                                 <div className="text-xs text-slate-500 truncate">{r.address}</div>
+                                            )}
+                                            {(r.city || r.country) && (
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    {[r.city, r.country].filter(Boolean).join(" · ")}
+                                                </p>
+                                            )}
+                                            {r._distKm != null && (
+                                                <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded-md font-medium">
+                                                        📍 {r._distKm.toFixed(1)} km
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
                                     </button>
