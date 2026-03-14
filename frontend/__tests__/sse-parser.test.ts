@@ -15,7 +15,7 @@ describe('parseSSE', () => {
 
     it('should parse multiple events in one chunk', () => {
         const chunk = 'event: start\ndata: {}\n\nevent: text\ndata: {"text":"Hi"}\n\n'
-        const { events, remaining } = parseSSE(chunk, '')
+        const { events } = parseSSE(chunk, '')
 
         expect(events).toHaveLength(2)
         expect(events[0].event).toBe('start')
