@@ -27,8 +27,9 @@ describe('debug utilities', () => {
             // debugLog checks NODE_ENV at call time
             const { debugLog } = await import('@/lib/debug')
             debugLog('secret')
+            
             // In production, debugLog should suppress output
-            // Note: depends on implementation - if it checks at call time
+            expect(spy).not.toHaveBeenCalled()
         })
     })
 

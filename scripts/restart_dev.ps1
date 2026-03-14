@@ -1,23 +1,41 @@
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 
-Write-Host "Killing existing node/python processes (optional safety step)..."
-# Try to kill existing processes to free up ports (ignore errors if not found)
-Stop-Process -Name "node" -ErrorAction SilentlyContinue
-Stop-Process -Name "python" -ErrorAction SilentlyContinue 
-# Note: This might kill the user's background python task, but it's necessary if ports are locked.
-# The user's metadata says they are running `python backend/reproduce_links.py`. 
-# Ideally we filter, but for now a full clean might be safer for "Connection Refused".
-# Actually, let's NOT kill python blindly to avoid killing the user's other task if possible,
-# but usually 'dev server' implies we want to clear the port. 
-# Let's trust the user wants a restart.
+Write-Host "--- v16 Precision Server Restart ---" -ForegroundColor Cyan
 
-Write-Host "Starting Backend Server (Keep Open)..."
-$backendCmd = "cd /d ""$ScriptDir\..\backend"" && ""$ScriptDir\..\.venv\Scripts\python.exe"" -m uvicorn main:app --reload"
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$backendCmd" -WindowStyle Normal
+# 🎯 Step 1: 精確清理開發埠號 (3000, 8000)，不殺死 VS Code 內部的 Python LSP
+$TargetPorts = @(3000, 8000)
+foreach ($Port in $TargetPorts) {
+    try {
+        # 找出佔用該埠號的 PID
+        $Conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        if ($Conn) {
+            $PIDToKill = $Conn.OwningProcess
+            $ProcName = (Get-Process -Id $PIDToKill).Name
+            Write-Host "埠號 $Port 正被 $ProcName (PID: $PIDToKill) 佔用，正在強制解除..." -ForegroundColor Yellow
+            Stop-Process -Id $PIDToKill -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1 # 等待 OS 釋放埠號
+        }
+    } catch {
+        Write-Warning "無法自動清除埠號 $Port，可能需要手動檢查。"
+    }
+}
 
-Write-Host "Starting Frontend Server (Keep Open)..."
-$frontendCmd = "cd /d ""$ScriptDir\..\frontend"" && npm run dev"
-Start-Process -FilePath "cmd.exe" -ArgumentList "/k", "$frontendCmd" -WindowStyle Normal
+# 🚀 Step 2: 啟動後端伺服器
+Write-Host "正在開啟後端伺服器 (FastAPI)..." -ForegroundColor Green
+$BackendPath = Join-Path $ScriptDir "..\backend"
+$PythonExec = Join-Path $ScriptDir "..\.venv\Scripts\python.exe"
 
-Write-Host "Servers started. Please check the new windows for errors."
+# 使用原生 PowerShell 啟動並處理路徑空格
+# -WindowStyle Normal 確保用戶能看到控制台
+$backendCmd = "Set-Location -Path '$BackendPath'; & '$PythonExec' -m uvicorn main:app --reload"
+Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", $backendCmd -WindowStyle Normal
+
+# 🚀 Step 3: 啟動前端伺服器
+Write-Host "正在開啟前端伺服器 (Next.js)..." -ForegroundColor Green
+$FrontendPath = Join-Path $ScriptDir "..\frontend"
+$frontendCmd = "Set-Location -Path '$FrontendPath'; npm run dev"
+Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-Command", $frontendCmd -WindowStyle Normal
+
+Write-Host "`n✅ 所有伺服器指令已發送。請檢查新開啟的視窗。" -ForegroundColor Cyan
+Write-Host "若側邊欄仍有警告，請關閉此終端機並重新開啟一個新的 PowerShell 視窗。"
