@@ -1,0 +1,89 @@
+502: async def parse_receipt(
+503:     request: Request,
+504:     body: ReceiptRequest,
+505:     api_key: str = Depends(get_gemini_key)
+506: ):
+507:     """📸 AI 收據解析 (v21 Hardened)
+508:     
+509:     使用非同步調度與 3 層 Fallback，具備 Capability Gating。
+510:     """
+511:     print(f"📸 收到收據請求: {body.imageUrl[:50] if body.imageUrl else 'Base64 image'}...")
+512:     
+513:     try:
+514:         # 1. 構建 Prompt
+515:         prompt = """分析這張收據圖片，提取結構化 JSON 資料。
+516:         
+517:         輸出必須包含以下欄位：
+518:         - title: 店名或消費標題
+519:         - date: 消費日期 (格式 YYYY-MM-DD)，若無則給今天
+520:         - currency: 幣別 (如 JPY, TWD, USD)
+521:         - total_amount: 總金額 (數值)
+522:         - category: 分類 (food, shopping, transport, sightseeing, hotel)
+523:         - details: 細目列表 [{"name": "品項", "amount": 數值}]
+524:         
+525:         ⚠️ 只回傳 JSON。"""
+526: 
+527:         # 2. 構建 Contents (支援 Base64 與 URL)
+528:         parts = [prompt]
+529:         if body.image:
+530:             b64_str = body.image
+531:             if "," in b64_str:
+532:                 b64_str = b64_str.split(",")[1]
+533:             image_bytes = base64.b64decode(b64_str)
+534:             parts.append(types.Part.from_bytes(
+535:                 data=image_bytes, 
+536:                 mime_type=body.mime_type or "image/jpeg"
+537:             ))
+538:         elif body.imageUrl:
+539:             parts.append(body.imageUrl)
+540:         else:
+541:             raise HTTPException(status_code=400, detail="未提供收據圖片")
+542: 
+543:         # 3. 非同步調度 (v21 核心)
+544:         # 注意：圖片分析任務強制不落入不支援媒體/Schema 的備援模型
+545:         raw_text = await call_extraction(
+546:             api_key, 
+547:             prompt=parts, 
+548:             intent_type="EXTRACTION"
+549:         )
+550:         
+551:         parsed_data = json.loads(raw_text)
+552: 
+553:         # 4. 🎭 語義校驗 (Semantic Validation) — v21 硬化
+554:         # 避免 AI 產生的邏輯錯誤 (如負數金額) 污染數據
+555:         total = parsed_data.get("total_amount", 0)
+556:         items = parsed_data.get("details", [])
+557:         
+558:         if total < 0:
+559:             raise HTTPException(status_code=400, detail="收據總額不可為負數")
+560:         
+561:         if items:
+562:             items_sum = sum(item.get("amount", 0) for item in items)
+563:             # 🎭 語義校驗 (Semantic Validation) — v21.1 執法升級
+564:             # 若細目加總與總額偏差過大 (>5% 或 >$5)，視為 AI 生成數據不可解，拋出 400
+565:             if abs(items_sum - total) > max(total * 0.05, 5.0):
+566:                  print(f"❌ 語義錯誤: 細目加總 ({items_sum}) 與總額 ({total}) 嚴重不符")
+567:                  raise HTTPException(status_code=400, detail=f"辨識數據校驗失敗: 細目與總額不符 ({items_sum} vs {total})")
+568: 
+569:         return parsed_data
+570:         
+571:     except NonRetryableAuthError as e:
+572:         # 透傳挑戰標頭 (v21 標準)
+573:         headers = {"WWW-Authenticate": 'Bearer realm="AI Gateway"'}
+574:         raise HTTPException(status_code=401, detail=str(e), headers=headers)
+575:     except NonRetryableRequestError as e:
+576:         # 壞請求 (如 Invalid Schema/Argument) 不應嘗試 Fallback，直接回 400
+577:         raise HTTPException(status_code=400, detail=str(e))
+578:     except json.JSONDecodeError:
+579:         raise HTTPException(status_code=422, detail="AI 生成的數據不是有效的 JSON 格式")
+580:     except AllModelsFailedError as e:
+581:         print(f"❌ Receipt Fallback Failed: {e.attempts}")
+582:         raise HTTPException(status_code=503, detail="辨識服務暫時不可用，請稍後再試")
+583:     except Exception as e:
+584:         print(f"🔥 Receipt AI Error: {e}")
+585:         # 保底 500
+586:         raise HTTPException(status_code=500, detail=f"辨識系統錯誤: {str(e)}")
+587: 
+588: 
+589: @router.post("/actuary")
+590: @limiter.limit("10/minute")
