@@ -430,7 +430,7 @@ export function ExpenseDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="sm:max-w-md pb-[env(safe-area-inset-bottom,2rem)] max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl">
+                <DialogContent className="sm:max-w-md pb-[calc(env(safe-area-inset-bottom)+60px)] max-h-[95vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl">
                     <DialogHeader>
                         <DialogTitle>{editItem ? t('edit') : t('add')} {t('expense')}</DialogTitle>
                         <DialogDescription className="sr-only">
