@@ -243,43 +243,8 @@ async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-AP
 def root_status():
     return {"status": "Alive", "mode": "BYOK"}
 
-@app.post("/api/plan")
-@limiter.limit("5/minute")
-async def generate_itinerary(
-    request: Request,
-    prefs: UserPreferences, 
-    api_key: str = Depends(get_gemini_key) # 自動從 Header 抓 Key
-):
-    print(f"💊 收到處方需求: 去 {prefs.destination}")
-    
-    try:
-        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
-        from services.model_manager import call_extraction
-        
-        prompt = f"""
-        你是 Ryan，一位幽默的藥師兼旅遊達人。請為我規劃 {prefs.destination} 的 {prefs.days} 天行程。
-        風格：日式極簡。預算：{prefs.budget}。興趣：{', '.join(prefs.interests)}。
-        請回傳純 JSON 格式 (不要 Markdown)：
-        {{
-            "title": "行程標題",
-            "days": [
-                {{
-                    "day": 1,
-                    "activities": [
-                        {{ "time": "10:00", "place": "地點", "category": "sightseeing", "desc": "簡介" }}
-                    ]
-                }}
-            ]
-        }}
-        """
-        
-        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
-        text = raw_text.replace("```json", "").replace("```", "").strip()
-        return json.loads(text)
-        
-    except Exception as e:
-        print(f"🔥 AI Error: {e}")
-        raise HTTPException(status_code=400, detail=f"AI Service Error: {str(e)}")
+# /api/plan and generate_itinerary have been superseded by 
+# /api/ai/generate-trip in routers/ai.py.
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

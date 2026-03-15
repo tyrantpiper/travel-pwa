@@ -393,7 +393,7 @@ async def get_trip_by_id(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/trips/{trip_id}/members/{member_user_id}")
+@router.delete("/{trip_id}/members/{member_user_id}")
 async def kick_member(
     trip_id: str,
     member_user_id: str,
@@ -434,7 +434,7 @@ async def kick_member(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/trips/{trip_id}")
+@router.delete("/{trip_id}")
 async def delete_trip(
     trip_id: str, 
     user_id: str = Depends(get_verified_user),
@@ -449,6 +449,14 @@ async def delete_trip(
         if not trip_check.data:
             raise HTTPException(status_code=404, detail="找不到此行程")
         
+        # 🛡️ FK Cleanup: Delete associated expenses FIRST to avoid constraint violation
+        try:
+            supabase.table("expenses").delete().eq("itinerary_id", trip_id).execute()
+            print(f"🧹 Cleared expenses for trip {trip_id}")
+        except Exception as fk_err:
+            print(f"⚠️ FK Cleanup Warning (expenses): {fk_err}")
+
+        # 1. 創立者驗證
         if trip_check.data[0]['created_by'] != user_id:
             raise HTTPException(status_code=403, detail="只有行程創立者可以刪除行程")
         
@@ -479,7 +487,7 @@ async def delete_trip(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/trip/create-manual")
+@router.post("/create-manual")
 async def create_manual_trip(
     request: CreateManualTripRequest,
     user_id: str = Depends(get_verified_user),
@@ -537,7 +545,7 @@ async def create_manual_trip(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/trips/{trip_id}/title")
+@router.patch("/{trip_id}/title")
 async def update_trip_title(
     trip_id: str, 
     request: UpdateTripTitleRequest,
@@ -926,13 +934,31 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
         # C. 合併 AI 審核 (保留原有的或更新)
         if request.ai_review:
             updated_content["ai_review"] = request.ai_review
+            # 🛡️ v7.1: 同步至頂層欄位，確保全域讀取一致性
+            supabase.table("itineraries").update({"ai_review": request.ai_review}).eq("id", request.trip_id).execute()
         
         # 3. 更新主行程 content
         supabase.table("itineraries").update({"content": updated_content}).eq("id", request.trip_id).execute()
         
-        # 4. 插入細項 (Children)
+        # 4. 取得現有地點組合，執行「智能去重」(Smart Deduplication)
+        existing_items_res = supabase.table("itinerary_items").select("day_number, place_name").eq("itinerary_id", request.trip_id).execute()
+        existing_set = set()
+        if existing_items_res.data:
+            for item in existing_items_res.data:
+                existing_set.add((item["day_number"], item["place_name"]))
+        
+        # 5. 插入細項 (Children) 並更新結束日期
         items_data = []
+        max_imported_day = 0
+        skipped_count = 0
+        
         for item in request.items:
+            # 去重檢查：若 (天數, 地名) 已存在則跳過
+            if (item.day_number, item.place_name) in existing_set:
+                skipped_count += 1
+                continue
+                
+            max_imported_day = max(max_imported_day, item.day_number)
             items_data.append({
                 "itinerary_id": request.trip_id,
                 "day_number": item.day_number,
@@ -958,11 +984,51 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
                 "preview_metadata": item.preview_metadata
             })
             
+        # 🛡️ 戰略修復 v6.2: 自動同步行程結束日期 (Robust Date Range Sync)
+        # 🆕 v10: 優先使用 AI 偵測到的 start_date (若現有行程尚未設定或需要同步)
+        sync_start_date = request.start_date or existing_trip.get("start_date")
+        
+        if max_imported_day > 0 and sync_start_date:
+            try:
+                from datetime import datetime, timedelta
+                # 🛡️ 彈性解析：處理可能的 ISO 時間戳
+                raw_start = str(sync_start_date).split('T')[0]
+                start_dt = datetime.strptime(raw_start, "%Y-%m-%d")
+                
+                # 若行程原本沒日期，則更新為 AI 偵測到的日期
+                if not existing_trip.get("start_date") and request.start_date:
+                    print(f"📅 [Auto-Sync] Setting missing start_date to: {request.start_date}")
+                    supabase.table("itineraries").update({"start_date": request.start_date}).eq("id", request.trip_id).execute()
+
+                # 計算新天數對應的結束日期
+                new_end_dt = start_dt + timedelta(days=max_imported_day - 1)
+                new_end_date = new_end_dt.strftime("%Y-%m-%d")
+                
+                # 獲取目前的結束日期並正規化
+                current_days = 1
+                if existing_trip.get("end_date"):
+                    raw_end = str(existing_trip["end_date"]).split('T')[0]
+                    old_end_dt = datetime.strptime(raw_end, "%Y-%m-%d")
+                    current_days = (old_end_dt - start_dt).days + 1
+                
+                if max_imported_day > current_days:
+                    print(f"📅 [Auto-Sync] Extending trip end_date to: {new_end_date} (Day {max_imported_day})")
+                    supabase.table("itineraries").update({"end_date": new_end_date}).eq("id", request.trip_id).execute()
+                else:
+                    print(f"📅 [Auto-Sync] No extension needed (Day {max_imported_day} <= {current_days})")
+            except Exception as date_err:
+                print(f"⚠️ [Date Sync Critical Failure] {date_err} | Start: {existing_trip.get('start_date')}")
+
         if items_data:
-            print(f"   📦 準備插入 {len(items_data)} 個細項...")
+            print(f"   📦 準備插入 {len(items_data)} 個細項 (已跳過 {skipped_count} 個重複項)...")
             supabase.table("itinerary_items").insert(items_data).execute()
             
-        return {"status": "success", "message": f"成功匯入 {len(items_data)} 個項目"}
+        return {
+            "status": "success", 
+            "message": f"成功匯入 {len(items_data)} 個新項目 (跳過 {skipped_count} 個重複地點)",
+            "inserted": len(items_data),
+            "skipped": skipped_count
+        }
 
     except Exception as e:
         print(f"🔥 Import Error: {e}")
@@ -970,7 +1036,7 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/trips/{trip_id}/day-data")
+@router.patch("/{trip_id}/day-data")
 async def update_day_data(
     trip_id: str, 
     request: UpdateDayDataRequest, 
@@ -1067,7 +1133,7 @@ async def update_day_data(
         
 
 
-@router.patch("/trips/{trip_id}/location")
+@router.patch("/{trip_id}/location")
 async def update_trip_location(
     trip_id: str, 
     request: UpdateLocationRequest, 
@@ -1111,7 +1177,7 @@ async def update_trip_location(
 
 
 
-@router.post("/trips/{trip_id}/leave")
+@router.post("/{trip_id}/leave")
 async def leave_trip(
     trip_id: str,
     user_id: str = Header(None, alias="X-User-ID"),
@@ -1130,7 +1196,7 @@ async def leave_trip(
         # 2. Remove from trip_members
         res = supabase.table("trip_members").delete().eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
         
-        if res.count == 0:
+        if not res.data:
             return {"message": "User was not in trip or already left"}
 
         return {"message": "Successfully left the trip"}
@@ -1142,7 +1208,7 @@ async def leave_trip(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/trips/{trip_id}/info")
+@router.patch("/{trip_id}/info")
 async def update_trip_info(
     trip_id: str, 
     request: UpdateInfoRequest, 
@@ -1488,7 +1554,7 @@ async def delete_item(
 # ⚠️ Contains complex algorithms: Ghostbuster, Scorched Earth, Smart Clone
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@router.delete("/trips/{trip_id}/days/{day_number}")
+@router.delete("/{trip_id}/days/{day_number}")
 async def delete_day(
     trip_id: str, 
     day_number: int, 
