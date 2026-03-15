@@ -466,7 +466,7 @@ export const tripsApi = {
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (user_id) headers["X-User-ID"] = user_id
 
-        const res = await fetch(`${API_HOST}/api/import-to-trip`, {
+        const res = await fetch(`${API.TRIPS}/import-to-trip`, {
             method: "POST",
             headers,
             body: JSON.stringify({ trip_id: tripId, ...data })

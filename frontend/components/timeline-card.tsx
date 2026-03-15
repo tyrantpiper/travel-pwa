@@ -247,7 +247,8 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
             {/* 右側：卡片內容 */}
             <div className={cn("timeline-card flex-1 min-w-0 mb-6 relative p-4 rounded-xl border cursor-default overflow-hidden transition-all duration-300",
                 isHeader ? "bg-amber-50/30 dark:bg-amber-900/20 border-amber-200/50 dark:border-amber-700/50" :
-                    "bg-white dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-600 shadow-sm dark:shadow-none"
+                    "bg-white dark:bg-slate-800 border-transparent hover:border-slate-200 dark:hover:border-slate-600 shadow-sm dark:shadow-none",
+                activity.is_highlight && !isHeader && "ring-2 ring-amber-400 dark:ring-amber-500 shadow-[0_0_15px_rgba(251,191,36,0.2)] dark:shadow-[0_0_20px_rgba(245,158,11,0.15)] bg-amber-50/10 dark:bg-amber-900/10"
             )}>
                 {renderContent()}
             </div>
