@@ -321,9 +321,11 @@ class ReorderRequest(BaseModel):
 
 
 class ImportToTripRequest(BaseModel):
-    """匯入到現有行程請求"""
+    """匯入到現有行程請求學"""
     trip_id: str
     items: List[ItineraryItem] = Field(default_factory=list)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
     daily_locations: Dict[str, Any] = Field(default_factory=dict)
     day_notes: Dict[str, Any] = Field(default_factory=dict)
     day_costs: Dict[str, Any] = Field(default_factory=dict)
