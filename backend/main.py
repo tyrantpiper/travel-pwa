@@ -527,7 +527,7 @@ async def chat_with_ryan(
         # 🆕 v3.5: 偵測診斷意圖
         from services.model_manager import detect_diagnosis_intent
         
-        intent_type = "PLANNING"  # 預設
+        intent_type = "CHAT"  # 預設 (恢復 Ryan 人格)
         if detect_diagnosis_intent(body.message):
             intent_type = "DIAGNOSIS"
             print("🩺 診斷意圖偵測：切換到 DIAGNOSIS 模式")
@@ -699,7 +699,7 @@ async def stream_chat_generator(
         stream_success = False
         for i, candidate_model in enumerate(DAILY_ROUTING):
             try:
-                safe_config = sanitize_config_for_model(stream_config, candidate_model)
+                safe_config = sanitize_config_for_model(stream_config, candidate_model, intent_type="CHAT")
                 model_name = candidate_model
                 label = "🧠 Primary" if i == 0 else f"🔄 Fallback #{i}"
                 print(f"{label} Stream: {candidate_model}")

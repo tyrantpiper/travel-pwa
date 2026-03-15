@@ -173,44 +173,55 @@ def build_json_schema_for_intent(intent_type: str) -> Optional[Dict[str, Any]]:
             "required": ["title", "date", "currency", "total_amount", "items"]
         }
     if intent_type == "PLANNING":
-        # 行程生成專用 Schema (Synced with v27.1 Prompt)
+        # 🆕 v28.7 Nested Per-Day Architecture (Hard Enforcement)
         return {
             "type": "object",
             "properties": {
                 "title": {"type": "string"},
                 "start_date": {"type": "string", "description": "ISO date string (YYYY-MM-DD)"},
                 "end_date": {"type": "string", "description": "ISO date string (YYYY-MM-DD)"},
-                "items": {
+                "days": {
                     "type": "array",
                     "items": {
                         "type": "object",
                         "properties": {
                             "day_number": {"type": "integer"},
-                            "time_slot": {"type": "string"},
-                            "place_name": {"type": "string"},
-                            "category": {"type": "string"},
-                            "desc": {"type": "string"},
-                            "lat": {"type": "number"},
-                            "lng": {"type": "number"},
-                            "tags": {"type": "array", "items": {"type": "string"}},
-                            "is_highlight": {"type": "boolean"},
-                            "sub_items": {
+                            "activities": {
                                 "type": "array",
+                                "minItems": 6,
+                                "maxItems": 10,
                                 "items": {
                                     "type": "object",
                                     "properties": {
-                                        "name": {"type": "string"},
-                                        "checked": {"type": "boolean"},
+                                        "time": {"type": "string", "description": "e.g. 08:30"},
+                                        "place_name": {"type": "string"},
+                                        "category": {"type": "string"},
                                         "desc": {"type": "string"},
-                                        "link": {"type": "string", "description": "Optional URL for this sub-item"}
+                                        "lat": {"type": "number"},
+                                        "lng": {"type": "number"},
+                                        "tags": {"type": "array", "items": {"type": "string"}},
+                                        "is_highlight": {"type": "boolean"},
+                                        "sub_items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "name": {"type": "string"},
+                                                    "checked": {"type": "boolean"},
+                                                    "desc": {"type": "string"},
+                                                    "link": {"type": "string"}
+                                                },
+                                                "required": ["name"]
+                                            }
+                                        },
+                                        "link_url": {"type": "string"}
                                     },
-                                    "required": ["name"]
+                                    "required": ["time", "place_name", "category"],
                                 }
-                            },
-                            "link_url": {"type": "string", "description": "URL link (e.g. Google Maps)"}
+                            }
                         },
-                        "required": ["day_number", "place_name", "category"],
-                    },
+                        "required": ["day_number", "activities"]
+                    }
                 },
                 "ai_review": {"type": "string"},
                 "day_metadata": {
@@ -227,7 +238,7 @@ def build_json_schema_for_intent(intent_type: str) -> Optional[Dict[str, Any]]:
                     }
                 }
             },
-            "required": ["items"],
+            "required": ["days"],
         }
     return None
 
@@ -237,7 +248,11 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
     base_configs = {
         "PLANNING": types.GenerateContentConfig(
             temperature=1.0,
-            max_output_tokens=8192,  # 🚀 Maximize for 14-day+ itineraries
+            max_output_tokens=16384,  # 🚀 Increased for deep thinking and high density
+            thinking_config=types.ThinkingConfig(
+                include_thoughts=True,
+                thinking_level="high"
+            ),
             media_resolution="media_resolution_high",
             response_mime_type="application/json",
             response_schema=build_json_schema_for_intent("PLANNING")

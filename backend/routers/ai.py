@@ -283,35 +283,45 @@ async def generate_trip(
     try:
         from services.model_manager import call_extraction
         
-        # 🆕 v27.3 Professional Guide (Persona Neutralization)
+        # 🆕 v28.8 Ultra-Precision (Nested Enforcement)
         prompt = f"""你是 Ryan，一位專業、有效率且對當地極其熟悉的在地嚮導。
-        任務：為使用者規劃地圖精確、路線流暢且具備深度文化底蘊的旅遊方案。需求：{body.prompt}
+        
+        ### 思考指令 (Thinking Instruction):
+        目前已開啟 [Thinking: High] 模式。在輸出 JSON 之前，請先在思考區塊內進行「時光脊椎模擬」。
+        務必確認每一天的行程從 08:00 開始到 22:00 結束。
+        
+        任務：為使用者規劃方案。需求：{body.prompt}
 
-        ### 世界級規劃核心指令 (v27.3):
-        1. **天數完整性 (Mandatory)**: 如果使用者需求為 X 日遊，你必須輸出從 Day 1 到 Day X 的完整行程項目，每個天數都必須包含 3-4 個精確景點。不准截斷。
-        2. **專業標題與描述**: 
-           - 標題應簡潔有力（例如：大阪京都經典深度遊）。不准包含「藥師」、「特製」等冗餘詞彙。
-           - `desc` 應聚焦於景點歷史、交通秘訣或必吃理由。嚴禁加入醫療建議或「藥師叮嚀」。
-        3. **地理精確度**: `place_name` 必須是具體的、可搜尋的地標全名。
-        4. **禁止裝飾**: 嚴禁在輸出內容中使用藥品圖示 (💊) 或任何非旅遊相關的貼圖。
+        ### 世界級規劃核心指令 (v28.8 - Physical Density):
+        1. **強制高密度 (Mandatory 6-10 Items per day)**: 
+           - 每一天必須產出 6-10 個行程點。
+           - 嚴禁跳過任何時段。若景點間行程較長，請務必排入具體的交通說明或中繼休息點。
+        2. **時間流對齊**: 從早餐 (08:30) 開始，直到夜間活動 (21:00+) 結束。
+        3. **專業標題與描述**: 
+           - 標題應簡潔有力。排除藥師(💊)人設噪聲。
+           - `desc` 應像專業嚮導般提供歷史背景、排隊攻略、點餐建議或最佳拍照角度。
+        4. **禁止裝飾**: 嚴禁在輸出內容中使用藥品圖示 (💊) 或非旅遊相關符號。
 
-        ### 輸出格式範例 (Strict JSON):
+        ### 輸出格式範例 (Strict JSON - Nested Day Structure):
         {{
-            "title": "行程名稱 (簡潔專業)",
-            "items": [
+            "title": "行程名稱",
+            "days": [
                 {{
-                    "day_number": 1, "time_slot": "09:00", "place_name": "具體地標全名", "category": "sightseeing", "desc": "專業景點介紹與遊玩建議", "tags": ["必去", "風景"], "is_highlight": true
+                    "day_number": 1,
+                    "activities": [
+                        {{ "time": "08:30", "place_name": "築地市場 (早餐)", "category": "food", "desc": "建議 08:00 前抵達避免排隊。", "tags": ["在地美食"], "is_highlight": true }},
+                        {{ "time": "10:30", "place_name": "淺草寺", "category": "sightseeing", "desc": "東京最古老寺廟，歷史悠久。", "tags": ["地標"], "is_highlight": false }},
+                        {{ "time": "12:30", "place_name": "淺草今半 (午餐)", "category": "food", "desc": "百年壽喜燒老店，性價比極高。", "tags": ["必吃"], "is_highlight": false }},
+                        {{ "time": "14:30", "place_name": "上野公園", "category": "sightseeing", "desc": "散步享受寧靜氛圍與藝術館。", "tags": ["風景"], "is_highlight": false }},
+                        {{ "time": "17:00", "place_name": "秋葉原萬世橋", "category": "shopping", "desc": "古老紅磚建築改裝的特色文創區。", "tags": ["逛街"], "is_highlight": false }},
+                        {{ "time": "19:30", "place_name": "六本木之丘", "category": "nightlife", "desc": "俯瞰東京鐵塔的最佳位置。", "tags": ["夜景", "浪漫"], "is_highlight": true }}
+                    ]
                 }}
             ],
             "day_metadata": [
-                {{
-                    "day_number": 1,
-                    "notes": [{{ "item": "建議", "content": "建議內容" }}],
-                    "costs": [{{ "item": "項次", "amount": "1000" }}],
-                    "tickets": [{{ "name": "票卷", "price": "250" }}]
-                }}
+                {{ "day_number": 1, "notes": [], "costs": [], "tickets": [] }}
             ],
-            "ai_review": "給旅行者的專業行前建議與路線優化總結。嚴禁提及「藥師」、「醫療」、「保健」或任何醫療相關用語。"
+            "ai_review": "給旅行者的專業行前建議..."
         }}
 
         語言：全繁體中文。
@@ -321,6 +331,22 @@ async def generate_trip(
         raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         data = json.loads(cleaned_text)
+        
+        # 🛡️ v28.9 Flattening Bridge (Unpack Nested Activities to Flat Items)
+        if "days" in data and isinstance(data["days"], list):
+            flat_items = []
+            for day_entry in data["days"]:
+                d_num = day_entry.get("day_number", 1)
+                acts = day_entry.get("activities", [])
+                for a in acts:
+                    a["day_number"] = d_num
+                    if "time" in a:
+                        a["time_slot"] = a["time"] # Front-end compatibility
+                    if "desc" in a and len(a["desc"]) > 60:
+                        a["desc"] = a["desc"][:57] + "..."
+                    flat_items.append(a)
+            data["items"] = flat_items
+        
         data = reconstruct_metadata(data)
         data = fix_sub_items_structure(data)
         
@@ -480,7 +506,7 @@ async def actuary_chat(
     try:
         persona = "你是 Ryan，一位專業、理性的旅遊財務顧問（AI Actuary）。你擅長處理複雜的拆帳問題、匯率計算與花費分析。請以精簡、專業且具備幽默感（但不涉及藥師身分）的語氣回答。"
         prompt = f"{persona}\n\nAnalyze travel expenses for {json.dumps(body.members)}. Query: {body.message}"
-        result = await call_with_fallback(api_key=api_key, history=[], message=prompt, intent_type="PLANNING")
+        result = await call_with_fallback(api_key=api_key, history=[], message=prompt, intent_type="CHAT")
         return {"response": result["text"]}
     except Exception as e:
         print(f"[Error] actuary_chat: {e}")
