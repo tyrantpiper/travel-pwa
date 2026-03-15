@@ -103,6 +103,237 @@ def convert_heic_to_jpeg(data: bytes) -> bytes:
         print(f"⚠️ [HEIC Fallback] Conversion failed: {e}")
         return data # Return original if conversion fails
 
+
+def fix_sub_items_structure(data: dict) -> dict:
+    """🛡️ v7.1 結構補償器：確保 sub_items 具備完整欄位，杜絕前端渲染崩潰"""
+    items = data.get("items")
+    if not isinstance(items, list):
+        return data
+        
+    for item in items:
+        # 1. 處理 sub_items
+        sub_items = item.get("sub_items")
+        if not isinstance(sub_items, list):
+            item["sub_items"] = []
+        else:
+            for sub in sub_items:
+                if isinstance(sub, dict):
+                    if "checked" not in sub:
+                         sub["checked"] = False
+                    if not sub.get("name"):
+                         sub["name"] = "Untitled Action"
+        
+        # 2. 核心欄位補強
+        if "is_highlight" not in item:
+            item["is_highlight"] = False
+        item["place_name"] = item.get("place_name") or "Unknown Place"
+        item["category"] = item.get("category") or "sightseeing"
+        
+    return data
+    
+def reconstruct_metadata(data: dict) -> dict:
+    """
+    🔄 Pivot Gemini-Safe array structure back into flat Dictionary format.
+    
+    Structure Transformation:
+    FROM: "day_metadata": [{"day_number": 1, "notes": [...], "costs": [...], "tickets": [...]}]
+    TO:   "day_notes": {"1": [...]}, "day_costs": {"1": [...]}, "day_tickets": {"1": [...]}
+    """
+    metadata = data.get("day_metadata", [])
+    if not isinstance(metadata, list):
+        return data
+        
+    day_notes = {}
+    day_costs = {}
+    day_tickets = {}
+    
+    for entry in metadata:
+        if not isinstance(entry, dict):
+            continue
+        day_key = str(entry.get("day_number", 1))
+        
+        if entry.get("notes") and isinstance(entry["notes"], list):
+            day_notes[day_key] = entry["notes"]
+        if entry.get("costs") and isinstance(entry["costs"], list):
+            day_costs[day_key] = entry["costs"]
+        if entry.get("tickets") and isinstance(entry["tickets"], list):
+            day_tickets[day_key] = entry["tickets"]
+            
+    data["day_notes"] = day_notes
+    data["day_costs"] = day_costs
+    data["day_tickets"] = day_tickets
+    
+    # Cleanup to save bandwidth/storage
+    if "day_metadata" in data:
+        del data["day_metadata"]
+        
+    return data
+
+
+# --- World-Class Itinerary Engine (V26.1) ---
+
+@router.post("/parse-md")
+@limiter.limit("10/minute")
+async def parse_markdown(
+    request: Request,
+    body: MarkdownImportRequest,
+    api_key: str = Depends(get_gemini_key)
+):
+    """[Itinerary] World-Class Markdown-to-JSON Parser with CoT Reasoning"""
+    try:
+        from services.model_manager import call_extraction
+        
+        prompt = f"""你是 Ryan，一位專業且極其細心的旅遊數據分析師。今日日期為 2026-03-15。
+        任務：將提供的 Markdown 內容【完整、逐項】地解析為結構化 JSON 行程。
+        
+        ### 高保真提取指令 (v28.2 Zero-Loss):
+        1. **字面提取 (Literal Extraction)**：嚴格根據待解析文本中的行程表進行提取。每一行時間、地點都必須對應一個 JSON item。嚴禁合併或省略景點。
+        2. **表格優先 (Tabular Priority)**：優先從 Markdown 的表格 (`| 時間 | 📍 地點 | ... |`) 中提取資料。表格中的每一列都必須轉化為一個項目。
+        3. **特殊列處理 (Transit/Flight Recovery)**：
+           - 若「地點」欄位為空、"-" 或包含 "出發/抵達"，請從「Google Maps」欄位的連結文字或「筆記」欄位中提取地點名稱。
+           - 若有多個地點（如：桃園機場 -> 成田機場），請建立為兩個連續的項目或在 `place_name` 中完整保留。
+        4. **中繼資料全量擷取**：
+           - **注意事項 (day_notes)**：從 `### Day X 注意事項` 或類似表格中提取。格式為 `{{"item": "...", "content": "..."}}`。
+           - **預估花費 (day_costs)**：從 `💰 Day X 預估花費` 表格中提取。格式為 `{{"item": "...", "amount": "..."}}`。
+           - **交通票券 (day_tickets)**：從 `🎫 Day X 交通票券` 列表或表格中提取。格式為 `{{"name": "...", "price": "..."}}`。
+        5. **日期感應 (Date Awareness)**：從各天的標題（如 `Day 1 (2/2)`）中提取日期。
+           - 基準年份暫定為 2026 年（除非內容有明確提到其他年份）。
+           - 輸出的 `start_date` 應為 Day 1 的日期，`end_date` 為最後一天的日期。格式：`YYYY-MM-DD`。
+        6. **網址提取 (URL Extraction)**：若表格中有「Google Maps」或類似連結欄位，請優先提取網址並存入 `link_url`（主地點連結）。
+        7. **多重連結處理 (Multi-Link Recovery)**：
+           - 若段落中出現針對某行程項目的「補充列表」或「推薦清單」（如：多間超市推薦、訂位連結清單），請將其轉換為該項目的 `sub_items`。
+           - 每個 `sub_item` 必須包含 `name`, `desc`, `link` (URL)。
+        8. **自動檢偏 (Self-Correction)**：若檢測到 10 個以上的時間標點，但輸出的 items 少於 10 個，則視為失敗，請重新生成。
+
+        ### JSON 結構要求:
+        {{
+            "title": "行程標題",
+            "start_date": "YYYY-MM-DD",
+            "end_date": "YYYY-MM-DD",
+            "items": [
+                {{
+                    "day_number": 1,
+                    "time_slot": "HH:MM",
+                    "place_name": "搜尋優化後的地點全名",
+                    "original_name": "原文名稱",
+                    "category": "food",
+                    "desc": "以專業導遊角度提供的在地洞察，嚴禁醫療建議",
+                    "tags": ["必吃", "米其林"],
+                    "sub_items": [
+                        {{ "name": "🥇 まいばすけっと", "checked": false, "desc": "07:00-23:00 | 出站直達", "link": "https://www.google.com/maps/..." }},
+                        {{ "name": "🥈 スーパーイズミ", "checked": false, "desc": "09:00-21:00 | 昭和激安", "link": "https://www.google.com/maps/..." }}
+                    ],
+                    "link_url": "https://www.google.com/maps/...",
+                    "is_highlight": false
+                }}
+            ],
+            "day_metadata": [
+                {{
+                    "day_number": 1,
+                    "notes": [{{ "item": "標題", "content": "內容" }}],
+                    "costs": [{{ "item": "項目", "amount": "金額" }}],
+                    "tickets": [{{ "name": "票券名", "price": "價格" }}]
+                }}
+            ],
+            "ai_review": "以專業旅遊數據分析師身分提供的行程優化分析，嚴禁任何藥師、醫療或健康叮嚀用語。"
+        }}
+        
+        CRITICAL: 輸出必須是純 JSON，不得包含 Markdown 標記，嚴禁 items 為空。
+        
+        待解析文本:
+        {body.markdown_text}
+        """
+        
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(cleaned_text)
+        data = reconstruct_metadata(data)
+        data = fix_sub_items_structure(data)
+        
+        # 🛡️ NaN/Null Guard: 確保 items 絕對不為空
+        if not data.get("items"):
+            print("⚠️ [AI Parser] Empty items detected, attempting emergency recovery...")
+            # 如果 AI 回傳的天數結構不對，嘗試修復 (前端及後端存檔期望扁平的 items 陣列)
+            if "days" in data:
+                flat_items = []
+                for d in data["days"]:
+                    dn = d.get("day_number") or d.get("day") or 1
+                    for act in d.get("activities", []):
+                        act["day_number"] = dn
+                        # 型別校正
+                        act["place_name"] = act.get("place_name") or act.get("place") or "Unknown"
+                        act["time_slot"] = act.get("time_slot") or act.get("time") or "00:00"
+                        flat_items.append(act)
+                data["items"] = flat_items
+
+        return data
+
+    except Exception as e:
+        print(f"🔥 [Parser Error] {e}")
+        raise HTTPException(status_code=500, detail=f"Itinerary Parser Error: {str(e)}")
+
+@router.post("/generate-trip")
+@limiter.limit("5/minute")
+async def generate_trip(
+    request: Request,
+    body: SimplePromptRequest,
+    api_key: str = Depends(get_gemini_key)
+):
+    """[Itinerary] World-Class Itinerary Generator with Ryan's Soul"""
+    try:
+        from services.model_manager import call_extraction
+        
+        # 🆕 v27.3 Professional Guide (Persona Neutralization)
+        prompt = f"""你是 Ryan，一位專業、有效率且對當地極其熟悉的在地嚮導。
+        任務：為使用者規劃地圖精確、路線流暢且具備深度文化底蘊的旅遊方案。需求：{body.prompt}
+
+        ### 世界級規劃核心指令 (v27.3):
+        1. **天數完整性 (Mandatory)**: 如果使用者需求為 X 日遊，你必須輸出從 Day 1 到 Day X 的完整行程項目，每個天數都必須包含 3-4 個精確景點。不准截斷。
+        2. **專業標題與描述**: 
+           - 標題應簡潔有力（例如：大阪京都經典深度遊）。不准包含「藥師」、「特製」等冗餘詞彙。
+           - `desc` 應聚焦於景點歷史、交通秘訣或必吃理由。嚴禁加入醫療建議或「藥師叮嚀」。
+        3. **地理精確度**: `place_name` 必須是具體的、可搜尋的地標全名。
+        4. **禁止裝飾**: 嚴禁在輸出內容中使用藥品圖示 (💊) 或任何非旅遊相關的貼圖。
+
+        ### 輸出格式範例 (Strict JSON):
+        {{
+            "title": "行程名稱 (簡潔專業)",
+            "items": [
+                {{
+                    "day_number": 1, "time_slot": "09:00", "place_name": "具體地標全名", "category": "sightseeing", "desc": "專業景點介紹與遊玩建議", "tags": ["必去", "風景"], "is_highlight": true
+                }}
+            ],
+            "day_metadata": [
+                {{
+                    "day_number": 1,
+                    "notes": [{{ "item": "建議", "content": "建議內容" }}],
+                    "costs": [{{ "item": "項次", "amount": "1000" }}],
+                    "tickets": [{{ "name": "票卷", "price": "250" }}]
+                }}
+            ],
+            "ai_review": "給旅行者的專業行前建議與路線優化總結。嚴禁提及「藥師」、「醫療」、「保健」或任何醫療相關用語。"
+        }}
+
+        語言：全繁體中文。
+        """
+
+        
+        raw_text = await call_extraction(api_key, prompt, intent_type="PLANNING")
+        cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(cleaned_text)
+        data = reconstruct_metadata(data)
+        data = fix_sub_items_structure(data)
+        
+        # 🆕 v26.1: Wrap with status for Frontend Zod Schema
+        return {
+            "status": "success",
+            "data": data
+        }
+
+    except Exception as e:
+        print(f"🔥 [Generator Error] {e}")
+        raise HTTPException(status_code=500, detail=f"Itinerary Generator Error: {str(e)}")
+
 @router.post("/parse-receipt")
 @limiter.limit("5/minute")
 async def parse_receipt(
@@ -247,7 +478,8 @@ async def actuary_chat(
     api_key: str = Depends(get_gemini_key)
 ):
     try:
-        prompt = f"Analyze travel expenses for {json.dumps(body.members)}. Query: {body.message}"
+        persona = "你是 Ryan，一位專業、理性的旅遊財務顧問（AI Actuary）。你擅長處理複雜的拆帳問題、匯率計算與花費分析。請以精簡、專業且具備幽默感（但不涉及藥師身分）的語氣回答。"
+        prompt = f"{persona}\n\nAnalyze travel expenses for {json.dumps(body.members)}. Query: {body.message}"
         result = await call_with_fallback(api_key=api_key, history=[], message=prompt, intent_type="PLANNING")
         return {"response": result["text"]}
     except Exception as e:
