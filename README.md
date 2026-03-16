@@ -35,11 +35,13 @@
 ## ✨ Features / 功能特色
 
 ### 🤖 AI Travel Assistant / AI 旅遊助手
-- **Gemini 2.5 Chat** — Real-time streaming responses via SSE / 即時串流回應
+- **Gemini 2.5 + AI Engine V2026.3** — Real-time streaming with **CoT Reasoning** and **Literal Extraction** / 具備思維鏈 (CoT) 與字面高保真提取
 - **Itinerary Health Check** — AI reviews your daily plan and suggests improvements / AI 行程健檢
-- **Smart POI Recommendations** — Function Calling to add places directly to itinerary / 智能景點推薦，一鍵加入行程
+- **High-Density Generation** — V28.8 Nested Day Structure with **Physical Density Enforcement** (6-10 items/day) / 極致密度規劃 (每日 6-10 個行程點)
+- **Smart POI Recommendations** — Function Calling and **Multi-Link Recovery** for deep recommendations / 多重連結提取與智能景點推薦
 - **Memory Engine** — Auto-summarizes long conversations to maintain context / 記憶壓縮引擎
 - **BYOK (Bring Your Own Key)** — Your API key, your privacy / 自帶金鑰，隱私至上
+
 
 ### 🗺️ Interactive Maps / 互動地圖
 - **MapLibre GL** with 3D buildings, satellite view, and Chinese labels / 3D 建築、衛星圖、中文標籤
@@ -60,8 +62,11 @@
 - **9 Currencies** — JPY, USD, EUR, KRW, TWD, and more / 9 種幣別
 - **Real-time Exchange Rates** — Auto-convert to your home currency / 即時匯率換算
 - **Category Analytics** — Pie charts and daily/total views / 分類統計圖表
-- **Receipt Photo Upload** — Cloudinary integration / 收據照片上傳
-- **Shared & Private Ledgers** — Split expenses with travel buddies / 公帳私帳分離
+- **AI Actuary** — One-click splitting and financial advisor chat / AI 精算師一鍵拆帳與財務顧問
+- **Receipt Photo Upload** — AI OCR with HEIC support and SSRF protection / AI 收據辨識 (支援 HEIC)
+- **Shared & Private Ledgers** — Split expenses with travel buddies via **Shared Ledger (Phase 8)** / 旅遊公帳、私帳分離與分享
+- **Credit Card Rewards** — Reward rate tracking and automatic cashback calculation / 信用卡回饋追蹤與試算
+
 
 ### 🔐 Privacy & Security / 隱私安全
 - **BYOK Model** — AI keys stored locally, never on server / 金鑰僅存本地
