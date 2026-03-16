@@ -9,9 +9,10 @@
 <h1 align="center">Tabidachi 旅立ち</h1>
 
 <p align="center">
-  <strong>AI-Powered Collaborative Travel Planner PWA</strong><br/>
-  <strong>AI 驅動的協作旅行規劃 PWA</strong>
+  <strong>Tabidachi：全域零邊際旅遊規劃平台 (BYOK Edition)</strong><br/>
+  <strong>Zero-Cost Collaborative AI Travel Planner</strong>
 </p>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" />
