@@ -19,7 +19,8 @@
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi" />
-  <img src="https://img.shields.io/badge/Gemini_AI-2.5-4285F4?logo=google" />
+  <img src="https://img.shields.io/badge/Gemini_AI-3.1%20%7C%203%20%7C%202.5-4285F4?logo=google" />
+  <img src="https://img.shields.io/badge/Gemma-3_27B-8E44AD?logo=google-cloud" />
   <img src="https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa" />
   <img src="https://img.shields.io/badge/License-MIT-green" />
 </p>
@@ -35,8 +36,12 @@
 
 ## ✨ Features / 功能特色
 
-### 🤖 AI Travel Assistant / AI 旅遊助手
-- **Gemini 2.5 + AI Engine V2026.3** — Real-time streaming with **CoT Reasoning** and **Literal Extraction** / 具備思維鏈 (CoT) 與字面高保真提取
+### 🤖 Hybrid AI Intelligence / 混合動力 AI 助手
+- **ZeroPoint Core V2026.3** — Multi-tier routing architecture / 多層級智能代碼調度架構
+  - **Gemini 3.1 Flash Preview** (Reasoning & CoT) — High-fidelity CoT deduction / 高保真思維鏈推理
+  - **Gemini 3 Flash** (Speed & Multimedia) — Real-time multimedia extraction / 極速多媒體解析
+  - **Gemini 2.5 Flash** (Stable Workhorse) — High-density planning / 高密度穩健規劃
+  - **Gemma 3 27B** (Open Fallback) — Privacy-first local/open routing / 開源模型安全備援
 - **Itinerary Health Check** — AI reviews your daily plan and suggests improvements / AI 行程健檢
 - **High-Density Generation** — V28.8 Nested Day Structure with **Physical Density Enforcement** (6-10 items/day) / 極致密度規劃 (每日 6-10 個行程點)
 - **Smart POI Recommendations** — Function Calling and **Multi-Link Recovery** for deep recommendations / 多重連結提取與智能景點推薦
