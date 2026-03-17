@@ -9,6 +9,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { itemsApi, poiApi } from "@/lib/api"
 import { debugLog } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
+import { getSecureApiKey } from "@/lib/security"
 
 // 三源整合資料結構
 interface EnrichedPOI {
@@ -73,7 +74,7 @@ export default function POIPreviewCard({
                     type: poiData.category || "sightseeing",
                     lat: poiData.lat || 0,
                     lng: poiData.lng || 0,
-                    api_key: localStorage.getItem("user_gemini_key")
+                    api_key: getSecureApiKey()
                 }, userId || undefined)
                 if (data.success && data.poi) {
                     setEnriched(data.poi)

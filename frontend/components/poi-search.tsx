@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { poiApi } from "@/lib/api"
 import { useLanguage } from "@/lib/LanguageContext"
+import { getSecureApiKey } from "@/lib/security"
 
 
 // POI 類別定義
@@ -91,9 +92,7 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
         setAiRecommendation(null)
 
         try {
-            const apiKey = localStorage.getItem("user_gemini_key") ||
-                localStorage.getItem("gemini_api_key") ||
-                process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
+            const apiKey = getSecureApiKey()
 
             if (!apiKey) {
                 setAiRecommendation(t('ps_no_api_key'))

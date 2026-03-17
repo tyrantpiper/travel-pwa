@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
 import { useLanguage } from "@/lib/LanguageContext"
+import { getSecureApiKey } from "@/lib/security"
 
 interface Task {
     id: string
@@ -41,10 +42,7 @@ export function TaskCard({ onNavigateToApiKey, className }: TaskCardProps) {
     const tasks = useMemo((): Task[] => {
         const hasNickname = typeof window !== 'undefined' && !!localStorage.getItem("user_nickname")
         const hasTrip = trips && trips.length > 0
-        const hasApiKey = typeof window !== 'undefined' && (
-            !!localStorage.getItem("user_gemini_key") ||
-            !!process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-        )
+        const hasApiKey = !!getSecureApiKey()
 
         return [
             {

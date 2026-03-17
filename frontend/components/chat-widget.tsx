@@ -11,6 +11,7 @@ import { useTripContext } from "@/lib/trip-context"
 import { useFocusedDay } from "@/lib/stores/tripStore"
 import { useTripDetail } from "@/lib/hooks"
 import { useDynamicPolling } from "@/lib/polling-manager"
+import { getSecureApiKey } from "@/lib/security"
 import { getLeanItinerary, LeanItinerary } from "@/lib/getLeanItinerary"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
@@ -416,7 +417,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         if ((!input.trim() && !selectedImage) || isLoading) return
 
         // Check for API key
-        const apiKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || ""
+        const apiKey = getSecureApiKey()
         if (!apiKey) {
             const errorMsg = t('ai_apikey_missing')
             setMessages(prev => [

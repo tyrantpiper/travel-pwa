@@ -36,6 +36,7 @@ import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
 import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
+import { encryptData, getSecureApiKey } from "@/lib/security"
 
 
 
@@ -112,14 +113,16 @@ export function ProfileView() {
         }
 
         // Check keys
-        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
+        const secureKey = getSecureApiKey()
 
-        if (storedKey && isMounted) {
-            setApiKey(devKey ? (zh ? "(開發者模式)" : "(Dev Mode)") : storedKey)
+        if (secureKey && isMounted) {
+            const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
+            setApiKey(devKey === secureKey ? (zh ? "(開發者模式)" : "(Dev Mode)") : secureKey)
             setHasApiKey(true)
+            
+            // Auto-migration: If we have a legacy key but no encrypted key, encrypt it now
             if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
-                localStorage.setItem("user_gemini_key", storedKey)
+                localStorage.setItem("user_gemini_key", encryptData(secureKey))
                 localStorage.removeItem("gemini_api_key")
             }
         }
@@ -258,7 +261,8 @@ export function ProfileView() {
 
     const handleSaveApiKey = () => {
         if (!apiKey.trim()) return
-        localStorage.setItem("user_gemini_key", apiKey)
+        // 🛡️ Security Hardened: Encrypt key before storage
+        localStorage.setItem("user_gemini_key", encryptData(apiKey))
         setHasApiKey(true)
         setApiKeyDialogOpen(false)
         toast.success(t('profile_key_set'))

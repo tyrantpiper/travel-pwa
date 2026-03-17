@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader } f
 import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { compressImage } from "@/lib/image-utils"
 import { useLanguage } from "@/lib/LanguageContext"
+import { isTrustedUrl } from "@/lib/security"
 
 // 🆕 DND-Kit imports
 import {
@@ -202,9 +203,9 @@ export function MultiImageUpload({
 
     const canAddMore = values.length < maxImages
 
-    // 🆕 Cloudinary 縮圖轉換 (200x200, 裁切填滿)
+    // 🛡️ Security Hardened: Verify actual hostname to prevent path-traversal bypass
     const getThumbnailUrl = useCallback((url: string) => {
-        if (!url.includes('cloudinary.com')) return url
+        if (!isTrustedUrl(url, 'cloudinary.com')) return url
         return url.replace('/upload/', '/upload/w_200,h_200,c_fill,q_auto/')
     }, [])
 

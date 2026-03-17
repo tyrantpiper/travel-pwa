@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
 import { poiApi } from "@/lib/api"
 import { useLanguage } from "@/lib/LanguageContext"
+import { getSecureApiKey } from "@/lib/security"
 
 export interface ClusterItem {
     id?: string;
@@ -172,7 +173,7 @@ export default function POIDetailDrawer({
                 type: poi.type,
                 lat: poi.lat,
                 lng: poi.lng,
-                api_key: localStorage.getItem("user_gemini_key")
+                api_key: getSecureApiKey()
             }, userId)
 
             setAiData(data)

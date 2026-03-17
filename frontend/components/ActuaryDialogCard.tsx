@@ -96,10 +96,10 @@ export function ActuaryDialogCard({ open, onOpenChange, expenses, members }: Act
                 messages // 前送的歷史記錄
             )
 
-            if (response.status === "success" && response.reply) {
-                setMessages(prev => [...prev, { role: "model" as const, content: response.reply }])
+            if (response.status === "success" && response.response) {
+                setMessages(prev => [...prev, { role: "model" as const, content: response.response }])
             } else {
-                setMessages(prev => [...prev, { role: "model" as const, content: "⚠️ " + (response.reply || "API 回傳異常，請重試。") }])
+                setMessages(prev => [...prev, { role: "model" as const, content: "⚠️ " + (response.response || "API 回傳異常，請重試。") }])
             }
         } catch (error) {
             console.error("Actuary Failed:", error)

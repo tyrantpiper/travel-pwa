@@ -34,7 +34,7 @@ from models.base import (
     ReceiptRequest,
     ActuaryRequest
 )
-from utils.deps import get_gemini_key, get_verified_user
+from utils.deps import get_gemini_key, get_verified_user, get_supabase
 from services.model_manager import call_extraction, call_with_fallback
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -497,6 +497,101 @@ async def parse_receipt(
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/trips/{trip_id}/days/{day}/ai-review")
+@limiter.limit("5/minute")
+async def generate_day_review(
+    request: Request,
+    trip_id: str,
+    day: int,
+    api_key: str = Depends(get_gemini_key),
+    supabase=Depends(get_supabase)
+):
+    """🕵️ AI 深度審核：讀取當天所有細節並提供分析"""
+    try:
+        # 1. 抓取當天所有行程細項 (High-Fidelity Context)
+        items_res = supabase.table("itinerary_items")\
+            .select("time_slot, place_name, notes, category")\
+            .eq("itinerary_id", trip_id)\
+            .eq("day_number", day)\
+            .order("time_slot")\
+            .execute()
+        
+        activities = items_res.data or []
+        if not activities:
+            return {"status": "success", "review": "💡 當天尚未安排任何景點藍圖，建議先添加一些行程點，我才能為您進行深度審核。"}
+
+        # 2. 構建高密度上下文 (Context Engineering)
+        ctx_lines = [f"- {a['time_slot']} | {a['place_name']} ({a['category']}) | 備註: {a['notes'] or '無'}" for a in activities]
+        activity_summary = "\n".join(ctx_lines)
+
+        # 3. 呼叫 AI 進行分析 (Persona: Ryan)
+        prompt = f"""你是 Ryan，一位資深旅遊數據分析師與行程架構師。
+        任務：對以下 Day {day} 的行程進行『全景式深度審核』。
+        
+        待審核行程細節：
+        {activity_summary}
+
+        ### 審核規範:
+        1. **實體流暢度**：景點間的時間分配是否合理？是否會太趕？
+        2. **邏輯優化**：有沒有更順路的排法？
+        3. **在地洞察**：針對這些類型的地點，給予 1-2 個專業小撇步。
+        4. **禁止事項**：嚴禁任何醫療、健康或藥師人設相關用語。
+        
+        請以繁體中文回答，並使用標頭 [🎯 總評]、[✅ 優點]、[⚠️ 修正建議]、[💡 在地小撇步] 進行格式化。
+        """
+        
+        review_text = await call_extraction(api_key, prompt, intent_type="DIAGNOSIS")
+
+        # 4. 原子化更新資料庫 (Prevent Overwrite)
+        # 先讀取最新的 content
+        trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到行程資料")
+            
+        content = trip_res.data.get("content") or {}
+        if "day_ai_reviews" not in content:
+            content["day_ai_reviews"] = {}
+            
+        content["day_ai_reviews"][str(day)] = review_text
+        
+        # 寫回更新
+        supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+        
+        return {
+            "status": "success", 
+            "day": day,
+            "review": review_text
+        }
+
+    except Exception as e:
+        print(f"🔥 [AI Review Error] {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/trips/{trip_id}/days/{day}/ai-review")
+async def clear_day_review(
+    request: Request,
+    trip_id: str,
+    day: int,
+    supabase=Depends(get_supabase)
+):
+    """🗑️ 清除特定天數的 AI 審核報告"""
+    try:
+        trip_res = supabase.table("itineraries").select("content").eq("id", trip_id).single().execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="找不到行程資料")
+            
+        content = trip_res.data.get("content") or {}
+        reviews = content.get("day_ai_reviews", {})
+        
+        if str(day) in reviews:
+            del reviews[str(day)]
+            content["day_ai_reviews"] = reviews
+            supabase.table("itineraries").update({"content": content}).eq("id", trip_id).execute()
+            
+        return {"status": "success", "message": "Review cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/actuary")
 @limiter.limit("10/minute")
 async def actuary_chat(
@@ -504,11 +599,14 @@ async def actuary_chat(
     body: ActuaryRequest,
     api_key: str = Depends(get_gemini_key)
 ):
+    """🤖 AI 精算師對話 (V23.1 Protocol)"""
     try:
         persona = "你是 Ryan，一位專業、理性的旅遊財務顧問（AI Actuary）。你擅長處理複雜的拆帳問題、匯率計算與花費分析。請以精簡、專業且具備幽默感（但不涉及藥師身分）的語氣回答。"
-        prompt = f"{persona}\n\nAnalyze travel expenses for {json.dumps(body.members)}. Query: {body.message}"
-        result = await call_with_fallback(api_key=api_key, history=[], message=prompt, intent_type="CHAT")
-        return {"response": result["text"]}
+        prompt = f"{persona}\n\nAnalyze travel expenses for {json.dumps(body.members)}. Context: {json.dumps(body.expenses)}. Query: {body.message}"
+        
+        # Use simple response key to match ActuaryDialogCard schema update
+        result = await call_with_fallback(api_key=api_key, history=body.history, message=prompt, intent_type="CHAT")
+        return {"status": "success", "response": result["text"]}
     except Exception as e:
-        print(f"[Error] actuary_chat: {e}")
+        print(f"🔥 [Actuary Error] {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -13,6 +13,7 @@ import {
 import { Settings, Key, ExternalLink, CheckCircle2, AlertCircle, Eraser } from "lucide-react"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
+import { encryptData, getSecureApiKey } from "@/lib/security"
 
 interface ApiKeySettingsProps {
     onKeySaved: (key: string) => void;
@@ -30,27 +31,20 @@ export function ApiKeySettings({ onKeySaved, className }: ApiKeySettingsProps) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- SSR hydration safety
         setIsMounted(true)
 
-        // 1. 優先檢查開發者後門
-        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-        if (devKey) {
-            setKey(devKey)
-            onKeySaved(devKey)
-            setIsDev(true)
-            return
-        }
-
-        // 2. 檢查瀏覽器庫存
-        const storedKey = localStorage.getItem("user_gemini_key")
-        if (storedKey) {
-            setKey(storedKey)
-            onKeySaved(storedKey)
+        const secureKey = getSecureApiKey()
+        if (secureKey) {
+            setKey(secureKey)
+            onKeySaved(secureKey)
+            if (secureKey === process.env.NEXT_PUBLIC_DEV_GEMINI_KEY) {
+                setIsDev(true)
+            }
         }
     }, [onKeySaved])
 
 
     const handleSave = () => {
         if (!key.trim()) return
-        localStorage.setItem("user_gemini_key", key)
+        localStorage.setItem("user_gemini_key", encryptData(key))
         onKeySaved(key)
         // 🆕 Real-time update event
         window.dispatchEvent(new CustomEvent('gemini-key-updated', { detail: key }))
