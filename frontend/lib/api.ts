@@ -19,6 +19,7 @@ import {
 } from './schemas';
 import { SubItem, PreviewMetadata } from './itinerary-types';
 import { z } from "zod";
+import { getSecureApiKey } from "@/lib/security";
 
 // === API Endpoints ===
 export const API = {
@@ -40,6 +41,7 @@ export const API = {
     RESOLVE_LINK: `${API_HOST}/api/geocode/resolve-link`,
     RECEIPT_PARSE: `${API_HOST}/api/ai/parse-receipt`,
     ACTUARY: `${API_HOST}/api/ai/actuary`,
+    SMART_SEARCH: `${API_HOST}/api/ai/smart-search`,
 }
 
 export { API_HOST }
@@ -127,6 +129,16 @@ export interface AiParseParams {
 export interface AiGenerateParams {
     prompt: string
     user_id?: string
+}
+
+export interface SmartSearchParams {
+    query: string
+    lat: number
+    lng: number
+    region?: string
+    trip_title?: string
+    api_key: string
+    max_results?: number
 }
 
 export interface SaveItineraryParams {
@@ -380,7 +392,7 @@ export const tripsApi = {
         if (userId) headers["X-User-ID"] = userId
 
         const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
-            method: "PUT",
+            method: "PATCH",
             headers,
             body: JSON.stringify({ day, ...data })
         })
@@ -390,9 +402,7 @@ export const tripsApi = {
 
     /** 🕵️ Generate AI day review */
     generateAIReview: async (tripId: string, day: number, userId?: string): Promise<{ status: string; day: number; review: string }> => {
-        const apiKey = typeof window !== 'undefined'
-            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
-            : ""
+        const apiKey = getSecureApiKey()
 
         if (!apiKey) {
             throw new Error("請到下方導覽列的「個人檔案」頁面設定 Gemini API Key")
@@ -420,10 +430,9 @@ export const tripsApi = {
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId
 
-        const res = await fetch(`${API.TRIPS}/${tripId}/day-data`, {
-            method: "PUT",
-            headers,
-            body: JSON.stringify({ day, day_ai_reviews: { [day]: "" } })
+        const res = await fetch(`${API_HOST}/api/ai/trips/${tripId}/days/${day}/ai-review`, {
+            method: "DELETE",
+            headers
         })
         if (!res.ok) throw new Error("Failed to clear AI review")
         return res.json()
@@ -485,9 +494,7 @@ export const tripsApi = {
 export const aiApi = {
     /** 🤖 Parse markdown itinerary into structured data */
     parseMarkdown: async (params: AiParseParams) => {
-        const apiKey = typeof window !== 'undefined'
-            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
-            : ""
+        const apiKey = getSecureApiKey()
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -515,9 +522,7 @@ export const aiApi = {
 
     /** 📸 Parse receipt image into structured expense data (Phase 5) */
     parseReceipt: async (imageUrl: string, image?: string) => {
-        const apiKey = typeof window !== 'undefined'
-            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
-            : ""
+        const apiKey = getSecureApiKey()
 
         // We forward the auth header so the Proxy can authenticate with the Backend FastAPI
         const headers: Record<string, string> = {
@@ -545,9 +550,7 @@ export const aiApi = {
         message: string,
         history: { role: string, content: string }[]
     ) => {
-        const apiKey = typeof window !== 'undefined'
-            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
-            : ""
+        const apiKey = getSecureApiKey()
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -570,9 +573,7 @@ export const aiApi = {
 
     /** 🚀 Generate itinerary from prompt */
     generateTrip: async (params: AiGenerateParams) => {
-        const apiKey = typeof window !== 'undefined'
-            ? (localStorage.getItem("user_gemini_key") || process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "")
-            : ""
+        const apiKey = getSecureApiKey()
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -596,6 +597,20 @@ export const aiApi = {
             return data
         }
         return parsed.data
+    },
+
+    /** 🧠 Smart AI Search using gemma-3-27b (Phase 9) */
+    smartSearch: async (params: SmartSearchParams) => {
+        const res = await fetch(API.SMART_SEARCH, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(params)
+        })
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ detail: "智能搜尋連線失敗" }))
+            throw new Error(errorData.detail || "智能搜尋連線失敗")
+        }
+        return res.json()
     }
 }
 

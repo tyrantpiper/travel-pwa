@@ -226,7 +226,8 @@ async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-AP
     """
     # 調試日誌
     if x_gemini_api_key:
-        print(f"🔑 收到 API Key: {x_gemini_api_key[:10]}... (長度: {len(x_gemini_api_key)})")
+        # 🛡️ Security Hardened: Do not print keys in production
+        pass
     
     # 🚫 沒有 Key 或格式不對，直接拒絕
     if not x_gemini_api_key or len(x_gemini_api_key) < 39:

@@ -27,7 +27,8 @@ async def get_gemini_key(
             
     # 調試日誌
     if final_key:
-        print(f"🔑 收到 API Key: {final_key[:10]}... (長度: {len(final_key)})")
+        # 🛡️ Security Hardened: Do not print keys in production
+        pass
     
     # 🚫 沒有 Key 或格式不對，直接拒絕
     if not final_key or len(final_key) < 39:

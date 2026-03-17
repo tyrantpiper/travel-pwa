@@ -20,24 +20,21 @@ interface TripState {
     initializeFromStorage: () => void
 }
 
+import { generateSecureUUID } from '../security'
+
 /**
  * 🔧 FIX: Sync initialize userId from localStorage to fix race condition
  * This ensures userId is available immediately on first render
- * 🆕 Auto-generates UUID if not exists
+ * 🛡️ Security Hardened: Uses Web Crypto API for UUID generation
  */
 const getInitialUserId = (): string | null => {
     if (typeof window !== 'undefined') {
         let uuid = localStorage.getItem('user_uuid')
         if (!uuid) {
-            // 🆕 Auto-generate UUID for new users
-            uuid = crypto.randomUUID?.() ||
-                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-                    const r = Math.random() * 16 | 0
-                    const v = c === 'x' ? r : (r & 0x3 | 0x8)
-                    return v.toString(16)
-                })
+            // 🛡️ Auto-generate cryptographically secure UUID
+            uuid = generateSecureUUID()
             localStorage.setItem('user_uuid', uuid)
-            console.log('🆕 Auto-generated user_uuid:', uuid)
+            console.log('🆕 Auto-generated secure user_uuid:', uuid)
         }
         return uuid
     }

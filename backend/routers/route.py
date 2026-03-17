@@ -21,10 +21,10 @@ ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
 async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -> dict:
     """使用 ArcGIS Routing API 計算路線"""
     if not ARCGIS_API_KEY:
-        print("   ❌ ArcGIS API Key is MISSING")
+        # print("   ❌ ArcGIS API Key is MISSING") # Silenced
         raise Exception("ArcGIS API Key 未設定")
     
-    print(f"   🔍 Using ArcGIS API Key: {ARCGIS_API_KEY[:6]}...{ARCGIS_API_KEY[-4:]}")
+    # print(f"   🔍 Using ArcGIS API Key: {ARCGIS_API_KEY[:6]}...{ARCGIS_API_KEY[-4:]}") # Silenced
     
     # ArcGIS stops 格式: lng,lat;lng,lat
     stops_str = ";".join([f"{s.lng},{s.lat}" for s in stops])

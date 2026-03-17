@@ -26,6 +26,7 @@ import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ExpenseChart, CATEGORY_COLORS } from "@/components/expense-chart"
 import { useTripContext } from "@/lib/trip-context"
+import { encryptData, decryptData, getSecureApiKey } from "@/lib/security"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
 import { Virtuoso } from "react-virtuoso"
@@ -328,18 +329,17 @@ export function ToolsView() {
     }
 
     useEffect(() => {
-        // Check if user has API key (check localStorage, old key, and DEV key)
-        const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-        const storedKey = localStorage.getItem("user_gemini_key") || localStorage.getItem("gemini_api_key") || devKey
-        setHasApiKey(!!storedKey)
+        setHasApiKey(!!getSecureApiKey())
     }, [])
 
     // 🆕 v3.8: 載入信用卡資料 (Local)
     useEffect(() => {
         try {
+            // 🛡️ Security Hardened: Decrypt card data on retrieval
             const saved = localStorage.getItem("credit_cards")
-            if (saved) {
-                setLocalCards(JSON.parse(saved))
+            const decrypted = decryptData(saved)
+            if (decrypted) {
+                setLocalCards(JSON.parse(decrypted))
             }
         } catch (e) {
             console.error("Failed to load local credit cards:", e)
@@ -732,7 +732,8 @@ export function ToolsView() {
 
     // 🆕 v3.8: 信用卡管理函數
     const saveCardsToLocalStorage = (cards: CreditCard[]) => {
-        localStorage.setItem("credit_cards", JSON.stringify(cards))
+        // 🛡️ Security Hardened: Encrypt card data before storage
+        localStorage.setItem("credit_cards", encryptData(JSON.stringify(cards)))
     }
 
     const openAddCardDialog = () => {
