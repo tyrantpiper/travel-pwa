@@ -11,11 +11,12 @@ import base64
 import uuid
 import httpx
 import io
+from urllib.parse import urlparse
 from PIL import Image
 try:
-    from backend.utils.url_safety import is_safe_url
-except ImportError:
     from utils.url_safety import is_safe_url
+except ImportError:
+    from backend.utils.url_safety import is_safe_url
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
