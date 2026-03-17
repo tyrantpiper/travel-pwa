@@ -8,18 +8,37 @@ export async function POST(request: Request) {
         let base64Image = image;
         let mimeType = reqMimeType || "image/jpeg";
 
-        // 如果沒有提供直接的 Base64，但有 URL，則進行抓取 (向後相容)
+        // 🛡️ SSRF Protection: Validate imageUrl before fetching
         if (!base64Image && imageUrl) {
-            console.log(`[Proxy] Fetching image from URL for backward compatibility: ${imageUrl.substring(0, 50)}...`);
-            const imageResponse = await fetch(imageUrl);
-            if (!imageResponse.ok) {
-                throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
-            }
+            try {
+                const url = new URL(imageUrl);
+                
+                // 1. Only allow HTTPS
+                if (url.protocol !== "https:") {
+                    throw new Error("Only HTTPS URLs are allowed");
+                }
+                
+                // 2. Domain Whitelist (Cloudinary as primary source)
+                const allowedDomains = ["res.cloudinary.com"];
+                if (!allowedDomains.some(domain => url.hostname.endsWith(domain))) {
+                    console.warn(`[Proxy] Blocked SSRF attempt to non-whitelisted domain: ${url.hostname}`);
+                    return NextResponse.json({ error: "Unauthorized image source" }, { status: 403 });
+                }
 
-            mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
-            const arrayBuffer = await imageResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
-            base64Image = buffer.toString("base64");
+                console.log(`[Proxy] Fetching image from trusted URL: ${imageUrl.substring(0, 50)}...`);
+                const imageResponse = await fetch(imageUrl);
+                if (!imageResponse.ok) {
+                    throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
+                }
+
+                mimeType = imageResponse.headers.get("content-type") || "image/jpeg";
+                const arrayBuffer = await imageResponse.arrayBuffer();
+                const buffer = Buffer.from(arrayBuffer);
+                base64Image = buffer.toString("base64");
+            } catch (e) {
+                console.error("[Proxy] URL Validation Error:", e);
+                return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid URL" }, { status: 400 });
+            }
         }
 
         if (!base64Image) {

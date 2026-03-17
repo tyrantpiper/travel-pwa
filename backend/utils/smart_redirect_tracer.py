@@ -14,6 +14,10 @@ import httpx
 import asyncio
 from typing import Dict, List, Optional
 from urllib.parse import urlparse, unquote
+try:
+    from backend.utils.url_safety import is_safe_url
+except ImportError:
+    from utils.url_safety import is_safe_url
 
 
 class SmartRedirectTracer:
@@ -36,7 +40,9 @@ class SmartRedirectTracer:
             (re.compile(r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)'), 'll_parameter'),         # 🥉 ll 參數
         ]
     
-    async def trace_full_chain_smart(self, short_url: str) -> Dict:
+            best['selection_reason'] = f'Street-level precision ({best["precision"]} decimals)'
+        
+        return best
         """
         Trace the full redirect chain and select the best coordinate.
         
@@ -59,6 +65,11 @@ class SmartRedirectTracer:
                         print(f"⚠️ Redirect loop detected at hop {hop}")
                         break
                     visited.add(current_url)
+                    
+                    # 🛡️ SSRF Check: Stop if URL points to internal network
+                    if not is_safe_url(current_url):
+                        print(f"🛑 Blocked SSRF attempt to internal/unsafe URL: {current_url}")
+                        break
                     
                     # Extract coordinates from current URL (but DO NOT STOP)
                     coords = self._extract_coords_from_url(current_url)

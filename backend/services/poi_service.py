@@ -398,6 +398,12 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
         WikiVoyage 速率限制: 每 30 秒最多 1 請求
         建議快取結果避免重複查詢
     """
+    # 🛡️ SSRF Protection: Validate language whitelist
+    allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
+    if lang not in allowed_langs:
+        print(f"⚠️ Blocked potential SSRF attempt with invalid lang: {lang}")
+        return None
+
     api_url = f"https://{lang}.wikivoyage.org/w/api.php"
     
     params = {

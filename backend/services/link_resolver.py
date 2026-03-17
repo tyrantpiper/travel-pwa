@@ -5,6 +5,11 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 
+try:
+    from backend.utils.url_safety import is_safe_url
+except ImportError:
+    from utils.url_safety import is_safe_url
+
 # 🆕 v35.26: Anti-Acidosis Protocol - Smart Redirect Tracer
 try:
     from backend.utils.smart_redirect_tracer import get_smart_tracer
@@ -39,6 +44,11 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
             "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
         }
         async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+            # 🛡️ SSRF Check
+            if not is_safe_url(url):
+                 print(f"🛑 [SSRF Block] Metadata fetch aborted for unsafe URL: {url}")
+                 return metadata
+
             resp = await client.get(url, headers=headers)
             if resp.status_code != 200:
                 return metadata
@@ -143,6 +153,11 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     try:
         # Step 1: Smart Trace with precision analysis
         if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
+            # 🛡️ SSRF Check before tracing
+            if not is_safe_url(url):
+                print(f"🛑 [SSRF Block] SmartTrace aborted for unsafe URL: {url}")
+                return result
+
             trace_result = await smart_tracer.trace_full_chain_smart(url)
             
             if trace_result.get('lat') and trace_result.get('lng'):
@@ -180,6 +195,11 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         # 🛡️ Graceful fallback: Use legacy logic if new tracer fails
         print(f"⚠️ SmartTracer/MolecularParser failed, falling back to legacy: {e}")
         try:
+            # 🛡️ SSRF Check
+            if not is_safe_url(url):
+                print(f"🛑 [SSRF Block] Legacy redirect aborted for unsafe URL: {url}")
+                return result
+
             async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
                 resp = await client.get(url)
                 final_url = str(resp.url)
@@ -225,6 +245,11 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
             }
             async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
+                # 🛡️ SSRF Check
+                if not is_safe_url(result['resolved_url']):
+                    print(f"🛑 [SSRF Block] DeepMine aborted for unsafe URL: {result['resolved_url']}")
+                    return result
+
                 resp = await client.get(result['resolved_url'], headers=headers)
                 if resp.status_code == 200:
                     body_text = resp.text

@@ -13,6 +13,10 @@ import httpx
 import io
 from PIL import Image
 try:
+    from backend.utils.url_safety import is_safe_url
+except ImportError:
+    from utils.url_safety import is_safe_url
+try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
 except ImportError:
@@ -45,20 +49,17 @@ async def safe_download_image(url: str) -> tuple[bytes, str]:
     Safely download image with SSRF protection and granular timeouts.
     Returns (bytes, mime_type).
     """
-    # 1. SSRF Check (Improved to allow most domains while blocking local network)
-    from urllib.parse import urlparse
+    # 1. SSRF Check (Robust centralized validation)
     parsed = urlparse(url)
     domain = parsed.netloc.lower()
     
-    # Simple block list for internal network patterns
-    forbidden_patterns = ["192.168.", "10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.", "localhost", "127.0.0.1"]
-    
-    # Exceptions for local dev
+    # Exceptions for local dev (if URL is explicitly localhost)
     if domain in ["localhost", "127.0.0.1"]:
+        # Allow internal fetches only in dev mode if explicitly requested
         pass 
-    elif any(p in domain for p in forbidden_patterns):
-        print(f"⚠️ [SSRF Block] Blocked attempt to fetch from: {domain}")
-        raise HTTPException(status_code=400, detail="Forbidden image source domain (internal network)")
+    elif not is_safe_url(url):
+        print(f"⚠️ [SSRF Block] Blocked attempt to fetch from unsafe URL: {url}")
+        raise HTTPException(status_code=400, detail="Forbidden image source domain (internal network or unsafe)")
 
     # 2. Granular Timeouts
     timeout = httpx.Timeout(5.0, connect=5.0, read=20.0, write=10.0, pool=5.0)
