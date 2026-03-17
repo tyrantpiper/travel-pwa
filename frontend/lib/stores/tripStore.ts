@@ -20,7 +20,7 @@ interface TripState {
     initializeFromStorage: () => void
 }
 
-import { generateSecureUUID } from '../security'
+import { generateSecureUUID } from '@/lib/security'
 
 /**
  * 🔧 FIX: Sync initialize userId from localStorage to fix race condition
