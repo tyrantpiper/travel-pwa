@@ -161,7 +161,7 @@ export function TripSwitcher({
                                         className
                                     )}
                                 >
-                                    <div className="flex items-center gap-2 truncate pr-2 w-full">
+                                    <div className="flex items-center gap-2 min-w-0 pr-2 w-full">
                                         {/* 🏮 Zen Seal: 狀態指示器 */}
                                         <div className="relative flex items-center justify-center shrink-0">
                                             <Map className={cn(

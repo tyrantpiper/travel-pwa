@@ -268,7 +268,7 @@ export default function POIDetailDrawer({
                                                         {item.number}
                                                     </div>
                                                     <div>
-                                                        <div className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{item.place}</div>
+                                                        <div className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors truncate">{item.place}</div>
                                                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.time || item.time_slot || '--:--'}</div>
                                                     </div>
                                                 </div>
@@ -307,7 +307,7 @@ export default function POIDetailDrawer({
                                     {poi.address && (
                                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                                             <MapPin className="w-4 h-4 flex-shrink-0" />
-                                            <span>{poi.address}</span>
+                                            <span className="line-clamp-2">{poi.address}</span>
                                         </div>
                                     )}
                                     {poi.phone && (

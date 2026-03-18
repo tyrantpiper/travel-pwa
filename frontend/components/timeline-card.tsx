@@ -136,7 +136,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 )}
 
                 <div className="flex justify-between items-start mb-1 pr-6">
-                    <h3 className={cn("font-bold text-slate-900 dark:text-white leading-tight", isHeader ? "text-xl" : "text-lg")}>
+                    <h3 className={cn("font-bold text-slate-900 dark:text-white leading-tight truncate", isHeader ? "text-xl" : "text-lg")}>
                         {activity.place || "Unknown Place"}
                     </h3>
                 </div>
@@ -193,7 +193,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                                 {activity.sub_items.map((item: SubItem, i: number) => (
                                     <TableRow key={i} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-700 transition-colors">
                                         <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
-                                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-0.5 break-words">{item.name}</div>
+                                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-0.5 truncate">{item.name}</div>
                                             {item.desc && <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight break-words whitespace-normal">{item.desc}</div>}
                                         </TableCell>
                                         {item.link ? (

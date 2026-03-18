@@ -125,8 +125,8 @@ export function TripList({
                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                            <div className="absolute bottom-4 left-4 text-white">
-                                <h3 className="font-bold text-lg">{trip.title}</h3>
+                            <div className="absolute bottom-4 left-4 right-4 text-white">
+                                <h3 className="font-bold text-lg truncate">{trip.title}</h3>
                                 <p className="text-xs opacity-80 flex items-center gap-1">
                                     <Calendar className="w-3 h-3" />
                                     {new Date(trip.start_date || new Date().toISOString()).toLocaleDateString()}
