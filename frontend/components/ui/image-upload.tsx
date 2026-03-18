@@ -186,7 +186,7 @@ export function ImageUpload({ value, onChange, onRemove, folder = "ryan_travel",
 
             {/* 全螢幕預覽 Dialog (可縮放) */}
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-                <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center">
+                <DialogContent className="max-w-[95vw] max-h-[90vh] p-0 bg-black/95 border-0 flex items-center justify-center z-[160]">
                     <VisuallyHidden>
                         <DialogTitle>{t('img_preview')}</DialogTitle>
                         <DialogDescription>{t('img_preview_desc')}</DialogDescription>
