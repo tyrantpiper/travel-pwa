@@ -13,10 +13,7 @@ import httpx
 import io
 from urllib.parse import urlparse
 from PIL import Image
-try:
-    from utils.url_safety import is_safe_url
-except ImportError:
-    from backend.utils.url_safety import is_safe_url
+from utils.url_safety import is_safe_url
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -183,7 +180,6 @@ async def parse_markdown(
 ):
     """[Itinerary] World-Class Markdown-to-JSON Parser with CoT Reasoning"""
     try:
-        from services.model_manager import call_extraction
         
         prompt = f"""你是 Ryan，一位專業且極其細心的旅遊數據分析師。今日日期為 2026-03-15。
         任務：將提供的 Markdown 內容【完整、逐項】地解析為結構化 JSON 行程。

@@ -21,6 +21,8 @@ from rapidfuzz import fuzz, process
 
 # Import AI model config
 from utils.ai_config import WORKHORSE_MODEL
+from services.model_manager import call_extraction_server
+import json
 
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
@@ -277,8 +279,6 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
     Returns:
         {name, address, display_name?, type?, description?}
     """
-    import json
-    
     # Step 1: Photon 原生查詢
     base_result = await reverse_geocode_with_photon(lat, lng)
     
@@ -292,17 +292,17 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
     # Step 2: AI 增強 (中文優化顯示)
     try:
         prompt = f"""根據座標 ({lat:.6f}, {lng:.6f}) 和地名 "{base_result.get('name', 'Unknown')}"，
-地址：{base_result.get('address', '')}
+        地址：{base_result.get('address', '')}
 
-請提供：
-1. display_name: 中文友好名稱（如果已經是中文則優化顯示）
-2. type: 地點類型（餐廳/景點/交通站/購物/住宿/其他）
-3. description: 一句話描述（20字內）
+        請提供：
+        1. display_name: 中文友好名稱（如果已經是中文則優化顯示）
+        2. type: 地點類型（餐廳/景點/交通站/購物/住宿/其他）
+        3. description: 一句話描述（20字內）
 
-嚴格按以下 JSON 格式回傳，不要額外說明：
-{{"display_name": "...", "type": "...", "description": "..."}}"""
+        嚴格按以下 JSON 格式回傳，不要額外說明：
+        {{"display_name": "...", "type": "...", "description": "..."}}"""
 
-        from services.model_manager import call_extraction_server
+        # call_extraction_server is now at top level
         raw = await call_extraction_server(prompt, intent_type="GEOCODE")
         text = raw.strip()
         # 處理可能的 markdown 包裝
@@ -800,7 +800,8 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
         return [query]
     
     # 🆕 緩存檢查
-    cache_key = (query.lower(), country_code)
+    # Cache key based on input
+    cache_key = (query.lower(), country_code) # Corrected cache_key to match function parameters
     if cache_key in TRANSLATION_CACHE:
         print(f"🔤 CACHE HIT: '{query}' → {TRANSLATION_CACHE[cache_key]}")
         return TRANSLATION_CACHE[cache_key]
@@ -810,7 +811,8 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
         return [query]
     
     try:
-        from services.model_manager import call_extraction_server
+        # Step 1: AI Analysis
+        # Assuming call_extraction_server is now globally available or imported at the top level
         country_name = country_info["name"]
         
         # 🆕 針對日本的特殊 prompt

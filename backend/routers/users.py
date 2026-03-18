@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 import orjson
 from utils.deps import get_supabase, get_verified_user
 from models.base import UpdateProfileRequest
+import os
+from services.geocode_service import HTTPX_CLIENT
 
 # 🆕 Standardized prefix for user endpoints
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -131,8 +133,6 @@ async def update_user_profile(
         print(f"🔍 Normalized UUID: {user_uuid}")
         
         # 🛡️ Direct HTTP approach - Optimized with async httpx
-        import os
-        from services.geocode_service import HTTPX_CLIENT
         
         supabase_url = os.getenv("SUPABASE_URL")
         supabase_key = os.getenv("SUPABASE_KEY")
