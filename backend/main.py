@@ -136,6 +136,7 @@ from routers.poi import router as poi_router
 from routers.users import router as users_router
 from routers.app import router as app_router
 from routers.sample_trip import router as sample_trip_router
+from routers.ledger import router as ledger_router
 
 app.include_router(geocode_router)
 app.include_router(expenses_router)
@@ -147,6 +148,7 @@ app.include_router(poi_router)
 app.include_router(users_router)
 app.include_router(app_router)
 app.include_router(sample_trip_router)
+app.include_router(ledger_router)
 print("[Routers] ✅ All systems registered")
 
 # 2. CORS 設定 (嚴格模式)

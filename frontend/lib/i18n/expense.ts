@@ -69,6 +69,7 @@ export const expenseTranslations = {
         exp_dialog_desc:
             "Fill in expense details including amount, currency, category, and payment method.",
         exp_save_failed: "Save failed",
+        exp_trip_not_ready: "Trip data loading, please try again",
 
         // Dynamic currency names (accessed via `t(`currency_${code}`)`)
         currency_JPY: "Yen",
@@ -155,6 +156,7 @@ export const expenseTranslations = {
         exp_dialog_desc:
             "填寫消費資訊，包括金額、幣別、分類與付款方式。",
         exp_save_failed: "儲存失敗",
+        exp_trip_not_ready: "行程資訊載入中，請稍後再試",
 
         // Dynamic currency names
         currency_JPY: "日幣",

@@ -10,8 +10,19 @@ from models.base import (
 from utils.deps import get_supabase, get_verified_user
 from utils.helpers import ensure_user_exists
 import json
+import uuid
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
+
+def is_valid_uuid(val: Any) -> bool:
+    """Check if a string is a valid UUID."""
+    if not val or not isinstance(val, str):
+        return False
+    try:
+        uuid.UUID(val)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def normalize_items(details: Any, version: int) -> List[ExpenseItem]:
@@ -153,8 +164,15 @@ async def add_expense(
             final_total = computed_total
             validation_msg = ""
 
-        await ensure_user_exists(supabase, request.created_by, request.creator_name)
-        
+        # 🛡️ Payer ID Sanitization: Only accept valid UUIDs. 
+        # If frontend sends a guest name, move it to notes.
+        actual_payer_id = request.payer_id
+        actual_notes = request.notes
+        if actual_payer_id and not is_valid_uuid(actual_payer_id):
+            guest_info = f"[Payer: {actual_payer_id}]"
+            actual_notes = f"{guest_info} {actual_notes}" if actual_notes else guest_info
+            actual_payer_id = None
+
         # Mapping Layer
         items_json = [item.dict() for item in request.items] if request.items else []
         
@@ -185,12 +203,18 @@ async def add_expense(
             "validation_code": request.diagnostics.code if request.diagnostics else None,
             "validation_message": "[BACKEND_VERIFIED] " + validation_msg if validation_msg == "" else validation_msg,
             "mismatch_amount": request.diagnostics.mismatch_amount if request.diagnostics else 0.0,
-            "notes": request.notes,
+            "notes": actual_notes,
             "custom_icon": request.custom_icon,
-            "payer_id": request.payer_id
+            "payer_id": actual_payer_id
         }
         
-        supabase.table("expenses").insert(payload).execute()
+        res = supabase.table("expenses").insert(payload).execute()
+        
+        # 🚨 Explicit Validation: Verify that data was actually written
+        if not res.data:
+            print(f"❌ Supabase Insertion Failed: {res}")
+            raise HTTPException(status_code=500, detail="資料庫寫入失敗，請稍後再試")
+
         return {"status": "success"}
     except HTTPException:
         raise
@@ -313,8 +337,16 @@ async def update_expense(
 
         if request.items is not None:
             # 🛡️ 關鍵修復：確保所有 Pydantic 模型都被序列化為字典，解決 500 序列化錯誤
-            data['details'] = [item.dict() for item in request.items]
+            # 同時防止 request.items 為 None 時的疊代錯誤
+            data['details'] = [item.dict() for item in request.items] if request.items else []
             data['details_schema_version'] = 2
+            
+        # 🛡️ Payer ID Sanitization for Update
+        if 'payer_id' in data and data['payer_id'] and not is_valid_uuid(data['payer_id']):
+            guest_info = f"[Payer: {data['payer_id']}]"
+            curr_notes = data.get('notes') or exp_data.get('notes') or ""
+            data['notes'] = f"{guest_info} {curr_notes}".strip()
+            data['payer_id'] = None
             
         # 1. First, merge diagnostics from the request (if any)
         if 'diagnostics' in raw_data:
@@ -367,7 +399,13 @@ async def update_expense(
                 data['validation_message'] = "[BACKEND_VERIFIED] Fallback to computed total."
                 data['validation_status'] = "pass"
 
-        supabase.table("expenses").update(data).eq("id", expense_id).execute()
+        res = supabase.table("expenses").update(data).eq("id", expense_id).execute()
+        
+        # 🚨 Explicit Validation for Update
+        if not res.data:
+            print(f"❌ Supabase Update Failed: {res}")
+            raise HTTPException(status_code=404, detail="更新失敗：找不到記錄或資料庫錯誤")
+
         return {"status": "success"}
     except Exception as e:
         print(f"❌ Update Expense Error: {e}")

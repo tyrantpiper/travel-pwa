@@ -368,7 +368,11 @@ export function ExpenseDialog({
             return
         }
 
-        if (!activeTripId) return
+        if (!activeTripId) {
+            haptic.error()
+            toast.error(t('exp_trip_not_ready') || "行程資訊載入中，請稍後再試")
+            return
+        }
         setIsSavingExpense(true)
 
         const payload = {
