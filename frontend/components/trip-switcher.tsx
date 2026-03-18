@@ -140,10 +140,10 @@ export function TripSwitcher({
                 ) : (
                     <motion.div
                         key="switcher"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                     >
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -177,7 +177,10 @@ export function TripSwitcher({
                                                 />
                                             )}
                                         </div>
-                                        <span className="truncate tracking-tight font-serif drop-shadow-sm">
+                                        <span 
+                                            className="truncate tracking-tight font-serif drop-shadow-sm"
+                                            title={activeTrip?.title || t('ts_select_trip')}
+                                        >
                                             {activeTrip?.title || t('ts_select_trip')}
                                         </span>
                                     </div>

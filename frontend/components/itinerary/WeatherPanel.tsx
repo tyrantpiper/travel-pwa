@@ -149,7 +149,7 @@ export function WeatherPanel({
                         </div>
                         <div className="min-w-0 flex-1">
                             <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2 leading-tight">
-                                <span className="break-words">{resolvedLocation?.name || t('w_unknown_location')}</span>
+                                <span className="truncate">{resolvedLocation?.name || t('w_unknown_location')}</span>
                                 {resolvedLocation && (
                                     <span className="text-[9px] font-mono font-normal text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-800 px-1 rounded inline-block">
                                         {resolvedLocation.lat.toFixed(2)}, {resolvedLocation.lng.toFixed(2)}

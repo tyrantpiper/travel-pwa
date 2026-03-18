@@ -1268,7 +1268,7 @@ export function ItineraryView() {
                 biasLoc={calculateBiasLocation(day)}
             />
 
-            <div className="flex-1 overflow-y-auto scroll-smooth" ref={setScrollerEl}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth" ref={setScrollerEl}>
                 {/* 🆕 Phase 3: Modular Header - Restored to Scroll Flow (bcfeb32 parity) */}
                 <ItineraryHeader
                     currentTrip={currentTrip}

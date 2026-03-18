@@ -43,13 +43,13 @@ export function ItineraryHeader({
     return (
         <div className="bg-white dark:bg-slate-800 pt-12 pb-2 border-b border-slate-200 dark:border-slate-700">
             <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4 sm:gap-2">
-                <div className="w-full sm:w-auto">
+                <div className="w-full sm:w-auto min-w-0">
                     <button onClick={onBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
                         <ArrowLeft className="w-3 h-3" /> {t('back')}
                     </button>
                     <TripSwitcher className="w-full sm:w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                 </div>
-                <div className="flex items-center justify-between w-full sm:w-auto sm:gap-4">
+                <div className="flex items-center justify-between w-full sm:w-auto sm:gap-4 min-w-0">
                     <div className="flex items-center gap-2">
                         {currentTrip?.public_id && (
                             <ShareButton
