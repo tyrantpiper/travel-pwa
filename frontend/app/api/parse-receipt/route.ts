@@ -20,13 +20,14 @@ export async function POST(request: Request) {
                 
                 // 2. Domain Whitelist (Cloudinary as primary source)
                 const allowedDomains = ["res.cloudinary.com"];
-                if (!allowedDomains.some(domain => url.hostname.endsWith(domain))) {
-                    console.warn(`[Proxy] Blocked SSRF attempt to non-whitelisted domain: ${url.hostname}`);
+                const hostname = url.hostname;
+                if (!allowedDomains.includes(hostname) && !allowedDomains.some(domain => hostname.endsWith("." + domain))) {
+                    console.warn(`[Proxy] Blocked SSRF attempt to non-whitelisted domain: ${hostname}`);
                     return NextResponse.json({ error: "Unauthorized image source" }, { status: 403 });
                 }
 
-                console.log(`[Proxy] Fetching image from trusted URL: ${imageUrl.substring(0, 50)}...`);
-                const imageResponse = await fetch(imageUrl);
+                console.log(`[Proxy] Fetching image from trusted URL: ${url.origin}${url.pathname.substring(0, 20)}...`);
+                const imageResponse = await fetch(url.toString());
                 if (!imageResponse.ok) {
                     throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
                 }
