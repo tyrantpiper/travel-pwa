@@ -5,6 +5,7 @@ POI 服務層 - 整合 OSM Overpass + OpenTripMap API
 
 import httpx
 import asyncio
+import re
 from typing import List, Dict, Optional
 from math import radians, cos, sin, sqrt, atan2
 from urllib.parse import quote
@@ -401,7 +402,7 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
     # 🛡️ SSRF Protection: Validate language whitelist
     allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
     if lang not in allowed_langs:
-        print(f"⚠️ Blocked potential SSRF attempt with invalid lang: {lang}")
+        print(f"[POI] Blocked potential SSRF attempt with invalid lang: {lang}")
         return None
 
     api_url = f"https://{lang}.wikivoyage.org/w/api.php"
@@ -417,8 +418,11 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
     }
     
     try:
+        headers = {
+            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+        }
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(api_url, params=params)
+            response = await client.get(api_url, params=params, headers=headers)
             
             if response.status_code != 200:
                 print(f"WikiVoyage API error: {response.status_code}")
@@ -479,8 +483,7 @@ async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en") -> Dict:
 
 # ==================== Wikipedia API ====================
 
-WIKIPEDIA_API = "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}"
-
+from utils.url_safety import is_safe_url
 
 async def get_wikipedia_summary(name: str, lang: str = "zh") -> str:
     """
@@ -493,10 +496,25 @@ async def get_wikipedia_summary(name: str, lang: str = "zh") -> str:
     Returns:
         景點簡介文字
     """
+    # 🛡️ SSRF Protection: Validate language whitelist
+    allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
+    if lang not in allowed_langs:
+        print(f"[POI] Blocked potential SSRF attempt with invalid Wikipedia lang: {lang}")
+        return ""
+
     try:
         url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(name)}"
+        
+        # 🛡️ SSRF Check
+        if not is_safe_url(url):
+            print(f"🛑 [SSRF Block] Wikipedia fetch aborted for unsafe URL: {url}")
+            return ""
+
+        headers = {
+            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+        }
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
+            response = await client.get(url, headers=headers)
             if response.status_code == 200:
                 data = response.json()
                 extract = data.get("extract", "")
@@ -529,13 +547,24 @@ async def get_wikidata_labels(wikidata_id: str) -> Optional[Dict]:
             "opening_hours": "9:00-17:00"
         }
     """
-    if not wikidata_id:
+    # 🛡️ SSRF Protection: Validate Wikidata ID format (e.g., Q123)
+    if not re.match(r"^Q\d+$", wikidata_id):
+        print(f"[POI] Blocked suspicious Wikidata ID format: {wikidata_id}")
         return None
-    
+
     try:
         url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
+        
+        # 🛡️ SSRF Check
+        if not is_safe_url(url):
+            print(f"🛑 [SSRF Block] Wikidata fetch aborted for unsafe URL: {url}")
+            return None
+
+        headers = {
+            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+        }
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url)
+            response = await client.get(url, headers=headers)
             if response.status_code != 200:
                 return None
             

@@ -16,6 +16,8 @@ from typing import Dict, List, Optional
 from urllib.parse import urlparse, unquote
 
 
+from utils.url_safety import is_safe_url
+
 class SmartRedirectTracer:
     """
     Smart Redirect Tracer with Anti-Acidosis Protocol.
@@ -54,6 +56,11 @@ class SmartRedirectTracer:
             }
             async with httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(self.timeout)) as client:
                 for hop in range(self.max_hops):
+                    # 🛡️ v35.65: SSRF Protection - Validate every single hop
+                    if not is_safe_url(current_url):
+                        print(f"🛑 [SSRF Block] SmartTracer blocked unsafe URL at hop {hop}: {current_url}")
+                        break
+
                     # Loop detection
                     if current_url in visited:
                         print(f"⚠️ Redirect loop detected at hop {hop}")
