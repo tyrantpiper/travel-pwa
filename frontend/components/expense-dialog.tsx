@@ -653,6 +653,12 @@ export function ExpenseDialog({
                                                 />
                                             </div>
                                             <ScrollArea className="flex-1">
+                                                {(!activeTrip?.members || activeTrip.members.length === 0) && (
+                                                    <div className="py-10 px-4 text-center">
+                                                        <User className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                                        <p className="text-xs text-slate-400 font-medium">{t('exp_no_members')}</p>
+                                                    </div>
+                                                )}
                                                 {activeTrip?.members?.filter(m =>
                                                     m.user_name.toLowerCase().includes(payerSearch.toLowerCase())
                                                 ).map((member) => (
