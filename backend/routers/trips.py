@@ -14,6 +14,7 @@ import re
 import uuid
 import random
 import string
+import copy
 import traceback
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -248,7 +249,7 @@ async def get_trip_by_id(
         
         # 🆕 Auto-Migration: If public_id is missing, generate and save it
         if not trip.get("public_id"):
-            from utils.helpers import generate_public_id
+            # generate_public_id is now at top level
             new_public_id = generate_public_id()
             try:
                 # 僅在此處嘗試更新，若 column 不存在會失敗但會被 catch
@@ -388,7 +389,6 @@ async def get_trip_by_id(
         raise
     except Exception as e:
         print(f"❌ Fetch Error for Trip {trip_id}: {e}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -990,7 +990,7 @@ async def import_to_trip(request: ImportToTripRequest, supabase=Depends(get_supa
         
         if max_imported_day > 0 and sync_start_date:
             try:
-                from datetime import datetime, timedelta
+                # datetime/timedelta now at top level
                 # 🛡️ 彈性解析：處理可能的 ISO 時間戳
                 raw_start = str(sync_start_date).split('T')[0]
                 start_dt = datetime.strptime(raw_start, "%Y-%m-%d")
@@ -1127,7 +1127,6 @@ async def update_day_data(
         raise
     except Exception as e:
         print(f"Update Day Error: {e}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
         
@@ -1365,7 +1364,6 @@ async def reorder_items(
         print(f"✅ 排序更新完成: {len(results)} 項目")
         return {"status": "success", "results": results}
     except Exception as e:
-        import traceback
         traceback.print_exc()
         print(f"🔥 Reorder Error: {e}")
         raise HTTPException(status_code=500, detail=f"Reorder failed: {str(e)}")
@@ -1512,7 +1510,6 @@ async def update_item(
         print("✅ 更新成功")
         return {"status": "success", "data": res.data}
     except Exception as e:
-        import traceback
         traceback.print_exc()
         print(f"🔥 Update Item Exception: {e}")
         raise HTTPException(status_code=500, detail=f"Database update failed: {str(e)}")
@@ -1766,7 +1763,7 @@ async def add_day(
             # 🆕 身分洗白 (Identity Wash) 強化版
             def wash_ids(items):
                 if not isinstance(items, list): return items
-                import uuid
+            # uuid now at top level
                 new_items = copy.deepcopy(items)
                 for item in new_items:
                     if isinstance(item, dict) and "id" in item:

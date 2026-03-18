@@ -27,6 +27,7 @@ from services.poi_service import (
     search_wikivoyage
 )
 from services.smart_search_service import smart_search
+from services.model_manager import call_extraction
 
 router = APIRouter(prefix="/api", tags=["poi"])
 
@@ -53,7 +54,7 @@ async def ai_enrich_poi(request: POIAIEnrichRequest):
         if not api_key:
             raise HTTPException(status_code=400, detail="需要 API Key")
         
-        from services.model_manager import call_extraction
+        # call_extraction is now at top level
         
         prompt = f"""
 You are a travel guide assistant. Search the web for information about this place and provide a structured response.

@@ -4,20 +4,13 @@ import os
 import urllib.parse
 from bs4 import BeautifulSoup
 from typing import Dict, Any
+from datetime import datetime
 
-try:
-    from backend.utils.url_safety import is_safe_url
-except ImportError:
-    from utils.url_safety import is_safe_url
+from utils.url_safety import is_safe_url
 
 # 🆕 v35.26: Anti-Acidosis Protocol - Smart Redirect Tracer
-try:
-    from backend.utils.smart_redirect_tracer import get_smart_tracer
-    from backend.utils.molecular_parser import get_molecular_parser
-except ImportError:
-    # Fallback for when running from backend/ directory
-    from utils.smart_redirect_tracer import get_smart_tracer
-    from utils.molecular_parser import get_molecular_parser
+from utils.smart_redirect_tracer import get_smart_tracer
+from utils.molecular_parser import get_molecular_parser
 
 # Regex for coordinates in URLs
 # Pattern A: @lat,lng
@@ -318,7 +311,6 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         # Log to a persistent file for "carpet-bombing" optimization
         try:
             with open("semantic_fallback_audit.log", "a", encoding="utf-8") as audit_f:
-                from datetime import datetime
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 audit_f.write(f"[{timestamp}] FAIL | URL: {final_url} | Metadata: {result.get('metadata', {}).get('title')} \n")
         except:
