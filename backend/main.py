@@ -168,7 +168,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
     allow_headers=["Content-Type", "Authorization", "X-Gemini-Key", "X-Gemini-API-Key", "X-Requested-With", "X-User-ID"],
     max_age=3600, # Cache preflight requests for 1 hour
 )
@@ -198,7 +198,7 @@ async def add_security_headers(request, call_next):
 
 
 # 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
     """🩺 強化版健康檢查 (2026 Resilience Edition)
     提供環境、資料庫與連線池的深度狀態
@@ -297,7 +297,7 @@ async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-AP
     return x_gemini_api_key
 
 # --- API 路由 ---
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root_status():
     return {"status": "Alive", "mode": "BYOK"}
 
@@ -325,23 +325,6 @@ def root_status():
 # Import from: services.geocode_service (see lines 39-69)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@app.on_event("startup")
-async def startup_test():
-    logger.debug("=== SERVER STARTED ===")
-    api_key = os.getenv("GEMINI_API_KEY")
-    logger.debug(f"API Key present: {bool(api_key)}")
-    if api_key:
-        try:
-            # These functions are now in services.geocode_service, so we need to import them or call them via the service.
-            # For startup test, let's assume they are accessible or mock them if not critical.
-            # For now, commenting out as the original code had `log_debug` which is not defined here.
-            # res = await detect_country_from_trip_title("2026 Japan Trip", api_key)
-            # logger.debug(f"Test Detect '2026 Japan Trip': {res}")
-            # res2 = await detect_country_from_trip_title("東京迪士尼之旅", api_key)
-            # logger.debug(f"Test Detect '東京迪士尼之旅': {res2}")
-            pass
-        except Exception as e:
-            logger.debug(f"Startup Test Failed: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 🗺️ Geocode Endpoints - MOVED TO routers/geocode.py
