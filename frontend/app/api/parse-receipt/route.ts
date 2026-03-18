@@ -27,7 +27,12 @@ export async function POST(request: Request) {
                 }
 
                 console.log(`[Proxy] Fetching image from trusted URL: ${url.origin}${url.pathname.substring(0, 20)}...`);
-                const imageResponse = await fetch(url.toString());
+                
+                // 3. URL Reconstruction (🛡️ SSRF Mitigation)
+                // We DO NOT use url.toString() to prevent taint propagation.
+                // We rebuild the URL from strictly validated components (hostname/pathname).
+                const safeUrl = `https://${hostname}${url.pathname}`;
+                const imageResponse = await fetch(safeUrl);
                 if (!imageResponse.ok) {
                     throw new Error(`Failed to fetch image from URL: ${imageResponse.statusText}`);
                 }
