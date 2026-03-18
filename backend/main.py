@@ -272,29 +272,7 @@ else:
 # UserPreferences, MarkdownImportRequest, GenerateTripRequest 等模型
 # 現在從 models.base 導入，詳見檔案頂部的 import 區塊
 
-# --- 嚴謹的依賴注入 (Dependency Injection) ---
-# 🔒 完全 BYOK 模式：使用者必須自己提供 API Key
-from utils.deps import get_verified_user
-
-async def get_gemini_key(x_gemini_api_key: str = Header(None, alias="X-Gemini-API-Key")):
-    """ 
-    強制 BYOK (Bring Your Own Key) 模式
-    使用者必須在 Header 中提供有效的 Gemini API Key
-    """
-    # 調試日誌
-    if x_gemini_api_key:
-        # 🛡️ Security Hardened: Do not print keys in production
-        pass
-    
-    # 🚫 沒有 Key 或格式不對，直接拒絕
-    if not x_gemini_api_key or len(x_gemini_api_key) < 39:
-        print(f"❌ API Key 驗證失敗：未提供或格式無效")
-        raise HTTPException(
-            status_code=401, 
-            detail="請先在設定中輸入您的 Gemini API Key (點擊右上角齒輪圖示)"
-        )
-    
-    return x_gemini_api_key
+# --- 嚴謹的依賴注入 (Dependency Injection已移至頂層及 utils.deps) ---
 
 # --- API 路由 ---
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -435,7 +413,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
                 
                 memo = item.get("memo")
                 if memo:
-                    safe_memo_lines = [l for l in memo.split('\n') if "[PRIVATE]" not in l]
+                    safe_memo_lines = [line_text for line_text in memo.split('\n') if "[PRIVATE]" not in line_text]
                     if safe_memo_lines:
                         lines.append(f"    [Memo] {' '.join(safe_memo_lines)}")
         else:
@@ -574,16 +552,16 @@ async def chat_with_ryan(
             print("🩺 診斷意圖偵測：切換到 DIAGNOSIS 模式")
             # 注入診斷專用 System Prompt
             diagnosis_prompt = """
-**[診斷模式啟動]**
+**[診斷模式啟用]**
 你現在是一位嚴謹的「行程診斷專家」。請對用戶的行程進行深度分析：
 
-1. **物流可行性**：檢查交通時間、轉乘是否合理
-2. **營業時間衝突**：景點/餐廳是否在計畫時間營業
-3. **體力負荷**：評估當日步行距離和疲勞程度
-4. **時間緩衝**：是否有足夠的用餐和休息時間
-5. **雨備方案**：如有戶外活動，是否有替代方案
+1. **交通順暢度**：檢查交通工具、換乘是否合理
+2. **營業時間衝突**：景點/餐廳是否在計畫時間營業、是否順路
+3. **體力負荷評估**：評估當日步行量與疲勞程度
+4. **時間緩衝檢測**：是否有足夠的用餐與休息時間
+5. **雨天備案建議**：針對戶外活動提供雨天替代方案
 
-請使用批判性思維指出問題，並提供具體改善建議。
+請使用批判性思維指出風險，並提供具體的優化建議。
 """
             enhanced_message = diagnosis_prompt + enhanced_message
             
@@ -726,6 +704,7 @@ async def stream_chat_generator(
         
         # 嘗試路由陣列中的每個模型
         stream_success = False
+        full_text = ""  # 🛡️ 關鍵修復：初始化以避免 UnboundLocalError
         for i, candidate_model in enumerate(DAILY_ROUTING):
             try:
                 safe_config = sanitize_config_for_model(stream_config, candidate_model, intent_type="CHAT")
@@ -746,6 +725,11 @@ async def stream_chat_generator(
                         yield ": heartbeat\n\n"
                         last_heartbeat = current_time
                     
+                    # 🆕 v5.2: 處理思考過程 (Thought Streaming)
+                    if hasattr(chunk, 'thought') and chunk.thought:
+                        yield f'event: thinking\ndata: {json.dumps({"status": "thinking", "thought": chunk.thought})}\n\n'
+                        await asyncio.sleep(0)
+                        
                     # 發送文字 chunk
                     if hasattr(chunk, 'text') and chunk.text:
                         full_text += chunk.text
@@ -881,7 +865,6 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
         poi_keywords = ["怎麼樣", "推薦", "介紹", "告訴我", "什麼", "好玩", "好吃", "值得"]
         place_indicators = ["寺", "神社", "城", "塔", "公園", "站", "車站", "廟", "宮", "殿", "館", "園"]
         
-        message_lower = body.message.lower()
         has_poi_question = any(kw in body.message for kw in poi_keywords)
         has_place = any(ind in body.message for ind in place_indicators)
         
@@ -905,14 +888,14 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
                 
                 if formatted_info and len(formatted_info) > 20:
                     # 將三源資料注入到訊息前
-                    enriched_message = f"""用戶詢問關於「{place_name}」的問題。
+                    enriched_message = f"""用戶詢問關於「{place_name}」資訊。
 
-📚 以下是來自維基百科/維基導遊的參考資料：
+🔬 以下是來自維基百科/旅遊導覽的參考資料：
 {formatted_info}
 
 用戶原始問題：{body.message}
 
-請根據以上資料回答用戶問題，使用你的 Ryan 旅遊達人風格！"""
+請根據以上資料回答用戶問題，並保持你 Ryan 專家擬人的溫暖、風趣風格。"""
                     print(f"✅ 三源資料已注入 ({len(formatted_info)} 字), 來源數: {len(poi_sources)}")
     except Exception as e:
         print(f"⚠️ 三源資料注入失敗 (不影響主流程): {e}")
