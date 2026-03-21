@@ -9,6 +9,32 @@ import re
 from typing import List, Dict, Optional
 from math import radians, cos, sin, sqrt, atan2
 from urllib.parse import quote
+from datetime import datetime
+import time
+
+# 🆕 Phase 1 Observability (Lazy Loading to prevent Windows import deadlock)
+_POI_METRICS = {"latency": None, "requests": None}
+
+def _get_poi_metrics():
+    """Lazy initialization of Prometheus metrics"""
+    from prometheus_client import Counter, Histogram
+    if _POI_METRICS["latency"] is None:
+        _POI_METRICS["latency"] = Histogram(
+            "poi_enrichment_latency_seconds",
+            "Latency of individual source enrichment in seconds",
+            ["source"],
+            buckets=[0.1, 0.5, 1.0, 2.0, 2.5, 3.0, 5.0, 10.0]
+        )
+    if _POI_METRICS["requests"] is None:
+        _POI_METRICS["requests"] = Counter(
+            "poi_enrichment_requests_total",
+            "Total number of enrichment requests per source and status",
+            ["source", "status"]
+        )
+    return _POI_METRICS["latency"], _POI_METRICS["requests"]
+
+# 🆕 Phase 1 Concurrency Control
+WIKI_SEMAPHORE = asyncio.Semaphore(50)
 
 # Overpass API endpoint
 OVERPASS_API = "https://overpass-api.de/api/interpreter"
@@ -288,10 +314,8 @@ async def search_poi_combined(
     )
     
     # 處理異常
-    if isinstance(overpass_results, Exception):
-        overpass_results = []
-    if isinstance(opentripmap_results, Exception):
-        opentripmap_results = []
+    overpass_results = overpass_results if isinstance(overpass_results, list) else []
+    opentripmap_results = opentripmap_results if isinstance(opentripmap_results, list) else []
     
     # 建立 Wikidata ID 對照表（用於合併評分）
     wikidata_ratings = {}
@@ -380,24 +404,9 @@ def get_ai_prompt_for_recommendation(
 WIKIVOYAGE_API = "https://en.wikivoyage.org/w/api.php"
 
 
-async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]:
+async def search_wikivoyage(place_name: str, lang: str = "en", client: httpx.AsyncClient = None) -> Optional[Dict]:
     """
-    透過 WikiVoyage MediaWiki API 搜索景點描述
-    
-    Args:
-        place_name: 景點名稱 (英文效果較佳)
-        lang: 語言代碼 (en, ja, zh 等)
-    
-    Returns:
-        {
-            "title": "Tokyo",
-            "description": "Tokyo is Japan's capital...",
-            "url": "https://en.wikivoyage.org/wiki/Tokyo"
-        }
-    
-    Note:
-        WikiVoyage 速率限制: 每 30 秒最多 1 請求
-        建議快取結果避免重複查詢
+    透過 WikiVoyage MediaWiki API 搜索景點描述 (經由共享 Client 與 Semaphore)
     """
     # 🛡️ SSRF Protection: Validate language whitelist
     allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
@@ -417,16 +426,32 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
         "formatversion": "2"
     }
     
+    start_time = time.time()
     try:
         headers = {
-            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+            "User-Agent": "RyanTravelPWA/1.1 (POI-Wiki-Phase1)"
         }
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(api_url, params=params, headers=headers)
+        
+        async with WIKI_SEMAPHORE:
+            # 使用傳入的共享 client 或 fallback 到一次性 client (不建議)
+            if client:
+                response = await client.get(api_url, params=params, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=10.0) as temp_client:
+                    response = await temp_client.get(api_url, params=params, headers=headers)
+            
+            latency = time.time() - start_time
+            latency_metric, _ = _get_poi_metrics()
+            latency_metric.labels(source="wikivoyage").observe(latency)
             
             if response.status_code != 200:
+                _, requests_metric = _get_poi_metrics()
+                requests_metric.labels(source="wikivoyage", status="error").inc()
                 print(f"WikiVoyage API error: {response.status_code}")
                 return None
+            
+            _, requests_metric = _get_poi_metrics()
+            requests_metric.labels(source="wikivoyage", status="success").inc()
             
             data = response.json()
             pages = data.get("query", {}).get("pages", [])
@@ -435,15 +460,12 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
                 return None
             
             page = pages[0]
-            
-            # 檢查是否找到頁面
             if page.get("missing"):
                 return None
             
             title = page.get("title", place_name)
             extract = page.get("extract", "")
             
-            # 限制描述長度 (避免 token 過多)
             if len(extract) > 500:
                 extract = extract[:500] + "..."
             
@@ -458,21 +480,14 @@ async def search_wikivoyage(place_name: str, lang: str = "en") -> Optional[Dict]
         return None
 
 
-async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en") -> Dict:
+async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en", client: httpx.AsyncClient = None) -> Dict:
     """
-    用 WikiVoyage 資料豐富 POI 資訊
-    
-    Args:
-        poi: POI 資料字典
-        lang: 語言代碼
-    
-    Returns:
-        豐富後的 POI (加入 wikivoyage_description)
+    用 WikiVoyage 資料豐富 POI 資訊 (共享 Client)
     """
     if not poi.get("name"):
         return poi
     
-    wiki_data = await search_wikivoyage(poi["name"], lang)
+    wiki_data = await search_wikivoyage(poi["name"], lang, client=client)
     
     if wiki_data:
         poi["wikivoyage_description"] = wiki_data.get("description", "")
@@ -485,16 +500,9 @@ async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en") -> Dict:
 
 from utils.url_safety import is_safe_url
 
-async def get_wikipedia_summary(name: str, lang: str = "zh") -> str:
+async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.AsyncClient = None) -> str:
     """
-    從 Wikipedia 獲取景點簡介 (200 字以內)
-    
-    Args:
-        name: 景點名稱
-        lang: 語言代碼 (zh, ja, en)
-    
-    Returns:
-        景點簡介文字
+    從 Wikipedia 獲取景點簡介 (200 字以內，共享 Client 與 Semaphore)
     """
     # 🛡️ SSRF Protection: Validate language whitelist
     allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
@@ -502,102 +510,146 @@ async def get_wikipedia_summary(name: str, lang: str = "zh") -> str:
         print(f"[POI] Blocked potential SSRF attempt with invalid Wikipedia lang: {lang}")
         return ""
 
+    start_time = time.time()
     try:
-        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(name)}"
-        
-        # 🛡️ SSRF Check
+        # Wikipedia REST API 規範：空格應轉為下底線 _
+        clean_name = name.strip().replace(' ', '_')
+        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(clean_name)}"
         if not is_safe_url(url):
-            print(f"🛑 [SSRF Block] Wikipedia fetch aborted for unsafe URL: {url}")
             return ""
 
         headers = {
-            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+            "User-Agent": "RyanTravelApp/1.2 (contact@example.com)",
+            "Accept": "application/json"
         }
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url, headers=headers)
+        
+        async with WIKI_SEMAPHORE:
+            if client:
+                response = await client.get(url, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                    response = await temp_client.get(url, headers=headers)
+            
+            latency = time.time() - start_time
+            latency_metric, _ = _get_poi_metrics()
+            latency_metric.labels(source="wikipedia").observe(latency)
+                    
             if response.status_code == 200:
+                _, requests_metric = _get_poi_metrics()
+                requests_metric.labels(source="wikipedia", status="success").inc()
                 data = response.json()
                 extract = data.get("extract", "")
-                # 限制長度
-                return extract[:200] if len(extract) > 200 else extract
+                image_url = data.get("thumbnail", {}).get("source", "") # 🆕 Phase 5.3.2: Extract image
+                
+                final_extract = extract[:200] if len(extract) > 200 else extract
+                return final_extract, image_url
+            else:
+                _, requests_metric = _get_poi_metrics()
+                requests_metric.labels(source="wikipedia", status="error").inc()
     except Exception as e:
+        _, requests_metric = _get_poi_metrics()
+        requests_metric.labels(source="wikipedia", status="exception").inc()
         print(f"Wikipedia API error ({lang}): {e}")
     
     # 語言 fallback: zh → ja → en
     fallback_order = {"zh": "ja", "ja": "en"}
     if lang in fallback_order:
-        return await get_wikipedia_summary(name, fallback_order[lang])
+        return await get_wikipedia_summary(name, fallback_order[lang], client=client)
     
-    return ""
+    return "", "" # 🆕 Phase 5.3.2: Return tuple
 
 
 # ==================== Wikidata API ====================
 
-async def get_wikidata_labels(wikidata_id: str) -> Optional[Dict]:
+async def get_wikidata_labels(wikidata_id: str, client: httpx.AsyncClient = None) -> Optional[Dict]:
     """
-    從 Wikidata 獲取多語言 labels 和結構化資料
-    
-    Args:
-        wikidata_id: Wikidata ID (如 Q42)
-    
-    Returns:
-        {
-            "labels": {"zh": "金閣寺", "ja": "金閣寺", "en": "Kinkaku-ji"},
-            "website": "https://...",
-            "opening_hours": "9:00-17:00"
-        }
+    從 Wikidata 獲取多語言 labels 和結構化資料 (共享 Client 與 Semaphore)
     """
-    # 🛡️ SSRF Protection: Validate Wikidata ID format (e.g., Q123)
     if not re.match(r"^Q\d+$", wikidata_id):
-        print(f"[POI] Blocked suspicious Wikidata ID format: {wikidata_id}")
         return None
 
+    start_time = time.time()
     try:
         url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
-        
-        # 🛡️ SSRF Check
         if not is_safe_url(url):
-            print(f"🛑 [SSRF Block] Wikidata fetch aborted for unsafe URL: {url}")
             return None
 
         headers = {
-            "User-Agent": "RyanTravelPWA/1.0 (https://github.com/tyrantpiper/travel-pwa)"
+            "User-Agent": "RyanTravelApp/1.2 (contact@example.com)"
         }
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url, headers=headers)
+        
+        async with WIKI_SEMAPHORE:
+            if client:
+                response = await client.get(url, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                    response = await temp_client.get(url, headers=headers)
+            
+            latency = time.time() - start_time
+            latency_metric, _ = _get_poi_metrics()
+            latency_metric.labels(source="wikidata").observe(latency)
+                    
             if response.status_code != 200:
+                _, requests_metric = _get_poi_metrics()
+                requests_metric.labels(source="wikidata", status="error").inc()
+                print(f"⚠️ Wikidata API returned {response.status_code} for {wikidata_id}")
                 return None
             
+            _, requests_metric = _get_poi_metrics()
+            requests_metric.labels(source="wikidata", status="success").inc()
+            
             data = response.json()
-            entity = data.get("entities", {}).get(wikidata_id, {})
+            # 支援 entities 結構抓取
+            entities = data.get("entities", {})
+            entity = entities.get(wikidata_id, {})
+            if not entity:
+                # 有時返回的 key 可能不同或層級有差，做個保險
+                if entities:
+                    first_key = list(entities.keys())[0]
+                    entity = entities[first_key]
             
             # 解析多語言 labels
             labels_raw = entity.get("labels", {})
             labels = {}
-            for lang in ["zh", "zh-tw", "zh-hant", "ja", "en"]:
+            # 支援更多 BCP 47 變體
+            for lang in ["zh-tw", "zh-hant", "zh-hk", "zh", "ja", "en", "ko"]:
                 if lang in labels_raw:
-                    # 統一使用 zh
-                    key = "zh" if lang.startswith("zh") else lang
+                    # 規範化 key
+                    key = lang
+                    if lang in ["zh-tw", "zh-hant"]: key = "zh-TW"
+                    elif lang == "zh-hk": key = "zh-HK"
+                    elif lang == "zh": key = "zh-CN"
+                    elif lang == "ja": key = "ja-JP"
+                    elif lang == "en": key = "en-US"
+                    elif lang == "ko": key = "ko-KR"
+                    
                     if key not in labels:
                         labels[key] = labels_raw[lang].get("value", "")
             
-            # 解析 claims (結構化資料)
             claims = entity.get("claims", {})
-            
-            # P856: 官方網站
             website = ""
             if "P856" in claims:
                 website = claims["P856"][0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
             
-            # P3025: 開放時間
             opening_hours = ""
             if "P3025" in claims:
                 opening_hours = claims["P3025"][0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
             
+            # 解析 Sitelinks (全域抓取支援 Phase 5.2 翻譯鏈)
+            sitelinks_raw = entity.get("sitelinks", {})
+            sitelinks = {k: v.get("title", "") for k, v in sitelinks_raw.items()}
+            
+            # P18: 核心高畫質圖源
+            wikidata_image = ""
+            if "P18" in claims:
+                wikidata_image = claims["P18"][0].get("mainsnak", {}).get("datavalue", {}).get("value", "")
+            
             return {
                 "labels": labels,
+                "sitelinks": sitelinks,
                 "website": website,
-                "opening_hours": opening_hours
+                "opening_hours": opening_hours,
+                "wikidata_image": wikidata_image # 🆕 Phase 5.1.1
             }
             
     except Exception as e:
@@ -607,19 +659,9 @@ async def get_wikidata_labels(wikidata_id: str) -> Optional[Dict]:
 
 # ==================== 三源整合 ====================
 
-async def enrich_poi_complete(poi: Dict) -> Dict:
+async def enrich_poi_complete(poi: Dict, client: httpx.AsyncClient = None) -> Dict:
     """
-    三源互補整合：Wikidata + Wikipedia + WikiVoyage
-    
-    Args:
-        poi: POI 資料字典 (需包含 name, 可選 wikidata_id)
-    
-    Returns:
-        豐富後的 POI，包含:
-        - display_name: {primary, secondary}
-        - cultural_desc: Wikipedia 描述
-        - travel_tips: WikiVoyage 描述
-        - official_url: 官方網站
+    三源互補整合：Wikidata + Wikipedia + WikiVoyage (2026 Phase 1 Parallel)
     """
     name = poi.get("name", "")
     wikidata_id = poi.get("wikidata_id", "")
@@ -627,32 +669,132 @@ async def enrich_poi_complete(poi: Dict) -> Dict:
     if not name:
         return poi
     
-    # 並行查詢三個來源
+    poi["warnings"] = []
+    poi["status"] = "SUCCESS"
+    poi["resolved_language"] = "zh-TW" # Default
+    poi["image_url"] = ""              # 🆕 Phase 5.3.1 Safety Init
+    
+    # 並行查詢三個來源 (每項 3s Timeout 防護)
     try:
         tasks = [
-            get_wikidata_labels(wikidata_id) if wikidata_id else asyncio.sleep(0),
-            get_wikipedia_summary(name),
-            search_wikivoyage(name)
+            asyncio.wait_for(get_wikidata_labels(wikidata_id, client=client), 3.0) if wikidata_id else asyncio.sleep(0),
+            asyncio.wait_for(get_wikipedia_summary(name, client=client), 3.0),
+            asyncio.wait_for(search_wikivoyage(name, client=client), 3.0)
         ]
+        
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        wikidata_result = results[0] if not isinstance(results[0], Exception) else None
-        wikipedia_result = results[1] if not isinstance(results[1], Exception) else ""
-        wikivoyage_result = results[2] if not isinstance(results[2], Exception) else None
-        
-        # 處理 Wikidata 多語言名稱
-        if wikidata_result and isinstance(wikidata_result, dict):
-            labels = wikidata_result.get("labels", {})
-            primary = labels.get("zh", name)
-            ja_name = labels.get("ja", "")
-            en_name = labels.get("en", "")
+        # 1. 處理 Wikidata 結果
+        wikidata_result = None
+        res0 = results[0]
+        if isinstance(res0, asyncio.TimeoutError):
+            poi["warnings"].append("WIKIDATA_TIMEOUT")
+            if poi["status"] == "SUCCESS": poi["status"] = "PARTIAL_SUCCESS"
+        elif isinstance(res0, Exception):
+            poi["warnings"].append("WIKIDATA_ERROR")
+            if poi["status"] == "SUCCESS": poi["status"] = "PARTIAL_SUCCESS"
+        else:
+            wikidata_result = res0
             
-            # 組合副標題
+        # 2. 處理 Wikipedia 結果 (三步 Fallback 流程)
+        wikipedia_result = ""
+        wikipedia_image = "" # 🆕 Phase 5.3.2
+        res1 = results[1]
+        
+        # 定義：內部抓取函式 (方便 fallback 時重用)
+        async def fetch_wiki(title_to_fetch: str):
+            if not title_to_fetch: return "", ""
+            return await get_wikipedia_summary(title_to_fetch, client=client)
+
+        if isinstance(res1, asyncio.TimeoutError):
+            poi["warnings"].append("WIKIPEDIA_TIMEOUT")
+            if poi["status"] == "SUCCESS": poi["status"] = "PARTIAL_SUCCESS"
+        elif isinstance(res1, Exception):
+            # 初始抓取異常，稍後嘗試 Sitelink Fallback
+            pass
+        else:
+            # Unpack the tuple
+            if isinstance(res1, tuple):
+                wikipedia_result, wikipedia_image = res1
+            else:
+                wikipedia_result = res1 or ""
+
+        # --- Fallback Step 2 & 3: Wikidata Sitelink ---
+        if not wikipedia_result and wikidata_result:
+            sitelinks = wikidata_result.get("sitelinks", {})
+            
+            # Step 2: 優先核心語系 (zh -> ja -> en)
+            best_title = sitelinks.get("zhwiki") or sitelinks.get("jawiki") or sitelinks.get("enwiki")
+            
+            # Step 3: 全球保底 (Phase 5.2: 抓取第一個可用語系)
+            target_lang = "zh" # Default
+            if not best_title and sitelinks:
+                # 排除一些非百科的 Meta 連結
+                valid_wikis = [k for k in sitelinks.keys() if k.endswith("wiki") and not k.startswith("commons")]
+                if valid_wikis:
+                    wiki_key = valid_wikis[0]
+                    best_title = sitelinks[wiki_key]
+                    target_lang = wiki_key.replace("wiki", "")
+                    print(f"🌍 [Global Fallback] Using {target_lang} Wikipedia: {best_title}")
+
+            if best_title:
+                try:
+                    # 使用 2s timeout 進行二次抓取
+                    res_fallback = await asyncio.wait_for(get_wikipedia_summary(best_title, lang=target_lang, client=client), 2.0)
+                    if isinstance(res_fallback, tuple):
+                        wikipedia_result, wikipedia_image = res_fallback
+                        # 如果不是中文且抓取成功，標記需要翻譯
+                        if not target_lang.startswith("zh"):
+                            poi["resolved_language"] = target_lang
+                    else:
+                        wikipedia_result = res_fallback
+                except:
+                    # 二次抓取失敗不中斷流程
+                    pass
+
+        # 最終 Wikipedia 狀態判定與 Warning 固定
+        if not wikipedia_result:
+            if isinstance(res1, asyncio.TimeoutError):
+                # 已經有 TIMEOUT warning 了
+                pass
+            else:
+                # 查無結果 (Page Not Found)
+                poi["warnings"].append("WIKIPEDIA_NOT_FOUND")
+            
+            if poi["status"] == "SUCCESS": poi["status"] = "PARTIAL_SUCCESS"
+        else:
+            # 有結果，但如果是空字串 (理論上 fetch_wiki 不會回傳空但保險起見)
+            if not wikipedia_result.strip():
+                poi["warnings"].append("WIKIPEDIA_EMPTY")
+            
+        # 3. 處理 WikiVoyage 結果
+        wikivoyage_result = None
+        res2 = results[2]
+        if isinstance(res2, asyncio.TimeoutError):
+            poi["warnings"].append("WIKIVOYAGE_TIMEOUT")
+        elif isinstance(res2, Exception):
+            poi["warnings"].append("WIKIVOYAGE_ERROR")
+        else:
+            wikivoyage_result = res2
+        
+        if wikidata_result:
+            # 🆕 Phase 5.1.3: Wikidata Image Fallback
+            if not poi.get("image_url") and wikidata_result.get("wikidata_image"):
+                # 將 Commons 檔名轉為基本連結 (後續由 Proxy 處理)
+                img_name = wikidata_result["wikidata_image"].replace(" ", "_")
+                poi["image_url"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{img_name}?width=500"
+
+            labels = wikidata_result.get("labels", {})
+            # BCP 47 優先權
+            primary = labels.get("zh-TW") or labels.get("zh-HK") or labels.get("zh-CN") or name
+            ja_name = labels.get("ja-JP", "")
+            en_name = labels.get("en-US", "")
+            
+            poi["resolved_language"] = "zh-TW" # 能查到 Wikidata 預設視為繁中處理
+            
             secondary_parts = []
-            if ja_name and ja_name != primary:
-                secondary_parts.append(ja_name)
-            if en_name:
-                secondary_parts.append(f"({en_name})")
+            if ja_name and ja_name != primary: secondary_parts.append(ja_name)
+            if en_name: secondary_parts.append(f"({en_name})")
             
             poi["display_name"] = {
                 "primary": primary,
@@ -663,19 +805,35 @@ async def enrich_poi_complete(poi: Dict) -> Dict:
                 poi["official_url"] = wikidata_result["website"]
             if wikidata_result.get("opening_hours"):
                 poi["wikidata_hours"] = wikidata_result["opening_hours"]
-        
+        else:
+            if wikidata_id:
+                poi["warnings"].append("WIKIDATA_NOT_FOUND")
+                poi["status"] = "PARTIAL_SUCCESS"
+
         # Wikipedia 文化描述
         if wikipedia_result:
             poi["cultural_desc"] = wikipedia_result
+            if wikipedia_image:
+                poi["image_url"] = wikipedia_image # 🆕 Phase 5.3.3: Store image
+        else:
+            # Warning 已經在前面 Logic 分支中處理過 WIKIPEDIA_TIMEOUT/NOT_FOUND
+            if poi["status"] == "SUCCESS": poi["status"] = "PARTIAL_SUCCESS"
         
         # WikiVoyage 旅遊指南
-        if wikivoyage_result and isinstance(wikivoyage_result, dict):
+        if wikivoyage_result:
             poi["travel_tips"] = wikivoyage_result.get("description", "")
             if wikivoyage_result.get("url"):
                 poi["wikivoyage_url"] = wikivoyage_result["url"]
+        else:
+            poi["warnings"].append("WIKIVOYAGE_EMPTY")
+
+        # 最終失敗判定
+        if poi["status"] == "SUCCESS" and not wikidata_result and not wikipedia_result and not wikivoyage_result:
+            poi["status"] = "FAILED"
         
     except Exception as e:
         print(f"enrich_poi_complete error: {e}")
+        poi["status"] = "FAILED"
     
     return poi
 

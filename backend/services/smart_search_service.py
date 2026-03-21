@@ -229,7 +229,9 @@ async def smart_search(
                 "address": poi.get("address", ""),
                 "distance": poi.get("distance"),
                 "rating": poi.get("rating"),
-                "source": poi.get("source", "osm")
+                "source": poi.get("source", "osm"),
+                "wikidata_id": poi.get("wikidata_id", ""),
+                "poi_id": poi.get("id", "")
             })
         
         return {

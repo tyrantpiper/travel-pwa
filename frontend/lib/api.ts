@@ -1032,8 +1032,16 @@ export const poiApi = {
         return res.json()
     },
 
-    /** 🆕 v5: Enriched POI Info with Auth Protection */
-    enrich: async (params: { name: string, type: string, lat: number, lng: number, api_key?: string | null }, userId?: string) => {
+    /** 🆕 v5: Enriched POI Info with Auth Protection (Upgraded for precision caching) */
+    enrich: async (params: { 
+        name: string, 
+        type: string, 
+        lat: number, 
+        lng: number, 
+        api_key?: string | null,
+        poi_id?: string,
+        wikidata_id?: string
+    }, userId?: string) => {
         if (!params.name) throw new Error("POI name is required for enrichment");
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId

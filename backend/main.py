@@ -22,7 +22,9 @@ import string
 import logging
 import re
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks, Request
+import httpx
+from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks, Request, Response
+# from prometheus_client import generate_latest, CONTENT_TYPE_LATEST (MODIFIED: Lazy below)
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 from google import genai
@@ -98,8 +100,14 @@ async def lifespan(app: FastAPI):
     else:
         app.state.supabase = None
 
-    # 3. 驗證 Geocode Service 狀態
-    print(f"[HTTPX] ✅ Global connection pool ready")
+    # 3. 初始化全局共享 AsyncClient (2026 POI Wiki Edition)
+    print(f"[HTTPX] 🚀 Initializing app-scoped shared AsyncClient...")
+    app.state.client = httpx.AsyncClient(
+        timeout=httpx.Timeout(10.0, connect=5.0),
+        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        headers={"User-Agent": "RyanTravelApp-POI-Wiki/1.2"}
+    )
+    print(f"[HTTPX] ✅ Global shared client ready")
 
     # 4. 註冊全局狀態標記
     app.state.start_time = datetime.utcnow()
@@ -110,10 +118,15 @@ async def lifespan(app: FastAPI):
     # --- Shutdown Logic ---
     print("🛑 [Lifespan] Releasing resources...")
     try:
+        if hasattr(app.state, "client"):
+            await app.state.client.aclose()
+            print("[HTTPX] ✅ Shared client closed")
+        
+        # 兼容性關閉舊的 HTTPX_CLIENT (Geocode Service)
         await HTTPX_CLIENT.aclose()
-        print("[HTTPX] ✅ Connection pool closed")
+        print("[HTTPX] ✅ Legacy geocode pool closed")
     except Exception as e:
-        print(f"⚠️ [Shutdown] Error closing HTTPX: {e}")
+        print(f"⚠️ [Shutdown] Error releasing HTTPX resources: {e}")
 
 # 0. Initialize App
 app = FastAPI(
@@ -275,6 +288,17 @@ else:
 # 現在從 models.base 導入，詳見檔案頂部的 import 區塊
 
 # --- 嚴謹的依賴注入 (Dependency Injection已移至頂層及 utils.deps) ---
+
+# 🛠️ Prometheus Metrics Endpoint (2026 Phase 1)
+@app.get("/metrics")
+async def metrics():
+    """📊 Prometheus Metrics Endpoint (Lazy Load)"""
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    except Exception as e:
+        logger.error(f"Failed to generate metrics: {e}")
+        return Response("Internal Error", status_code=500)
 
 # --- API 路由 ---
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -880,9 +904,9 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
                 place_name = matches[0]
                 print(f"🔍 偵測到景點查詢: {place_name}")
                 
-                # 2. 調用 POI 服務進行豐富與格式化
+                # 2. 調用 POI 服務進行豐富與格式化 (使用共用 Client)
                 poi = {"name": place_name, "wikidata_id": ""}
-                enriched_poi = await enrich_poi_complete(poi)
+                enriched_poi = await enrich_poi_complete(poi, client=request.app.state.client)
                 formatted_info = format_enriched_poi_for_ai(enriched_poi)
                 
                 # 🆕 v3.7.1: 收集來源 URLs
@@ -946,4 +970,7 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # PORT 8008 MIGRATION (Evades Windows CLOSE_WAIT ghost sockets)
+    # Disabled reload=True to prevent Uvicorn from swallowing socket bind errors
+    print("🚀 [Bootstrap] Starting Uvicorn on resilient Port 8008 (Single Worker)...")
+    uvicorn.run(app, host="127.0.0.1", port=8008)
