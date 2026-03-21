@@ -33,6 +33,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Tabidachi",
   },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icon.png",
+  },
   keywords: ["travel", "AI", "planner", "PWA", "offline", "itinerary"],
   authors: [{ name: "Ryan Su" }],
   openGraph: {
