@@ -16,22 +16,30 @@ import time
 _POI_METRICS = {"latency": None, "requests": None}
 
 def _get_poi_metrics():
-    """Lazy initialization of Prometheus metrics"""
-    from prometheus_client import Counter, Histogram
-    if _POI_METRICS["latency"] is None:
-        _POI_METRICS["latency"] = Histogram(
-            "poi_enrichment_latency_seconds",
-            "Latency of individual source enrichment in seconds",
-            ["source"],
-            buckets=[0.1, 0.5, 1.0, 2.0, 2.5, 3.0, 5.0, 10.0]
-        )
-    if _POI_METRICS["requests"] is None:
-        _POI_METRICS["requests"] = Counter(
-            "poi_enrichment_requests_total",
-            "Total number of enrichment requests per source and status",
-            ["source", "status"]
-        )
-    return _POI_METRICS["latency"], _POI_METRICS["requests"]
+    """Lazy initialization of Prometheus metrics with ModuleNotFoundError resilience"""
+    try:
+        from prometheus_client import Counter, Histogram
+        if _POI_METRICS["latency"] is None:
+            _POI_METRICS["latency"] = Histogram(
+                "poi_enrichment_latency_seconds",
+                "Latency of individual source enrichment in seconds",
+                ["source"],
+                buckets=[0.1, 0.5, 1.0, 2.0, 2.5, 3.0, 5.0, 10.0]
+            )
+        if _POI_METRICS["requests"] is None:
+            _POI_METRICS["requests"] = Counter(
+                "poi_enrichment_requests_total",
+                "Total number of enrichment requests per source and status",
+                ["source", "status"]
+            )
+        return _POI_METRICS["latency"], _POI_METRICS["requests"]
+    except (ImportError, ModuleNotFoundError):
+        # 🛡️ Resilience logic: Return a Mock object that accepts .labels().observe() and .labels().inc()
+        class MockMetric:
+            def labels(self, *args, **kwargs): return self
+            def observe(self, *args, **kwargs): pass
+            def inc(self, *args, **kwargs): pass
+        return MockMetric(), MockMetric()
 
 # 🆕 Phase 1 Concurrency Control
 WIKI_SEMAPHORE = asyncio.Semaphore(50)

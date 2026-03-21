@@ -122,9 +122,9 @@ Output in this EXACT JSON format (Traditional Chinese summary):
             translation_prompt = f"請將以下維基百科描述翻譯為繁體中文（zh-TW），保持旅遊指南的專業語氣：\n\n{cultural_desc}"
             try:
                 translated = await call_extraction(
-                    client=fastapi_req.app.state.client,
+                    api_key=api_key,
                     prompt=translation_prompt,
-                    intent_type="TRANSLATE"
+                    intent_type="SUMMARIZE"  # Use SUMMARIZE for simple translation tasks to avoid schema overhead
                 )
                 if translated:
                     wiki_result["cultural_desc"] = translated
