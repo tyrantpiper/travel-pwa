@@ -13,6 +13,7 @@ orjson>=3.10.0
 beautifulsoup4
 Pillow
 pillow-heif
+prometheus-client
 
 # Production Server
 gunicorn
