@@ -10,6 +10,7 @@ import { SplashScreen } from "@/components/ui/splash-screen"
 import ChatWidget from "@/components/chat-widget"
 import { SyncManager } from "@/components/sync-manager"
 import { HtmlLangSync } from "@/components/ui/html-lang-sync"
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,6 +50,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
+        {/* 🚀 Global PWA Install Event Trap (Pre-Hydration) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.promptEvent = null;
+              window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                window.promptEvent = e;
+              });
+            `
+          }}
+        />
         <ThemeProvider>
           <LanguageProvider>
             <HtmlLangSync />
@@ -57,6 +70,7 @@ export default function RootLayout({
               <SyncManager />
               {children}
               <ChatWidget />
+              <PWAInstallPrompt />
             </TripProvider>
           </LanguageProvider>
         </ThemeProvider>
