@@ -437,16 +437,20 @@ async def search_wikivoyage(place_name: str, lang: str = "en", client: httpx.Asy
     start_time = time.time()
     try:
         headers = {
-            "User-Agent": "RyanTravelPWA/1.1 (POI-Wiki-Phase1)"
+            "User-Agent": "RyanTravelApp/1.2 (contact@example.com)",
+            "Accept": "application/json"
         }
         
         async with WIKI_SEMAPHORE:
-            # 使用傳入的共享 client 或 fallback 到一次性 client (不建議)
+            # 🛡️ Anti-SSRF Guard
+            if not is_safe_url(api_url):
+                return None
+
             if client:
-                response = await client.get(api_url, params=params, headers=headers)
+                response = await client.get(api_url, params=params, headers=headers, follow_redirects=True)
             else:
                 async with httpx.AsyncClient(timeout=10.0) as temp_client:
-                    response = await temp_client.get(api_url, params=params, headers=headers)
+                    response = await temp_client.get(api_url, params=params, headers=headers, follow_redirects=True)
             
             latency = time.time() - start_time
             latency_metric, _ = _get_poi_metrics()
@@ -533,10 +537,10 @@ async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.Async
         
         async with WIKI_SEMAPHORE:
             if client:
-                response = await client.get(url, headers=headers)
+                response = await client.get(url, headers=headers, follow_redirects=True)
             else:
-                async with httpx.AsyncClient(timeout=5.0) as temp_client:
-                    response = await temp_client.get(url, headers=headers)
+                async with httpx.AsyncClient(timeout=10.0) as temp_client:
+                    response = await temp_client.get(url, headers=headers, follow_redirects=True)
             
             latency = time.time() - start_time
             latency_metric, _ = _get_poi_metrics()
@@ -685,9 +689,9 @@ async def enrich_poi_complete(poi: Dict, client: httpx.AsyncClient = None) -> Di
     # 並行查詢三個來源 (每項 3s Timeout 防護)
     try:
         tasks = [
-            asyncio.wait_for(get_wikidata_labels(wikidata_id, client=client), 3.0) if wikidata_id else asyncio.sleep(0),
-            asyncio.wait_for(get_wikipedia_summary(name, client=client), 3.0),
-            asyncio.wait_for(search_wikivoyage(name, client=client), 3.0)
+            asyncio.wait_for(get_wikidata_labels(wikidata_id, client=client), 6.0) if wikidata_id else asyncio.sleep(0),
+            asyncio.wait_for(get_wikipedia_summary(name, client=client), 6.0),
+            asyncio.wait_for(search_wikivoyage(name, client=client), 6.0)
         ]
         
         results = await asyncio.gather(*tasks, return_exceptions=True)

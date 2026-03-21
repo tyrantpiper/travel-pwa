@@ -8,6 +8,11 @@ def is_safe_url(url: str) -> bool:
     🛡️ Centralized SSRF Prevention Utility.
     Checks if a URL is safe to fetch by the server.
     """
+    # 🆕 Phase 5.4: Domain Whitelist (Bypass blocking DNS checks for known safe hosts)
+    SAFE_WIKI_DOMAINS = [".wikipedia.org", ".wikidata.org", ".wikivoyage.org", ".wikimedia.org"]
+    if any(domain in url.lower() for domain in SAFE_WIKI_DOMAINS):
+        return True
+        
     return get_safe_ip(url) is not None
 
 def get_safe_ip(url: str) -> str:
