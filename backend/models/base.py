@@ -417,6 +417,8 @@ class POIAIEnrichRequest(BaseModel):
     type: str
     lat: float
     lng: float
+    poi_id: Optional[str] = None
+    wikidata_id: Optional[str] = None
     api_key: Optional[str] = None
 
 

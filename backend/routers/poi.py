@@ -10,8 +10,12 @@ Handles Point of Interest related endpoints including:
 
 import json
 import re
+import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+import httpx
+from typing import List, Optional, Any, Dict
 from google import genai
 from google.genai import types
 
@@ -28,8 +32,12 @@ from services.poi_service import (
 )
 from services.smart_search_service import smart_search
 from services.model_manager import call_extraction
+from utils.poi_utils import generate_v2_cache_key
 
 router = APIRouter(prefix="/api", tags=["poi"])
+
+# 🆕 Phase 2 Cache (Process-level with v2 versioning)
+POI_ENRICH_CACHE: Dict[str, Dict] = {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -37,69 +45,133 @@ router = APIRouter(prefix="/api", tags=["poi"])
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/poi/ai-enrich")
-async def ai_enrich_poi(request: POIAIEnrichRequest):
+async def ai_enrich_poi(fastapi_req: Request, request: POIAIEnrichRequest):
     """
-    🤖 AI 增強 POI 端點 - 使用 Gemini + Grounding 取得評論摘要
+    🤖 整合型 POI 增強端點 - 同時取得 AI 摘要與 Wikipedia/WikiVoyage 資訊
     
-    Returns:
-        {
-            "summary": "AI 懶人包",
-            "must_try": ["推薦 1", "推薦 2"],
-            "rating": 4.5,
-            "business_status": "OPERATIONAL"
-        }
+    具備背景並行抓取、三級保底鏈防護與 v2 版本化快取。
     """
     try:
+        # 🆕 Step 3: 快取檢查 (v2 versioned)
+        cache_key = generate_v2_cache_key(
+            name=request.name,
+            lat=request.lat,
+            lng=request.lng,
+            poi_id=request.poi_id,
+            wikidata_id=request.wikidata_id
+        )
+        
+        if cache_key in POI_ENRICH_CACHE:
+            print(f"⚡ [Cache Hit] {cache_key}")
+            return POI_ENRICH_CACHE[cache_key]
+
         api_key = request.api_key
         if not api_key:
             raise HTTPException(status_code=400, detail="需要 API Key")
         
-        # call_extraction is now at top level
-        
         prompt = f"""
-You are a travel guide assistant. Search the web for information about this place and provide a structured response.
-
-Target:
+You are a travel guide assistant. Search the web for reviews and vibes for:
 - Name: {request.name}
 - Type: {request.type}
 - Location: {request.lat}, {request.lng}
 
-Please search for reviews, ratings, and popular items (if it's a restaurant).
-
-Output in this EXACT JSON format (no markdown, pure JSON):
+Output in this EXACT JSON format (Traditional Chinese summary):
 {{
-    "summary": "A 1-2 sentence vibe check in Traditional Chinese (e.g., 氛圍舒適的咖啡廳，適合約會或工作)",
-    "must_try": ["Item 1", "Item 2", "Item 3"],
+    "summary": "1-2 sentence vibe check",
+    "must_try": ["Item 1", "Item 2"],
     "rating": 4.5,
     "business_status": "OPERATIONAL"
 }}
-
-If it's not a restaurant, put relevant highlights in must_try field (e.g., ["夜景絕美", "拍照聖地"]).
-Rating should be a number from 1-5 based on general web sentiment.
 """
+        # 🚀 並行執行 AI 摘要與 Wiki 豐富
+        ai_task = call_extraction(api_key, prompt, "POI_ENRICH")
+        wiki_task = enrich_poi_complete({
+            "name": request.name,
+            "wikidata_id": request.wikidata_id or ""
+        }, fastapi_req.app.state.client)
         
-        result = await call_extraction(api_key, prompt, "POI_ENRICH")
+        ai_result, wiki_result = await asyncio.gather(ai_task, wiki_task, return_exceptions=True)
         
-        # 解析 JSON
-        json_match = re.search(r'\{[\s\S]*\}', result)
-        if json_match:
-            data = json.loads(json_match.group())
-            return data
-        else:
-            return {
-                "summary": result[:200],
-                "must_try": [],
-                "rating": 0,
-                "business_status": "UNKNOWN"
+        # 1. 處理 AI 摘要結果
+        ai_data = {}
+        if not isinstance(ai_result, Exception):
+            json_match = re.search(r'\{[\s\S]*\}', ai_result)
+            if json_match:
+                try:
+                    ai_data = json.loads(json_match.group())
+                except:
+                    ai_data = {"summary": ai_result[:200]}
+            else:
+                ai_data = {"summary": str(ai_result)[:200]}
+        
+        # 2. 處理 Wiki 結果
+        if isinstance(wiki_result, Exception):
+            wiki_result = {
+                "status": "PARTIAL_SUCCESS",
+                "warnings": ["WIKI_SYSTEM_ERROR"],
+                "cultural_desc": None,
+                "travel_tips": None
             }
         
+        # 🆕 Phase 5.2: AI Translation Fallback
+        resolved_lang = wiki_result.get("resolved_language", "zh-TW")
+        cultural_desc = wiki_result.get("cultural_desc")
+        
+        if cultural_desc and resolved_lang != "zh-TW" and not str(resolved_lang).startswith("zh"):
+            print(f"🌐 [AI Translate] Translating {resolved_lang} to zh-TW...")
+            translation_prompt = f"請將以下維基百科描述翻譯為繁體中文（zh-TW），保持旅遊指南的專業語氣：\n\n{cultural_desc}"
+            try:
+                translated = await call_extraction(
+                    client=fastapi_req.app.state.client,
+                    prompt=translation_prompt,
+                    intent_type="TRANSLATE"
+                )
+                if translated:
+                    wiki_result["cultural_desc"] = translated
+                    wiki_result["resolved_language"] = f"zh-TW (translated from {resolved_lang})"
+            except Exception as te:
+                print(f"⚠️ Translation failed: {te}")
+
+        # 3. 數據合流與保底鏈 (Summary Fallback Chain)
+        final_summary = ai_data.get("summary") or wiki_result.get("cultural_desc") or f"{request.name} 是位於當地的地點。"
+        
+        # 4. 狀態判定
+        ai_success = bool(ai_data.get("summary"))
+        wiki_status = wiki_result.get("status", "FAILED")
+        
+        final_status = "SUCCESS"
+        if not ai_success or wiki_status != "SUCCESS":
+            final_status = "PARTIAL_SUCCESS"
+        if not ai_success and wiki_status == "FAILED":
+            final_status = "FAILED"
+            
+        result_payload = {
+            "summary": final_summary,
+            "must_try": ai_data.get("must_try") or [],
+            "rating": ai_data.get("rating") or 0,
+            "business_status": ai_data.get("business_status") or "UNKNOWN",
+            "cultural_desc": wiki_result.get("cultural_desc"),
+            "travel_tips": wiki_result.get("travel_tips"),
+            "resolved_language": wiki_result.get("resolved_language") or "zh-TW",
+            "image_url": wiki_result.get("image_url"), # 🆕 Phase 5.4: Expose image
+            "status": final_status,
+            "warnings": (wiki_result.get("warnings") or []),
+            "official_url": wiki_result.get("official_url")
+        }
+
+        # 🆕 Step 3: 快取存儲 (僅在完全成功 SUCCESS 時存儲，不快取帶有警告的 PARTIAL 狀態)
+        if final_status == "SUCCESS":
+            POI_ENRICH_CACHE[cache_key] = result_payload
+            
+        return result_payload
+        
     except Exception as e:
-        print(f"🔥 AI POI 增強失敗：{e}")
+        print(f"🔥 AI POI 整合失敗：{e}")
         raise HTTPException(status_code=500, detail=f"AI 增強失敗: {str(e)}")
 
 
 @router.post("/poi/enrich")
-async def enrich_poi(request: POIEnrichRequest):
+async def enrich_poi(fastapi_req: Request, body: POIEnrichRequest):
     """
     📚 三源整合 POI 端點 - Wikipedia + WikiVoyage + Wikidata
     
@@ -113,11 +185,11 @@ async def enrich_poi(request: POIEnrichRequest):
     """
     try:
         poi = {
-            "name": request.name,
-            "wikidata_id": request.wikidata_id or ""
+            "name": body.name,
+            "wikidata_id": body.wikidata_id or ""
         }
         
-        enriched = await enrich_poi_complete(poi)
+        enriched = await enrich_poi_complete(poi, fastapi_req.app.state.client)
         formatted = format_enriched_poi_for_ai(enriched)
         
         return {
@@ -326,3 +398,35 @@ async def ai_smart_search(request: SmartSearchRequest):
     except Exception as e:
         print(f"🔥 Smart Search Error: {e}")
         raise HTTPException(status_code=500, detail=f"Smart search failed: {str(e)}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Media Proxy (Phase 5.4)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/poi/media-proxy")
+async def media_proxy(url: str):
+    """
+    🖼️ 媒體代理端點 - 解決維基百科圖片的 CORS 與 Referrer 限制
+    """
+    if not url.startswith("https://upload.wikimedia.org/"):
+        raise HTTPException(status_code=400, detail="Invalid media source")
+
+    async def stream_image():
+        headers = {
+            "User-Agent": "RyanTravelApp/1.2 (contact@example.com)",
+            "Referer": "https://www.wikipedia.org/"
+        }
+        async with httpx.AsyncClient() as client:
+            async with client.stream("GET", url, headers=headers) as response:
+                if response.status_code != 200:
+                    return
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+
+    # 簡單偵測 content_type (或是預設為 image/jpeg)
+    content_type = "image/jpeg"
+    if url.lower().endswith(".png"): content_type = "image/png"
+    elif url.lower().endswith(".svg"): content_type = "image/svg+xml"
+    elif url.lower().endswith(".gif"): content_type = "image/gif"
+
+    return StreamingResponse(stream_image(), media_type=content_type)

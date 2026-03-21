@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     X, MapPin, Phone, Globe, Clock,
     Navigation, Share2, Plus, Sparkles,
-    ExternalLink, Image as ImageIcon, Loader2
+    ExternalLink, Image as ImageIcon, Loader2,
+    BookOpen, Tent, AlertCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
@@ -40,14 +41,21 @@ export interface POIBasicData {
     image_url?: string   // 🆕 Alternative image field
     clusterItems?: ClusterItem[] // 🆕 Added for Cluster Support
     number?: number      // 🆕 Added for Itinerary Sequence
+    poi_id?: string;      // 🆕 Added for precise caching
+    wikidata_id?: string; // 🆕 Added for precise caching
 }
 
 // AI 增強資料
 export interface POIEnrichData {
-    summary: string        // AI 懶人包
-    must_try: string[]     // 必點推薦
-    rating: number         // 綜合評分 (1-5)
-    business_status?: string
+    summary: string;
+    must_try: string[];
+    rating: number;
+    cultural_desc?: string;       // Layer 2: Wikipedia (Primary)
+    travel_tips?: string;         // Layer 3: WikiVoyage (Secondary)
+    resolved_language?: string;   // BCP 47 (e.g., "zh-TW")
+    image_url?: string;           // 🆕 Phase 5: Wikipedia/Wikidata image
+    status: "SUCCESS" | "PARTIAL_SUCCESS" | "FAILED";
+    warnings?: string[];
 }
 
 interface POIDetailDrawerProps {
@@ -76,7 +84,20 @@ export default function POIDetailDrawer({
     const [aiError, setAiError] = useState<string | null>(null)
     const [selectedTime, setSelectedTime] = useState(suggestedTime)
     const [isSharing, setIsSharing] = useState(false)
-    const [isMinimized, setIsMinimized] = useState(false)  // 🆕 最小化狀態
+    const [isMinimized, setIsMinimized] = useState(false)
+
+    // 🚀 Phase 3 Logic Guards (Unified Flow)
+    const isLegacy = aiData && !('status' in aiData)
+    const effectiveStatus = isLegacy ? undefined : aiData?.status
+    
+    const hasSummary = !!aiData?.summary?.trim()
+    const hasCulturalDesc = !!aiData?.cultural_desc?.trim()
+    const hasTravelTips = !!aiData?.travel_tips?.trim()
+    const hasRenderableEnrichContent = hasSummary || hasCulturalDesc || hasTravelTips
+    
+    const showSkeleton = aiLoading && !hasRenderableEnrichContent
+    const showWikipediaHint = effectiveStatus === "PARTIAL_SUCCESS" && !hasCulturalDesc
+    const isFailed = effectiveStatus === "FAILED"
 
     // 🛡️ 狀態重置：當 POI 變更或關閉時清除舊資料
     useEffect(() => {
@@ -119,9 +140,14 @@ export default function POIDetailDrawer({
         let locationHint = ''
         if (poi.address) {
             locationHint = poi.address.split(',')[0]
-        } else if (poi.lat && poi.lng) {
-            // 無地址時，用日本地理提示讓 Google 搜尋日本結果
-            locationHint = '日本 Japan'
+        } else if (aiData?.resolved_language) {
+            // 🆕 根據解析語言提供動態地理提示 (Phase 6.3)
+            const lang = aiData.resolved_language.toLowerCase()
+            if (lang.includes('fa')) locationHint = '伊朗 Iran'
+            else if (lang.includes('ja')) locationHint = '日本 Japan'
+            else if (lang.includes('ko')) locationHint = '韓國 Korea'
+            else if (lang.includes('fr')) locationHint = '法國 France'
+            else if (lang.includes('de')) locationHint = '德國 Germany'
         }
         const query = encodeURIComponent(`${poi.name} ${locationHint}`.trim())
         const url = `https://www.google.com/search?tbm=isch&q=${query}`
@@ -173,7 +199,9 @@ export default function POIDetailDrawer({
                 type: poi.type,
                 lat: poi.lat,
                 lng: poi.lng,
-                api_key: getSecureApiKey()
+                api_key: getSecureApiKey(),
+                poi_id: poi.poi_id,
+                wikidata_id: poi.wikidata_id
             }, userId)
 
             setAiData(data)
@@ -392,53 +420,150 @@ export default function POIDetailDrawer({
                                         </Button>
                                     )}
 
-                                    {aiLoading && (
-                                        <div className="space-y-3 animate-pulse">
-                                            <div className="flex items-center gap-2 text-purple-500">
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                <span className="text-sm">{t('poi_ai_analyzing')}</span>
+                                    {showSkeleton && (
+                                        <div className="space-y-4 animate-pulse">
+                                            {/* Summary Skeleton */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
+                                                    <div className="h-4 bg-purple-100 dark:bg-purple-900/30 rounded w-24" />
+                                                </div>
+                                                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-full" />
+                                                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-5/6" />
                                             </div>
-                                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
-                                            <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+                                            {/* Wikipedia Skeleton */}
+                                            <div className="pt-2">
+                                                <div className="h-24 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+                                            </div>
+                                            {/* Travel Tips Skeleton */}
+                                            <div>
+                                                <div className="h-16 bg-slate-100 dark:bg-slate-800 rounded-xl w-full" />
+                                            </div>
                                         </div>
                                     )}
 
-                                    {aiError && (
-                                        <p className="text-sm text-red-500 text-center">{aiError}</p>
-                                    )}
+                                    {aiError || (isFailed && !aiLoading) ? (
+                                        <div className="flex flex-col items-center gap-3 p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-800/30">
+                                            <AlertCircle className="w-8 h-8 text-red-500 opacity-50" />
+                                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                                                {aiError || t('poi_ai_failed')}
+                                            </p>
+                                            <Button 
+                                                onClick={handleAIAnalyze}
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50"
+                                            >
+                                                重試分析 (Retry)
+                                            </Button>
+                                        </div>
+                                    ) : null}
 
                                     {aiData && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="space-y-3 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-4"
+                                            className="space-y-4"
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <Sparkles className="w-4 h-4 text-purple-500" />
-                                                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
-                                                    {t('poi_ai_suggestion')}
-                                                </span>
-                                                {aiData.rating && (
-                                                    <span className="ml-auto text-sm font-bold text-amber-600">
-                                                        ⭐ {aiData.rating.toFixed(1)}
+                                            {/* Layer 1: AI / Core Summary */}
+                                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Sparkles className="w-4 h-4 text-purple-500" />
+                                                    <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                                                        {t('poi_ai_suggestion')}
                                                     </span>
+                                                    {aiData.rating && (
+                                                        <span className="ml-auto text-sm font-bold text-amber-600">
+                                                            ⭐ {aiData.rating.toFixed(1)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-slate-700 dark:text-slate-300">
+                                                    {aiData.summary}
+                                                </p>
+                                                {aiData.must_try && aiData.must_try.length > 0 && (
+                                                    <div className="pt-1">
+                                                        <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-1">
+                                                            🍽️ {t('poi_take_photo')}
+                                                        </p>
+                                                        <ul className="text-sm text-slate-600 dark:text-slate-400 list-disc list-inside">
+                                                            {aiData.must_try.map((item, i) => (
+                                                                <li key={i}>{item}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
                                                 )}
                                             </div>
-                                            <p className="text-sm text-slate-700 dark:text-slate-300">
-                                                {aiData.summary}
-                                            </p>
-                                            {aiData.must_try && aiData.must_try.length > 0 && (
-                                                <div>
-                                                    <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-1">
-                                                        🍽️ {t('poi_take_photo')}
-                                                    </p>
-                                                    <ul className="text-sm text-slate-600 dark:text-slate-400 list-disc list-inside">
-                                                        {aiData.must_try.map((item, i) => (
-                                                            <li key={i}>{item}</li>
-                                                        ))}
-                                                    </ul>
+
+                                            {/* Layer 2: Wikipedia Insight (Primary) */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 px-1">
+                                                    <BookOpen className="w-4 h-4 text-indigo-500" />
+                                                    <span id="wiki-insight-label" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                        Wikipedia Insight
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="relative min-h-[100px]">
+                                                    {hasCulturalDesc ? (
+                                                        <div 
+                                                            tabIndex={0}
+                                                            role="region"
+                                                            aria-labelledby="wiki-insight-label"
+                                                            className="max-h-[140px] overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-sm text-slate-600 dark:text-slate-300 leading-relaxed focus:ring-2 focus:ring-indigo-500/50 outline-none transition-shadow"
+                                                        >
+                                                            {aiData.cultural_desc}
+                                                            {/* Bottom Fade Overlay */}
+                                                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/90 dark:from-slate-900/90 to-transparent pointer-events-none rounded-b-xl" />
+                                                        </div>
+                                                    ) : showWikipediaHint ? (
+                                                        <div className="p-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center gap-2 text-slate-400">
+                                                            <AlertCircle className="w-4 h-4" />
+                                                            <span className="text-xs italic" aria-live="polite">
+                                                                Partial data temporarily unavailable.
+                                                            </span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            {/* Layer 3: Travel Tips (Secondary) */}
+                                            {hasTravelTips && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2 px-1">
+                                                        <Tent className="w-4 h-4 text-emerald-500" />
+                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                            Travel Tips
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100/50 dark:border-emerald-800/30 rounded-xl text-sm text-slate-600 dark:text-slate-300">
+                                                        {aiData.travel_tips}
+                                                    </div>
                                                 </div>
                                             )}
+
+                                            {/* Layer 4: Meta Footer */}
+                                            <div className="flex justify-between items-center pt-2 px-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    {aiData.status === "PARTIAL_SUCCESS" && (
+                                                        <div 
+                                                            className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full"
+                                                            aria-label="Partial data available"
+                                                            title="Some data sources timed out or failed"
+                                                        >
+                                                            <AlertCircle className="w-3 h-3" />
+                                                            <span>PARTIAL</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                {aiData.resolved_language && (
+                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-sm tracking-tighter">
+                                                        <span className="opacity-70">RESOURCE LANGUAGE:</span>
+                                                        <span className="text-slate-500 dark:text-slate-300 uppercase">{aiData.resolved_language.toUpperCase()}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </motion.div>
                                     )}
                                 </div>

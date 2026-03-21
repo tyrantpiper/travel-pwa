@@ -397,41 +397,44 @@ async def get_trip_by_id(
 async def kick_member(
     trip_id: str,
     member_user_id: str,
-    x_user_id: Optional[str] = Header(None),
+    current_user_id: str = Depends(get_verified_user),
     supabase=Depends(get_supabase)
 ):
     """🚫 踢出成員 (僅行程創建者可用)"""
     try:
-        if not x_user_id:
-            raise HTTPException(status_code=401, detail="未提供使用者 ID")
-        
-        # 1. 驗證請求者是創建者
-        trip_res = supabase.table("itineraries").select("created_by").eq("id", trip_id).single().execute()
+        # 1. 取得行程資訊 (檢查建立者)
+        trip_res = supabase.table("itineraries").select("created_by").eq("id", trip_id).execute()
         if not trip_res.data:
-            raise HTTPException(status_code=404, detail="找不到行程")
+            raise HTTPException(status_code=404, detail="找不到該行程")
+            
+        created_by = str(trip_res.data[0].get("created_by"))
         
-        created_by = trip_res.data.get("created_by")
-        if x_user_id != created_by:
-            raise HTTPException(status_code=403, detail="只有行程創建者可以踢出成員")
-        
-        # 2. 不能踢出自己 (創建者)
+        # 🛡️ 權限檢查 1：只有行程建立者可以剔除成員
+        if current_user_id != created_by:
+            raise HTTPException(status_code=403, detail="只有行程建立者可以剔除成員")
+            
+        # 🛡️ 權限檢查 2：建立者不能剔除自己
         if member_user_id == created_by:
-            raise HTTPException(status_code=400, detail="無法踢出行程創建者")
+            raise HTTPException(status_code=400, detail="建立者不能將自己從行程中剔除")
         
-        # 3. 從 trip_members 刪除
-        result = supabase.table("trip_members").delete().eq("itinerary_id", trip_id).eq("user_id", member_user_id).execute()
-        
-        if not result.data:
-            raise HTTPException(status_code=404, detail="找不到此成員")
-        
+        # 2. 執行刪除
+        del_res = supabase.table("trip_members")\
+            .delete()\
+            .eq("itinerary_id", trip_id)\
+            .eq("user_id", member_user_id)\
+            .execute()
+            
+        if not del_res.data:
+             raise HTTPException(status_code=404, detail="找不到此成員")
+
         print(f"🚫 已踢出成員 {member_user_id} from trip {trip_id}")
-        return {"status": "success", "kicked_user_id": member_user_id}
+        return {"status": "success", "message": "成員已成功移除", "kicked_user_id": member_user_id}
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Kick Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"🔥 Kick Member Error: {e}")
+        raise HTTPException(status_code=500, detail="移除成員時發生未知錯誤")
 
 
 @router.delete("/{trip_id}")
