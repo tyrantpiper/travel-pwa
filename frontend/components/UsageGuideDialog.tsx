@@ -252,6 +252,14 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                                     title={zh ? '收據上傳' : 'Receipt Upload'}
                                     desc={zh ? '記帳時可拍照或上傳收據圖片，方便日後查看和退稅。' : 'Take a photo or upload receipt images when recording expenses for future reference and tax refunds.'}
                                 />
+                                <Step n={6}
+                                    title={zh ? 'AI 辨識記帳' : 'AI Receipt Parsing'}
+                                    desc={zh ? '在工具箱中使用「AI 辨識」功能，貼上收據文字或截圖，AI 會自動精準拆分各個品項與金額。' : 'Use "AI Parse" in Toolbox to paste receipt text or screenshots. AI auto-splits items and amounts accurately.'}
+                                />
+                                <Step n={7}
+                                    title={zh ? '旅遊公帳分享' : 'Travel Ledger Share'}
+                                    desc={zh ? '點擊工具箱頂部的分享按鈕 📤 可產生公帳連結，分享給旅伴即可讓他們即時查看所有消費明細。' : 'Tap the share button 📤 to generate a ledger link for trip mates to view all expenses instantly.'}
+                                />
                                 <Tip>{zh ? 'AI 工具可以幫你自動解析截圖中的消費明細！拍照就能記帳。' : 'AI tools can auto-parse expense details from screenshots! Just take a photo to record.'}</Tip>
                             </AccordionContent>
                         </AccordionItem>
@@ -279,6 +287,10 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                                 <Step n={4}
                                     title={zh ? 'API Key 設定（免費）' : 'API Key Setup (Free)'}
                                     desc={zh ? '前往「個人檔案」→ 點擊「API 金鑰設定」圖示 → 按照指示取得 API Key。' : 'Go to Profile → Tap the "API Key Settings" icon → Follow steps to get a free key.'}
+                                />
+                                <Step n={5}
+                                    title={zh ? 'AI 偏好記憶' : 'AI Adaptive Memory'}
+                                    desc={zh ? '系統會自動記錄你的旅行偏好（如：評價優先、距離優先）。可在「個人檔案」查看、刪除或將其摺疊收納。' : 'System auto-learns your travel preferences (e.g., rating or distance). View, delete, or collapse them in your Profile.'}
                                 />
                                 <Tip>{zh ? 'AI 助手會自動讀取你目前的行程資料，所以回答會根據你的行程量身定制！' : 'AI assistant auto-reads your current itinerary, so answers are tailored to your specific trip!'}</Tip>
                             </AccordionContent>
@@ -334,6 +346,10 @@ export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) 
                                 <Step n={4}
                                     title={zh ? 'PWA 安裝到桌面' : 'Install as PWA'}
                                     desc={zh ? '在手機瀏覽器中點擊「加入主畫面」，即可像原生 App 一樣從桌面開啟，享受全螢幕體驗。' : 'Tap "Add to Home Screen" in your mobile browser to use like a native app with fullscreen experience.'}
+                                />
+                                <Step n={5}
+                                    title={zh ? '聯絡開發者' : 'Contact Developer'}
+                                    desc={zh ? '如果您有任何建議、發現問題或有合作意向，歡迎透過「個人檔案」選單中的按鈕與我聯繫。' : 'If you have suggestions, issues, or collaboration ideas, contact the developer via the Profile menu button.'}
                                 />
                                 <Tip>{zh ? 'Recovery Key 非常重要！這是唯一能還原帳號的方式，請務必備份。' : 'Recovery Key is critical! It\'s the only way to restore your account. Always back it up.'}</Tip>
                             </AccordionContent>

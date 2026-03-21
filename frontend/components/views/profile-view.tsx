@@ -5,7 +5,7 @@ import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
     ChevronDown, ChevronUp, Brain, // 🆕 AI 記憶圖示
-    BookOpen  // 🆕 使用說明圖示
+    BookOpen, Mail, Check  // 🆕 使用說明與聯絡圖示
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -76,7 +76,10 @@ export function ProfileView() {
     // 🧠 AI Adaptive Memory Preferences
     const [preferences, setPreferences] = useState<UserPreference[]>([])
     const [isLoadPrefs, setIsLoadPrefs] = useState(false)
-    const [memoryExpanded, setMemoryExpanded] = useState(false) // 🧠 AI 記憶展開狀態
+    const [memoryExpanded, setMemoryExpanded] = useState(false)
+    const [contactDialogOpen, setContactDialogOpen] = useState(false)
+    const [copied, setCopied] = useState(false)
+ // 🧠 AI 記憶展開狀態
 
     useEffect(() => {
         let isMounted = true
@@ -258,6 +261,27 @@ export function ProfileView() {
             if (uuid) localStorage.setItem("user_uuid", uuid)  // 🆕 Restore UUID
             window.location.reload()
         }
+    }
+
+    const handleCopyEmail = async () => {
+        const email = "ryanpig228@gmail.com"
+        try {
+            await navigator.clipboard.writeText(email)
+            setCopied(true)
+            toast.success(zh ? "已複製信箱！" : "Email copied!")
+            setTimeout(() => setCopied(false), 2000)
+        } catch {
+            toast.error(zh ? "無法複製，請手動輸入" : "Failed to copy")
+        }
+    }
+
+    const handleWriteEmail = (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        
+        // 🚀 GMAIL DIRECT COMPOSE: Bypasses system-level mailto issues
+        const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=ryanpig228@gmail.com"
+        window.open(gmailUrl, '_blank')
     }
 
     const handleSaveApiKey = () => {
@@ -1005,6 +1029,12 @@ export function ProfileView() {
                         <Separator />
                         <MenuItem icon={CreditCard} label={t('default_currency')} value="TWD (NT$)" />
                         <Separator />
+                        <MenuItem 
+                            icon={Mail} 
+                            label={zh ? "聯絡開發者" : "Contact Developer"} 
+                            onClick={() => setContactDialogOpen(true)} 
+                        />
+                        <Separator />
                         <MenuItem icon={Trash2} label={t('clear_cache')} isDestructive onClick={handleClearCache} />
                         <Separator />
                         {/* 🔴 刪除所有資料 (GDPR) */}
@@ -1057,6 +1087,49 @@ export function ProfileView() {
                                         {t('profile_confirm_delete')}
                                     </Button>
                                 </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* ✉️ 聯絡開發者 Dialog */}
+                        <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+                            <DialogContent className="sm:max-w-[400px] border-blue-100/50 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90 dark:border-slate-800">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2 text-blue-600">
+                                        <Mail className="w-5 h-5" />
+                                        {zh ? "聯絡開發者" : "Contact Developer"}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-left pt-2">
+                                        {zh ? "如果您有任何建議、功能回報或合作意向，歡迎隨時聯繫我。" : "Feel free to reach out for suggestions, bug reports, or collaboration."}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                
+                                <div className="py-6 flex flex-col items-center gap-4">
+                                    <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/50 w-full flex flex-col items-center gap-1 group">
+                                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">{zh ? '官方信箱' : 'OFFICIAL EMAIL'}</span>
+                                        <span className="text-lg font-mono font-medium text-slate-700 dark:text-slate-200">ryanpig228@gmail.com</span>
+                                    </div>
+
+                                    <div className="flex gap-3 w-full">
+                                        <Button 
+                                            variant="outline" 
+                                            className={cn(
+                                                "flex-1 h-11 transition-all duration-300",
+                                                copied ? "border-green-500 text-green-500 bg-green-50 dark:bg-green-900/10" : "border-slate-200 dark:border-slate-700"
+                                            )}
+                                            onClick={handleCopyEmail}
+                                        >
+                                            {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                                            {zh ? (copied ? "已複製" : "複製信箱") : (copied ? "Copied" : "Copy")}
+                                        </Button>
+                                    <Button 
+                                        className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white"
+                                        onClick={handleWriteEmail}
+                                    >
+                                        <Mail className="w-4 h-4 mr-2" />
+                                        {zh ? "撰寫郵件" : "Write Email"}
+                                    </Button>
+                                    </div>
+                                </div>
                             </DialogContent>
                         </Dialog>
                     </div>
