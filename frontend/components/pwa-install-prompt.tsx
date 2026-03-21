@@ -146,7 +146,7 @@ export function PWAInstallPrompt() {
                                 <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                                     {platform === 'ios' ? (
                                         <div className="flex flex-col gap-1.5">
-                                            <p>{zh ? "點擊下方的分享圖示，然後選擇「加入主畫面」。" : "Tap the share icon below and select 'Add to Home Screen'."}</p>
+                                            <p>{zh ? "點擊分享圖示，然後選擇「加入主畫面」。" : "Tap the share icon and select 'Add to Home Screen'."}</p>
                                             <div className="flex items-center gap-2 rounded-lg bg-slate-100/50 p-2 dark:bg-slate-800/50">
                                                 <Share className="h-4 w-4 text-blue-500" />
                                                 <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
