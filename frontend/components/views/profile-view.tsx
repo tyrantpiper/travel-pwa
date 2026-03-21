@@ -76,6 +76,7 @@ export function ProfileView() {
     // 🧠 AI Adaptive Memory Preferences
     const [preferences, setPreferences] = useState<UserPreference[]>([])
     const [isLoadPrefs, setIsLoadPrefs] = useState(false)
+    const [memoryExpanded, setMemoryExpanded] = useState(false) // 🧠 AI 記憶展開狀態
 
     useEffect(() => {
         let isMounted = true
@@ -784,7 +785,18 @@ export function ProfileView() {
                                         <span className="text-[10px] text-slate-400 font-medium">{t('profile_ai_memory_desc')}</span>
                                     </div>
                                 </div>
-                                {isLoadPrefs && <Loader2 className="w-4 h-4 animate-spin text-slate-300" />}
+                                <div className="flex items-center gap-2">
+                                    {isLoadPrefs && <Loader2 className="w-4 h-4 animate-spin text-slate-300" />}
+                                    {preferences.length > 0 && (
+                                        <button
+                                            onClick={() => setMemoryExpanded(!memoryExpanded)}
+                                            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-all text-slate-400"
+                                            title={memoryExpanded ? "收合" : "展開全部"}
+                                        >
+                                            {memoryExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {preferences.length === 0 ? (
@@ -792,42 +804,71 @@ export function ProfileView() {
                                     {isLoadPrefs ? t('loading') : t('profile_ai_memory_empty')}
                                 </div>
                             ) : (
-                                <div className="ml-11 flex flex-wrap gap-2">
-                                    {preferences.map((pref) => (
-                                        <div
-                                            key={pref.id}
-                                            className="group relative flex items-center gap-2 px-3 py-1.5 bg-stone-50 dark:bg-slate-900/50 border border-stone-200 dark:border-slate-700 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-all"
-                                        >
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold uppercase tracking-wider text-blue-500/70">
-                                                        {t(`profile_pref_${pref.category}` as TranslationKey) || pref.category}
-                                                    </span>
-                                                    <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{pref.preference}</span>
-                                                </div>
-                                                {pref.reasoning && (
-                                                    <span className="text-[8px] text-slate-400 leading-tight max-w-[150px] truncate">{pref.reasoning}</span>
-                                                )}
-                                            </div>
-                                            <button
-                                                onClick={async () => {
-                                                    const userId = localStorage.getItem("user_uuid")
-                                                    if (!userId) return
-                                                    try {
-                                                        await usersApi.deletePreference(userId, pref.id)
-                                                        setPreferences(prev => prev.filter(p => p.id !== pref.id))
-                                                        toast.success(t('update_success'))
-                                                    } catch {
-                                                        toast.error(t('profile_delete_failed'))
-                                                    }
-                                                }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
-                                                title={t('profile_pref_delete')}
+                                <div className="relative group/memory">
+                                    <div className={cn(
+                                        "ml-11 flex flex-wrap gap-2 transition-all duration-500 ease-in-out relative",
+                                        !memoryExpanded && preferences.length > 3 ? "max-h-24 overflow-hidden" : "max-h-[1000px]"
+                                    )}>
+                                        {preferences.map((pref) => (
+                                            <div
+                                                key={pref.id}
+                                                className="group relative flex items-center gap-2 px-3 py-1.5 bg-stone-50 dark:bg-slate-900/50 border border-stone-200 dark:border-slate-700 rounded-xl hover:border-blue-200 dark:hover:border-blue-900/50 transition-all"
                                             >
-                                                <Trash2 className="w-3 h-3 text-red-400" />
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-blue-500/70">
+                                                            {t(`profile_pref_${pref.category}` as TranslationKey) || pref.category}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{pref.preference}</span>
+                                                    </div>
+                                                    {pref.reasoning && (
+                                                        <span className="text-[8px] text-slate-400 leading-tight max-w-[150px] truncate">{pref.reasoning}</span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        const userId = localStorage.getItem("user_uuid")
+                                                        if (!userId) return
+                                                        try {
+                                                            await usersApi.deletePreference(userId, pref.id)
+                                                            setPreferences(prev => prev.filter(p => p.id !== pref.id))
+                                                            toast.success(t('update_success'))
+                                                        } catch {
+                                                            toast.error(t('profile_delete_failed'))
+                                                        }
+                                                    }}
+                                                    className="opacity-40 lg:opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
+                                                    title={t('profile_pref_delete')}
+                                                >
+                                                    <Trash2 className="w-4 h-4 text-red-400" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* 🆕 漸層遮罩 (僅在收合且有更多資料時顯示) */}
+                                    {!memoryExpanded && preferences.length > 3 && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-slate-800 to-transparent pointer-events-none z-10" />
+                                    )}
+
+                                    {/* 🆕 展開/收合輔助按鈕 (僅在條目較多時顯示) */}
+                                    {preferences.length > 3 && (
+                                        <div className={cn(
+                                            "ml-11 mt-2 flex justify-start transition-opacity duration-300",
+                                            memoryExpanded ? "opacity-100" : "opacity-70 group-hover/memory:opacity-100"
+                                        )}>
+                                            <button
+                                                onClick={() => setMemoryExpanded(!memoryExpanded)}
+                                                className="text-[10px] font-bold text-blue-500 hover:text-blue-600 flex items-center gap-1 py-1"
+                                            >
+                                                {memoryExpanded ? (
+                                                    <><ChevronUp className="w-3 h-3" /> {zh ? "收起" : "Collapse"}</>
+                                                ) : (
+                                                    <><ChevronDown className="w-3 h-3" /> {zh ? `瀏覽全部 (${preferences.length})` : `View All (${preferences.length})`}</>
+                                                )}
                                             </button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             )}
                         </div>
