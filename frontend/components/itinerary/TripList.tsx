@@ -63,7 +63,11 @@ export function TripList({
                     })),
                     notes: fullTrip.day_notes?.[d.day] || []
                 })),
-                hotels: fullTrip.hotel_info || []
+                hotels: Array.isArray(fullTrip.hotel_info) 
+                    ? fullTrip.hotel_info 
+                    : (fullTrip.hotel_info && Object.keys(fullTrip.hotel_info).length > 0 
+                        ? [fullTrip.hotel_info] 
+                        : [])
             }
 
             const blobUrl = await generateTripPDF(pdfData, (current, total, stage) => {
