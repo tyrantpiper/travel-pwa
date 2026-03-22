@@ -1,11 +1,18 @@
-/** @type {import('next').NextConfig} */
+import { fileURLToPath } from 'url';
+import path from 'path';
 import withPWA from '@ducanh2912/next-pwa';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
+    reactCompiler: true,      // 自動 Memoization
+    turbopack: {
+        root: __dirname,      // 物理座標鎖定
+    },
     // 🚀 React 19 性能優化
     experimental: {
-        reactCompiler: true,      // 自動 Memoization
         viewTransition: true,     // 原生頁面過場動畫
     },
     images: {
