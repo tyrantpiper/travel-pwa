@@ -9,8 +9,13 @@
 <h1 align="center">Tabidachi 旅立ち</h1>
 
 <p align="center">
-  <strong>AI-Powered Collaborative Travel Planner PWA</strong><br/>
-  <strong>AI 驅動的協作旅行規劃 PWA</strong>
+  <strong>Next-Generation Generative AI Travel Orchestrator</strong><br/>
+  <strong>新一代生成式 AI 旅遊編排助手</strong>
+</p>
+
+<p align="center">
+  <i>"Beyond Planning. Intelligent Journey Orchestration."</i><br/>
+  <i>「超越規劃，開啟智慧旅程編排新境界。」</i>
 </p>
 
 <p align="center">
@@ -29,6 +34,15 @@
   <a href="#-features--功能特色">✨ Features</a> •
   <a href="#-tech-stack--技術棧">🏗️ Tech Stack</a>
 </p>
+
+---
+
+| 🚀 創新亮點 | 💡 技術實作 | 🏆 評審價值 |
+| :--- | :--- | :--- |
+| **Generative Intelligence** | Gemini AI + Sliding Window Context + SSE Stream | **超越 Chatbot**：將 LLM 轉化為能驅動 UI 與數據的輔助 Agent。 |
+| **Technical Resilience** | Offline-First PWA (Service Worker 3-Tier Cache) | **剛需場景**：出國無網路時，地圖與行程依然 100% 可用。 |
+| **Privacy First (BYOK)** | Bring Your Own Key Architecture | **數據主權**：金鑰僅存本地，完全排除隱私洩漏與伺服器成本。 |
+| **Modern Stack** | React 19 + Next.js 16 + Turbopack | **技術領先**：運用最新的 React Compiler 與 View Transitions。 |
 
 ---
 
@@ -119,33 +133,32 @@
 
 ---
 
-## 📐 Architecture / 架構
+## 📐 Technical Architecture / 系統架構圖
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16)             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │ Itinerary│  │    Map   │  │  AI Chat │          │
-│  │   View   │  │ (MapLibre│  │  (SSE)   │          │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-│       │              │              │                │
-│  ┌────┴──────────────┴──────────────┴────┐          │
-│  │         SWR + Zustand + PWA           │          │
-│  └───────────────────┬───────────────────┘          │
-└──────────────────────┼──────────────────────────────┘
-                       │ REST API / SSE
-┌──────────────────────┼──────────────────────────────┐
-│              Backend (FastAPI)                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │  Trips   │  │ Geocode  │  │    AI    │          │
-│  │  Router  │  │ Service  │  │  Router  │          │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-└───────┼──────────────┼─────────────┼────────────────┘
-        │              │             │
-   ┌────┴────┐   ┌─────┴────┐  ┌────┴─────┐
-   │Supabase │   │ ArcGIS / │  │ Gemini   │
-   │PostgreSQL│   │Nominatim │  │   API    │
-   └─────────┘   └──────────┘  └──────────┘
+```mermaid
+graph TB
+    subgraph Client["🖥️ PWA Client (Next.js 16)"]
+        UI["Interative UI (React 19)"]
+        SW["Service Worker (Offline Engine)"]
+        Cache["IndexedDB / Browser Cache"]
+    end
+    
+    subgraph Backend["⚙️ AI Orchestrator (FastAPI)"]
+        Router["Smart Router"]
+        Geo["Geocoding Engine (ArcGIS/Nominatim)"]
+        Context["AI Context Manager"]
+    end
+    
+    subgraph Cloud["☁️ Cloud Services"]
+        DB["Supabase (PostgreSQL)"]
+        AI["Gemini AI (US Regulated)"]
+        CDN["Cloudinary (Media)"]
+    end
+    
+    UI <--> Backend
+    Backend <--> Cloud
+    UI <--> SW
+    SW <--> Cache
 ```
 
 ---
@@ -316,3 +329,16 @@ SOFTWARE.
 <p align="center">
   Made with ❤️ by Ryan Su
 </p>
+
+---
+
+## 🏆 Judging Guide / 評審導覽
+
+如果您是競賽評審，我們建議您重點關注以下幾個最能展現技術深度與創意的模組：
+
+1.  **AI 智慧排程 (Itinerary Synthesis)**：在 Chat 中輸入一個旅遊請求，觀察 SSE 串流生成的流暢感與內容的精準度。
+2.  **離線地圖實測 (Offline Resilience)**：嘗試關閉網路並操作地圖，您會發現已瀏覽過的圖資與行程依然能即時讀取。
+3.  **多人共編 (Real-time Collaboration)**：觀察行程修改如何透過 Supabase Realtime 即時同步。
+4.  **隱私 BYOK 模式**：觀察 API 金鑰如何完全存放於使用者端，達成資料主權保護。
+
+---

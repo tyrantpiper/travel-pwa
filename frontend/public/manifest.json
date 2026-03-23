@@ -1,7 +1,7 @@
 {
     "name": "Tabidachi - 旅立ち",
     "short_name": "Tabidachi",
-    "description": "AI-powered travel planner with offline maps, real-time collaboration, and smart itinerary generation.",
+    "description": "Next-generation travel orchestrator powered by Generative AI. Offline-first, real-time, and adaptive.",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait",
