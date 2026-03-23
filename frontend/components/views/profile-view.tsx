@@ -1054,14 +1054,16 @@ export function ProfileView() {
                                         <AlertTriangle className="w-5 h-5" />
                                         {t('profile_delete_all_data')}
                                     </DialogTitle>
-                                    <DialogDescription className="text-left">
-                                        {t('profile_delete_warning')}
-                                        <ul className="list-disc pl-5 mt-2 space-y-1 text-slate-500">
-                                            <li>{t('profile_all_trips')}</li>
-                                            <li>{t('profile_all_expenses')}</li>
-                                            <li>{t('profile_all_photos')}</li>
-                                        </ul>
-                                        <p className="mt-3 text-red-600 font-bold">{t('profile_delete_irreversible')}</p>
+                                    <DialogDescription asChild>
+                                        <div className="text-left text-sm text-muted-foreground">
+                                            {t('profile_delete_warning')}
+                                            <ul className="list-disc pl-5 mt-2 space-y-1 text-slate-500">
+                                                <li>{t('profile_all_trips')}</li>
+                                                <li>{t('profile_all_expenses')}</li>
+                                                <li>{t('profile_all_photos')}</li>
+                                            </ul>
+                                            <p className="mt-3 text-red-600 font-bold">{t('profile_delete_irreversible')}</p>
+                                        </div>
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="py-4">
