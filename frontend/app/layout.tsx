@@ -25,8 +25,8 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "Tabidachi - AI Travel Planner",
-  description: "AI-powered travel planner with offline support, real-time collaboration, and smart itinerary generation.",
+  title: "Tabidachi | Generative AI Travel Companion",
+  description: "Next-generation travel orchestrator powered by Generative AI. Features real-time multi-user collaboration, offline-first maps, and intelligent itinerary synthesis.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     apple: "/icon.png",
   },
-  keywords: ["travel", "AI", "planner", "PWA", "offline", "itinerary"],
+  keywords: ["Generative AI", "Travel AI", "PWA", "Offline Maps", "Itinerary Planner", "AI Agent", "Innovation", "Travel Tech"],
   authors: [{ name: "Ryan Su" }],
   openGraph: {
     title: "Tabidachi - AI Travel Planner",
