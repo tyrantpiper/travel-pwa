@@ -6,6 +6,7 @@ export interface Coordinate {
 export interface LocationInfo extends Coordinate {
     name: string
     display_name?: string
+    address?: string
     type?: string
     country?: string
     admin1?: string
@@ -31,6 +32,7 @@ export interface ItineraryItemState {
     place: string
     category?: string
     desc: string
+    address?: string
     tags?: string[]
     lat?: number | string | null
     lng?: number | string | null
@@ -88,6 +90,7 @@ export interface Activity {
     category?: string
     notes?: string // Backwards compat
     desc?: string
+    address?: string
     lat?: number
     lng?: number
     image_url?: string

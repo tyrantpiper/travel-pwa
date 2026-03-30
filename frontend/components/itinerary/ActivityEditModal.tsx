@@ -65,6 +65,8 @@ export function ActivityEditModal({
     const [isSearching, setIsSearching] = useState(false)
     const [isResolvingLink, setIsResolvingLink] = useState(false)
     const [resolveStatus, setResolveStatus] = useState<'idle' | 'success' | 'fallback' | 'error'>('idle')
+    const [isResolvingAddress, setIsResolvingAddress] = useState(false)
+    const [addressResolveStatus, setAddressResolveStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const haptic = useHaptic()
     const { t, lang } = useLanguage()
     const zh = lang === 'zh'
@@ -183,6 +185,42 @@ export function ActivityEditModal({
         }
     }
 
+    const handleResolveAddress = async () => {
+        if (!editItem?.address?.trim()) return
+        setIsResolvingAddress(true)
+        setAddressResolveStatus('idle')
+        try {
+            const data = await geocodeApi.resolveAddress(editItem.address)
+            if (data.success && data.lat && data.lng) {
+                // 順向補填: 如果 place 為空，拿 name 或 address 當 place
+                const currentPlace = editItem.place?.trim()
+                const newPlace = currentPlace ? currentPlace : (data.name || data.address || "")
+                setEditItem({
+                    ...editItem,
+                    lat: data.lat,
+                    lng: data.lng,
+                    place: newPlace,
+                    isManualCoords: true
+                })
+                setAddressResolveStatus('success')
+                toast.success(zh ? "地址高精解析成功" : "Address resolved with high precision")
+            }
+        } catch (error: unknown) {
+            setAddressResolveStatus('error')
+            const err = error as { message?: string, retryable?: boolean }
+            const msg = err.message || (zh ? "無法在地圖上定位此地址" : "Address not found")
+            const isRetryable = err.retryable
+            
+            if (isRetryable) {
+                toast.error(`⚠️ ${msg}`, { duration: 5000 })
+            } else {
+                toast.error(msg)
+            }
+        } finally {
+            setIsResolvingAddress(false)
+        }
+    }
+
     const updateCoords = (lat: number | string, lng: number | string) => {
         if (!editItem) return
         setEditItem({
@@ -198,6 +236,7 @@ export function ActivityEditModal({
             setEditItem({
                 ...editItem,
                 place: loc.name,
+                address: loc.address || loc.display_name, // 順向自動帶入
                 lat: loc.lat,
                 lng: loc.lng,
                 isManualCoords: true, // 🚩 手動選擇地點視同人工座標
@@ -412,11 +451,50 @@ export function ActivityEditModal({
                         <div className="border-t border-slate-100 dark:border-slate-800 my-2" />
                         */}
 
-                        {/* 2. 地圖連結 (Google Maps) */}
-                        <div className="space-y-1.5">
+                        {/* 🌟 2026 高精度地址解析引擎 (Green Block) */}
+                        <div className="space-y-1.5 bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800/30 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none transition-transform group-hover:scale-110"></div>
+                            
+                            <div className="flex justify-between items-center mb-2">
+                                <Label className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase flex items-center gap-1.5 font-black tracking-widest relative z-10">
+                                    📍 {zh ? '地址解析引擎' : 'Address Engine'}
+                                </Label>
+                                <div className="flex items-center gap-2 relative z-10">
+                                    {isResolvingAddress && <Loader2 className="w-3 h-3 text-emerald-500 animate-spin" />}
+                                    {!isResolvingAddress && addressResolveStatus === 'success' && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                                    {!isResolvingAddress && addressResolveStatus === 'error' && <AlertCircle className="w-3 h-3 text-rose-500" />}
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2 relative z-10">
+                                <textarea
+                                    placeholder={zh ? "貼上混亂地址，AI 會為您精確定位...\n(例: 105台北市松山區敦化北路100號)" : "Paste full address..."}
+                                    className="text-xs min-h-[64px] w-full resize-y rounded-lg border border-emerald-200 dark:border-emerald-800/60 bg-white dark:bg-slate-900/60 px-3 py-2.5 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500 shadow-inner transition-colors"
+                                    value={editItem.address || ''}
+                                    onChange={(e) => {
+                                        setEditItem({ ...editItem, address: e.target.value })
+                                        setAddressResolveStatus('idle')
+                                    }}
+                                />
+                                <div className="flex justify-end mt-0.5">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={isResolvingAddress || !editItem.address?.trim()}
+                                        onClick={handleResolveAddress}
+                                        className="h-8 px-5 rounded-md text-[11px] font-bold tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white border border-transparent shadow-[0_2px_10px_-3px_rgba(5,150,105,0.4)] transition-all active:scale-95 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+                                    >
+                                        {isResolvingAddress ? <Loader2 className="w-3 h-3 animate-spin" /> : (zh ? "高精解析" : "GEOCODE")}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. 導航網址 (Google Maps / Apple Maps Link) */}
+                        <div className="space-y-1.5 p-1">
                             <div className="flex justify-between items-center mb-1">
                                 <Label className="text-[10px] text-amber-600 dark:text-amber-400 uppercase flex items-center gap-1.5 font-black tracking-widest">
-                                    📍 {t('primary_address') || "Map / Navigation Link"}
+                                    🔗 {zh ? '導航網址' : 'Navigation URL'}
                                 </Label>
                                 <div className="flex items-center gap-2">
                                     {isResolvingLink && <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />}
@@ -666,8 +744,13 @@ export function ActivityEditModal({
                     </div>
 
                     <DialogFooter>
-                        <Button onClick={onSave} disabled={isSaving}>
-                            {isSaving ? (zh ? "儲存中..." : "Saving...") : (isAddMode ? "Add" : "Save")}
+                        <Button 
+                            onClick={onSave} 
+                            disabled={isSaving || isResolvingAddress || isResolvingLink}
+                        >
+                            {isSaving ? (zh ? "儲存中..." : "Saving...") : 
+                             (isResolvingAddress || isResolvingLink) ? (zh ? "解析中..." : "Resolving...") :
+                             (isAddMode ? "Add" : "Save")}
                         </Button>
                     </DialogFooter>
                 </div>

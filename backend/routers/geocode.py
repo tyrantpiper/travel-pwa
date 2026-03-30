@@ -11,9 +11,12 @@ from services.geocode_service import (
     reverse_geocode_with_photon,
     reverse_geocode_with_ai_enhancement,  # 🆕 AI 增強版
     log_debug,
-    geocode_place # 🆕 用於 Tier 3 Fallback
+    geocode_place, # 🆕 用於 Tier 3 Fallback
+    resolve_address_pipeline
 )
 from services.link_resolver import resolve_google_maps_link # 🆕 Link-to-Pin 核心
+from models.base import ResolveAddressRequest, ResolveAddressErrorResponse
+import httpx
 import re
 from utils.limiter import limiter
 
@@ -111,3 +114,47 @@ async def geocode_resolve_link(request: Request, body: dict):
             result["method"] = f"{result['method']}+jit_geocode"
             
     return {"success": True, **result}
+
+
+@router.post("/resolve-address", response_model=None)
+@limiter.limit("20/minute")
+async def resolve_address(request: Request, body: ResolveAddressRequest):
+    """📍 獨立地址解析器 (FOSS 規範)
+    專門處理結構化地址與 5 大黃金屬性。
+    統一返回 ResolveAddressErrorResponse DTO 以利前端判斷 retryable。
+    """
+    try:
+        result = await resolve_address_pipeline(body.address)
+        if result:
+            return {"success": True, **result}
+        
+        # 找不到但沒有拋錯
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=404,
+            content={"code": "NOT_FOUND", "message": "無法在地圖上定位此地址", "retryable": False}
+        )
+        
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code
+        retryable = status in [500, 502, 503, 504]
+        
+        if status in [429, 403]:
+            # Nominatim 限流或 UA 阻擋
+            retryable = True
+            message = "解析服務繁忙或遭遇限流，請稍後再試"
+            status = 429 # Normalize to 429
+        else:
+            message = "外部地圖服務暫時無法連線"
+            
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=status,
+            content={"code": f"HTTP_{status}", "message": message, "retryable": retryable}
+        )
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"code": "INTERNAL_ERROR", "message": str(e), "retryable": True}
+        )
