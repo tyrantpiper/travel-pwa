@@ -856,9 +856,18 @@ export const geocodeApi = {
 
     /** 📍 Resolve structured address using Nominatim (2026 High-Fidelity) */
     resolveAddress: async (address: string) => {
-        const res = await offlineFetch(API.RESOLVE_ADDRESS, { // Use offlineFetch if proxy/cache supports it
+        const geminiKey = typeof window !== 'undefined'
+            ? localStorage.getItem("user_gemini_key")
+            : null
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json"
+        }
+        if (geminiKey) {
+            headers["X-Gemini-Key"] = geminiKey
+        }
+        const res = await offlineFetch(API.RESOLVE_ADDRESS, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({ address })
         })
         if (!res.ok) {

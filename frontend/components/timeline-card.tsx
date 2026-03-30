@@ -415,7 +415,8 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
 
                             {/* 🆕 新增：主要地址與 Meta 資訊 */}
                             <div className="grid grid-cols-2 gap-3">
-                                {activity.link_url && (
+                                {/* 🆕 2026-03 隱藏唯讀模式下的導航與媒體連結 (依據 L0 指令) */}
+                                {false && activity.link_url && (
                                     <div className="col-span-2 p-3 bg-amber-50/30 dark:bg-amber-900/10 rounded-xl border border-amber-100/50 dark:border-amber-800/50">
                                         <div className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold mb-1 tracking-wider">📍 {t('tc_nav_link_label')}</div>
                                         <div className="text-xs text-slate-600 dark:text-slate-300 break-all font-mono mb-2">{activity.link_url}</div>
@@ -441,8 +442,8 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                 )}
                             </div>
 
-                            {/* 🆕 解析按鈕 UI 組件 (用於編輯模式) */}
-                            {isEditing && (
+                            {/* 🆕 解析按鈕 UI 組件 (用於編輯模式) - 目前已屏蔽隱藏 (2026-03) */}
+                            {false && isEditing && (
                                 <div className="space-y-4 pt-2">
                                     <div className="space-y-2 p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-800">
                                         <Label className="text-[10px] text-blue-600 dark:text-blue-400 uppercase font-bold">🔗 {t('media_link')}</Label>

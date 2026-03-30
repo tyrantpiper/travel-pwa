@@ -118,13 +118,13 @@ async def geocode_resolve_link(request: Request, body: dict):
 
 @router.post("/resolve-address", response_model=None)
 @limiter.limit("20/minute")
-async def resolve_address(request: Request, body: ResolveAddressRequest):
+async def resolve_address(request: Request, body: ResolveAddressRequest, x_gemini_key: str = Header(None, alias="X-Gemini-Key")):
     """📍 獨立地址解析器 (FOSS 規範)
     專門處理結構化地址與 5 大黃金屬性。
     統一返回 ResolveAddressErrorResponse DTO 以利前端判斷 retryable。
     """
     try:
-        result = await resolve_address_pipeline(body.address)
+        result = await resolve_address_pipeline(body.address, user_gemini_key=x_gemini_key)
         if result:
             return {"success": True, **result}
         
