@@ -42,6 +42,7 @@ export const API = {
     RECEIPT_PARSE: `${API_HOST}/api/ai/parse-receipt`,
     ACTUARY: `${API_HOST}/api/ai/actuary`,
     SMART_SEARCH: `${API_HOST}/api/ai/smart-search`,
+    RESOLVE_ADDRESS: `${API_HOST}/api/geocode/resolve-address`,
 }
 
 export { API_HOST }
@@ -80,6 +81,7 @@ export interface CreateItemParams {
     reservation_code?: string
     cost?: number | null
     sub_items?: SubItem[]
+    address?: string
     hide_navigation?: boolean
     is_private?: boolean       // 🆕 新增
     is_highlight?: boolean     // 🆕 新增
@@ -99,6 +101,7 @@ export interface UpdateItemParams {
     memo?: string
     sub_items?: SubItem[]
     link_url?: string
+    address?: string
     reservation_code?: string
     cost?: number | null
     sort_order?: number
@@ -681,6 +684,8 @@ export const itemsApi = {
             is_highlight: params.is_highlight,
             preview_metadata: params.preview_metadata
         }
+        if (params.address !== undefined) backendPayload.address = params.address
+        
         const headers: Record<string, string> = { "Content-Type": "application/json" }
 
         // Use a generic userID if provided in params or separate arg? 
@@ -727,6 +732,7 @@ export const itemsApi = {
         if (params.is_highlight !== undefined) payload.is_highlight = params.is_highlight
         if (params.preview_metadata !== undefined) payload.preview_metadata = params.preview_metadata
         if (params.website_link !== undefined) payload.website_link = params.website_link
+        if (params.address !== undefined) payload.address = params.address
 
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId
@@ -838,7 +844,6 @@ export const geocodeApi = {
         return parsed.data
     },
 
-    /** 🧠 Resolve location from Google Maps Link (2026 Heuristic) */
     resolveLink: async (url: string, type: "map" | "media" = "map") => {
         const res = await fetch(API.RESOLVE_LINK, {
             method: "POST",
@@ -846,6 +851,27 @@ export const geocodeApi = {
             body: JSON.stringify({ url, type })
         })
         if (!res.ok) throw new Error("Link resolution failed")
+        return res.json()
+    },
+
+    /** 📍 Resolve structured address using Nominatim (2026 High-Fidelity) */
+    resolveAddress: async (address: string) => {
+        const res = await offlineFetch(API.RESOLVE_ADDRESS, { // Use offlineFetch if proxy/cache supports it
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ address })
+        })
+        if (!res.ok) {
+            // 解析伺服器拋回的標準錯誤格式
+            const errData = await res.json().catch(() => null)
+            if (errData && errData.message !== undefined) {
+                // throw 包含額外屬性的 error object 讓 UI 可以抓 retryable 判斷
+                const error = new Error(errData.message)
+                Object.assign(error, { retryable: errData.retryable, code: errData.code })
+                throw error
+            }
+            throw new Error(`Failed to resolve address (HTTP ${'status' in res ? res.status : 'unknown'})`)
+        }
         return res.json()
     },
 }

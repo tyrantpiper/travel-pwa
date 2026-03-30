@@ -179,6 +179,18 @@ class ExpenseResponse(BaseModel):
 
 # === 地理編碼模型 ===
 
+class ResolveAddressRequest(BaseModel):
+    """獨立地址解析請求"""
+    address: str
+
+
+class ResolveAddressErrorResponse(BaseModel):
+    """獨立地址解析錯誤回應"""
+    code: str
+    message: str
+    retryable: bool
+
+
 class GeocodeSearchRequest(BaseModel):
     """地理編碼搜尋請求"""
     query: str
@@ -207,6 +219,7 @@ class ItineraryItem(BaseModel):
     original_name: Optional[str] = None
     category: str
     desc: Optional[str] = None
+    address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     cost_amount: float = 0.0
@@ -264,6 +277,7 @@ class UpdateItemRequest(BaseModel):
     place_name: Optional[str] = None
     notes: Optional[str] = None
     cost_amount: Optional[float] = None
+    address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     memo: Optional[str] = None
@@ -290,6 +304,7 @@ class CreateItemRequest(BaseModel):
     place_name: str
     category: str
     notes: Optional[str] = None
+    address: Optional[str] = None
     lat: Optional[float] = None
     lng: Optional[float] = None
     image_url: Optional[str] = None

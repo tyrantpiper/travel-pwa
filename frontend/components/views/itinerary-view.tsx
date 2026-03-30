@@ -841,18 +841,13 @@ export function ItineraryView() {
 
         setIsSavingActivity(true)
 
-        // 🕵️ 奈米級決策矩陣 (Sub-Atomic Decision Matrix)
-        const isUrlChanged = editItem?.link_url !== originalUrlRef.current
-        const shouldAutoRefresh = isUrlChanged && !editItem?.isManualCoords && !isAddMode
+        // 🌟 2026 絕對信任協議 (Absolute Trust Protocol)
+        // 條件：UI 畫面上是什麼經緯度，打死就存什麼經緯度，系統不准背後偷改！
+        let finalLat = editItem?.lat !== undefined ? editItem.lat : null
+        let finalLng = editItem?.lng !== undefined ? editItem.lng : null
 
-        // 🛡️ v35.38: If coords already resolved, preserve them
-        const hasResolvedCoords = editItem?.lat != null && editItem?.lng != null
-        let finalLat = hasResolvedCoords ? editItem.lat : (shouldAutoRefresh ? null : editItem?.lat)
-        let finalLng = hasResolvedCoords ? editItem.lng : (shouldAutoRefresh ? null : editItem?.lng)
-
-        // 🧠 v30.7: Signal Purity Guard - If URL changed, strictly SILENCE frontend search
-        // and let backend's high-precision JIT resolver handle it.
-        if (!shouldAutoRefresh && !editItem?.isManualCoords && editItem?.place && (finalLat === null || finalLat === undefined || finalLng === null || finalLng === undefined)) {
+        // 🧠 JIT 救援守衛：如果經緯度真的是空的 (例如新增活動時)，才嘗試用名稱執行最後攔截
+        if (!editItem?.isManualCoords && editItem?.place && (finalLat === null || finalLng === null)) {
             try {
                 const data = await geocodeApi.search({
                     query: editItem.place,
@@ -874,10 +869,11 @@ export function ItineraryView() {
                 day: day,
                 time: editItem?.time || "10:00",
                 place: editItem?.place || "",
+                address: editItem?.address, // <=== 🌟 加入這行關鍵的通訊血脈
                 desc: editItem?.desc,
                 category: editItem?.category,
-                lat: (typeof finalLat === 'number' && !isNaN(finalLat)) ? finalLat : (finalLat === null ? null : undefined),
-                lng: (typeof finalLng === 'number' && !isNaN(finalLng)) ? finalLng : (finalLng === null ? null : undefined),
+                lat: (finalLat !== null && finalLat !== "" && !isNaN(parseFloat(String(finalLat)))) ? parseFloat(String(finalLat)) : (finalLat === null || finalLat === "" ? null : undefined),
+                lng: (finalLng !== null && finalLng !== "" && !isNaN(parseFloat(String(finalLng)))) ? parseFloat(String(finalLng)) : (finalLng === null || finalLng === "" ? null : undefined),
                 image_url: editItem?.image_url,
                 image_urls: editItem?.image_urls,
                 tags: editItem?.tags,

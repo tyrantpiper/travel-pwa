@@ -12,9 +12,11 @@ import os
 import orjson
 import httpx
 import asyncio
+import re
 from google import genai
 from google.genai import types
 from pathlib import Path
+import time
 
 # 🆕 模糊搜尋 (Restore rapidfuzz for Cloud Run optimization)
 from rapidfuzz import fuzz, process
@@ -115,8 +117,14 @@ async def geocode_with_arcgis(place_name: str):
         data = orjson.loads(res.content)
         if data.get("candidates"):
             loc = data["candidates"][0]["location"]
+            attrs = data["candidates"][0].get("attributes", {})
             print(f"🗺️ ArcGIS: {place_name} → ({loc['y']:.4f}, {loc['x']:.4f})")
-            return {"lat": loc["y"], "lng": loc["x"]}
+            return {
+                "lat": loc["y"], 
+                "lng": loc["x"],
+                "name": attrs.get("PlaceName", ""),
+                "address": attrs.get("Place_addr", place_name)
+            }
     except Exception as e:
         print(f"⚠️ ArcGIS error for '{place_name}': {e}")
     return None
@@ -154,6 +162,215 @@ async def geocode_with_nominatim(place_name: str):
             }
     except Exception as e:
         print(f"🌍 Nominatim error for '{place_name}': {e}")
+_NOMINATIM_LOCK = asyncio.Lock()
+_NOMINATIM_CACHE = {}
+
+async def _gemma_parse_address(address: str) -> dict:
+    """使用 Gemma 3 27B 零成本暴力拆解地址為 Structured Query 參數"""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {}
+        
+    prompt = f"""You are a precise address parser.
+Extract the components of the following address into a JSON object compatible with OpenStreetMap Nominatim structured query.
+Keys: "postalcode", "country", "state" (can be province/prefecture), "county", "city", "street" (house number + street).
+If a component is missing, leave the value empty.
+Do NOT output markdown (no ```json). Output valid JSON only.
+
+Address: {address}"""
+    
+    try:
+        def run_sync_genai():
+            client = genai.Client(api_key=api_key)
+            return client.models.generate_content(
+                model=WORKHORSE_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.0)
+            )
+        # Prevent event loop blocking
+        res = await asyncio.to_thread(run_sync_genai)
+        text = res.text.strip()
+        if text.startswith("```json"):
+            text = text[7:-3].strip()
+        data = json.loads(text)
+        return {k: v for k, v in data.items() if v and isinstance(v, str)}
+    except Exception as e:
+        print(f"⚠️ Gemma Address Parse Error: {e}")
+        return {}
+
+
+async def resolve_address_pipeline(address: str):
+    """
+    📍 [專用] 獨立結構化地址解析器 (Address Resolver) 
+    具有 1 req/sec 限流、記憶體快取與絕對 FOSS 規範。
+    🆕 2026: ArcGIS 首發倒置架構 (ArcGIS -> Nominatim -> Photon)。
+             內建 Gemma 3 結構解析，支援 Structured Parameter 打擊。
+    """
+    clean_addr = address.strip()
+    if not clean_addr:
+        return None
+        
+    # [小螺絲] 移除亞洲過度沾黏的 3~5 碼郵遞區號 (ex: '105台北市...' -> '台北市...')
+    clean_addr = re.sub(r'^\d{3,5}\s*', '', clean_addr)
+        
+    # Check cache first (1 hour expiration)
+    now = time.time()
+    if clean_addr in _NOMINATIM_CACHE:
+        cache_entry = _NOMINATIM_CACHE[clean_addr]
+        if now - cache_entry["time"] < 3600:
+            print(f"🌍 Geocode Cache HIT: {clean_addr}")
+            return cache_entry["data"]
+
+    # 🛡️ Tier 1: 企業級核武 ArcGIS (首發)
+    if ARCGIS_API_KEY:
+        try:
+            print(f"🌍 [Tier 1] Dispatching to ArcGIS for '{clean_addr}'")
+            arcgis_res = await geocode_with_arcgis(clean_addr)
+            if arcgis_res and "lat" in arcgis_res:
+                result_data = {
+                    "lat": arcgis_res["lat"],
+                    "lng": arcgis_res["lng"],
+                    "name": arcgis_res.get("name", ""),
+                    "address": arcgis_res.get("address", clean_addr)
+                }
+                _NOMINATIM_CACHE[clean_addr] = { "time": time.time(), "data": result_data }
+                print(f"🌍 [Tier 1] ArcGIS Hit: {clean_addr}")
+                return result_data
+            else:
+                print(f"⚠️ [Tier 1] ArcGIS miss. Falling back to FOSS engines.")
+        except Exception as e:
+            print(f"⚠️ [Tier 1] ArcGIS Exception: {e}. Falling back to FOSS engines.")
+
+    # Throttle 1 request per second (For Nominatim)
+    async with _NOMINATIM_LOCK:
+        # Check cache again inside lock just in case it was fetched while waiting
+        now = time.time()
+        if clean_addr in _NOMINATIM_CACHE and (now - _NOMINATIM_CACHE[clean_addr]["time"] < 3600):
+            return _NOMINATIM_CACHE[clean_addr]["data"]
+
+        base_url = os.getenv("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org/search")
+        user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/2.0 (contact@ryantravel.app)")
+        
+        # 🧠 Gemma 3 降維解構
+        structured_data = await _gemma_parse_address(clean_addr)
+        
+        params = {
+            "format": "geocodejson",
+            "addressdetails": "1",
+            "namedetails": "1",
+            "entrances": "1",
+            "accept-language": "zh-TW,zh,en",
+            "limit": 1
+        }
+        
+        if structured_data:
+            print(f"🧠 Gemma parsed structure: {structured_data}")
+            # 強制禁止混用 q
+            for k, v in structured_data.items():
+                if k in ["postalcode", "country", "state", "county", "city", "street"]:
+                    params[k] = v
+        else:
+            # Fallback to standard q
+            params["q"] = clean_addr
+            
+        headers = {
+            "User-Agent": user_agent,
+        }
+
+        try:
+            def extract_nominatim_data(payload):
+                if payload.get("features") and len(payload["features"]) > 0:
+                    feat = payload["features"][0]
+                    p = feat.get("properties", {}).get("geocoding", {})
+                    g = feat.get("geometry", {}).get("coordinates", [0, 0])
+                    return {
+                        "lat": g[1], "lng": g[0],
+                        "name": p.get("name", ""),
+                        "address": p.get("label", clean_addr)
+                    }
+                return None
+
+            result_data = None
+            
+            # 🛡️ Tier 2: Nominatim 精確打擊
+            print(f"🌍 [Tier 2] Dispatching to Nominatim (Strict) for '{clean_addr}'")
+            # Enforce 1 req/s delay if recent fetch
+            last_f = getattr(resolve_address_pipeline, "_last_fetch", 0)
+            elapsed = time.time() - last_f
+            if elapsed < 1.0: await asyncio.sleep(1.0 - elapsed)
+            
+            res = await HTTPX_CLIENT.get(base_url, params=params, headers=headers, timeout=8.0)
+            resolve_address_pipeline._last_fetch = time.time()
+            res.raise_for_status()
+            
+            result_data = extract_nominatim_data(res.json())
+            
+            # 🛡️ Tier 3: Nominatim 降級打擊 (Dynamic Degradation)
+            if not result_data:
+                degraded_street = ""
+                if structured_data and "street" in structured_data:
+                    # 拔除「號/巷/弄/樓」等精確字元，退避到路名
+                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-].*$', '', structured_data["street"]).strip()
+                else:
+                    # 如果 AI 沒有作用，直接從原始字串退避
+                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-].*$', '', clean_addr).strip()
+                    
+                # 只有當退避後的字串不同且非空時，才進行降級打擊
+                if degraded_street and ((structured_data and degraded_street != structured_data.get("street")) or (not structured_data and degraded_street != clean_addr)):
+                    target_str = structured_data["street"] if structured_data else clean_addr
+                    print(f"⚠️ [Tier 3] Nominatim miss. Degrading address '{target_str}' -> '{degraded_street}'")
+                    
+                    if structured_data:
+                        params["street"] = degraded_street
+                    else:
+                        params["q"] = degraded_street
+                        
+                    last_f2 = getattr(resolve_address_pipeline, "_last_fetch", 0)
+                    elapsed2 = time.time() - last_f2
+                    if elapsed2 < 1.0: await asyncio.sleep(1.0 - elapsed2)
+                    
+                    res_deg = await HTTPX_CLIENT.get(base_url, params=params, headers=headers, timeout=8.0)
+                    resolve_address_pipeline._last_fetch = time.time()
+                    res_deg.raise_for_status()
+                    result_data = extract_nominatim_data(res_deg.json())
+
+            if result_data:
+                _NOMINATIM_CACHE[clean_addr] = {"time": time.time(), "data": result_data}
+                print(f"🌍 [Tier 2/3] Nominatim API Success: {clean_addr} -> {result_data['lat']}, {result_data['lng']}")
+                return result_data
+            else:
+                # 🛡️ Tier 4: Nominatim 找不到精確門牌與道路，啟動 Photon 模糊搜尋保險絲
+                print(f"⚠️ Nominatim completely missed. [Tier 4] Falling back to Photon for '{clean_addr}'")
+                try:
+                    photon_res = await geocode_with_photon(clean_addr, limit=1)
+                    if photon_res and len(photon_res) > 0:
+                        first_match = photon_res[0]
+                        result_data = {
+                            "lat": first_match["lat"],
+                            "lng": first_match["lng"],
+                            "name": first_match.get("name", ""),
+                            "address": first_match.get("address", clean_addr)
+                        }
+                        _NOMINATIM_CACHE[clean_addr] = {
+                            "time": time.time(),
+                            "data": result_data
+                        }
+                        print(f"🌍 [Tier 4] Photon Fallback Success: {clean_addr} -> {result_data['lat']}, {result_data['lng']}")
+                        return result_data
+                except Exception as photon_err:
+                    print(f"⚠️ [Tier 4] Photon Fallback failed: {photon_err}")
+                
+                # All engines failed
+                print(f"❌ All geocoding engines failed for '{clean_addr}'")
+                return None
+
+        except httpx.HTTPStatusError as e:
+            print(f"⚠️ Nominatim Status Error ({e.response.status_code}): {e}")
+            raise  # Propagate to router
+        except Exception as e:
+            print(f"⚠️ Nominatim Generic Error: {e}")
+            raise
+            
     return None
 
 
@@ -165,7 +382,8 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
         zoom: 縮放層級，用於 P2 動態 bias scale
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/3.0 (contact@ryantravel.app)")
+        async with httpx.AsyncClient(timeout=5.0, headers={"User-Agent": user_agent}) as client:
             # 🆕 P0: 雙變體查詢 (原字串 + 簡體變體)
             simplified = normalize_for_fuzzy(place_name)
             if simplified != place_name.lower().strip():
@@ -184,8 +402,7 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
             
             params = {
                 "q": query_text,
-                "limit": limit,
-                "lang": "zh"  # 中文優先
+                "limit": limit
             }
             
             # 🆕 P7: 添加 osm_tag 過濾
@@ -206,7 +423,7 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                 else:
                     params["location_bias_scale"] = 0.2
 
-            res = await HTTPX_CLIENT.get(
+            res = await client.get(
                 "https://photon.komoot.io/api/",
                 params=params
             )
@@ -242,9 +459,11 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
 async def reverse_geocode_with_photon(lat: float, lng: float):
     """Photon 反向地理編碼（座標 → 地名）"""
     try:
+        user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/3.0 (contact@ryantravel.app)")
         res = await HTTPX_CLIENT.get(
             "https://photon.komoot.io/reverse",
-            params={"lat": lat, "lon": lng, "lang": "zh"}
+            params={"lat": lat, "lon": lng},
+            headers={"User-Agent": user_agent}
         )
         data = orjson.loads(res.content)
         if data.get("features") and len(data["features"]) > 0:
