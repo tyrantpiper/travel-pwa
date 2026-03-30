@@ -165,9 +165,9 @@ async def geocode_with_nominatim(place_name: str):
 _NOMINATIM_LOCK = asyncio.Lock()
 _NOMINATIM_CACHE = {}
 
-async def _gemma_parse_address(address: str) -> dict:
+async def _gemma_parse_address(address: str, user_key: str = None) -> dict:
     """使用 Gemma 3 27B 零成本暴力拆解地址為 Structured Query 參數"""
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = user_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {}
         
@@ -199,7 +199,7 @@ Address: {address}"""
         return {}
 
 
-async def resolve_address_pipeline(address: str):
+async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
     """
     📍 [專用] 獨立結構化地址解析器 (Address Resolver) 
     具有 1 req/sec 限流、記憶體快取與絕對 FOSS 規範。
@@ -252,7 +252,7 @@ async def resolve_address_pipeline(address: str):
         user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/2.0 (contact@ryantravel.app)")
         
         # 🧠 Gemma 3 降維解構
-        structured_data = await _gemma_parse_address(clean_addr)
+        structured_data = await _gemma_parse_address(clean_addr, user_key=user_gemini_key)
         
         params = {
             "format": "geocodejson",
@@ -343,6 +343,10 @@ async def resolve_address_pipeline(address: str):
                 print(f"⚠️ Nominatim completely missed. [Tier 4] Falling back to Photon for '{clean_addr}'")
                 try:
                     photon_res = await geocode_with_photon(clean_addr, limit=1)
+                    # 🛡️ Photon 雙波次打擊：原始字串失敗 → 拔掉門牌再試
+                    if (not photon_res or len(photon_res) == 0) and degraded_street and degraded_street != clean_addr:
+                        print(f"⚠️ [Tier 4] Photon missed original. Retrying with degraded: '{degraded_street}'")
+                        photon_res = await geocode_with_photon(degraded_street, limit=1)
                     if photon_res and len(photon_res) > 0:
                         first_match = photon_res[0]
                         result_data = {
