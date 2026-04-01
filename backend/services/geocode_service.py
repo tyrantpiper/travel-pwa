@@ -17,6 +17,7 @@ from google import genai
 from google.genai import types
 from pathlib import Path
 import time
+import random
 
 # 🆕 模糊搜尋 (Restore rapidfuzz for Cloud Run optimization)
 from rapidfuzz import fuzz, process
@@ -28,6 +29,159 @@ import json
 
 # Load API Key
 ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+
+# 🌐 Country Name → ISO 3166-1 Alpha-2 (動態 Nominatim countrycodes 鎖定)
+COUNTRY_TO_ISO = {
+    # ─── 東亞 ───
+    "台灣": "tw", "臺灣": "tw", "Taiwan": "tw", "Taiwan, Province of China": "tw",
+    "日本": "jp", "Japan": "jp",
+    "韓國": "kr", "South Korea": "kr", "Korea, Republic of": "kr", "대한민국": "kr",
+    "中國": "cn", "China": "cn", "中华人民共和国": "cn",
+    "香港": "hk", "Hong Kong": "hk",
+    "澳門": "mo", "Macau": "mo", "Macao": "mo",
+    "蒙古": "mn", "Mongolia": "mn",
+    # ─── 東南亞 ───
+    "泰國": "th", "Thailand": "th", "ไทย": "th",
+    "越南": "vn", "Vietnam": "vn", "Viet Nam": "vn", "Việt Nam": "vn",
+    "新加坡": "sg", "Singapore": "sg",
+    "馬來西亞": "my", "Malaysia": "my",
+    "印尼": "id", "Indonesia": "id",
+    "菲律賓": "ph", "Philippines": "ph",
+    "緬甸": "mm", "Myanmar": "mm",
+    "柬埔寨": "kh", "Cambodia": "kh",
+    "寮國": "la", "Laos": "la", "Lao People's Democratic Republic": "la",
+    "汶萊": "bn", "Brunei": "bn", "Brunei Darussalam": "bn",
+    "東帝汶": "tl", "Timor-Leste": "tl",
+    # ─── 南亞 ───
+    "印度": "in", "India": "in",
+    "斯里蘭卡": "lk", "Sri Lanka": "lk",
+    "尼泊爾": "np", "Nepal": "np",
+    "孟加拉": "bd", "Bangladesh": "bd",
+    "巴基斯坦": "pk", "Pakistan": "pk",
+    "馬爾地夫": "mv", "Maldives": "mv",
+    "不丹": "bt", "Bhutan": "bt",
+    # ─── 中亞 / 西亞 ───
+    "土耳其": "tr", "Turkey": "tr", "Türkiye": "tr",
+    "以色列": "il", "Israel": "il",
+    "阿聯酋": "ae", "UAE": "ae", "United Arab Emirates": "ae",
+    "沙烏地阿拉伯": "sa", "Saudi Arabia": "sa",
+    "卡達": "qa", "Qatar": "qa",
+    "約旦": "jo", "Jordan": "jo",
+    "黎巴嫩": "lb", "Lebanon": "lb",
+    "伊朗": "ir", "Iran": "ir", "Iran, Islamic Republic of": "ir",
+    "伊拉克": "iq", "Iraq": "iq",
+    "科威特": "kw", "Kuwait": "kw",
+    "巴林": "bh", "Bahrain": "bh",
+    "阿曼": "om", "Oman": "om",
+    "葉門": "ye", "Yemen": "ye",
+    "喬治亞": "ge", "Georgia": "ge",
+    "亞美尼亞": "am", "Armenia": "am",
+    "亞塞拜然": "az", "Azerbaijan": "az",
+    "哈薩克": "kz", "Kazakhstan": "kz",
+    "烏茲別克": "uz", "Uzbekistan": "uz",
+    # ─── 北美洲 ───
+    "美國": "us", "USA": "us", "United States": "us", "United States of America": "us",
+    "加拿大": "ca", "Canada": "ca",
+    "墨西哥": "mx", "Mexico": "mx",
+    # ─── 中美洲 / 加勒比 ───
+    "古巴": "cu", "Cuba": "cu",
+    "巴拿馬": "pa", "Panama": "pa",
+    "哥斯大黎加": "cr", "Costa Rica": "cr",
+    "瓜地馬拉": "gt", "Guatemala": "gt",
+    "牙買加": "jm", "Jamaica": "jm",
+    "多明尼加": "do", "Dominican Republic": "do",
+    "波多黎各": "pr", "Puerto Rico": "pr",
+    # ─── 南美洲 ───
+    "巴西": "br", "Brazil": "br", "Brasil": "br",
+    "阿根廷": "ar", "Argentina": "ar",
+    "智利": "cl", "Chile": "cl",
+    "哥倫比亞": "co", "Colombia": "co",
+    "秘魯": "pe", "Peru": "pe",
+    "委內瑞拉": "ve", "Venezuela": "ve",
+    "厄瓜多": "ec", "Ecuador": "ec",
+    "烏拉圭": "uy", "Uruguay": "uy",
+    "玻利維亞": "bo", "Bolivia": "bo",
+    "巴拉圭": "py", "Paraguay": "py",
+    # ─── 西歐 ───
+    "英國": "gb", "UK": "gb", "United Kingdom": "gb", "Great Britain": "gb",
+    "法國": "fr", "France": "fr",
+    "德國": "de", "Germany": "de", "Deutschland": "de",
+    "義大利": "it", "Italy": "it", "Italia": "it",
+    "西班牙": "es", "Spain": "es", "España": "es",
+    "葡萄牙": "pt", "Portugal": "pt",
+    "荷蘭": "nl", "Netherlands": "nl",
+    "比利時": "be", "Belgium": "be",
+    "盧森堡": "lu", "Luxembourg": "lu",
+    "瑞士": "ch", "Switzerland": "ch",
+    "奧地利": "at", "Austria": "at", "Österreich": "at",
+    "愛爾蘭": "ie", "Ireland": "ie",
+    # ─── 北歐 ───
+    "瑞典": "se", "Sweden": "se",
+    "挪威": "no", "Norway": "no",
+    "丹麥": "dk", "Denmark": "dk",
+    "芬蘭": "fi", "Finland": "fi",
+    "冰島": "is", "Iceland": "is",
+    # ─── 東歐 / 中歐 ───
+    "波蘭": "pl", "Poland": "pl", "Polska": "pl",
+    "捷克": "cz", "Czech Republic": "cz", "Czechia": "cz",
+    "斯洛伐克": "sk", "Slovakia": "sk",
+    "匈牙利": "hu", "Hungary": "hu",
+    "羅馬尼亞": "ro", "Romania": "ro",
+    "保加利亞": "bg", "Bulgaria": "bg",
+    "克羅埃西亞": "hr", "Croatia": "hr",
+    "塞爾維亞": "rs", "Serbia": "rs",
+    "斯洛維尼亞": "si", "Slovenia": "si",
+    "烏克蘭": "ua", "Ukraine": "ua",
+    "俄羅斯": "ru", "Russia": "ru", "Russian Federation": "ru",
+    "白俄羅斯": "by", "Belarus": "by",
+    "立陶宛": "lt", "Lithuania": "lt",
+    "拉脫維亞": "lv", "Latvia": "lv",
+    "愛沙尼亞": "ee", "Estonia": "ee",
+    "希臘": "gr", "Greece": "gr",
+    "賽普勒斯": "cy", "Cyprus": "cy",
+    "馬爾他": "mt", "Malta": "mt",
+    "阿爾巴尼亞": "al", "Albania": "al",
+    "北馬其頓": "mk", "North Macedonia": "mk",
+    "波士尼亞": "ba", "Bosnia and Herzegovina": "ba",
+    "蒙特內哥羅": "me", "Montenegro": "me",
+    "摩爾多瓦": "md", "Moldova": "md", "Moldova, Republic of": "md",
+    # ─── 大洋洲 ───
+    "澳洲": "au", "Australia": "au",
+    "紐西蘭": "nz", "New Zealand": "nz",
+    "斐濟": "fj", "Fiji": "fj",
+    "巴布亞紐幾內亞": "pg", "Papua New Guinea": "pg",
+    # ─── 非洲 ───
+    "埃及": "eg", "Egypt": "eg",
+    "南非": "za", "South Africa": "za",
+    "摩洛哥": "ma", "Morocco": "ma",
+    "突尼西亞": "tn", "Tunisia": "tn",
+    "肯亞": "ke", "Kenya": "ke",
+    "奈及利亞": "ng", "Nigeria": "ng",
+    "衣索比亞": "et", "Ethiopia": "et",
+    "坦尚尼亞": "tz", "Tanzania": "tz", "Tanzania, United Republic of": "tz",
+    "迦納": "gh", "Ghana": "gh",
+    "塞內加爾": "sn", "Senegal": "sn",
+    # ─── 特殊 ───
+    "梵蒂岡": "va", "Vatican City": "va", "Holy See": "va",
+    "摩納哥": "mc", "Monaco": "mc",
+    "聖馬利諾": "sm", "San Marino": "sm",
+    "列支敦士登": "li", "Liechtenstein": "li",
+    "安道爾": "ad", "Andorra": "ad",
+}
+
+def country_to_iso(name: str) -> str:
+    """將國家名稱轉為 ISO 3166-1 alpha-2 碼，找不到返回空字串"""
+    if not name:
+        return ""
+    code = COUNTRY_TO_ISO.get(name.strip(), "")
+    if code:
+        return code
+    # 大小寫不敏感 fallback
+    name_lower = name.strip().lower()
+    for k, v in COUNTRY_TO_ISO.items():
+        if k.lower() == name_lower:
+            return v
+    return ""
 
 # 🆕 2026 Connection Pooling: Global AsyncClient
 # 🔧 Optimizing for long-running Cloud Run instances
@@ -171,13 +325,37 @@ async def _gemma_parse_address(address: str, user_key: str = None) -> dict:
     if not api_key:
         return {}
         
-    prompt = f"""You are a precise address parser.
-Extract the components of the following address into a JSON object compatible with OpenStreetMap Nominatim structured query.
-Keys: "postalcode", "country", "state" (can be province/prefecture), "county", "city", "street" (house number + street).
-If a component is missing, leave the value empty.
-Do NOT output markdown (no ```json). Output valid JSON only.
+    prompt = f"""You are an expert multilingual address parser. Decompose any address from any country into structured JSON for OpenStreetMap Nominatim.
 
-Address: {address}"""
+RULES:
+1. Output ONLY valid JSON. No markdown, no explanations.
+2. Keys: "postalcode", "country", "state", "county", "city", "street"
+3. "street" = house number + street name (e.g. "十全一路100號" or "1-1 Jingumae")
+4. "state" = province, prefecture, or state-level division
+5. "county" = district, ward (区/區), or county-level division
+6. If a component is absent, use ""
+7. Keep values in ORIGINAL language/script. Do NOT translate.
+
+EXAMPLES:
+
+Address: 807高雄市三民區十全一路100號
+Output: {{"postalcode":"807","country":"台灣","state":"高雄市","county":"三民區","city":"","street":"十全一路100號"}}
+
+Address: 〒150-0001 東京都渋谷区神宮前1丁目1番地
+Output: {{"postalcode":"150-0001","country":"日本","state":"東京都","county":"渋谷区","city":"","street":"神宮前1丁目1番地"}}
+
+Address: 1600 Amphitheatre Parkway, Mountain View, CA 94043, USA
+Output: {{"postalcode":"94043","country":"USA","state":"CA","county":"","city":"Mountain View","street":"1600 Amphitheatre Parkway"}}
+
+Address: Via della Conciliazione, 1, 00120 Città del Vaticano
+Output: {{"postalcode":"00120","country":"Vatican City","state":"","county":"","city":"Città del Vaticano","street":"Via della Conciliazione 1"}}
+
+Address: 25 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110
+Output: {{"postalcode":"10110","country":"ไทย","state":"กรุงเทพมหานคร","county":"เขตคลองเตย","city":"แขวงคลองเตย","street":"25 ถนนสุขุมวิท"}}
+
+Now parse:
+Address: {address}
+Output:"""
     
     try:
         def run_sync_genai():
@@ -199,19 +377,71 @@ Address: {address}"""
         return {}
 
 
+_DEAD_URL_CACHE = {}
+
+async def geocode_with_gas(place_name: str) -> dict | None:
+    """🛡️ Tier 0: GAS 無代理伺服器輪詢引擎 (Zero-Cost Load Balancer)"""
+    urls_str = os.getenv("GAS_GEOCODE_URLS", "")
+    if not urls_str:
+        return None
+        
+    urls = [u.strip() for u in urls_str.split(",") if u.strip()]
+    if not urls:
+        return None
+        
+    random.shuffle(urls)
+    now = time.time()
+    
+    for url in urls:
+        # Check dead cache (12 hour penalty)
+        if url in _DEAD_URL_CACHE and (now - _DEAD_URL_CACHE[url] < 43200):
+            continue
+            
+        try:
+            # GAS Web Apps return 302 redirects → must follow them
+            async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as gas_client:
+                res = await gas_client.get(url, params={"address": place_name})
+            res.raise_for_status()
+            data = res.json()
+            
+            if data and "results" in data and len(data["results"]) > 0:
+                loc = data["results"][0]["geometry"]["location"]
+                addr = data["results"][0].get("formatted_address", place_name)
+                print(f"🌍 [Tier 0] GAS Proxy Hit: {place_name} -> ({loc['lat']:.4f}, {loc['lng']:.4f})")
+                return {
+                    "lat": loc["lat"],
+                    "lng": loc["lng"],
+                    "name": addr.split(",")[0],
+                    "address": addr
+                }
+            elif data and data.get("error") and data.get("quota_exceeded"):
+                print(f"⚠️ [Tier 0] GAS URL Quota Exceeded. Banning URL for 12 hours.")
+                _DEAD_URL_CACHE[url] = now
+            elif data and "error_message" in data:
+                print(f"⚠️ [Tier 0] GAS Maps API Error: {data['error_message']}")
+                if "quota" in data['error_message'].lower() or "over_query_limit" in data.get("status", "").lower():
+                    _DEAD_URL_CACHE[url] = now
+        except Exception as e:
+            print(f"⚠️ [Tier 0] GAS Request Failed: {e}")
+            continue
+            
+    return None
+
+
 async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
     """
-    📍 [專用] 獨立結構化地址解析器 (Address Resolver) 
-    具有 1 req/sec 限流、記憶體快取與絕對 FOSS 規範。
-    🆕 2026: ArcGIS 首發倒置架構 (ArcGIS -> Nominatim -> Photon)。
-             內建 Gemma 3 結構解析，支援 Structured Parameter 打擊。
+    📍 [專用] 獨立結構化地址解析器 (Address Resolver)
+    🆕 2026 v2.0: T0 GAS 木馬 → ArcGIS → Gemma Few-Shot + Nominatim 國碼鎖定 → Photon
+                 全球 200+ 國動態 countrycodes 鎖定，Few-Shot 5 洲範例錨定。
     """
     clean_addr = address.strip()
     if not clean_addr:
         return None
         
     # [小螺絲] 移除亞洲過度沾黏的 3~5 碼郵遞區號 (ex: '105台北市...' -> '台北市...')
-    clean_addr = re.sub(r'^\d{3,5}\s*', '', clean_addr)
+    # 只移除「緊接 CJK 字元」的亞洲黏著郵遞區號 (807高雄市 → 高雄市)
+    # 不影響西方門牌 (1600 Amphitheatre) 與其他格式
+    clean_addr = re.sub(r'^\d{3,5}(?=[\u4e00-\u9fff\u3400-\u4dbf])', '', clean_addr)
         
     # Check cache first (1 hour expiration)
     now = time.time()
@@ -221,7 +451,13 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
             print(f"🌍 Geocode Cache HIT: {clean_addr}")
             return cache_entry["data"]
 
-    # 🛡️ Tier 1: 企業級核武 ArcGIS (首發)
+    # 🛡️ Tier 0: 零成本 GAS 木馬陣列 (首發無敵星星)
+    gas_res = await geocode_with_gas(clean_addr)
+    if gas_res:
+        _NOMINATIM_CACHE[clean_addr] = { "time": time.time(), "data": gas_res }
+        return gas_res
+
+    # 🛡️ Tier 1: 企業級核武 ArcGIS (原首發)
     if ARCGIS_API_KEY:
         try:
             print(f"🌍 [Tier 1] Dispatching to ArcGIS for '{clean_addr}'")
@@ -265,6 +501,11 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
         
         if structured_data:
             print(f"🧠 Gemma parsed structure: {structured_data}")
+            # 🌐 動態國家鎖定：將國名轉為 ISO 碼，注入 countrycodes 硬過濾
+            iso_code = country_to_iso(structured_data.get("country", ""))
+            if iso_code:
+                params["countrycodes"] = iso_code
+                print(f"🌐 Country Lock: '{structured_data['country']}' → countrycodes={iso_code}")
             # 強制禁止混用 q
             for k, v in structured_data.items():
                 if k in ["postalcode", "country", "state", "county", "city", "street"]:
