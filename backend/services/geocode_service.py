@@ -694,10 +694,10 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                     })
                 
                 if results:
-                    print(f"🔍 Photon: {place_name} → {len(results)} 結果")
+                    print(f"[Photon] {place_name} -> {len(results)} results")
                     return results
     except Exception as e:
-        print(f"🔍 Photon error for '{place_name}': {e}")
+        print(f"[Photon] Error for '{place_name}': {e}")
     return None
 
 
