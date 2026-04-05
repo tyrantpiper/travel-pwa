@@ -24,3 +24,6 @@ ENV/
 # Development tools (不需要部署)
 seed_trip.py
 _append_code.py
+e2e_evidence.py
+verify_dna.py
+tmp_*

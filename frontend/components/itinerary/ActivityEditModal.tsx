@@ -142,15 +142,27 @@ export function ActivityEditModal({
             const result = await geocodeApi.resolveLink(url, type)
             if (result.success) {
                 if (type === "map" && result.lat && result.lng) {
-                    // 🛡️ v35.38: Combine coord and metadata update into single setEditItem
-                    // to avoid closure bug where second setEditItem overwrites first
+                    // 🧬 v35.80: Clean Name Logic (Atomic Overwrite)
+                    // Supports: " - ", " | ", Maps, 地圖, 地图, マップ, etc.
+                    // 🧬 v35.82: DNA-Level Overwrite Priority
+                    const rawTitle = result.metadata?.title || "";
+                    const cleanedTitle = rawTitle
+                        .replace(/\s*[-|]\s*Google\s*(Maps|地图|地圖|マップ|映射|map|search)/gi, "")
+                        .trim();
+                    
+                    // 🛡️ Ensure query (path extraction) wins over old name if title is generic/empty
+                    const cleanName = cleanedTitle || result.query || editItem.place;
+
                     const newMetadata = result.metadata?.image ? {
                         ...editItem.preview_metadata,
                         map_image: result.metadata.image
-                    } : editItem.preview_metadata
+                    } : editItem.preview_metadata;
+
+                    console.log("🛡️ [Audit] Place Name resolved & overwritten:", cleanName);
 
                     setEditItem({
                         ...editItem,
+                        place: cleanName,
                         lat: result.lat,
                         lng: result.lng,
                         isManualCoords: true,

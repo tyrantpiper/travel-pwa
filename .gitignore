@@ -33,3 +33,7 @@ Thumbs.db
 backend/migrations/20260308_security_hardening.sql
 *.json
 gcp-sa-key.json
+
+# Scratch & Diff files
+*.diff
+tmp/

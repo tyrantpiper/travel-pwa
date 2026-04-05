@@ -5,10 +5,10 @@ from urllib.parse import urlparse
 
 def is_safe_url(url: str) -> bool:
     """
-    🛡️ Centralized SSRF Prevention Utility.
+    [SAFETY] Centralized SSRF Prevention Utility.
     Checks if a URL is safe to fetch by the server.
     """
-    # 🆕 Phase 5.4: Domain Whitelist (Bypass blocking DNS checks for known safe hosts)
+    # [NEW] Phase 5.4: Domain Whitelist (Bypass blocking DNS checks for known safe hosts)
     SAFE_WIKI_DOMAINS = [".wikipedia.org", ".wikidata.org", ".wikivoyage.org", ".wikimedia.org"]
     if any(domain in url.lower() for domain in SAFE_WIKI_DOMAINS):
         return True
@@ -17,7 +17,7 @@ def is_safe_url(url: str) -> bool:
 
 def get_safe_ip(url: str) -> str:
     """
-    🛡️ Anti-DNS-Rebinding IP Resolver.
+    [SAFETY] Anti-DNS-Rebinding IP Resolver.
     Resolves the hostname and checks if the IP is safe (public).
     Returns the IP string if safe, otherwise returns None.
     """
@@ -36,7 +36,7 @@ def get_safe_ip(url: str) -> str:
             return None
         
         # 2. Resolve hostname to check real IP
-        # 🛡️ DNS Rebinding Protection: We resolve it ONCE here.
+        # [SAFETY] DNS Rebinding Protection: We resolve it ONCE here.
         try:
             ip_addr = socket.gethostbyname(hostname)
             ip = ipaddress.ip_address(ip_addr)

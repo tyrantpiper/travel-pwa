@@ -37,6 +37,13 @@ class SmartRedirectTracer:
             (re.compile(r'@(-?\d+\.\d+),(-?\d+\.\d+)'), 'at_symbol'),                   # 🥈 地圖中心 (fallback)
             (re.compile(r'[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)'), 'll_parameter'),         # 🥉 ll 參數
         ]
+        
+        # 🛡️ v35.84: Name Extraction Patterns (DNA-Rescue Capture)
+        self.name_patterns = [
+            re.compile(r'[?&](?:q|query|place_name)=([^&]+)'),  # Pattern C: query
+            re.compile(r'/place/([^/@]+)'),                     # Pattern D: /place/
+            re.compile(r'/search/([^/?&]+)'),                   # Pattern E: /search/
+        ]
     
     async def trace_full_chain_smart(self, short_url: str) -> Dict:
         """
@@ -45,6 +52,7 @@ class SmartRedirectTracer:
         Anti-Acidosis: Collects ALL coordinates, selects most precise.
         """
         all_coords = []
+        all_names = [] # 🛡️ v35.84: Collect all names from hops
         current_url = short_url
         visited = set()  # Prevent infinite loops
         
@@ -77,6 +85,17 @@ class SmartRedirectTracer:
                     else:
                         # 🛡️ v35.60: Even if no coords, keep track of the most "advanced" URL to help Visual Mining
                         pass
+                    
+                    # 🛡️ v35.84: Extract name from current URL DNA
+                    for pattern in self.name_patterns:
+                        name_match = pattern.search(current_url)
+                        if name_match:
+                            try:
+                                name = unquote(name_match.group(1)).replace("+", " ")
+                                if name and len(name) > 2: # Ignore too short fragments
+                                    all_names.append(name)
+                                    print(f"🔍 Hop {hop}: Captured Name DNA: {name}")
+                            except: pass
                     
                     # Trace next hop (NO auto-follow)
                     try:
@@ -137,6 +156,11 @@ class SmartRedirectTracer:
         best_coord['total_hops'] = len(visited)
         best_coord['candidates_count'] = len(all_coords)
         
+        # 🛡️ v35.84: Select best name (longest/most descriptive from hops)
+        if all_names:
+            best_coord['place_name'] = max(all_names, key=len)
+        else:
+            best_coord['place_name'] = None        
         print(f"✅ Best coordinate selected: Hop {best_coord.get('hop')}, Precision {best_coord.get('precision')}")
         
         return best_coord

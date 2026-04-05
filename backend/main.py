@@ -72,11 +72,11 @@ from utils.deps import get_gemini_key, get_verified_user, get_supabase
 from utils.ai_config import DAILY_ROUTING, WORKHORSE_MODEL
 from google.genai import errors as genai_errors
 
-# 🆕 Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
+# [NEW] Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup Logic (Predictive Loading) ---
-    print("🚀 [Lifespan] Initializing system resources...")
+    print("[START] [Lifespan] Initializing system resources...")
     
     # 1. 驗證環境變數
     required_env = ["SUPABASE_URL", "SUPABASE_KEY"]
@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
     if supabase_url and supabase_key:
         try:
             app.state.supabase = create_client(supabase_url, supabase_key)
-            # 🛡️ Predictive Check: Test connection with a lightweight query
+            # [SAFETY] Predictive Check: Test connection with a lightweight query
             test_res = app.state.supabase.table("itineraries").select("id").limit(1).execute()
             print(f"[Supabase] ✅ Connected and verified (Query OK: {len(test_res.data) if test_res.data else 0} items)")
         except Exception as e:
@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
         app.state.supabase = None
 
     # 3. 初始化全局共享 AsyncClient (2026 POI Wiki Edition)
-    print(f"[HTTPX] 🚀 Initializing app-scoped shared AsyncClient...")
+    print(f"[HTTPX] [START] Initializing app-scoped shared AsyncClient...")
     app.state.client = httpx.AsyncClient(
         timeout=httpx.Timeout(10.0, connect=5.0),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
@@ -111,12 +111,12 @@ async def lifespan(app: FastAPI):
 
     # 4. 註冊全局狀態標記
     app.state.start_time = datetime.utcnow()
-    print("✨ [Lifespan] All systems operational")
+    print("[DONE] [Lifespan] All systems operational")
     
     yield
     
     # --- Shutdown Logic ---
-    print("🛑 [Lifespan] Releasing resources...")
+    print("[STOP] [Lifespan] Releasing resources...")
     try:
         if hasattr(app.state, "client"):
             await app.state.client.aclose()
@@ -138,7 +138,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# 🆕 Phase 4: 註冊 Routers (保持在頂層但延遲部分內部依賴)
+# [NEW] Phase 4: 註冊 Routers (保持在頂層但延遲部分內部依賴)
 from routers.geocode import router as geocode_router
 from routers.expenses import router as expenses_router
 from routers.ai import router as ai_router
@@ -212,10 +212,10 @@ async def add_security_headers(request, call_next):
 # 3. 初始化已遷移至 Lifespan Manager
 
 
-# 🆕 Health Check (for UptimeRobot - prevents Supabase 7-day pause)
+# [NEW] Health Check (for UptimeRobot - prevents Supabase 7-day pause)
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
-    """🩺 強化版健康檢查 (2026 Resilience Edition)
+    """[HEALTH] 強化版健康檢查 (2026 Resilience Edition)
     提供環境、資料庫與連線池的深度狀態
     """
     
@@ -289,7 +289,7 @@ else:
 
 # --- 嚴謹的依賴注入 (Dependency Injection已移至頂層及 utils.deps) ---
 
-# 🛠️ Prometheus Metrics Endpoint (2026 Phase 1)
+# [METRICS] Prometheus Metrics Endpoint (2026 Phase 1)
 @app.get("/metrics")
 async def metrics():
     """📊 Prometheus Metrics Endpoint (Lazy Load)"""
@@ -310,7 +310,7 @@ def root_status():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🗺️ Geocode Service Functions - MOVED TO services/geocode_service.py
+# [GEO] Geocode Service Functions - MOVED TO services/geocode_service.py
 # ═══════════════════════════════════════════════════════════════════════════════
 # The following functions and data structures have been modularized:
 #
@@ -331,7 +331,7 @@ def root_status():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🗺️ Geocode Endpoints - MOVED TO routers/geocode.py
+# [GEO] Geocode Endpoints - MOVED TO routers/geocode.py
 # ═══════════════════════════════════════════════════════════════════════════════
 # The following endpoints have been modularized:
 # - POST /api/geocode/search → geocode_search
@@ -340,7 +340,7 @@ def root_status():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 🤖 AI Generation Endpoints - MOVED TO routers/ai.py
+# [AI] AI Generation Endpoints - MOVED TO routers/ai.py
 # ═══════════════════════════════════════════════════════════════════════════════
 # The following endpoints have been modularized:
 # - POST /api/parse-md → parse_markdown (Markdown to JSON)
@@ -371,10 +371,10 @@ def root_status():
 
 # --- AI 聊天機器人 (Ryan) ---
 
-# 🆕 v3.5: 行程上下文格式化函數
+# [NEW] v3.5: 行程上下文格式化函數
 def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     """
-    🧠 2026 Sliding Window Context Injection
+    [BRAIN] 2026 Sliding Window Context Injection
     將精簡版行程轉為 AI 可理解的 Markdown 格式，並優化長行程 Token 消耗。
     核心邏輯：完整顯示 Focused Day 的細節，其餘天數僅保留標題與地點。
     """
@@ -394,7 +394,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
     lines = [
         "\n--- SYSTEM CONTEXT: NEURAL ITINERARY CONNECTION (SLIDING WINDOW) ---",
         f"當前系統時間: {now_str}",
-        "以下是使用者目前的行程摘要。為了保持效能，我將重點展示你「目前正在查看」的天數細節（以 👉 標記）。",
+        "以下是使用者目前的行程摘要。為了保持效能，我將重點展示你「目前正在查看」的天數細節（以 [REF] 標記）。",
         f"行程標題: {itinerary_title}",
         f"起訖日期: {start_date} ~ {end_date} (共 {total_days} 天)",
         ""
@@ -411,7 +411,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
         # 否則只顯示簡略地點，大幅節省 Token
         show_full_detail = is_focused or total_days <= 3
         
-        prefix = "👉 " if is_focused else "• "
+        prefix = "[REF] " if is_focused else "• "
         lines.append(f"{prefix}**Day {day_num}** ({date_str}):")
         
         items = day.get("items", [])
@@ -426,7 +426,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
                 place = item.get("place", "?")
                 category = item.get("category", "")
                 icon = {
-                    "transport": "🚃", "food": "🍽️", "hotel": "🏨", "shopping": "🛍️", "sightseeing": "📸"
+                    "transport": "[T]", "food": "[F]", "hotel": "[H]", "shopping": "[S]", "sightseeing": "[P]"
                 }.get(category, "📍")
                 
                 highlight = "⭐ " if item.get("is_highlight") else ""
@@ -449,7 +449,7 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
         
     lines.append("")
     if weather_context:
-        lines.append(f"🌡️ **實時天氣脈絡:**\n{weather_context}\n")
+        lines.append(f"[WEATHER] **實時天氣脈絡:**\n{weather_context}\n")
         
     lines.append("--- END OF SYSTEM CONTEXT ---\n")
     return "\n".join(lines)
@@ -494,16 +494,16 @@ async def chat_with_ryan(
     api_key: str = Depends(get_gemini_key)
 ):
     try:
-        # 🆕 使用 Model Manager (Gemini 3 優先 + 自動降級)
+        # [NEW] 使用 Model Manager (Gemini 3 優先 + 自動降級)
         
-        # 🆕 v3.8: 獲取使用者記憶偏好
+        # [NEW] v3.8: 獲取使用者記憶偏好
         memory_context = ""
         if user_id:
             memory_context = await MemoryService.get_preferences_context(user_id, app.state.supabase)
             if memory_context:
-                print(f"🧠 [Memory] 注入使用者偏好脈絡 (User: {user_id})")
+                print(f"[BRAIN] [Memory] 注入使用者偏好脈絡 (User: {user_id})")
         
-        # 🆕 偵測是否為 POI 相關查詢
+        # [NEW] 偵測是否為 POI 相關查詢
         poi_detection = detect_poi_query(body.message)
         poi_context = ""
         
@@ -515,7 +515,7 @@ async def chat_with_ryan(
                 location_name = body.location.get("name", "當前位置")
                 category = poi_detection["category"]
                 
-                print(f"🗺️ POI 查詢觸發: {category} @ ({lat}, {lng})")
+                print(f"[GEO] POI 查詢觸發: {category} @ ({lat}, {lng})")
                 
                 pois = await search_poi_combined(lat, lng, category, radius=1000)
                 
@@ -531,7 +531,7 @@ async def chat_with_ryan(
             except Exception as poi_err:
                 print(f"⚠️ POI 查詢失敗: {poi_err}")
         
-        # 🆕 建構對話歷史 (加入 System Prompt)
+        # [NEW] 建構對話歷史 (加入 System Prompt)
         # 使用 rawParts (如果有) 或向後相容 content
         system_history = [
             {"role": "user", "parts": [{"text": SYSTEM_PROMPT}]},
@@ -543,7 +543,7 @@ async def chat_with_ryan(
         for msg in body.history:
             role = "user" if msg.get("role") == "user" else "model"
             
-            # 🆕 優先使用 rawParts (含思想簽名)
+            # [NEW] 優先使用 rawParts (含思想簽名)
             if "rawParts" in msg and msg["rawParts"]:
                 parts = msg["rawParts"]
             elif "parts" in msg and msg["parts"]:
@@ -557,7 +557,7 @@ async def chat_with_ryan(
         
         full_history = system_history + processed_history
         
-        # 🆕 v3.5: 注入行程上下文
+        # [NEW] v3.5: 注入行程上下文
         itinerary_context = ""
         if body.current_itinerary:
             itinerary_context = format_itinerary_context(
@@ -569,7 +569,7 @@ async def chat_with_ryan(
         # 處理當前訊息 (包含 POI 上下文 + 行程上下文 + 記憶上下文)
         enhanced_message = body.message + poi_context + itinerary_context + memory_context
         
-        # 🧪 Step 3: 行程診斷 (Diagnosis) Intent Detection
+        # [TEST] Step 3: 行程診斷 (Diagnosis) Intent Detection
         # v3.5: 只有當 message 看起來像在問行程好不好時才觸發
         is_diagnosis = detect_diagnosis_intent(body.message)
         intent_type = "CHAT"  # 預設 (恢復 Ryan 人格)
@@ -593,7 +593,7 @@ async def chat_with_ryan(
             
         final_message = enhanced_message
         
-        # 📸 Step 4: 圖像處理 (Vision Overlay)
+        # [VISION] Step 4: 圖像處理 (Vision Overlay)
         if body.image:
             
             try:
@@ -617,12 +617,12 @@ async def chat_with_ryan(
                 
                 # Google GenAI SDK 支援直接傳入 [Part, Part]
                 final_message = [image_part, types.Part.from_text(text=enhanced_message)]
-                print(f"📸 成功載入圖片 ({mime_type})，切換為 Multi-modal 原生請求")
+                print(f"[VISION] 成功載入圖片 ({mime_type})，切換為 Multi-modal 原生請求")
             except Exception as img_err:
                 print(f"⚠️ Image processing error: {img_err}")
                 final_message = f"[系統提示：使用者上傳了一張圖片，但系統解析失敗]\n{enhanced_message}"
         
-        # 🆕 調用 Model Manager (含思想簽名 Round-Trip)
+        # [NEW] 調用 Model Manager (含思想簽名 Round-Trip)
         result = await call_with_fallback(
             api_key=api_key,
             history=full_history,
@@ -631,7 +631,7 @@ async def chat_with_ryan(
             intent_type=intent_type  
         )
         
-        # 🆕 v3.8: 非同步學習使用者偏好 (Adaptive Memory)
+        # [NEW] v3.8: 非同步學習使用者偏好 (Adaptive Memory)
         if user_id and result.get("text"):
             background_tasks.add_task(
                 MemoryService.extract_preferences,
@@ -658,21 +658,21 @@ async def chat_with_ryan(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==================== 🆕 SSE Streaming Chat API ====================
+# ==================== [NEW] SSE Streaming Chat API ====================
 
 async def stream_chat_generator(
     api_key: str,
     history: List[dict],
     message: str,
     thought_signatures: Optional[List[dict]] = None,
-    sources: Optional[List[dict]] = None  # 🆕 v3.7.1: 來源 URLs
+    sources: Optional[List[dict]] = None  # [NEW] v3.7.1: 來源 URLs
 ):
     """
     SSE Generator for streaming AI responses
     實作 Vercel 10s Bypass 策略
     """
     
-    # 🔥 Step 1: TTFB Bypass - 立即發送 start 事件
+    # [FIRE] Step 1: TTFB Bypass - 立即發送 start 事件
     yield "event: start\ndata: {}\n\n"
     await asyncio.sleep(0)  # Force flush
     
@@ -735,7 +735,7 @@ async def stream_chat_generator(
             try:
                 safe_config = sanitize_config_for_model(stream_config, candidate_model, intent_type="CHAT")
                 model_name = candidate_model
-                label = "🧠 Primary" if i == 0 else f"🔄 Fallback #{i}"
+                label = "[BRAIN] Primary" if i == 0 else f"[REF] Fallback #{i}"
                 print(f"{label} Stream: {candidate_model}")
                 
                 async for chunk in await client.aio.models.generate_content_stream(
@@ -751,7 +751,7 @@ async def stream_chat_generator(
                         yield ": heartbeat\n\n"
                         last_heartbeat = current_time
                     
-                    # 🆕 v5.2: 處理思考過程 (Thought Streaming)
+                    # [NEW] v5.2: 處理思考過程 (Thought Streaming)
                     if hasattr(chunk, 'thought') and chunk.thought:
                         yield f'event: thinking\ndata: {json.dumps({"status": "thinking", "thought": chunk.thought})}\n\n'
                         await asyncio.sleep(0)
@@ -778,7 +778,7 @@ async def stream_chat_generator(
         
         raw_parts = [{"text": full_text}]
         
-        # 🆕 v5.0: 從最後一個 chunk 提取 grounding_metadata（引文來源）
+        # [NEW] v5.0: 從最後一個 chunk 提取 grounding_metadata（引文來源）
         citations = []
         if last_chunk and hasattr(last_chunk, 'candidates') and last_chunk.candidates:
             candidate = last_chunk.candidates[0]

@@ -1,6 +1,8 @@
 import httpx
 import re
 import os
+import random
+import time as _time
 import urllib.parse
 from bs4 import BeautifulSoup
 from typing import Dict, Any
@@ -12,6 +14,70 @@ from utils.url_safety import is_safe_url
 from utils.smart_redirect_tracer import get_smart_tracer
 from utils.molecular_parser import get_molecular_parser
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 🛰️ GAS Two-Shot Rescue Gateway (Failure-Only Fallback)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+_GAS_RESOLVE_DEAD_CACHE: Dict[str, float] = {}
+
+async def resolve_via_gas(short_url: str) -> Dict[str, Any] | None:
+    """
+    🛰️ GAS Rescue: 只在所有本地引擎失敗後才啟動。
+    利用 GAS 的 google-apps-script User-Agent 繞過 Google 機器人偵測，
+    取得本地 httpx 無法拿到的座標與地名。
+    
+    Two-Shot 策略：
+      Shot 1: followRedirects=false → 攔截 Location Header 取座標
+      Shot 2: followRedirects=true  → 抓 HTML <title> 取地名
+    
+    Returns:
+        成功: {"lat": float, "lng": float, "title": str|None, ...}
+        失敗: None
+    """
+    urls_str = os.getenv("GAS_RESOLVE_LINK_URLS", "")
+    if not urls_str:
+        return None
+    
+    urls = [u.strip() for u in urls_str.split(",") if u.strip()]
+    if not urls:
+        return None
+    
+    random.shuffle(urls)  # Load balancing
+    now = _time.time()
+    
+    for gas_url in urls:
+        # Dead URL cache (12h penalty)
+        if gas_url in _GAS_RESOLVE_DEAD_CACHE and (now - _GAS_RESOLVE_DEAD_CACHE[gas_url] < 43200):
+            continue
+        
+        try:
+            # GAS Web Apps return 302 redirects → must follow them
+            # 🛡️ 2026 Emergency: Disable SSL verify only in development for internal GAS rescue gateway
+            should_verify_ssl = os.getenv("ENVIRONMENT") != "development"
+            async with httpx.AsyncClient(follow_redirects=True, timeout=15.0, verify=should_verify_ssl) as client:
+                res = await client.get(gas_url, params={"url": short_url})
+            res.raise_for_status()
+            data = res.json()
+            
+            if data and data.get("success") and data.get("lat"):
+                print(f"[GAS Rescue] OK ({data['lat']}, {data['lng']}) title={data.get('title')}")
+                return {
+                    "lat": float(data["lat"]),
+                    "lng": float(data["lng"]),
+                    "title": data.get("title"),
+                    "titleReliable": data.get("titleReliable", False),
+                    "longUrl": data.get("longUrl", short_url),
+                    "method": "gas_rescue"
+                }
+            elif data and "quota" in str(data.get("error", "")).lower():
+                print(f"[GAS Rescue] Quota exceeded. Banning URL for 12 hours.")
+                _GAS_RESOLVE_DEAD_CACHE[gas_url] = now
+        except Exception as e:
+            print(f"[GAS Rescue] Request failed: {e}")
+            continue
+    
+    return None
+
+
 # Regex for coordinates in URLs
 # Pattern A: @lat,lng
 RE_COORD_A = re.compile(r'@(-?\d+\.\d+),(-?\d+\.\d+)')
@@ -19,6 +85,9 @@ RE_COORD_A = re.compile(r'@(-?\d+\.\d+),(-?\d+\.\d+)')
 RE_COORD_B = re.compile(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)')
 # Pattern C: search?q=... or ?query=...
 RE_QUERY = re.compile(r'[?&](?:q|query|place_name)=([^&]+)')
+# Pattern D: /place/NAME/... or /search/NAME/... (Modern Google Maps Path Style)
+RE_PLACE_PATH = re.compile(r'/place/([^/@]+)')
+RE_SEARCH_PATH = re.compile(r'/search/([^/?&]+)')
 
 async def fetch_og_metadata(url: str) -> Dict[str, Any]:
     """
@@ -39,7 +108,7 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
         async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
             # 🛡️ SSRF Check
             if not is_safe_url(url):
-                 print(f"🛑 [SSRF Block] Metadata fetch aborted for unsafe URL: {url}")
+                 print(f"[SSRF Block] Metadata fetch aborted for unsafe URL: {url}")
                  return metadata
 
             resp = await client.get(url, headers=headers)
@@ -84,7 +153,7 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
                     best_match = lh_matches[0]
                     # 重寫為 1000x800 高清格式
                     metadata["image"] = re.sub(r'=w\d+-h\d+', '=w1000-h800-k-no', best_match)
-                    print(f"🎯 DeepScraper: Found photo buried in JS: {metadata['image']}")
+                    print(f"[DeepScraper] Found photo buried in JS: {metadata['image']}")
 
             # 4. URL 正規化與過濾 (Protocol-relative & Generic Icon)
             if metadata["image"]:
@@ -92,7 +161,7 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
                     metadata["image"] = "https:" + metadata["image"]
                 
                 if any(icon in metadata["image"] for icon in ["maps_512dp.png", "maps_icon_60.png"]):
-                    print(f"🚫 Filtering generic Google Maps logo: {metadata['image']}")
+                    print(f"[Filter] Generic Google Maps logo skipped: {metadata['image']}")
                     metadata["image"] = None
             
             # 5. 回退機制 - Title & Description
@@ -105,7 +174,7 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
                     metadata["description"] = desc.get("content")
 
     except Exception as e:
-        print(f"⚠️ Metadata fetch failed for {url}: {e}")
+        print(f"[WARN] Metadata fetch failed for {url}: {e}")
         
     return metadata
 
@@ -123,6 +192,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     }
 
     # 🆕 v35.26: Anti-Acidosis Protocol - Use SmartRedirectTracer
+    original_input_url = url
     final_url = url
     smart_tracer = get_smart_tracer()
     
@@ -148,7 +218,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         if any(domain in url for domain in ["goo.gl", "maps.app.goo.gl"]):
             # 🛡️ SSRF Check before tracing
             if not is_safe_url(url):
-                print(f"🛑 [SSRF Block] SmartTrace aborted for unsafe URL: {url}")
+                print(f"[SSRF Block] SmartTrace aborted for unsafe URL: {url}")
                 return result
 
             trace_result = await smart_tracer.trace_full_chain_smart(url)
@@ -160,7 +230,12 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 result["method"] = f"smart_tracer+{trace_result.get('method', 'unknown')}"
                 result["resolved_url"] = trace_result.get("final_url", url)
                 final_url = trace_result.get("final_url", url)
-                print(f"✅ SmartTracer: ({result['lat']}, {result['lng']}) precision={trace_result.get('precision', 'N/A')}")
+                
+                # 🛡️ v35.84: Capture name from tracer DNA
+                if trace_result.get("place_name") and not result.get("query"):
+                    result["query"] = trace_result["place_name"]
+                
+                print(f"[SmartTracer] OK ({result['lat']}, {result['lng']}) precision={trace_result.get('precision', 'N/A')}")
             else:
                 # SmartTracer found no coords in chain, try final URL parsing
                 final_url = trace_result.get("final_url", url)
@@ -173,7 +248,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                     result["lat"] = parsed["lat"]
                     result["lng"] = parsed["lng"]
                     result["method"] = f"molecular+{parsed.get('method', 'unknown')}"
-                    print(f"✅ MolecularParser: ({result['lat']}, {result['lng']})")
+                    print(f"[MolecularParser] OK ({result['lat']}, {result['lng']})")
         else:
             # Non-short URL: Direct parsing with MolecularParser
             parser = get_molecular_parser()
@@ -186,11 +261,11 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     
     except Exception as e:
         # 🛡️ Graceful fallback: Use legacy logic if new tracer fails
-        print(f"⚠️ SmartTracer/MolecularParser failed, falling back to legacy: {e}")
+        print(f"[WARN] SmartTracer/MolecularParser failed, fallback to legacy: {e}")
         try:
             # 🛡️ SSRF Check
             if not is_safe_url(url):
-                print(f"🛑 [SSRF Block] Legacy redirect aborted for unsafe URL: {url}")
+                print(f"[SSRF Block] Legacy redirect aborted for unsafe URL: {url}")
                 return result
 
             async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
@@ -199,7 +274,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 result["resolved_url"] = final_url
                 result["method"] = "legacy_redirect"
         except Exception as legacy_e:
-            print(f"⚠️ Legacy fallback also failed: {legacy_e}")
+            print(f"[WARN] Legacy fallback failed: {legacy_e}")
             return result
         
         # Legacy regex extraction
@@ -232,7 +307,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # 只有當 (1) 沒座標 (2) 是 Google Maps 連結 時才啟動
     if not result["lat"] and result.get("resolved_url") and "google.com/maps" in result["resolved_url"]:
         try:
-            print(f"🕵️ [DeepMine] 啟動 HTML 深度搜查: {result['resolved_url']}")
+            print(f"[DeepMine] Starting HTML search: {result['resolved_url']}")
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7"
@@ -240,7 +315,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
             async with httpx.AsyncClient(follow_redirects=True, timeout=5.0) as client:
                 # 🛡️ SSRF Check
                 if not is_safe_url(result['resolved_url']):
-                    print(f"🛑 [SSRF Block] DeepMine aborted for unsafe URL: {result['resolved_url']}")
+                    print(f"[SSRF Block] DeepMine aborted for unsafe URL: {result['resolved_url']}")
                     return result
 
                 resp = await client.get(result['resolved_url'], headers=headers)
@@ -260,7 +335,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                             result["lat"] = lat_f
                             result["lng"] = lng_f
                             result["method"] = f"{result['method']}+proto_mining"
-                            print(f"✅ [ProtoMine] Extracted precision from state: ({lat_f}, {lng_f})")
+                            print(f"[ProtoMine] Extracted precision: ({lat_f}, {lng_f})")
                         
                     # Fallback to generic array mining ONLY if still no lat
                     if not result["lat"]:
@@ -275,10 +350,82 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                                 break
         except Exception as e:
             # 異常吞噬：失敗則跳過，確保不影響後續視覺抓取
-            print(f"⚠️ [DeepMine] HTML 搜查略過: {e}")
+            print(f"[DeepMine] HTML Search skipped: {e}")
+
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # 🆕 Step 3.7: GAS Two-Shot Rescue (Failure-Only Gateway)
+    # 條件: (1) 所有本地引擎失敗 (2) 原始輸入是短網址
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if not result["lat"] and any(d in original_input_url for d in ["goo.gl", "maps.app.goo.gl"]):
+        try:
+            gas_input = original_input_url  # 使用原始短網址呼叫 GAS 效果最好
+            print(f"[GAS Rescue] Local engines failed, invoking GAS for original URL: {gas_input[:60]}...")
+            
+            gas_result = await resolve_via_gas(gas_input)
+            
+            if gas_result and gas_result.get("lat"):
+                result["lat"] = gas_result["lat"]
+                result["lng"] = gas_result["lng"]
+                result["method"] = f"{result.get('method', 'none')}+gas_rescue"
+                
+                # 更新 final_url 以利後續 Metadata 取得更好結果
+                if gas_result.get("longUrl") and gas_result["longUrl"] != gas_input:
+                    final_url = gas_result["longUrl"]
+                    result["resolved_url"] = final_url
+                
+                # 地名注入（僅在可靠時）
+                if gas_result.get("title") and gas_result.get("titleReliable"):
+                    result["query"] = gas_result["title"]
+                    
+                print(f"[GAS Rescue] Success: ({result['lat']}, {result['lng']})")
+            else:
+                print(f"[GAS Rescue] GAS could not resolve this link.")
+        except Exception as gas_e:
+            print(f"[GAS Rescue] Exception: {gas_e}")
 
     # Step 4: Fetch Metadata (Visuals)
     result["metadata"] = await fetch_og_metadata(final_url)
+    
+    # 🕵️ v35.84: DNA-Level Name Recovery (Full Cascade)
+    # If title is generic "Google Maps" or missing, use a priority chain to recover the real name
+    current_title = result["metadata"].get("title", "")
+    is_generic = any(g in current_title.lower() for g in ["google maps", "google 地圖", "google地圖", "google マップ"]) or not current_title
+    
+    if is_generic:
+        recovered_name = None
+        
+        # Priority 1: Query already extracted from ?q= (Line 294)
+        if result.get("query"):
+            recovered_name = result["query"]
+            print(f"[DNA-Recovery] P1 (Query): {recovered_name}")
+            
+        # Priority 2: Extract from /place/ NAME /...
+        if not recovered_name:
+            place_match = RE_PLACE_PATH.search(final_url)
+            if place_match:
+                try:
+                    recovered_name = urllib.parse.unquote(place_match.group(1)).replace("+", " ")
+                    print(f"[DNA-Recovery] P2 (Place Path): {recovered_name}")
+                except: pass
+                
+        # Priority 3: Extract from /search/ NAME /...
+        if not recovered_name:
+            search_match = RE_SEARCH_PATH.search(final_url)
+            if search_match:
+                try:
+                    recovered_name = urllib.parse.unquote(search_match.group(1)).replace("+", " ")
+                    print(f"[DNA-Recovery] P3 (Search Path): {recovered_name}")
+                except: pass
+
+        if recovered_name:
+            result["query"] = recovered_name
+            result["metadata"]["title"] = recovered_name
+            is_generic = False # Successfully recovered
+            
+    # 🆕 GAS Title Backfill: Only if still generic/missing
+    if is_generic and result.get("query") and "gas_rescue" in result.get("method", ""):
+        result["metadata"]["title"] = result["query"]
+        print(f"[GAS Title] Backfill: {result['query']}")
     
     # 🛡️ [Region Guard] Safety First Protocol
     # v35.70: Categorical check to prevent IP-localized "drift" (Zero-Regression)
@@ -291,7 +438,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         is_japan_geo = 20.0 <= result["lat"] <= 50.0 and 120.0 <= result["lng"] <= 155.0
         
         if is_japan_meta and not is_japan_geo:
-            print(f"🚨 [RegionGuard] Geo-Drift detected! Meta indicates Japan but coords are at ({result['lat']}, {result['lng']}). PURGING COORDS.")
+            print(f"[RegionGuard] Geo-Drift detected! Meta indicates Japan but coords are at ({result['lat']}, {result['lng']}). PURGING COORDS.")
             result["lat"] = None
             result["lng"] = None
             result["method"] = f"{result.get('method', 'unknown')}+drift_purged"
@@ -332,7 +479,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 f"token={arcgis_key}"
             )
             result["metadata"]["image"] = static_url
-            print(f"🗺️ Engine 2 Fallback: Generated ArcGIS Static Map: {static_url[:60]}...")
+            print(f"[ArcGIS] Engine 2 Fallback: Generated static map: {static_url[:60]}...")
 
     return result
 
