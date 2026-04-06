@@ -66,12 +66,12 @@ class SmartRedirectTracer:
                 for hop in range(self.max_hops):
                     # 🛡️ v35.65: SSRF Protection - Validate every single hop
                     if not is_safe_url(current_url):
-                        print(f"🛑 [SSRF Block] SmartTracer blocked unsafe URL at hop {hop}: {current_url}")
+                        print(f"[SSRF Block] SmartTracer blocked unsafe URL at hop {hop}: {current_url}")
                         break
 
                     # Loop detection
                     if current_url in visited:
-                        print(f"⚠️ Redirect loop detected at hop {hop}")
+                        print(f"[WARN] Redirect loop detected at hop {hop}")
                         break
                     visited.add(current_url)
                     
@@ -81,7 +81,7 @@ class SmartRedirectTracer:
                         coords['hop'] = hop
                         coords['url'] = current_url
                         all_coords.append(coords)
-                        print(f"🔍 Hop {hop}: Found coords ({coords['lat']}, {coords['lng']}) - Precision: {coords['precision']}")
+                        print(f"[Tracer] Hop {hop}: Found coords ({coords['lat']}, {coords['lng']}) - Precision: {coords['precision']}")
                     else:
                         # 🛡️ v35.60: Even if no coords, keep track of the most "advanced" URL to help Visual Mining
                         pass
@@ -94,7 +94,7 @@ class SmartRedirectTracer:
                                 name = unquote(name_match.group(1)).replace("+", " ")
                                 if name and len(name) > 2: # Ignore too short fragments
                                     all_names.append(name)
-                                    print(f"🔍 Hop {hop}: Captured Name DNA: {name}")
+                                    print(f"[Tracer] Hop {hop}: Captured Name DNA: {name}")
                             except: pass
                     
                     # Trace next hop (NO auto-follow)
@@ -107,6 +107,7 @@ class SmartRedirectTracer:
                         
                         # Non-redirect status: chain ends
                         if resp.status_code not in [301, 302, 303, 307, 308]:
+                            # 🗑️ v35.92: Terminal Hop Body Mining REMOVED due to IP poisoning.
                             break
                         
                         next_url = resp.headers.get('Location')
@@ -121,10 +122,10 @@ class SmartRedirectTracer:
                         current_url = next_url
                     
                     except asyncio.TimeoutError:
-                        print(f"⚠️ Hop {hop} timeout")
+                        print(f"[WARN] Hop {hop} timeout")
                         break
                     except Exception as e:
-                        print(f"⚠️ Hop {hop} error: {e}")
+                        print(f"[WARN] Hop {hop} error: {e}")
                         break
                 
                 # Final URL check (if not already checked)
@@ -136,7 +137,7 @@ class SmartRedirectTracer:
                         all_coords.append(coords)
         
         except Exception as e:
-            print(f"⚠️ SmartTracer session error: {e}")
+            print(f"[WARN] SmartTracer session error: {e}")
             return {
                 'error': str(e),
                 'final_url': current_url,
@@ -161,7 +162,7 @@ class SmartRedirectTracer:
             best_coord['place_name'] = max(all_names, key=len)
         else:
             best_coord['place_name'] = None        
-        print(f"✅ Best coordinate selected: Hop {best_coord.get('hop')}, Precision {best_coord.get('precision')}")
+        print(f"[SmartTracer] Best coordinate selected: Hop {best_coord.get('hop')}, Precision {best_coord.get('precision')}")
         
         return best_coord
     
