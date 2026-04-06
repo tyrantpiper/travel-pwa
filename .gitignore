@@ -37,3 +37,11 @@ gcp-sa-key.json
 # Scratch & Diff files
 *.diff
 tmp/
+# Diagnostic Scripts
+backend/scripts/maps_diagnostic/
+backend/v17_*.py
+backend/phase2_*.py
+db_probe_*.py
+e2e_evidence.py
+reproduce_links.py
+tmp_*.py

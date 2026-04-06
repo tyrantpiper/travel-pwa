@@ -321,33 +321,21 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
                 resp = await client.get(result['resolved_url'], headers=headers)
                 if resp.status_code == 200:
                     body_text = resp.text
-                    # 🛡️ v35.70: Target structured Protobuf state instead of generic float arrays
-                    # Pattern: window.APP_INITIALIZATION_STATE=[[[lat, lng, ...]]]
-                    init_match = re.search(r'window\.APP_INITIALIZATION_STATE=\[\[\[(-?\d+\.\d+),(-?\d+\.\d+)', body_text)
-                    if init_match:
-                        lat_f, lng_f = float(init_match.group(2)), float(init_match.group(1)) # Swapped in proto!
-                        # Reverse check: Google often lists Lng first in these internal arrays
-                        if not (20.0 <= lat_f <= 50.0 and 120.0 <= lng_f <= 155.0):
-                            # Try other way
-                            lat_f, lng_f = float(init_match.group(1)), float(init_match.group(2))
+                    # 🛡️ v35.90: Decode %21 to ! (Google encodes ! as %21 in HTML body)
+                    body_decoded = body_text.replace('%21', '!')
+                    
+                    # 🗑️ v35.93: ALL HTML Body Mining REMOVED due to IP Context Poisoning.
+                    # As discovered in testing, Google Maps URLs using "?q=" statically render 
+                    # HTML body with !2d/!3d and APP_INITIALIZATION_STATE mapped to the SERVER'S IP LOCATION.
+                    # It is absolutely impossible to extract POI coords from the static SSR HTML body reliably.
+                    # We are intentionally removing Priority 1 and Priority 2 to force the resolver
+                    # to fail-forward gracefully, passing only the extracted "Query" (Name DNA) 
+                    # down to the Tier 3 JIT Geocoding System (Photon/Nominatim).
                         
-                        if 20.0 <= lat_f <= 50.0 and 120.0 <= lng_f <= 155.0:
-                            result["lat"] = lat_f
-                            result["lng"] = lng_f
-                            result["method"] = f"{result['method']}+proto_mining"
-                            print(f"[ProtoMine] Extracted precision: ({lat_f}, {lng_f})")
-                        
-                    # Fallback to generic array mining ONLY if still no lat
-                    if not result["lat"]:
-                        candidates = re.findall(r'\[\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*\]', body_text)
-                        for lat_str, lng_str in candidates:
-                            lat_f, lng_f = float(lat_str), float(lng_str)
-                            # Tighten bounds: ONLY accept if it looks like Japan (avoid trans-continental swaps)
-                            if 30.0 <= lat_f <= 46.0 and 128.0 <= lng_f <= 146.0:
-                                result["lat"] = lat_f
-                                result["lng"] = lng_f
-                                result["method"] = f"{result['method']}+html_mining_sanitized"
-                                break
+                    # 🥉 v35.91: Generic array mining completely REMOVED.
+                    # Rationale: Protobuf (!2d/!3d) & InitState now safely cover global domains (-90~90).
+                    # Retaining generic array mining would risk pulling garbage floats out of the document
+                    # causing trans-continental coordinate swaps for non-Asian URLs.
         except Exception as e:
             # 異常吞噬：失敗則跳過，確保不影響後續視覺抓取
             print(f"[DeepMine] HTML Search skipped: {e}")
@@ -388,8 +376,8 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     
     # 🕵️ v35.84: DNA-Level Name Recovery (Full Cascade)
     # If title is generic "Google Maps" or missing, use a priority chain to recover the real name
-    current_title = result["metadata"].get("title", "")
-    is_generic = any(g in current_title.lower() for g in ["google maps", "google 地圖", "google地圖", "google マップ"]) or not current_title
+    current_title = result["metadata"].get("title") or ""
+    is_generic = not current_title or any(g in current_title.lower() for g in ["google maps", "google 地圖", "google地圖", "google マップ"])
     
     if is_generic:
         recovered_name = None
