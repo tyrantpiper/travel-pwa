@@ -1184,6 +1184,7 @@ export function ProfileView() {
                     <Button variant="outline" className="w-full h-12 text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 mt-4" onClick={handleLogout}>
                         <LogOut className="w-4 h-4 mr-2" /> {t('logout')}
                     </Button>
+                    <div className="h-20" />
                 </div>
 
             </div>
