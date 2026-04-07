@@ -68,7 +68,7 @@ export function ItineraryTimeline({
     });
 
     return (
-        <div className="px-5 py-6">
+        <div className="px-5 pt-6 pb-32">
             <DndContext
                 sensors={dndSensors}
                 collisionDetection={closestCorners}
