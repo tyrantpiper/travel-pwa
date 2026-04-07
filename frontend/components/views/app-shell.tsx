@@ -70,7 +70,7 @@ export function AppShell() {
         <>
             <OfflineBanner />
             <div className="h-screen bg-background flex flex-col overflow-hidden">
-                <main className="flex-1 pb-20 flex flex-col min-h-0" data-scroll="true">
+                <main className="flex-1 flex flex-col min-h-0" data-scroll="true">
 
                     {/* ItineraryView (Critical Path) */}
                     <div className={activeView === "itinerary" ? "flex-1 h-full min-h-0 overflow-hidden" : "hidden"}>

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Skeleton } from "@/components/ui/skeleton"
 import { TranslationKey } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
@@ -56,6 +57,7 @@ export function ProfileView() {
 
     // 🆕 捐贈功能 state（獨立區塊，不影響現有邏輯）
     const [donationProgress, setDonationProgress] = useState({ current: 0, goal: 2000 })
+    const [isDonationLoading, setIsDonationLoading] = useState(true)
     const [showDonation, setShowDonation] = useState(true)
     const [donationExpanded, setDonationExpanded] = useState(false)
 
@@ -184,6 +186,8 @@ export function ProfileView() {
                 }
             } catch (err) {
                 if (isMounted) debugLog('[Donation] Failed to fetch progress:', err)
+            } finally {
+                if (isMounted) setIsDonationLoading(false)
             }
         }
         fetchDonationProgress()
@@ -450,6 +454,44 @@ export function ProfileView() {
 
                 {/* 🆕 捐贈區塊 - 藥學系治療窗口版 */}
                 {showDonation && (() => {
+                    if (isDonationLoading) {
+                        return (
+                            <div className="mt-6 rounded-xl p-5 shadow-lg relative overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50">
+                                {/* Skeleton 標題區 */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <Skeleton className="h-5 w-24 bg-slate-200/80 dark:bg-slate-700" />
+                                    <Skeleton className="h-5 w-16 rounded-full bg-slate-200/80 dark:bg-slate-700" />
+                                </div>
+                                <Skeleton className="h-3 w-40 mb-6 bg-slate-200/80 dark:bg-slate-700" />
+                                
+                                {/* Skeleton 進度條與節點 */}
+                                <div className="mb-4">
+                                    <Skeleton className="h-6 w-full rounded-full bg-slate-200/80 dark:bg-slate-700" />
+                                    <div className="flex justify-between mt-2 px-1">
+                                        <Skeleton className="h-2 w-4 bg-slate-200/80 dark:bg-slate-700" />
+                                        <Skeleton className="h-2 w-4 bg-slate-200/80 dark:bg-slate-700" />
+                                        <Skeleton className="h-2 w-4 bg-slate-200/80 dark:bg-slate-700" />
+                                        <Skeleton className="h-2 w-4 bg-slate-200/80 dark:bg-slate-700" />
+                                        <Skeleton className="h-2 w-4 bg-slate-200/80 dark:bg-slate-700" />
+                                    </div>
+                                </div>
+                                
+                                {/* Skeleton 數字區域 */}
+                                <div className="flex justify-between items-end mb-4">
+                                    <Skeleton className="h-3 w-12 bg-slate-200/80 dark:bg-slate-700" />
+                                    <Skeleton className="h-6 w-32 bg-slate-200/80 dark:bg-slate-700" />
+                                </div>
+                                
+                                <div className="space-y-2 mb-4">
+                                    <Skeleton className="h-2 w-1/2 bg-slate-200/80 dark:bg-slate-700" />
+                                    <Skeleton className="h-2 w-2/3 bg-slate-200/80 dark:bg-slate-700" />
+                                </div>
+                                
+                                <Skeleton className="h-10 w-full rounded-lg bg-slate-200/80 dark:bg-slate-700" />
+                            </div>
+                        )
+                    }
+
                     const percentage = Math.min((donationProgress.current / donationProgress.goal) * 100, 120)
 
                     // 治療窗口狀態判斷
