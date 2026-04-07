@@ -28,11 +28,35 @@ import { useHaptic, useTripDetail } from "@/lib/hooks"
 import { FlightCard } from "./info/FlightCard"
 import { extractCoordsFromUrl, isGoogleMapsShortlink, getDistanceKm } from "@/lib/location-utils"
 
+// --- 🛡️ Step 1: Type Infrastructure ---
+import type { FlightData as FlightSegment } from "./info/FlightCard"
 
+const EMPTY_FLIGHT_SEGMENT: FlightSegment = {
+    dep_date: "", arr_date: "", airline: "", code: "",
+    dep_time: "", arr_time: "", dep_airport: "", arr_airport: "",
+    seat: "", terminal: "", pnr: "",
+    seats: [], terminals: [], pnrs: []
+}
+
+/**
+ * 🛡️ Step 2: Safety Migration Gate
+ * 無論讀到的是舊物件還是新陣列，都強制輸出為陣列，防止程式碼崩潰
+ */
+const normalizeFlights = (data: unknown, type: 'outbound' | 'inbound'): FlightSegment[] => {
+    const defaultAirport = type === 'outbound' ? { dep: "TPE", arr: "NRT" } : { dep: "NRT", arr: "TPE" }
+    const baseSegment = { ...EMPTY_FLIGHT_SEGMENT, dep_airport: defaultAirport.dep, arr_airport: defaultAirport.arr }
+
+    if (!data) return [baseSegment]
+    if (Array.isArray(data)) {
+        return data.length > 0 ? data.map(s => ({ ...baseSegment, ...s })) : [baseSegment]
+    }
+    // 舊資料物件相容 (Legacy Object fallback)
+    return [{ ...baseSegment, ...data }]
+}
 
 const DEFAULT_FLIGHTS = {
-    outbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "TPE", arr_airport: "NRT", seat: "", terminal: "", pnr: "", seats: [] as string[], terminals: [] as string[], pnrs: [] as string[] },
-    inbound: { dep_date: "", arr_date: "", airline: "", code: "", dep_time: "", arr_time: "", dep_airport: "NRT", arr_airport: "TPE", seat: "", terminal: "", pnr: "", seats: [] as string[], terminals: [] as string[], pnrs: [] as string[] }
+    outbound: normalizeFlights(null, 'outbound'),
+    inbound: normalizeFlights(null, 'inbound')
 }
 
 const DEFAULT_HOTEL = {
@@ -123,14 +147,10 @@ export function InfoView() {
         if (isEditing) return
 
         if (activeTripData) {
-            if (activeTripData.flight_info?.outbound) {
-                setFlights({
-                    outbound: { ...DEFAULT_FLIGHTS.outbound, ...activeTripData.flight_info.outbound },
-                    inbound: { ...DEFAULT_FLIGHTS.inbound, ...activeTripData.flight_info.inbound }
-                })
-            } else {
-                setFlights(DEFAULT_FLIGHTS)
-            }
+            setFlights({
+                outbound: normalizeFlights(activeTripData.flight_info?.outbound, 'outbound'),
+                inbound: normalizeFlights(activeTripData.flight_info?.inbound, 'inbound')
+            })
             const hData = activeTripData.hotel_info || {}
             const parsedHotels = (Array.isArray(hData) ? hData : (Object.keys(hData).length ? [hData] : [DEFAULT_HOTEL]))
                 .map((h: Partial<Hotel>) => ({ ...DEFAULT_HOTEL, ...h }))
@@ -147,6 +167,33 @@ export function InfoView() {
         } catch (e) {
             console.error(e)
             throw e
+        }
+    }
+
+    const updateFlightSegment = (type: 'outbound' | 'inbound', index: number, field: string, value: string | string[]) => {
+        setFlights(prev => {
+            const newList = [...prev[type]]
+            newList[index] = { ...newList[index], [field]: value }
+            return { ...prev, [type]: newList }
+        })
+    }
+
+    const addFlightSegment = (type: 'outbound' | 'inbound') => {
+        haptic.tap()
+        setFlights(prev => ({
+            ...prev,
+            [type]: [...prev[type], { ...EMPTY_FLIGHT_SEGMENT, dep_airport: type === 'outbound' ? "TPE" : "NRT", arr_airport: type === 'outbound' ? "NRT" : "TPE" }]
+        }))
+    }
+
+    const removeFlightSegment = (type: 'outbound' | 'inbound', index: number) => {
+        haptic.tap()
+        if (confirm(t('confirm_delete'))) {
+            haptic.success()
+            setFlights(prev => {
+                const newList = prev[type].filter((_, i) => i !== index)
+                return { ...prev, [type]: newList.length ? newList : normalizeFlights(null, type) }
+            })
         }
     }
 
@@ -416,22 +463,64 @@ export function InfoView() {
                                                 animate={{ opacity: 1, x: 0 }}
                                                 exit={{ opacity: 0, x: flightTab === 'outbound' ? 10 : -10 }}
                                                 transition={{ duration: 0.2 }}
+                                                className="space-y-6"
                                             >
-                                                {flightTab === 'outbound' ? (
-                                                    <FlightCard
-                                                        data={flights.outbound}
-                                                        isEditing={isEditing}
-                                                        onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, outbound: { ...prev.outbound, [f]: v } }))}
-                                                        onClear={() => setFlights({ ...flights, outbound: { ...DEFAULT_FLIGHTS.outbound } })}
-                                                    />
-                                                ) : (
-                                                    <FlightCard
-                                                        data={flights.inbound}
-                                                        isEditing={isEditing}
-                                                        onChange={(f: string, v: string | string[]) => setFlights(prev => ({ ...prev, inbound: { ...prev.inbound, [f]: v } }))}
-                                                        onClear={() => setFlights({ ...flights, inbound: { ...DEFAULT_FLIGHTS.inbound } })}
-                                                    />
+                                                {isEditing && (
+                                                    <div className="flex justify-end mb-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => addFlightSegment(flightTab)}
+                                                            className="h-9 px-4 text-xs font-bold text-blue-600 hover:bg-blue-50 bg-white rounded-xl border border-blue-100 shadow-sm transition-all hover:shadow-md active:scale-95"
+                                                        >
+                                                            <Plus className="w-3 h-3 mr-1.5" /> {t('add_flight_segment') || (flightTab === 'outbound' ? "Add Outbound" : "Add Inbound")}
+                                                        </Button>
+                                                    </div>
                                                 )}
+
+                                                {flights[flightTab].map((segment, idx) => (
+                                                    <div key={idx} className="relative group">
+                                                        {isEditing && (
+                                                            <div className="absolute -top-3 -right-3 z-30 flex gap-2">
+                                                                {flights[flightTab].length > 1 && (
+                                                                    <button
+                                                                        onClick={() => removeFlightSegment(flightTab, idx)}
+                                                                        className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all active:scale-90"
+                                                                        title={t('remove_segment')}
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="relative">
+                                                            {flights[flightTab].length > 1 && (
+                                                                <div className="absolute -left-2 top-8 -rotate-90 origin-left text-[9px] font-black text-slate-300 dark:text-slate-500 uppercase tracking-widest pointer-events-none">
+                                                                    {t('leg') || "Leg"} {idx + 1}
+                                                                </div>
+                                                            )}
+                                                            <FlightCard
+                                                                data={segment}
+                                                                isEditing={isEditing}
+                                                                onChange={(f, v) => updateFlightSegment(flightTab, idx, f, v)}
+                                                                onClear={() => {
+                                                                    const baseAirport = flightTab === 'outbound' ? { dep: "TPE", arr: "NRT" } : { dep: "NRT", arr: "TPE" }
+                                                                    updateFlightSegment(flightTab, idx, 'dep_date', '')
+                                                                    updateFlightSegment(flightTab, idx, 'arr_date', '')
+                                                                    updateFlightSegment(flightTab, idx, 'airline', '')
+                                                                    updateFlightSegment(flightTab, idx, 'code', '')
+                                                                    updateFlightSegment(flightTab, idx, 'dep_time', '')
+                                                                    updateFlightSegment(flightTab, idx, 'arr_time', '')
+                                                                    updateFlightSegment(flightTab, idx, 'dep_airport', baseAirport.dep)
+                                                                    updateFlightSegment(flightTab, idx, 'arr_airport', baseAirport.arr)
+                                                                    updateFlightSegment(flightTab, idx, 'pnrs', [])
+                                                                    updateFlightSegment(flightTab, idx, 'seats', [])
+                                                                    updateFlightSegment(flightTab, idx, 'terminals', [])
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </motion.div>
                                         </AnimatePresence>
                                     </div>

@@ -132,6 +132,10 @@ export const remainingTranslations = {
         seat: "Seat",
         departure: "Departure",
         arrival: "Arrival",
+        add_flight_segment: "+ Add Flight Segment",
+        remove_segment: "Remove this segment",
+        leg: "Segment",
+        confirm_delete: "Are you sure you want to delete this?",
 
         // Tools
         tools: "Tools",
@@ -658,6 +662,10 @@ export const remainingTranslations = {
         seat: "座位",
         departure: "起飛",
         arrival: "抵達",
+        add_flight_segment: "+ 新增航段",
+        remove_segment: "移除此航段",
+        leg: "第",
+        confirm_delete: "確定要刪除嗎？",
 
         // Tools
         tools: "工具",
