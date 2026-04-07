@@ -7,7 +7,7 @@ import {
     Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
     Sparkles, Upload, Image as ImageIcon, ChevronLeft, PieChart, List, Users, User,
-    Key, CheckCircle2, Share2
+    Key, CheckCircle2, Share2, Inbox
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -853,7 +853,7 @@ export function ToolsView() {
 
     return (
         <>
-            <div className="h-full bg-stone-50 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
+            <div className="h-full bg-stone-50 dark:bg-slate-950 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
                 <div className="min-h-screen pb-32">
                     <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                         <div className="space-y-3">
@@ -913,7 +913,7 @@ export function ToolsView() {
                                     <CardContent className="pt-4">
                                         <div className="flex justify-between items-center mb-4">
                                             <h3 className="font-semibold text-slate-900">{t('tv_my_cards')}</h3>
-                                            <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900">
+                                            <Button size="sm" onClick={openAddCardDialog} className="bg-slate-900 text-white dark:bg-white dark:text-slate-900">
                                                 <Plus className="w-4 h-4 mr-1" /> {t('tv_add_card')}
                                             </Button>
                                         </div>
@@ -984,7 +984,7 @@ export function ToolsView() {
                                         <Button
                                             variant={expenseView === 'summary' ? 'default' : 'outline'}
                                             size="sm"
-                                            className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900' : '')}
+                                            className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
                                             onClick={() => setExpenseView('summary')}
                                         >
                                             <PieChart className="w-4 h-4 mr-2" /> {t('total')}
@@ -992,7 +992,7 @@ export function ToolsView() {
                                         <Button
                                             variant={expenseView === 'daily' ? 'default' : 'outline'}
                                             size="sm"
-                                            className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900' : '')}
+                                            className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
                                             onClick={() => setExpenseView('daily')}
                                         >
                                             <List className="w-4 h-4 mr-2" /> {t('tv_list')}
@@ -1099,7 +1099,7 @@ export function ToolsView() {
 
                                 {/* Features Group: Add & AI Actuary */}
                                 <div className="space-y-2">
-                                    <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900 h-10">
+                                    <Button disabled={!activeTripId} onClick={openAddDialog} className="w-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 h-10">
                                         <Plus className="w-4 h-4 mr-2" /> {activeTripId ? t('add') : "Please Select a Trip First"}
                                     </Button>
 
@@ -1139,14 +1139,18 @@ export function ToolsView() {
                                 </div>
                                 {filteredExpenses.length === 0 && (
                                     <div className="text-center py-10 text-slate-400">
-                                        <div className="text-3xl mb-2">📭</div>
+                                        <div className="flex justify-center mb-4">
+                                            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-full">
+                                                <Inbox className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                                            </div>
+                                        </div>
                                         <p className="text-sm mb-3">
                                             {expenseView === 'daily'
                                                 ? t('tv_no_expense_date', { date: formatDateDisplay(selectedDate) })
                                                 : t('tv_no_expenses')
                                             }
                                         </p>
-                                        <Button size="sm" onClick={openAddDialog} disabled={!activeTripId}>
+                                        <Button size="sm" onClick={openAddDialog} disabled={!activeTripId} className="dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200">
                                             <Plus className="w-4 h-4 mr-1" /> {t('tv_add_expense')}
                                         </Button>
                                     </div>
@@ -1184,7 +1188,7 @@ export function ToolsView() {
                                 )}
 
                                 {hasApiKey && (
-                                    <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 px-3 py-2 rounded-lg">
+                                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/30 px-3 py-2 rounded-lg border border-green-100 dark:border-green-800/50">
                                         <CheckCircle2 className="w-4 h-4" />
                                         <span>{t('tv_ai_ready')}</span>
                                     </div>
@@ -1192,9 +1196,9 @@ export function ToolsView() {
 
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                        <Button variant="outline" className="h-14 w-full bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white justify-between">
                                             <span className="flex items-center gap-3">
-                                                <div className="bg-amber-100 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600" /></div>
+                                                <div className="bg-amber-100 dark:bg-amber-500/20 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" /></div>
                                                 {t('ai_generator')}
                                             </span>
                                             <ChevronRight className="w-4 h-4 opacity-30" />
@@ -1204,15 +1208,15 @@ export function ToolsView() {
                                         <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
                                         <div className="flex-1 space-y-4 py-4">
                                             <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
-                                            <Button className="w-full" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
+                                            <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
                                             {aiResult?.items && (
-                                                <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                                <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
                                                     <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
 
                                                     <div className="space-y-1">
                                                         <Label className="text-xs text-slate-500">{t('tools_storage')}</Label>
                                                         <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                            <SelectTrigger className="w-full bg-white">
+                                                            <SelectTrigger className="w-full bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                                                                 <SelectValue placeholder={t('tools_storage_ph')} />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -1227,7 +1231,7 @@ export function ToolsView() {
                                                         </Select>
                                                     </div>
 
-                                                    <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                    <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleSaveTrip} disabled={isSaving}>
                                                         {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('confirm_import'))}
                                                     </Button>
                                                 </div>
@@ -1238,9 +1242,9 @@ export function ToolsView() {
 
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" className="h-14 w-full bg-white justify-between">
+                                        <Button variant="outline" className="h-14 w-full bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white justify-between">
                                             <span className="flex items-center gap-3">
-                                                <div className="bg-blue-100 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600" /></div>
+                                                <div className="bg-blue-100 dark:bg-blue-500/20 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" /></div>
                                                 {t('markdown_import')}
                                             </span>
                                             <ChevronRight className="w-4 h-4 opacity-30" />
@@ -1257,15 +1261,15 @@ export function ToolsView() {
                                                 </div>
                                             </div>
                                             <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
-                                            <Button className="w-full" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
+                                            <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
                                             {mdResult?.items && (
-                                                <div className="p-4 bg-stone-100 rounded-xl space-y-3">
+                                                <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
                                                     <p className="text-sm text-green-600 font-medium">✅ {t('tv_ai_parsed', { count: String(mdResult.items.length) })}</p>
 
                                                     <div className="space-y-1">
                                                         <Label className="text-xs text-slate-500">{t('tv_save_to')}</Label>
                                                         <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                            <SelectTrigger className="w-full bg-white">
+                                                            <SelectTrigger className="w-full bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white">
                                                                 <SelectValue placeholder={t('tv_save_to')} />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -1280,7 +1284,7 @@ export function ToolsView() {
                                                         </Select>
                                                     </div>
 
-                                                    <Button className="w-full" onClick={handleSaveTrip} disabled={isSaving}>
+                                                    <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleSaveTrip} disabled={isSaving}>
                                                         {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('tv_joined'))}
                                                     </Button>
                                                 </div>
