@@ -20,7 +20,7 @@ export interface SSEHandlers {
     onDone?: (data: {
         model_used: string;
         raw_parts: { text: string }[];
-        sources?: Array<{ title: string; url: string }>  // 🆕 v3.7.1
+        sources?: Array<{ title: string; url?: string; uri?: string }>  // 🆕 相容新舊格式
     }) => void
     onError?: (error: { message: string; code: number }) => void
     onHeartbeat?: () => void

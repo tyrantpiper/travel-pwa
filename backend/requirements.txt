@@ -18,3 +18,7 @@ prometheus-client
 # Production Server
 gunicorn
 uvicorn
+
+# Testing
+pytest
+pytest-asyncio

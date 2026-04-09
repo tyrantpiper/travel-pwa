@@ -37,7 +37,11 @@ HEAVY_ROUTING: List[str] = [
 # 🐴 Workhorse Model (Gemma 系列, 14,400 RPD, 零成本)
 # ═══════════════════════════════════════════════════════════════
 
-WORKHORSE_MODEL: str = "gemma-3-27b-it"
+WORKHORSE_ULTIMATE: str = "gemma-3-27b-it"        # 終極救援 (L3)
+WORKHORSE_PENULTIMATE: str = "gemma-4-31b-it"     # 倒數第二救援 (L2)
+WORKHORSE_MOE: str = "gemma-4-26b-a4b-it"         # 高效多模態專家
+
+WORKHORSE_MODEL: str = WORKHORSE_ULTIMATE
 
 # ═══════════════════════════════════════════════════════════════
 # 🔗 Backward-Compatible Aliases (Phase 3 清除後可移除)
