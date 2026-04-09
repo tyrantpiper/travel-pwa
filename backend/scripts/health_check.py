@@ -11,11 +11,11 @@ sys.path.append(backend_dir)
 
 def check_modules(package_name):
     """Recursively check all modules in a package."""
-    print(f"🔍 Checking package: {package_name}...")
+    print(f"Checking package: {package_name}...")
     
     package_path = os.path.join(backend_dir, package_name.replace('.', '/'))
     if not os.path.exists(package_path):
-        print(f"⚠️ Package path not found: {package_path}")
+        print(f"Package path not found: {package_path}")
         return True
 
     failed = False
@@ -26,17 +26,17 @@ def check_modules(package_name):
         try:
             print(f"   Testing import: {full_name}...", end="")
             importlib.import_module(full_name)
-            print(" ✅")
+            print(" PASS")
         except Exception as e:
-            print(" ❌ FAILED")
-            print(f"🔥 Error importing {full_name}:")
+            print(" FAILED")
+            print(f"Error importing {full_name}:")
             traceback.print_exc()
             failed = True
             
     return not failed
 
 def main():
-    print("🛡️ Starting Backend Health Check...")
+    print("Starting Backend Health Check...")
     print("====================================")
     
     success = True
@@ -49,21 +49,21 @@ def main():
             success = False
             
     # 2. Check main.py
-    print("\n🔍 Checking main.py...")
+    print("\nChecking main.py...")
     try:
         import main
-        print("   ✅ main.py imported successfully")
+        print("   main.py imported successfully")
     except Exception as e:
-        print("   ❌ main.py FAILED")
+        print("   main.py FAILED")
         traceback.print_exc()
         success = False
         
     print("\n====================================")
     if success:
-        print("✅ Health Check Passed! Codebase integrity looks good.")
+        print("Health Check Passed! Codebase integrity looks good.")
         sys.exit(0)
     else:
-        print("❌ Health Check Failed! Please fix the errors above.")
+        print("Health Check Failed! Please fix the errors above.")
         sys.exit(1)
 
 if __name__ == "__main__":
