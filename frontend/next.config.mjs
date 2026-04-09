@@ -23,6 +23,7 @@ const nextConfig = {
             { protocol: 'https', hostname: 'maps.googleapis.com' },
             { protocol: 'https', hostname: 'images.unsplash.com' },
             { protocol: 'https', hostname: 'plus.unsplash.com' },
+            { protocol: 'https', hostname: 'flagcdn.com' },
         ],
     },
     // 👇 強制顯示開發指示器
