@@ -20,6 +20,7 @@ from services.model_manager import (
     call_verifier,
     sanitize_config_for_model,
     get_generation_config,
+    build_effective_routing
 )
 from utils.ai_config import DAILY_ROUTING, HEAVY_ROUTING, WORKHORSE_MODEL
 from google.genai import types
@@ -61,7 +62,7 @@ def test_sanitize_removes_thinking_for_gemini_25():
     # 手動設定 thinking_config (模擬 Gemini 3 配置)
     config.thinking_config = types.ThinkingConfig(thinking_budget=1024)
     
-    safe = sanitize_config_for_model(config, "gemini-2.5-flash")
+    safe = sanitize_config_for_model(config, "gemini-2.5-flash", "CHAT")
     assert safe.thinking_config is None
 
 
@@ -72,7 +73,7 @@ def test_sanitize_removes_tools_for_gemma():
         tools=[{"google_search": {}}],
     )
     
-    safe = sanitize_config_for_model(config, "gemma-3-27b-it")
+    safe = sanitize_config_for_model(config, "gemma-3-27b-it", "SUMMARIZE")
     assert safe.tools is None
     assert safe.thinking_config is None  # 同時應被移除
 
@@ -84,7 +85,7 @@ def test_sanitize_keeps_config_for_gemini_3():
         tools=[{"google_search": {}}],
     )
     
-    safe = sanitize_config_for_model(config, "gemini-3-flash-preview")
+    safe = sanitize_config_for_model(config, "gemini-3-flash-preview", "HEAVY")
     assert safe.tools is None
     assert safe.temperature == 1.0  # 強制調高
 
@@ -92,7 +93,7 @@ def test_sanitize_keeps_config_for_gemini_3():
 def test_sanitize_enforces_temperature_for_gemini_3():
     """Gemini 3 的 temperature < 1.0 時應被強制為 1.0"""
     config = types.GenerateContentConfig(temperature=0.3)
-    safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite-preview")
+    safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite-preview", "LITE")
     assert safe.temperature == 1.0
 
 
@@ -141,23 +142,22 @@ async def test_call_with_fallback_total_collapse(mock_get_client):
     mock_chat = MagicMock()
     mock_client.aio.chats.create.return_value = mock_chat
     
-    # 所有模型全部失敗
+    # 所有模型全部失敗 (3 Gemini + 2 Gemma)
     mock_chat.send_message = AsyncMock()
     mock_chat.send_message.side_effect = [
-        Exception("Model 1 掛了"),
-        Exception("Model 2 掛了"),
-        Exception("Model 3 也掛了"),
+        Exception(f"Model {i+1} 也掛了") for i in range(5)
     ]
     
-    with pytest.raises(Exception, match="Model 3 也掛了"):
+    with pytest.raises(Exception, match="Model 5 也掛了"):
         await call_with_fallback(
             api_key="fake_key",
             history=[],
             message="幫我生資料"
         )
     
-    # 確認嘗試了所有 3 個模型
-    assert mock_client.aio.chats.create.call_count == len(DAILY_ROUTING)
+    # 確認嘗試了所有候選模型 (含救援層)
+    effective_routing = build_effective_routing("CHAT")
+    assert mock_client.aio.chats.create.call_count == len(effective_routing)
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -211,7 +211,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         role: msg.role || "model",
         displayContent: msg.displayContent || msg.content || "",
         rawParts: msg.rawParts || [{ text: msg.displayContent || msg.content || "" }],
-        groundingSources: msg.groundingSources,
+        groundingSources: msg.groundingSources || msg.sources?.map(s => ({ title: s.title, uri: s.url })),
         modelUsed: msg.modelUsed
     })
 
@@ -562,7 +562,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                     lastMsg.displayContent = streamingText
                                     lastMsg.rawParts = streamingRawParts
                                     lastMsg.modelUsed = data.model_used
-                                    lastMsg.sources = data.sources ?? []  // 🆕 v3.7.1
+                                    lastMsg.groundingSources = data.sources?.map(s => ({
+                                        title: s.title,
+                                        uri: s.uri || s.url || ""
+                                    }))
                                 }
                                 return updated
                             })
@@ -750,26 +753,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                 {msg.groundingSources && msg.groundingSources.length > 0 && (
                                                     <SourceCitation sources={msg.groundingSources} />
                                                 )}
-                                                {/* 🆕 v3.7.1: 三源引用標籤 */}
-                                                {msg.sources && msg.sources.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-slate-200">
-                                                        <p className="text-[10px] text-slate-400 mb-1">📚 {t('ai_sources')}</p>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {msg.sources.map((source, sidx) => (
-                                                                <a
-                                                                    key={sidx}
-                                                                    href={source.url}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors truncate max-w-[150px]"
-                                                                    title={source.url}
-                                                                >
-                                                                    {source.title}
-                                                                </a>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
+
                                             </>
                                         ) : (
                                             <div className="whitespace-pre-wrap">{msg.displayContent}</div>

@@ -181,6 +181,15 @@ export interface UserPreference {
     updated_at: string
 }
 
+// 🚀 v26.4: Grounding Metadata from Google Search
+export interface GroundingMetadata {
+    search_queries?: string[]
+    sources?: {
+        title: string
+        uri: string
+    }[]
+}
+
 // === Internal Helpers ===
 
 /**
@@ -570,7 +579,11 @@ export const aiApi = {
             const data = await res.json().catch(() => ({ reply: "AI 精算師連線失敗，請稍後再試" }))
             throw new Error(data.reply || "AI 精算師連線失敗，請稍後再試")
         }
-        return await res.json()
+        return await res.json() as { 
+            status: string, 
+            response: string, 
+            grounding_metadata?: GroundingMetadata 
+        }
     },
 
 

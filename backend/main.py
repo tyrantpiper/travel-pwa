@@ -61,7 +61,8 @@ from supabase import create_client
 from services.geocode_service import HTTPX_CLIENT
 from services.model_manager import (
     call_with_fallback, call_verifier, call_extraction, 
-    detect_diagnosis_intent, sanitize_config_for_model
+    detect_diagnosis_intent, sanitize_config_for_model,
+    build_effective_routing
 )
 from services.poi_service import (
     detect_poi_query, search_poi_combined, format_pois_for_ai, 
@@ -728,10 +729,11 @@ async def stream_chat_generator(
             parts=[genai.types.Part.from_text(text=message)]
         )]
         
-        # 嘗試路由陣列中的每個模型
+        # 嘗試路由陣列中的每個模型 (使用智慧路由：含熔斷與 Gemma 備援)
+        effective_routing = build_effective_routing("CHAT", DAILY_ROUTING)
         stream_success = False
-        full_text = ""  # 🛡️ 關鍵修復：初始化以避免 UnboundLocalError
-        for i, candidate_model in enumerate(DAILY_ROUTING):
+        full_text = ""
+        for i, candidate_model in enumerate(effective_routing):
             try:
                 safe_config = sanitize_config_for_model(stream_config, candidate_model, intent_type="CHAT")
                 model_name = candidate_model
@@ -792,11 +794,19 @@ async def stream_chat_generator(
                                 "uri": gc.web.uri if hasattr(gc.web, 'uri') else ""
                             })
         
-        # 發送完成事件（含引文來源）
+        # 發送完成事件（含引文來源，確保格式統一為 {title, uri}）
+        final_sources = []
+        raw_collection = citations or sources or []
+        for s in raw_collection:
+            final_sources.append({
+                "title": s.get("title", "Source"),
+                "uri": s.get("uri") or s.get("url") or ""
+            })
+
         done_data = {
             "model_used": model_name,
             "raw_parts": raw_parts,
-            "sources": citations or sources or [],
+            "sources": final_sources,
         }
         yield f'event: done\ndata: {json.dumps(done_data)}\n\n'
         

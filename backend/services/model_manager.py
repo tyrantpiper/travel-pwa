@@ -26,6 +26,8 @@ from utils.ai_config import (
     DAILY_ROUTING,
     HEAVY_ROUTING,
     WORKHORSE_MODEL,
+    WORKHORSE_PENULTIMATE,
+    WORKHORSE_ULTIMATE,
 )
 
 
@@ -39,6 +41,7 @@ class ModelCaps:
     supports_tools: bool
     supports_media_resolution: bool
     supports_thinking: bool  # 🚀 v21.2: 只有 Gemini 3.x 支援
+    supports_grounding: bool # 🚀 v26.4: Gemma 4 原生支援搜尋增強
     requires_property_ordering: bool
     allow_extraction_fallback: bool
     family: str  # "gemini" / "gemma"
@@ -50,6 +53,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=False,      # 🛡️ 暫時禁用以防 429
         supports_media_resolution=False,
         supports_thinking=True,
+        supports_grounding=False,
         requires_property_ordering=False,
         allow_extraction_fallback=True,
         family="gemini",
@@ -59,6 +63,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=False,      # 🛡️ 暫時禁用以防 429
         supports_media_resolution=True,
         supports_thinking=True,
+        supports_grounding=False,
         requires_property_ordering=False,
         allow_extraction_fallback=True,
         family="gemini",
@@ -68,6 +73,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=True,
         supports_media_resolution=False,
         supports_thinking=False,
+        supports_grounding=False,
         requires_property_ordering=False,
         allow_extraction_fallback=True,
         family="gemini",
@@ -77,6 +83,27 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=True,
         supports_media_resolution=False,
         supports_thinking=False,
+        supports_grounding=False,
+        requires_property_ordering=False,
+        allow_extraction_fallback=False,
+        family="gemma",
+    ),
+    "gemma-4-31b-it": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,
+        supports_media_resolution=True,
+        supports_thinking=True,
+        supports_grounding=True,
+        requires_property_ordering=False,
+        allow_extraction_fallback=False,
+        family="gemma",
+    ),
+    "gemma-4-26b-a4b-it": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,
+        supports_media_resolution=True,
+        supports_thinking=False,
+        supports_grounding=True,
         requires_property_ordering=False,
         allow_extraction_fallback=False,
         family="gemma",
@@ -85,7 +112,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
 
 # 意圖分群
 INTENTS_REQUIRING_JSON = {"EXTRACTION", "PLANNING"}
-INTENTS_ALLOW_GEMMA_LAST_RESORT = {"PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS"}
+INTENTS_ALLOW_GEMMA_LAST_RESORT = {"PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS", "CHAT"}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -310,15 +337,43 @@ def sanitize_config_for_model(
     if not caps:
         return safe
 
-    # 1. 移除不支援的工具
-    if hasattr(safe, 'tools') and not caps.supports_tools:
-        safe.tools = None
+    # 1. 移除不支援的工具 (v26.4 精細化：區分一般工具與搜尋增強)
+    if hasattr(safe, 'tools') and safe.tools:
+        if not caps.supports_tools:
+            safe.tools = None
+        elif not caps.supports_grounding:
+            # 如果不支援 Grounding，過濾掉 google_search 工具，保留自定義函數等
+            new_tools = []
+            for tool in safe.tools:
+                # 處理 SDK 物件格式
+                if hasattr(tool, 'google_search') and tool.google_search:
+                    continue
+                # 處理 字典格式
+                if isinstance(tool, dict) and "google_search" in tool:
+                    continue
+                new_tools.append(tool)
+            safe.tools = new_tools if new_tools else None
 
     # 2. 移除不支援的解析度
     if hasattr(safe, 'media_resolution') and not caps.supports_media_resolution:
         safe.media_resolution = None
 
-    # 3. 思想配置限制 (v21.2: 查表確定是否支援 thinking)
+    # 3. 🚀 2026 搜尋增強注入 (僅限非結構化任務)
+    if caps.supports_grounding and intent_type in ["CHAT", "DIAGNOSIS"]:
+        if not safe.tools:
+            safe.tools = []
+        # 使用 2026 最新 GoogleSearchRetrieval 配置
+        safe.tools.append(
+            types.Tool(
+                google_search=types.GoogleSearchRetrieval(
+                    dynamic_retrieval_config=types.DynamicRetrievalConfig(
+                        dynamic_threshold=0.6
+                    )
+                )
+            )
+        )
+
+    # 4. 思想配置限制 (v21.2: 查表確定是否支援 thinking)
     if hasattr(safe, 'thinking_config') and not caps.supports_thinking:
         safe.thinking_config = None
 
@@ -385,6 +440,39 @@ class AllModelsFailedError(AIProtocolError):
         super().__init__(f"All candidate models failed. Trace: {attempts}")
 
 
+# ═══════════════════════════════════════════════════════════════
+# 🚦 Circuit Breaker (熔斷器)
+# ═══════════════════════════════════════════════════════════════
+
+_CIRCUIT_STATE = {}  # {model_name: {"errors": int, "cooldown_until": float}}
+ERROR_THRESHOLD = 3
+COOLDOWN_PERIOD = 300  # 5 分鐘
+
+
+def is_model_circuit_broken(model_name: str) -> bool:
+    """檢查模型是否處於熔斷冷卻期"""
+    state = _CIRCUIT_STATE.get(model_name)
+    if not state:
+        return False
+
+    if time.time() < state.get("cooldown_until", 0):
+        return True
+
+    # 超過冷卻時間，重置狀態 (半開狀態)
+    if state["errors"] >= ERROR_THRESHOLD:
+        _CIRCUIT_STATE[model_name] = {"errors": 0, "cooldown_until": 0}
+    return False
+
+
+def record_model_error(model_name: str):
+    """記錄模型錯誤並視情況觸發熔斷"""
+    state = _CIRCUIT_STATE.get(model_name, {"errors": 0, "cooldown_until": 0})
+    state["errors"] += 1
+    if state["errors"] >= ERROR_THRESHOLD:
+        state["cooldown_until"] = time.time() + COOLDOWN_PERIOD
+    _CIRCUIT_STATE[model_name] = state
+
+
 def classify_api_error(err: errors.APIError) -> str:
     """法典化錯誤分類規範"""
     code = getattr(err, "code", None)
@@ -408,13 +496,20 @@ def build_effective_routing(
     intent_type: str,
     routing_strategy: Optional[List[str]] = None,
 ) -> List[str]:
-    """實體化 Gemma 備援路徑 (v21.2 修正：預設改為 HEAVY)"""
-    # 對於提取/生成類任務，預設應使用穩定度較高的 HEAVY_ROUTING
-    routing = list(routing_strategy or HEAVY_ROUTING)
-    # 若意圖允許且尚未包含，則在末尾掛載 Gemma
-    if WORKHORSE_MODEL not in routing:
-        if intent_type in INTENTS_ALLOW_GEMMA_LAST_RESORT:
-            routing.append(WORKHORSE_MODEL)
+    # 1. 建立初始路由並套用熔斷檢查
+    base_routing = list(routing_strategy or HEAVY_ROUTING)
+    routing = [m for m in base_routing if not is_model_circuit_broken(m)]
+
+    if intent_type in INTENTS_ALLOW_GEMMA_LAST_RESORT:
+        # 🚀 2026 多層級救援 (L2 Penultimate -> L3 Ultimate)
+        rescue_tier = [WORKHORSE_PENULTIMATE, WORKHORSE_ULTIMATE]
+        for model_name in rescue_tier:
+            # 🛡️ 熔斷器檢查：若模型正在「冷卻」，則跳過此救援層
+            if is_model_circuit_broken(model_name):
+                continue
+            if model_name not in routing:
+                routing.append(model_name)
+
     return routing
 
 
@@ -461,6 +556,7 @@ async def call_with_fallback(
 
         except errors.APIError as e:
             kind = classify_api_error(e)
+            record_model_error(model_name) # 🚀 觸發熔斷計數
             attempts.append({"model": model_name, "decision": kind, "code": e.code})
 
             if kind == "auth_fail":
@@ -516,6 +612,7 @@ async def call_verifier(
             }
         except errors.APIError as e:
             last_error = e
+            record_model_error(model_name)
             print(f"⚠️ [Verifier] {model_name} 失敗 (HTTP {e.code})")
         except Exception as e:
             last_error = e
@@ -557,9 +654,9 @@ async def call_extraction(
             continue
         
         # Gemma 准入檢查 (v21.2 精確分類)
-        if model_name == WORKHORSE_MODEL:
+        if caps.family == "gemma":
             # 對於 EXTRACTION (收據圖片解析)，目前仍嚴格禁止 fallback
-            # 但對於 PLANNING (行程生成)，Gemma 3 具備處理結構化數據的能力，允許作為末位備援
+            # 但對於 PLANNING (行程生成)，Gemma 3/4 具備處理結構化數據的能力，允許作為末位備援
             if intent_type == "EXTRACTION" and not caps.allow_extraction_fallback:
                 attempts.append({"model": model_name, "decision": "skip_strict_extraction_prevention"})
                 continue
@@ -591,6 +688,7 @@ async def call_extraction(
 
         except errors.APIError as e:
             kind = classify_api_error(e)
+            record_model_error(model_name)
             attempts.append({"model": model_name, "decision": kind, "code": e.code})
 
             if kind == "auth_fail":

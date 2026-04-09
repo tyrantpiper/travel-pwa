@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useLanguage } from "@/lib/LanguageContext"
-import { aiApi } from "@/lib/api"
+import { aiApi, GroundingMetadata } from "@/lib/api"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -34,7 +34,11 @@ interface ActuaryDialogCardProps {
     members: TripMember[]
 }
 
-type Message = { role: "user" | "model"; content: string }
+type Message = { 
+    role: "user" | "model"; 
+    content: string;
+    groundingMetadata?: GroundingMetadata;
+}
 
 export function ActuaryDialogCard({ open, onOpenChange, expenses, members }: ActuaryDialogCardProps) {
     const { t } = useLanguage()
@@ -97,7 +101,11 @@ export function ActuaryDialogCard({ open, onOpenChange, expenses, members }: Act
             )
 
             if (response.status === "success" && response.response) {
-                setMessages(prev => [...prev, { role: "model" as const, content: response.response }])
+                setMessages(prev => [...prev, { 
+                    role: "model" as const, 
+                    content: response.response,
+                    groundingMetadata: response.grounding_metadata
+                }])
             } else {
                 setMessages(prev => [...prev, { role: "model" as const, content: "⚠️ " + (response.response || "API 回傳異常，請重試。") }])
             }
@@ -160,6 +168,26 @@ export function ActuaryDialogCard({ open, onOpenChange, expenses, members }: Act
                                         >
                                             {msg.content}
                                         </ReactMarkdown>
+                                    </div>
+                                )}
+
+                                {/* 🚀 v26.4: Grounding Sources (可點選連結) */}
+                                {msg.role === "model" && msg.groundingMetadata?.sources && msg.groundingMetadata.sources.length > 0 && (
+                                    <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">參考來源</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {msg.groundingMetadata.sources.map((source, sIdx) => (
+                                                <a 
+                                                    key={sIdx}
+                                                    href={source.uri}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 hover:underline text-[11px]"
+                                                >
+                                                    {source.title || "來源 " + (sIdx + 1)}
+                                                </a>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>

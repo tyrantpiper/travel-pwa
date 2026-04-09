@@ -603,7 +603,11 @@ async def actuary_chat(
         
         # Use simple response key to match ActuaryDialogCard schema update
         result = await call_with_fallback(api_key=api_key, history=body.history, message=prompt, intent_type="CHAT")
-        return {"status": "success", "response": result["text"]}
+        return {
+            "status": "success", 
+            "response": result["text"],
+            "grounding_metadata": result.get("grounding_metadata")
+        }
     except Exception as e:
         print(f"🔥 [Actuary Error] {e}")
         raise HTTPException(status_code=500, detail=str(e))
