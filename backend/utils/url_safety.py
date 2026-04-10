@@ -9,8 +9,10 @@ def is_safe_url(url: str) -> bool:
     Checks if a URL is safe to fetch by the server.
     """
     # [NEW] Phase 5.4: Domain Whitelist (Bypass blocking DNS checks for known safe hosts)
-    SAFE_WIKI_DOMAINS = [".wikipedia.org", ".wikidata.org", ".wikivoyage.org", ".wikimedia.org"]
-    if any(domain in url.lower() for domain in SAFE_WIKI_DOMAINS):
+    SAFE_WIKI_DOMAINS = ["wikipedia.org", "wikidata.org", "wikivoyage.org", "wikimedia.org"]
+    parsed = urlparse(url.lower())
+    hostname = parsed.hostname or ""
+    if any(hostname == domain or hostname.endswith("." + domain) for domain in SAFE_WIKI_DOMAINS):
         return True
         
     return get_safe_ip(url) is not None
