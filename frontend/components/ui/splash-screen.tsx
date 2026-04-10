@@ -23,11 +23,11 @@ export function SplashScreen() {
             return
         }
 
-        // 動畫結束後隱藏
+        // 🚀 [2026 Perf Sync] 將閃屏停留時間優化為 1.2秒，提升「即開即用」的直觀感受
         const timer = setTimeout(() => {
             setShow(false)
             sessionStorage.setItem('splash_shown', 'true')
-        }, 2000)
+        }, 1200)
 
         return () => clearTimeout(timer)
     }, [])
@@ -41,8 +41,8 @@ export function SplashScreen() {
                 <motion.div
                     className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-stone-50 via-white to-stone-100"
                     initial={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.5 }}
+                    exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
+                    transition={{ duration: 0.6, ease: "easeInOut" }}
                 >
                     {/* 背景裝飾 - 更淡的圓形 */}
                     <div className="absolute inset-0 overflow-hidden">

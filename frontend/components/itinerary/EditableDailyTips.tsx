@@ -180,6 +180,7 @@ export default function EditableDailyTips({
     const [saving, setSaving] = useState(false)
 
     // 🆕 Per-item processing state for anti-spam
+    const [processingNotes, setProcessingNotes] = useState<Set<number>>(new Set())
     const [processingCosts, setProcessingCosts] = useState<Set<number>>(new Set())
     const [processingTickets, setProcessingTickets] = useState<Set<number>>(new Set())
 
@@ -257,24 +258,41 @@ export default function EditableDailyTips({
 
     // Notes
     const handleAddNote = async () => {
+        if (saving) return
         if (!newNote.title.trim()) { toast.error(zh ? "請輸入標題" : "Please enter a title"); return }
         setSaving(true); haptic.tap()
-        const updated = [...localNotes, newNote]
-        if (await onUpdate("notes", updated)) {
-            setLocalNotes(updated)
-            setNewNote({ icon: "⚠️", title: "", content: "" })
-            setAddingNote(false)
-            toast.success(zh ? "已新增提醒" : "Reminder added")
+        try {
+            const updated = [...localNotes, newNote]
+            if (await onUpdate("notes", updated)) {
+                setLocalNotes(updated)
+                setNewNote({ icon: "⚠️", title: "", content: "" })
+                setAddingNote(false)
+                toast.success(zh ? "已新增提醒" : "Reminder added")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleRemoveNote = async (idx: number) => {
+        // 🛡️ Anti-spam: skip if already processing
+        if (processingNotes.has(idx)) return
+
         haptic.tap()
-        const updated = localNotes.filter((_, i) => i !== idx)
-        if (await onUpdate("notes", updated)) {
-            setLocalNotes(updated)
-            toast.success(zh ? "已移除" : "Removed")
+        setProcessingNotes(prev => new Set(prev).add(idx))
+
+        try {
+            const updated = localNotes.filter((_, i) => i !== idx)
+            if (await onUpdate("notes", updated)) {
+                setLocalNotes(updated)
+                toast.success(zh ? "已移除" : "Removed")
+            }
+        } finally {
+            setProcessingNotes(prev => {
+                const next = new Set(prev)
+                next.delete(idx)
+                return next
+            })
         }
     }
 
@@ -287,17 +305,21 @@ export default function EditableDailyTips({
     }
 
     const handleSaveNotes = async () => {
+        if (saving) return
         setSaving(true)
         haptic.tap()
-        if (await onUpdate("notes", editNotesData)) {
-            setLocalNotes(editNotesData)
-            setEditingNotes(false)
-            setEditNotesData([])
-            toast.success(zh ? "已儲存修改" : "Changes saved")
-        } else {
-            toast.error(zh ? "儲存失敗" : "Save failed")
+        try {
+            if (await onUpdate("notes", editNotesData)) {
+                setLocalNotes(editNotesData)
+                setEditingNotes(false)
+                setEditNotesData([])
+                toast.success(zh ? "已儲存修改" : "Changes saved")
+            } else {
+                toast.error(zh ? "儲存失敗" : "Save failed")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleCancelEditNotes = () => {
@@ -313,16 +335,20 @@ export default function EditableDailyTips({
     }
 
     const handleAddCost = async () => {
+        if (saving) return
         if (!newCost.item.trim() || !newCost.amount.trim()) { toast.error(zh ? "請輸入項目和金額" : "Please enter item and amount"); return }
         setSaving(true); haptic.tap()
-        const updated = [...localCosts, newCost]
-        if (await onUpdate("costs", updated)) {
-            setLocalCosts(updated)
-            setNewCost({ item: "", amount: "", currency: DEFAULT_CURRENCY, note: "" })
-            setAddingCost(false)
-            toast.success(zh ? "已新增花費" : "Cost added")
+        try {
+            const updated = [...localCosts, newCost]
+            if (await onUpdate("costs", updated)) {
+                setLocalCosts(updated)
+                setNewCost({ item: "", amount: "", currency: DEFAULT_CURRENCY, note: "" })
+                setAddingCost(false)
+                toast.success(zh ? "已新增花費" : "Cost added")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleRemoveCost = async (idx: number) => {
@@ -386,17 +412,21 @@ export default function EditableDailyTips({
     }
 
     const handleSaveCosts = async () => {
+        if (saving) return
         setSaving(true)
         haptic.tap()
-        if (await onUpdate("costs", editCostsData)) {
-            setLocalCosts(editCostsData)
-            setEditingCosts(false)
-            setEditCostsData([])
-            toast.success(zh ? "已儲存修改" : "Changes saved")
-        } else {
-            toast.error(zh ? "儲存失敗" : "Save failed")
+        try {
+            if (await onUpdate("costs", editCostsData)) {
+                setLocalCosts(editCostsData)
+                setEditingCosts(false)
+                setEditCostsData([])
+                toast.success(zh ? "已儲存修改" : "Changes saved")
+            } else {
+                toast.error(zh ? "儲存失敗" : "Save failed")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleCancelEditCosts = () => {
@@ -413,16 +443,20 @@ export default function EditableDailyTips({
 
     // Tickets
     const handleAddTicket = async () => {
+        if (saving) return
         if (!newTicket.name.trim() || !newTicket.price.trim()) { toast.error(zh ? "請輸入票券名稱和價格" : "Please enter ticket name and price"); return }
         setSaving(true); haptic.tap()
-        const updated = [...localTickets, newTicket]
-        if (await onUpdate("tickets", updated)) {
-            setLocalTickets(updated)
-            setNewTicket({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
-            setAddingTicket(false)
-            toast.success(zh ? "已新增票券" : "Ticket added")
+        try {
+            const updated = [...localTickets, newTicket]
+            if (await onUpdate("tickets", updated)) {
+                setLocalTickets(updated)
+                setNewTicket({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
+                setAddingTicket(false)
+                toast.success(zh ? "已新增票券" : "Ticket added")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleRemoveTicket = async (idx: number) => {
@@ -486,17 +520,21 @@ export default function EditableDailyTips({
     }
 
     const handleSaveTickets = async () => {
+        if (saving) return
         setSaving(true)
         haptic.tap()
-        if (await onUpdate("tickets", editTicketsData)) {
-            setLocalTickets(editTicketsData)
-            setEditingTickets(false)
-            setEditTicketsData([])
-            toast.success(zh ? "已儲存修改" : "Changes saved")
-        } else {
-            toast.error(zh ? "儲存失敗" : "Save failed")
+        try {
+            if (await onUpdate("tickets", editTicketsData)) {
+                setLocalTickets(editTicketsData)
+                setEditingTickets(false)
+                setEditTicketsData([])
+                toast.success(zh ? "已儲存修改" : "Changes saved")
+            } else {
+                toast.error(zh ? "儲存失敗" : "Save failed")
+            }
+        } finally {
+            setSaving(false)
         }
-        setSaving(false)
     }
 
     const handleCancelEditTickets = () => {
@@ -578,8 +616,19 @@ export default function EditableDailyTips({
                                 <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 whitespace-pre-line">{note.content}</div>
                             </div>
                             {!readOnly && (
-                                <button onClick={() => handleRemoveNote(idx)} className="p-1.5 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation">
-                                    <X className="w-4 h-4" />
+                                <button
+                                    onClick={() => handleRemoveNote(idx)}
+                                    disabled={processingNotes.has(idx)}
+                                    className={cn(
+                                        "p-1.5 transition-all touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center",
+                                        processingNotes.has(idx) ? "opacity-50 cursor-not-allowed" : "text-slate-300 hover:text-red-500 active:text-red-600"
+                                    )}
+                                >
+                                    {processingNotes.has(idx) ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                        <X className="w-4 h-4" />
+                                    )}
                                 </button>
                             )}
                         </div>

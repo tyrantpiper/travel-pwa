@@ -5,10 +5,16 @@ import { AnimatePresence } from "framer-motion"
 import { Compass, Sparkles, ArrowRight, ShieldCheck, History } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { AppShell } from "@/components/views/app-shell"
 import { WelcomeWizard } from "@/components/onboarding/WelcomeWizard"
 import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { useLanguage } from "@/lib/LanguageContext"
+import dynamic from "next/dynamic"
+
+// 🚀 [Perf Audit 2026] 斷開首頁與核心 App 的強連結
+// 這將使首頁體積減少 90% (移除地圖、DND、PDF 等重型庫)
+const AppShell = dynamic(() => import("@/components/views/app-shell").then(mod => mod.AppShell), {
+    ssr: false,
+})
 
 import { toast } from "sonner"
 import { usersApi } from "@/lib/api"
@@ -28,6 +34,28 @@ export function LandingPage() {
     const [showRecover, setShowRecover] = useState(false)
     const [recoverCode, setRecoverCode] = useState("")
     const [showWizard, setShowWizard] = useState(false)
+    const [hasAttemptedPrerender, setHasAttemptedPrerender] = useState(false)
+
+    // 🕵️‍♂️ [2026 Hacker Pattern] Speculative Prerendering
+    // 當使用者準備輸入暱稱時，背後偷偷開始預算渲染整個 App 路徑
+    const handlePrerenderTrigger = () => {
+        if (hasAttemptedPrerender) return
+        setHasAttemptedPrerender(true)
+
+        if (typeof document !== 'undefined' && 'HTMLScriptElement' in window) {
+            const specScript = document.createElement('script')
+            specScript.type = 'speculationrules'
+            specScript.textContent = JSON.stringify({
+                "prerender": [{
+                    "source": "list",
+                    "urls": ["/"], // 基於目前的架構，將預熱根路徑的 AppShell 部分
+                    "eagerness": "moderate"
+                }]
+            })
+            document.head.appendChild(specScript)
+            debugLog("🚀 [Speculation] Prerender process initiated via user focus.")
+        }
+    }
 
     // 🆕 Onboarding state
     const { isCompleted: isOnboardingComplete } = useOnboardingStore()
@@ -66,11 +94,19 @@ export function LandingPage() {
         // 🆕 通知 ChatWidget 用戶已登入
         window.dispatchEvent(new CustomEvent('user-login-state-changed'))
 
-        // 🆕 Show welcome wizard for first-time users
-        if (!isOnboardingComplete) {
-            setShowWizard(true)
+        const performTransition = () => {
+            if (!isOnboardingComplete) {
+                setShowWizard(true)
+            } else {
+                setIsLoggedIn(true)
+            }
+        }
+
+        // 🏆 [2026 Native Flow] 使用瀏覽器內置過渡引擎，確保 60FPS 流暢換場
+        if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+            document.startViewTransition(performTransition)
         } else {
-            setIsLoggedIn(true)
+            performTransition()
         }
     }
 
@@ -108,8 +144,16 @@ export function LandingPage() {
             toast.dismiss(toastId)
             toast.success(`Welcome back, ${fetchedName}!`)
 
-            // Give UI a moment to show success before reload
-            setTimeout(() => window.location.reload(), 1000)
+            const goToApp = () => {
+                if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+                    document.startViewTransition(() => setIsLoggedIn(true))
+                } else {
+                    setIsLoggedIn(true)
+                }
+            }
+
+            // 🏆 [2026 Smooth Handoff] 讓成功訊息顯示 0.8秒後，優雅地換場
+            setTimeout(goToApp, 800)
 
         } catch (e) {
             console.error("Recovery Error", e)
@@ -119,7 +163,13 @@ export function LandingPage() {
             localStorage.setItem("user_uuid", recoverCode)
             localStorage.setItem("user_nickname", nickname || "Traveler")
             toast.success("Account recovered (Offline Mode)")
-            setTimeout(() => window.location.reload(), 1000)
+            setTimeout(() => {
+                if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+                    document.startViewTransition(() => setIsLoggedIn(true))
+                } else {
+                    setIsLoggedIn(true)
+                }
+            }, 800)
         }
     }
 
@@ -175,6 +225,7 @@ export function LandingPage() {
                                     value={nickname}
                                     onChange={(e) => setNickname(e.target.value)}
                                     autoComplete="off"
+                                    onFocus={handlePrerenderTrigger}
                                 />
                             </div>
 

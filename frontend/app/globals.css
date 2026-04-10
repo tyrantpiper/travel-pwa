@@ -223,3 +223,23 @@ button:not(:disabled):active,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* 🚀 2026 視圖過渡引擎 (View Transition API)
+   提供原生級別的 60FPS 換場動畫，由 GPU 直接驅動 */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root) {
+    animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out;
+  }
+  ::view-transition-new(root) {
+    animation: 350ms cubic-bezier(0.4, 0, 0.2, 1) both fade-in;
+  }
+
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
