@@ -619,12 +619,14 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
     return None
 
 
-async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None, zoom: float = None):
+async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None, zoom: float = None, location_bias_scale: float = None, osm_tag: str = None):
     """Photon 地理編碼 (基於 OpenStreetMap + Elasticsearch，模糊搜尋強)
     
     Args:
         lat, lng: 若提供，將優先返回附近的結果 (Location Bias)
         zoom: 縮放層級，用於 P2 動態 bias scale
+        location_bias_scale: 0.0 ~ 1.0，手動控制偏移強度 (🆕 2026 擴充)
+        osm_tag: OSM 標籤過濾，例如 'place:country' (🆕 2026 擴充)
     """
     try:
         user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/3.0 (contact@ryantravel.app)")
@@ -636,14 +638,14 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
             else:
                 query_text = place_name
                 
-            # 🆕 P7: 意圖偵測 (自動 osm_tag)
-            osm_tag = None
-            if any(k in place_name for k in ["站", "駅", "線", "鐵"]):
-                osm_tag = "railway:station"
-            elif any(k in place_name for k in ["飯店", "酒店", "旅館", "ホテル"]):
-                osm_tag = "tourism:hotel"
-            elif any(k in place_name for k in ["餐廳", "餐", "食堂", "レストラン"]):
-                osm_tag = "amenity:restaurant"
+            # 🆕 P7: 意圖偵測 (自動 osm_tag，僅在未指定時啟動)
+            if osm_tag is None:
+                if any(k in place_name for k in ["站", "駅", "線", "鐵"]):
+                    osm_tag = "railway:station"
+                elif any(k in place_name for k in ["飯店", "酒店", "旅館", "ホテル"]):
+                    osm_tag = "tourism:hotel"
+                elif any(k in place_name for k in ["餐廳", "餐", "食堂", "レストラン"]):
+                    osm_tag = "amenity:restaurant"
             
             params = {
                 "q": query_text,
@@ -660,7 +662,9 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                 params["lon"] = lng
                 
             # 🆕 P2: 動態 bias scale (根據 zoom)
-            if zoom is not None:
+            if location_bias_scale is not None:
+                params["location_bias_scale"] = location_bias_scale
+            elif zoom is not None:
                 if zoom > 14:
                     params["location_bias_scale"] = 0.9
                 elif zoom > 10:
@@ -766,8 +770,8 @@ async def reverse_geocode_with_ai_enhancement(lat: float, lng: float, api_key: s
         嚴格按以下 JSON 格式回傳，不要額外說明：
         {{"display_name": "...", "type": "...", "description": "..."}}"""
 
-        # call_extraction_server is now at top level
-        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        # 🆕 傳入 api_key 確保 BYOK 模式正常運作
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE", api_key=api_key)
         text = raw.strip()
         # 處理可能的 markdown 包裝
         if text.startswith("```"):
@@ -1229,16 +1233,18 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
         return None
     
     try:
-        prompt = f"""判斷這個旅遊行程的目的地國家。
+        prompt = f"""你是一個旅遊地理專家。請判斷這個旅遊行程標題所隱含的目的地國家。
 
 行程標題：「{trip_title}」
 
-請只回覆國家代碼（如 JP、KR、TW、TH、VN、SG、HK）。
-如果無法判斷或是多國行程，回覆 NONE。
-只輸出代碼，不要其他文字。"""
+規則：
+1. 請只回覆國家代碼（如 JP, KR, TW, TH, VN, SG, HK, US, GB, FR, IT, CA...）。
+2. 如果標題是【人名】（例如：Ryan Su, John Doe）、【日期】（例如：2026 夏天）、【無意義編號】或【無法判斷目的地】時，必須回覆 NONE。
+3. 如果是多國行程，回覆 NONE。
+4. 只輸出代碼，不要任何其他文字或解釋。"""
 
         from services.model_manager import call_extraction_server
-        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE", api_key=api_key)
         
         result = raw.strip().upper()
         if result in COUNTRY_BOUNDS:
@@ -1252,6 +1258,39 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
 
 # 🆕 翻譯結果緩存（減少重複 AI 調用）
 TRANSLATION_CACHE = {}  # {(query, country_code): [translations]}
+
+# ==========================================
+# 🗺️ 全球語系搜尋分級策略 (Global Language Geocoding Strategies)
+# ==========================================
+
+# 定義不同語系的搜尋指令模板
+GEOCODE_STRATEGIES = {
+    "CJK_V1": {
+        "name": "CJK (日本/東亞) 專家模式",
+        "instruction": "請翻譯成四種格式：1.日文漢字 2.平假名 3.片假名 4.羅馬拼音 (Romaji/English)。且各語系字串之間以換行分隔。"
+    },
+    "LATIN_V1": {
+        "name": "Latin (歐美/澳) 標準模式",
+        "instruction": "請將輸入詞強效對齊為「標準英文名稱」。不論輸入語系，務必回傳該地最權威的英文原名。"
+    },
+    "NATIVE_V1": {
+        "name": "Native/Dual (韓/泰/越) 雙軌模式",
+        "instruction": "請提供 1.母語寫法 (如 Hangul/Thai) 2.全球通用英文名。"
+    },
+    "GLOBAL_V1": {
+        "name": "全域標準模式",
+        "instruction": "請提供 1.當地母語寫法 2.通用英文名稱。"
+    }
+}
+
+def get_country_search_strategy(country_code: str) -> str:
+    """根據國碼回傳最適當的搜尋策略"""
+    cc = country_code.upper() if country_code else ""
+    if cc == "JP": return "CJK_V1"
+    if cc in ["AU", "US", "GB", "CA", "NZ", "IE"]: return "LATIN_V1"
+    if cc in ["KR", "TH", "VN", "RU", "UA", "KZ"]: return "NATIVE_V1"
+    if cc in ["FR", "DE", "ES", "IT", "PT", "BE", "CH"]: return "GLOBAL_V1" # 拉丁變體暫歸全域
+    return "GLOBAL_V1"
 
 async def translate_place_name(query: str, country_code: str, api_key: str = None) -> list:
     """🔤 使用 Gemini 將地名翻譯成目標國家語言
@@ -1276,49 +1315,37 @@ async def translate_place_name(query: str, country_code: str, api_key: str = Non
     
     try:
         # Step 1: AI Analysis
-        # Assuming call_extraction_server is now globally available or imported at the top level
+        # 🆕 識別語系策略
+        strat_key = get_country_search_strategy(country_code)
+        strat_info = GEOCODE_STRATEGIES.get(strat_key, GEOCODE_STRATEGIES["GLOBAL_V1"])
+        instruction = strat_info["instruction"]
+        
         country_name = country_info["name"]
         
-        # 🆕 針對日本的特殊 prompt
-        if country_code == "JP":
-            prompt = f"""你是日本地名翻譯專家。用戶正在搜尋日本的地點。
+        # 🆕 動態 Prompt 生成：根據各國語系策略進行專家級轉換
+        prompt = f"""你是地理資訊與搜尋地標專家。用戶正在前往 {country_name} ({country_code}) 進行旅行。
+用戶目前的搜尋地名：「{query}」
 
-用戶輸入：「{query}」
+【核心指令】：{instruction}
+【額外要求】：
+1. 輸出格式為每行一個，不要有編號 (1. 2. 3.) 或註釋說明。
+2. 最多回傳 3-4 行。
+3. 如果輸入詞已是當地母語，請額外提供英文名。
 
-請翻譯成以下三種格式（每行一個，不要編號）：
-1. 日文漢字寫法（如：浅草寺）
-2. 日文假名（如：せんそうじ 或 センソウジ）
-3. 英文羅馬拼音（如：Senso-ji）
+只輸出翻譯後的關鍵字列表，每行一個："""
 
-如果是餐廳/商店名稱，請使用官方日文名稱。
-如果輸入已經是日文，直接輸出原文 + 羅馬拼音。
-只輸出翻譯結果，每行一個，最多3行。"""
-        else:
-            prompt = f"""你是地名翻譯專家。用戶正在搜尋{country_name}的地點。
-
-用戶輸入：「{query}」
-
-請判斷這是否為{country_name}的地名或景點：
-1. 如果是，輸出該地名的【當地語言寫法】和【英文/羅馬拼音】
-2. 如果不確定，只輸出原文
-
-格式：每行一個，最多3行，不要編號或說明。
-例如：
-浅草寺
-Senso-ji
-淺草寺"""
-
-        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        # 🆕 傳入 api_key 確保地圖搜尋翻譯功能正常 (BYOK 模式)
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE", api_key=api_key)
         
         lines = [line.strip() for line in raw.strip().split("\n") if line.strip()]
         if lines:
             # 確保原始查詢也在列表中
             if query not in lines:
                 lines.append(query)
-            result = lines[:4]  # 🆕 最多4個變體（增加容錯）
+            result = lines[:5]  # 🆕 最多5個變體（增加語系容錯）
             # 🆕 存入緩存
             TRANSLATION_CACHE[cache_key] = result
-            print(f"🔤 Translated '{query}' → {result} (cached)")
+            print(f"🔤 Translated '{query}' via {strat_key} → {result} (cached)")
             return result
         return [query]
     except Exception as e:
@@ -1385,7 +1412,7 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
 只輸出代碼，不要其他文字。"""
 
         from services.model_manager import call_extraction_server
-        raw = await call_extraction_server(prompt, intent_type="GEOCODE")
+        raw = await call_extraction_server(prompt, intent_type="GEOCODE", api_key=api_key)
         result = raw.strip().upper()
         if result in COUNTRY_BOUNDS:
             print(f"🧠 Query '{query}' → Country: {result}")
@@ -1466,20 +1493,21 @@ async def smart_geocode_logic(
     # 🆕 第零優先級：前端明確指定的國家 (最高優先，大小寫不敏感)
     if country:
         normalized_country = country.strip().lower()
-        country_code = COUNTRY_NAME_TO_CODE.get(normalized_country) or COUNTRY_NAME_TO_CODE.get(country)
+        # 修正：使用正確的變數名稱 COUNTRY_TO_ISO，並支援大小寫不敏感查詢
+        found_code = next((v for k, v in COUNTRY_TO_ISO.items() if k.lower() == normalized_country), None)
+        country_code = found_code
         if country_code:
             log_debug(f"   🎯 Frontend Country Filter → {country_code}")
     
-    # 🆕 如果有區域，提取英文部分加入搜尋 query
-    if region:
-        clean_region = extract_region_for_search(region)
-        # 如果沒有國家碼，嘗試從 region 推測
-        if not country_code:
-            country_code = detect_country_from_keywords(region)
-        # 🆕 將區域加入搜尋（只在 query 中不包含時）
-        if clean_region and clean_region.lower() not in query.lower():
-            search_queries = [f"{query} {clean_region}"]
-            log_debug(f"   📍 Region added to query: '{query}' → '{query} {clean_region}'")
+    # 🆕 0.1 優先級：偵測搜尋詞本身是否就是國家名（明確導向）
+    user_explicit_country = False
+    norm_query = query.strip().lower()
+    # 修正：使用正確的變數名稱 COUNTRY_TO_ISO，並支援大小寫不敏感查詢
+    found_explicit_code = next((v for k, v in COUNTRY_TO_ISO.items() if k.lower() == norm_query), None)
+    if found_explicit_code:
+        country_code = found_explicit_code
+        user_explicit_country = True
+        log_debug(f"   🌍 Explicit Country Query Detected → {country_code}")
     
     # 第一優先級：關鍵字規則（確定性，零延遲，無需 API Key）
     if not country_code:
@@ -1551,6 +1579,16 @@ async def smart_geocode_logic(
     # 任務 B: 原始名稱初步搜尋 (Speculative Photon)
     speculative_task = asyncio.create_task(geocode_with_photon(query, limit, lat, lng, zoom))
     tasks.append(speculative_task)
+    
+    # 🆕 任務 C: 全域觀察者任務 (Global Observer)
+    # 如果偵測到「明確國名」，開啟全域不偏向搜尋，防止在地店家排擠國家座標
+    global_task = None
+    if user_explicit_country:
+        # 使用低強度 Bias (0.1) 確保全球範圍的權威結果能排到最前面
+        # 🆕 橋階關鍵字：利用純國碼 (如 AU) 進行強攻，直接定位主權實體，不帶地緣偏見
+        global_q = country_code.upper() if country_code else query
+        global_task = asyncio.create_task(geocode_with_photon(global_q, limit, None, None, None, location_bias_scale=None, osm_tag="place:country"))
+        tasks.append(global_task)
 
     log_debug(f"   🚀 Starting Speculative Searches for '{query}'...")
     
@@ -1580,6 +1618,15 @@ async def smart_geocode_logic(
     found_source = "none"
     
     # 🆕 整合投機性搜尋結果
+    # A. 全域觀察者結果 (優先級最高，因為這是明確的國土座標)
+    if global_task and not global_task.exception():
+        global_results = global_task.result()
+        if global_results:
+            for r in global_results: r["source"] = "photon_global"
+            all_results.extend(global_results)
+            log_debug(f"   🌍 Found {len(global_results)} global entities")
+
+    # B. 在地觀察者結果 (次之，包含附近同名店家)
     if speculative_task and not speculative_task.exception():
         photon_spec = speculative_task.result()
         if photon_spec:
@@ -1588,12 +1635,15 @@ async def smart_geocode_logic(
             found_source = "photon"
             log_debug(f"   ⚡ Using {len(photon_spec)} speculative results")
     
+    # 限定結果數量 (國名搜尋時放寬席位，避免被在地店家擠掉)
+    effective_limit = limit * 2 if user_explicit_country else limit
+    
     for q in search_queries:
-        if len(all_results) >= limit:
+        if len(all_results) >= effective_limit:
             break
             
-        # 如果 speculative 已經查過了這個 query，跳過
-        if q == query and found_source != "none":
+        # 如果是原生查詢，在之前的 parallel 階段已經查過兩種版本（在地+全域）了，直接跳過
+        if q == query:
             continue
 
         # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
@@ -1627,6 +1677,7 @@ async def smart_geocode_logic(
     if not all_results and ARCGIS_API_KEY:
         try:
             params = {"SingleLine": query, "f": "json", "outFields": "PlaceName,Place_addr,Type", "maxLocations": limit, "token": ARCGIS_API_KEY}
+            params = {"SingleLine": query, "f": "json", "outFields": "PlaceName,Place_addr,Type", "maxLocations": effective_limit, "token": ARCGIS_API_KEY}
             if lat is not None and lng is not None:
                 params["location"] = f"{lng},{lat}" # ArcGIS uses x,y
                 params["distance"] = 50000 # 50km radius bias
@@ -1650,9 +1701,14 @@ async def smart_geocode_logic(
         except Exception:
             pass
 
-    # 🗺️ 嚴格過濾
+    # 🗺️ 搜尋過濾策略 (2026 寬容化)
     if country_code and all_results:
-        all_results = filter_results_by_country(all_results, country_code, strict=True)
+        # 如果是「關鍵字命中」或「前端指定」，維持嚴格過濾 (用戶期望精確控制)
+        # 如果是「標題推測」，改為鬆散過濾 (維持全球視野)
+        is_contextual = not user_explicit_country and not country
+        is_strict = not is_contextual # 背景推測不使用嚴格過濾
+        
+        all_results = filter_results_by_country(all_results, country_code, strict=is_strict)
 
     # 去重
     seen = set()

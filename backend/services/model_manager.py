@@ -112,7 +112,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
 
 # 意圖分群
 INTENTS_REQUIRING_JSON = {"EXTRACTION", "PLANNING"}
-INTENTS_ALLOW_GEMMA_LAST_RESORT = {"PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS", "CHAT"}
+INTENTS_ALLOW_GEMMA_LAST_RESORT = {"PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS", "CHAT", "GEOCODE"}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -498,6 +498,11 @@ def build_effective_routing(
 ) -> List[str]:
     # 1. 建立初始路由並套用熔斷檢查
     base_routing = list(routing_strategy or HEAVY_ROUTING)
+    
+    # 🚀 2026 優先級調整：若為地理編碼任務，強行將 Gemma 置於首位以節省成本
+    if intent_type == "GEOCODE":
+        base_routing = [WORKHORSE_MODEL] + base_routing
+
     routing = [m for m in base_routing if not is_model_circuit_broken(m)]
 
     if intent_type in INTENTS_ALLOW_GEMMA_LAST_RESORT:
@@ -717,12 +722,16 @@ async def call_extraction_server(
     prompt: str,
     intent_type: str = "GEOCODE",
     routing_strategy: Optional[List[str]] = None,
+    api_key: Optional[str] = None  # 🆕 允許從外部傳入 Key
 ) -> str:
-    """Server-side key 版本的 call_extraction（給 geocode_service 等使用）"""
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY 環境變數未設定")
-    return await call_extraction(api_key, prompt, intent_type, routing_strategy)
+    """Server-side key 版本的 call_extraction，優先使用傳入的 api_key"""
+    # 優先級：參數傳入的 Key > 系統環境變數
+    effective_key = api_key or os.getenv("GEMINI_API_KEY")
+    
+    if not effective_key:
+        raise ValueError("GEMINI_API_KEY 環境變數未設定，且未提供用戶端 API Key")
+        
+    return await call_extraction(effective_key, prompt, intent_type, routing_strategy)
 
 
 # ═══════════════════════════════════════════════════════════════
