@@ -11,9 +11,18 @@ const nextConfig = {
     turbopack: {
         root: __dirname,      // 物理座標鎖定
     },
-    // 🚀 React 19 性能優化
+    cacheComponents: true,       // 🚀 [2026 Stable] 開啟組件級緩存與局部預渲染 (PPR)
     experimental: {
-        viewTransition: true,     // 原生頁面過場動畫
+        viewTransition: true,     // 原生頁面過場動畫 (2026 穩定版)
+        optimizePackageImports: [
+            "lucide-react",
+            "maplibre-gl",
+            "jspdf",
+            "react-virtuoso",
+            "@dnd-kit/core",
+            "framer-motion",
+            "sonner"
+        ],
     },
     images: {
         remotePatterns: [

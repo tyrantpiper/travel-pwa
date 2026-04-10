@@ -9,6 +9,7 @@ import { useHaptic } from "@/lib/hooks"
 import { toast } from "sonner"
 import { ChecklistItem } from "@/lib/itinerary-types"
 import { useLanguage } from "@/lib/LanguageContext"
+import { cn } from "@/lib/utils"
 
 // Types moved to @/lib/itinerary-types
 
@@ -107,34 +108,30 @@ export default function EditableDailyChecklist({
 
     // 新增項目
     const addItem = async () => {
-        if (!newItemText.trim()) return
-
+        if (!newItemText.trim() || isUpdating) return
+        setIsUpdating(true)
         haptic.success()
         pendingUpdatesCount.current++  // 🆕 Mark update pending
-        const newItem: ChecklistItem = {
-            id: generateId(),
-            text: newItemText.trim(),
-            checked: false,
-            is_private: false  // 🛡️ Explicitly initialize for type stability
-        }
-
-        const newItems = [...localItems, newItem]
-        setLocalItems(newItems)
-        setNewItemText("")
-        setIsAdding(false)
-
-        setIsUpdating(true)
+        
         try {
+            const newItem: ChecklistItem = {
+                id: generateId(),
+                text: newItemText.trim(),
+                checked: false,
+                is_private: false
+            }
+            
+            const newItems = [...localItems, newItem]
             const success = await onUpdate(newItems)
             if (!success) {
                 setLocalItems(localItems)
                 toast.error(zh ? "新增失敗" : "Failed to add")
             } else {
+                setLocalItems(newItems)
+                setNewItemText("")
+                setIsAdding(false)
                 toast.success(zh ? "已新增項目" : "Item added")
             }
-        } catch {
-            setLocalItems(localItems)
-            toast.error(zh ? "新增失敗" : "Failed to add")
         } finally {
             setIsUpdating(false)
             pendingUpdatesCount.current--  // 🆕 Clear pending flag
@@ -223,7 +220,9 @@ export default function EditableDailyChecklist({
     }
 
     const handleSaveEdit = async () => {
+        if (isUpdating) return
         setIsUpdating(true)
+        pendingUpdatesCount.current++  // 🆕 Mark update pending
         try {
             if (await onUpdate(editData)) {
                 setLocalItems(editData)
@@ -237,6 +236,7 @@ export default function EditableDailyChecklist({
             toast.error(zh ? "儲存失敗" : "Save failed")
         } finally {
             setIsUpdating(false)
+            pendingUpdatesCount.current--  // 🆕 Clear pending flag
         }
     }
 
@@ -280,7 +280,10 @@ export default function EditableDailyChecklist({
     }, [localItems])
 
     return (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-4 border border-indigo-100 dark:border-indigo-900/50">
+        <div className={cn(
+            "bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-4 border border-indigo-100 dark:border-indigo-900/50 transition-all",
+            isUpdating && "opacity-80 pointer-events-none cursor-wait"
+        )}>
             {/* 標題列 */}
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">

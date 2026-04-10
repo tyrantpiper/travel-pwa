@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
     return (
         <div
-            className={cn("animate-pulse rounded-md bg-slate-200", className)}
+            className={cn("animate-pulse rounded-md bg-slate-200 dark:bg-slate-800", className)}
             {...props}
         />
     )
@@ -19,9 +19,9 @@ export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivEl
  */
 export function TripCardSkeleton() {
     return (
-        <div className="p-0 overflow-hidden border-0 shadow-sm rounded-lg bg-white">
+        <div className="p-0 overflow-hidden border-0 shadow-sm rounded-lg bg-white dark:bg-slate-900">
             {/* Cover image placeholder */}
-            <div className="h-24 bg-slate-200 animate-pulse rounded-t-lg" />
+            <div className="h-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-t-lg" />
             {/* Content placeholder */}
             <div className="p-4 space-y-2">
                 <Skeleton className="h-5 w-3/4" />
@@ -36,7 +36,7 @@ export function TripCardSkeleton() {
  */
 export function ExpenseItemSkeleton() {
     return (
-        <div className="flex justify-between items-center p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div className="flex justify-between items-center p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-3">
                 <Skeleton className="w-10 h-10 rounded-full" />
                 <div className="space-y-2">

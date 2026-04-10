@@ -486,7 +486,11 @@ export function ExpenseDialog({
 
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" className="h-11 w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-bold text-base rounded-xl justify-between px-3">
+                                    <Button 
+                                        variant="outline" 
+                                        className="h-11 w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-bold text-base rounded-xl justify-between px-3"
+                                        disabled={isSavingExpense}
+                                    >
                                         <div className="flex items-center gap-2">
                                             {(() => {
                                                 const curr = CURRENCIES.find(c => c.code === inputCurrency) || allCurrencies.find(c => c.code === inputCurrency);
@@ -610,6 +614,7 @@ export function ExpenseDialog({
                                         inputMode="numeric"
                                         className="text-2xl font-mono font-bold h-12 text-center bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 rounded-xl"
                                         value={amountJPY}
+                                        disabled={isSavingExpense}
                                         onChange={e => {
                                             const val = e.target.value
                                             setAmountJPY(val)
@@ -631,9 +636,10 @@ export function ExpenseDialog({
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 {t('exp_title')}
                             </Label>
-                            <Input
+                             <Input
                                 placeholder={t('exp_title')}
                                 value={title}
+                                disabled={isSavingExpense}
                                 onChange={e => {
                                     setTitle(e.target.value)
                                     markAsUserEdited()
@@ -687,9 +693,10 @@ export function ExpenseDialog({
                                     ))}
                                 </div>
                             )}
-                            <Button
+                             <Button
                                 variant="outline"
                                 className="w-full h-10 border-dashed text-slate-500 font-medium hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 rounded-xl"
+                                disabled={isSavingExpense}
                                 onClick={() => {
                                     setItems([...items, { original_name: "", amount: 0 }])
                                     markAsUserEdited()
@@ -707,10 +714,11 @@ export function ExpenseDialog({
                                     <Calendar className="w-3 h-3" /> Day
                                 </Label>
                                 {activeTrip?.start_date ? (
-                                    <select
+                                     <select
                                         value={expenseDate}
                                         onChange={e => setExpenseDate(e.target.value)}
-                                        className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium appearance-none shadow-sm"
+                                        disabled={isSavingExpense}
+                                        className="w-full h-10 px-3 text-sm rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium appearance-none shadow-sm disabled:opacity-50"
                                     >
                                         {(() => {
                                             const startClean = (String(activeTrip.start_date!) || '').split('T')[0]
@@ -743,9 +751,10 @@ export function ExpenseDialog({
                                 </Label>
                                 <Popover open={payerOpen} onOpenChange={setPayerOpen}>
                                     <PopoverTrigger asChild>
-                                        <Button
+                                         <Button
                                             variant="outline"
                                             className="w-full h-10 justify-between bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 font-medium px-3 rounded-xl shadow-sm"
+                                            disabled={isSavingExpense}
                                         >
                                             {payerId ? (
                                                 <div className="flex items-center gap-2 overflow-hidden truncate">
@@ -958,7 +967,7 @@ export function ExpenseDialog({
                             <Label className="text-sm font-bold flex items-center gap-2">
                                 {isPublic ? <><Users className="w-5 h-5 text-blue-500" /> {t('shared')}</> : <><User className="w-5 h-5 text-amber-500" /> {t('private')}</>}
                             </Label>
-                            <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+                             <Switch checked={isPublic} onCheckedChange={setIsPublic} disabled={isSavingExpense} />
                         </div>
 
                         <Button 

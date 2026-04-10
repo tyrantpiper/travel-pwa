@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
 
@@ -7,10 +8,10 @@ import { LanguageProvider } from "@/lib/LanguageContext"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { TripProvider } from "@/lib/trip-context"
 import { SplashScreen } from "@/components/ui/splash-screen"
-import ChatWidget from "@/components/chat-widget"
 import { SyncManager } from "@/components/sync-manager"
 import { HtmlLangSync } from "@/components/ui/html-lang-sync"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
+import { AppClientLayer } from "@/components/app-client-layer"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -72,8 +73,10 @@ export default function RootLayout({
             <TripProvider>
               <SplashScreen />
               <SyncManager />
-              {children}
-              <ChatWidget />
+              <Suspense fallback={null}>
+                {children}
+              </Suspense>
+              <AppClientLayer />
               <PWAInstallPrompt />
             </TripProvider>
           </LanguageProvider>

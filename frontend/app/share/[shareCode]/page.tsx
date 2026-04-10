@@ -4,8 +4,6 @@ import { API_HOST } from '@/lib/api'
 import { Trip } from '@/lib/itinerary-types'
 import PublicTripView from './PublicTripView'
 
-// ISR: Revalidate every 1 hour
-export const revalidate = 3600
 
 interface PageProps {
     params: Promise<{ shareCode: string }>
@@ -15,7 +13,7 @@ interface PageProps {
 async function getTripByPublicId(publicId: string): Promise<Trip | null> {
     try {
         const res = await fetch(`${API_HOST}/api/trips/share/${publicId}`, {
-            next: { revalidate: 3600 }
+            cache: 'force-cache'
         })
         if (!res.ok) return null
         return res.json()
