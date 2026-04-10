@@ -20,12 +20,8 @@ export function generateSecureUUID(): string {
         });
     }
 
-    // Ultimate fallback (Legacy)
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+    // If we reach here, the environment does not support Web Crypto API
+    throw new Error('Cryptographically secure random number generation is not supported in this environment.');
 }
 
 /**

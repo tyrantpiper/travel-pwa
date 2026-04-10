@@ -550,11 +550,11 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
             if not result_data:
                 degraded_street = ""
                 if structured_data and "street" in structured_data:
-                    # 拔除「號/巷/弄/樓」等精確字元，退避到路名
-                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-].*$', '', structured_data["street"]).strip()
+                    # 拔除「號/巷/弄/樓」等精確字元，退避到路名 (優化正則以防止 ReDoS)
+                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-][^,]*', '', structured_data["street"]).strip()
                 else:
-                    # 如果 AI 沒有作用，直接從原始字串退避
-                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-].*$', '', clean_addr).strip()
+                    # 如果 AI 沒有作用，直接從原始字串退避 (優化正則以防止 ReDoS)
+                    degraded_street = re.sub(r'\d+[號巷弄樓Ff-][^,]*', '', clean_addr).strip()
                     
                 # 只有當退避後的字串不同且非空時，才進行降級打擊
                 if degraded_street and ((structured_data and degraded_street != structured_data.get("street")) or (not structured_data and degraded_street != clean_addr)):

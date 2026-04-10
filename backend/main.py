@@ -193,11 +193,17 @@ print(f"[CORS] Configured strict origins: {ALLOWED_ORIGINS}")
 # 3. 安全 Headers 中介軟體 (Security Headers)
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-# 只允許來自 Cloud Run 或 Localhost 的 Host header
-# 允許所有 Host (由 Cloud Run 的外部防火牆過濾，中間件層保持彈性)
+# 🛡️ 安全加固：只允許來自 Cloud Run、Vercel 或 Localhost 的 Host header
+ALLOWED_HOSTS = [
+    "travel-pwa-five.vercel.app",
+    "antigravity-backend-589255638719.us-central1.run.app",
+    "localhost",
+    "127.0.0.1"
+]
+
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"]
+    allowed_hosts=ALLOWED_HOSTS
 )
 
 
@@ -208,6 +214,8 @@ async def add_security_headers(request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # 🆕 強化版 CSP (防止非法內容加載)
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;"
     return response
 
 # 3. 初始化已遷移至 Lifespan Manager

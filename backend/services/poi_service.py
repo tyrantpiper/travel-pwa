@@ -11,6 +11,10 @@ from math import radians, cos, sin, sqrt, atan2
 from urllib.parse import quote
 from datetime import datetime
 import time
+import logging
+from utils.url_safety import is_safe_url
+
+logger = logging.getLogger("poi-service")
 
 # 🆕 Phase 1 Observability (Lazy Loading to prevent Windows import deadlock)
 _POI_METRICS = {"latency": None, "requests": None}
@@ -172,6 +176,11 @@ async def search_overpass(
     out center;
     """
     
+    # [SAFETY] SSRF Protection
+    if not is_safe_url(OVERPASS_API):
+        logger.warning(f"Blocked unsafe Overpass request: {OVERPASS_API}")
+        return []
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -256,6 +265,11 @@ async def search_opentripmap(
     if api_key:
         params["apikey"] = api_key
     
+    # [SAFETY] SSRF Protection
+    if not is_safe_url(url):
+        logger.warning(f"Blocked unsafe OpenTripMap request: {url}")
+        return []
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url, params=params)

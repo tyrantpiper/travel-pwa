@@ -62,6 +62,9 @@
     "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.9"
   },
+  "overrides": {
+    "serialize-javascript": "^6.0.2"
+  },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "4.1.18",
