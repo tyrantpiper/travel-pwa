@@ -984,7 +984,7 @@ export function ToolsView() {
                                         <Button
                                             variant={expenseView === 'summary' ? 'default' : 'outline'}
                                             size="sm"
-                                            className={cn("flex-1 h-9", expenseView === 'summary' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
+                                            className={cn("flex-1 h-11", expenseView === 'summary' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
                                             onClick={() => setExpenseView('summary')}
                                         >
                                             <PieChart className="w-4 h-4 mr-2" /> {t('total')}
@@ -992,7 +992,7 @@ export function ToolsView() {
                                         <Button
                                             variant={expenseView === 'daily' ? 'default' : 'outline'}
                                             size="sm"
-                                            className={cn("flex-1 h-9", expenseView === 'daily' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
+                                            className={cn("flex-1 h-11", expenseView === 'daily' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'dark:text-white dark:border-slate-700')}
                                             onClick={() => setExpenseView('daily')}
                                         >
                                             <List className="w-4 h-4 mr-2" /> {t('tv_list')}
@@ -1022,7 +1022,7 @@ export function ToolsView() {
                                             key={filter}
                                             onClick={() => setOwnerFilter(filter)}
                                             className={cn(
-                                                "flex-1 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
+                                                "flex-1 h-11 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1",
                                                 ownerFilter === filter ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"
                                             )}
                                         >
