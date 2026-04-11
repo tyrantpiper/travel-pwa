@@ -130,6 +130,19 @@ function IconPicker({ value, onChange }: { value: string, onChange: (val: string
         </Popover>
     )
 }
+
+// 🧠 AI Data Normalizer: 確保 AI 產出的 notes 能正確對應前端欄位
+// 向下相容：舊格式 {item, content} → 新格式 {icon, title, content}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeNote(raw: any): NoteItem {
+    if (!raw || typeof raw !== 'object') return { icon: '💡', title: '', content: '' }
+    return {
+        icon: raw.icon || undefined,
+        title: raw.title || raw.item || '',
+        content: raw.content || ''
+    }
+}
+
 const CURRENCIES = ["JPY", "TWD", "USD", "EUR", "KRW", "HKD"]
 const DEFAULT_CURRENCY = "JPY"
 
@@ -149,7 +162,7 @@ export default function EditableDailyTips({
 
     // Local state (initialized from props, synced via key prop from parent)
     // Note: Parent component should use `key={day}` to force re-mount on day change
-    const [localNotes, setLocalNotes] = useState<NoteItem[]>(notes || [])
+    const [localNotes, setLocalNotes] = useState<NoteItem[]>((notes || []).map(normalizeNote))
     const [localCosts, setLocalCosts] = useState<CostItem[]>(costs || [])
     const [localTickets, setLocalTickets] = useState<TicketItem[]>(tickets || [])
 
@@ -161,7 +174,7 @@ export default function EditableDailyTips({
     // 🔧 FIX: Sync local state when props update (async data loading)
     // 🛡️ L4 Protection: Skip sync if user is currently adding an item to prevent "Renew Overwrite"
     useEffect(() => {
-        if (!addingNote) setLocalNotes(notes || [])
+        if (!addingNote) setLocalNotes((notes || []).map(normalizeNote))
     }, [notes, addingNote])
 
     useEffect(() => {
