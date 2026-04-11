@@ -197,6 +197,9 @@ export const remainingTranslations = {
         profile_pref_accommodation: "Accommodation",
         profile_pref_transport: "Transport",
         profile_pref_other: "Other",
+        profile_memory_delete_confirm_title: "Forget this memory?",
+        profile_memory_delete_confirm_desc: "This helps Ryan understand you. Are you sure you want to forget it?",
+        profile_memory_deleting: "Forgetting...",
 
         // Weekdays (short)
         weekday_sun: "Sun", weekday_mon: "Mon", weekday_tue: "Tue",
@@ -726,6 +729,9 @@ export const remainingTranslations = {
         profile_pref_accommodation: "住宿",
         profile_pref_transport: "交通",
         profile_pref_other: "其他",
+        profile_memory_delete_confirm_title: "是否移除該記憶？",
+        profile_memory_delete_confirm_desc: "此記憶能幫助 Ryan 更了解您的偏好，確定要忘記它嗎？",
+        profile_memory_deleting: "移除中...",
         profile_user_not_found: "找不到用戶 ID",
         profile_updated: "個人檔案已更新！",
         profile_theme: "深色模式",

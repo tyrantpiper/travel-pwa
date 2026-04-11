@@ -47,6 +47,8 @@ export function ProfileView() {
     const { isDark, toggleDark, accentColor, setAccentColor, currentTheme } = useTheme()
     const [isEditing, setIsEditing] = useState(false)
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
+    const [memoryToDelete, setMemoryToDelete] = useState<UserPreference | null>(null)
+    const [isDeletingMemory, setIsDeletingMemory] = useState(false)
     const [apiKey, setApiKey] = useState("")
     const [hasApiKey, setHasApiKey] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -212,6 +214,25 @@ export function ProfileView() {
         } catch (error) {
             console.error(error)
             toast.error("Failed to update profile on server")
+        }
+    }
+
+    const handleConfirmDeleteMemory = async () => {
+        if (!memoryToDelete) return
+        
+        const userId = localStorage.getItem("user_uuid")
+        if (!userId) return
+
+        setIsDeletingMemory(true)
+        try {
+            await usersApi.deletePreference(userId, memoryToDelete.id)
+            setPreferences(prev => prev.filter(p => p.id !== memoryToDelete.id))
+            toast.success(t('update_success'))
+            setMemoryToDelete(null)
+        } catch {
+            toast.error(t('profile_delete_failed'))
+        } finally {
+            setIsDeletingMemory(false)
         }
     }
 
@@ -892,17 +913,7 @@ export function ProfileView() {
                                                     )}
                                                 </div>
                                                 <button
-                                                    onClick={async () => {
-                                                        const userId = localStorage.getItem("user_uuid")
-                                                        if (!userId) return
-                                                        try {
-                                                            await usersApi.deletePreference(userId, pref.id)
-                                                            setPreferences(prev => prev.filter(p => p.id !== pref.id))
-                                                            toast.success(t('update_success'))
-                                                        } catch {
-                                                            toast.error(t('profile_delete_failed'))
-                                                        }
-                                                    }}
+                                                    onClick={() => setMemoryToDelete(pref)}
                                                     className="opacity-40 lg:opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
                                                     title={t('profile_pref_delete')}
                                                 >
@@ -1012,6 +1023,59 @@ export function ProfileView() {
                                     </Button>
                                     <Button onClick={handleSaveApiKey} className="bg-slate-900 text-white hover:bg-slate-800 flex-1 sm:flex-none">
                                         <Key className="w-4 h-4 mr-2" /> {zh ? '儲存設定' : 'Save'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* 🧠 AI 記憶移除確認視窗 */}
+                        <Dialog 
+                            open={!!memoryToDelete} 
+                            onOpenChange={() => {
+                                if (!isDeletingMemory) setMemoryToDelete(null)
+                            }}
+                        >
+                            <DialogContent className="sm:max-w-[400px]">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2 text-red-600">
+                                        <Brain className="w-5 h-5 text-blue-500" />
+                                        {t('profile_memory_delete_confirm_title')}
+                                    </DialogTitle>
+                                    <DialogDescription asChild>
+                                        <div className="text-left text-sm text-muted-foreground pt-2">
+                                            {t('profile_memory_delete_confirm_desc')}
+                                            {memoryToDelete && (
+                                                <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                                                    <span className="text-[10px] font-bold text-blue-500/70 uppercase tracking-wider block mb-1">
+                                                        {t(`profile_pref_${memoryToDelete.category}` as TranslationKey) || memoryToDelete.category}
+                                                    </span>
+                                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                        &quot;{memoryToDelete.preference}&quot;
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter className="mt-4">
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => setMemoryToDelete(null)}
+                                        disabled={isDeletingMemory}
+                                    >
+                                        {t('cancel')}
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => handleConfirmDeleteMemory()}
+                                        disabled={isDeletingMemory}
+                                        className="min-w-[100px]"
+                                    >
+                                        {isDeletingMemory ? (
+                                            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('profile_memory_deleting')}</>
+                                        ) : (
+                                            <>{t('profile_pref_delete')}</>
+                                        )}
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
