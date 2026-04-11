@@ -549,8 +549,8 @@ export function ExpenseDialog({
                                                 )}
                                             </div>
                                         </div>
-                                        <ScrollArea className="flex-1 min-h-0 touch-pan-y select-none">
-                                            <div className="p-1 pb-16">
+                                        <ScrollArea className="flex-1 min-h-0">
+                                            <div className="p-1 pb-16 touch-pan-y overscroll-contain" onPointerDown={e => e.stopPropagation()}>
                                                 {!currencySearch && (
                                                     <>
                                                         <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Popular</div>
@@ -558,7 +558,7 @@ export function ExpenseDialog({
                                                             <Button
                                                                 key={c.code}
                                                                 variant="ghost"
-                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
+                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] touch-pan-y hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
@@ -591,7 +591,7 @@ export function ExpenseDialog({
                                                             <Button
                                                                 key={c.code}
                                                                 variant="ghost"
-                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
+                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] touch-pan-y hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
