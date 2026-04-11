@@ -529,7 +529,7 @@ export function ExpenseDialog({
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0 rounded-xl shadow-2xl overflow-hidden" align="start">
-                                    <div className="flex flex-col max-h-[400px]">
+                                    <div className="flex flex-col h-[400px] max-h-[80vh]">
                                         <div className="p-2 border-b bg-slate-50 dark:bg-slate-900">
                                             <div className="relative">
                                                 <Input
@@ -549,7 +549,7 @@ export function ExpenseDialog({
                                                 )}
                                             </div>
                                         </div>
-                                        <ScrollArea className="flex-1">
+                                        <ScrollArea className="flex-1 min-h-0">
                                             <div className="p-1 pb-16">
                                                 {!currencySearch && (
                                                     <>
