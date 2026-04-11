@@ -169,6 +169,67 @@ def reconstruct_metadata(data: dict) -> dict:
     return data
 
 
+def normalize_notes(data: dict) -> dict:
+    """
+    🧠 Smart Icon Mapper: 將 AI 產出的 notes 正規化為前端期望的 {icon, title, content} 格式。
+    
+    解決的問題：
+    - AI 可能產出 "item" 而非 "title" 欄位名稱
+    - AI 通常不會產出 "icon" 欄位
+    - 此函數根據 title/content 的關鍵字智慧匹配圖標
+    """
+    ICON_RULES = [
+        # (關鍵字列表, 圖標)
+        (["航班", "飛機", "機場", "出發", "抵達", "航廈", "登機"], "✈️"),
+        (["電車", "地鐵", "JR", "新幹線", "搭乘", "轉乘", "交通", "巴士", "公車", "計程車"], "🚇"),
+        (["早餐", "午餐", "晚餐", "餐廳", "美食", "排隊", "訂位", "預約用餐"], "🍽️"),
+        (["時間", "提早", "營業", "開門", "關門", "最後入場", "截止"], "⏰"),
+        (["門票", "票券", "入場", "預購", "免費入場", "入館"], "🎫"),
+        (["購物", "退稅", "免稅", "伴手禮", "紀念品", "血拼"], "🛒"),
+        (["天氣", "下雨", "雨具", "雨傘", "防曬", "防寒"], "☂️"),
+        (["check-in", "check-out", "入住", "退房", "行李", "寄放", "飯店", "旅館", "民宿"], "🏨"),
+        (["IC卡", "Suica", "PASMO", "ICOCA", "悠遊卡", "交通卡", "儲值", "省錢", "折扣"], "💳"),
+        (["拍照", "打卡", "最佳角度", "攝影", "夜景"], "📸"),
+        (["預約", "訂位", "預訂", "事先"], "📅"),
+        (["注意", "小心", "重要", "禁止", "危險", "封閉", "施工"], "⚠️"),
+        (["地址", "位置", "地點", "集合"], "📍"),
+        (["提醒", "建議", "推薦", "攻略", "技巧", "秘訣"], "💡"),
+    ]
+    
+    def match_icon(title: str, content: str) -> str:
+        """根據標題和內容關鍵字匹配最佳圖標"""
+        combined = f"{title} {content}"
+        for keywords, icon in ICON_RULES:
+            if any(kw in combined for kw in keywords):
+                return icon
+        return "💡"  # 預設 fallback（比 ⚠️ 更友善）
+    
+    day_notes = data.get("day_notes")
+    if not isinstance(day_notes, dict):
+        return data
+    
+    for day_key, notes_list in day_notes.items():
+        if not isinstance(notes_list, list):
+            continue
+        normalized = []
+        for note in notes_list:
+            if not isinstance(note, dict):
+                continue
+            # 欄位名稱轉換：item → title（向下相容）
+            title = note.get("title") or note.get("item") or ""
+            content = note.get("content") or ""
+            icon = note.get("icon") or match_icon(str(title), str(content))
+            normalized.append({
+                "icon": icon,
+                "title": str(title),
+                "content": str(content)
+            })
+        day_notes[day_key] = normalized
+    
+    data["day_notes"] = day_notes
+    return data
+
+
 # --- World-Class Itinerary Engine (V26.1) ---
 
 @router.post("/parse-md")
@@ -191,7 +252,7 @@ async def parse_markdown(
            - 若「地點」欄位為空、"-" 或包含 "出發/抵達"，請從「Google Maps」欄位的連結文字或「筆記」欄位中提取地點名稱。
            - 若有多個地點（如：桃園機場 -> 成田機場），請建立為兩個連續的項目或在 `place_name` 中完整保留。
         4. **中繼資料全量擷取**：
-           - **注意事項 (day_notes)**：從 `### Day X 注意事項` 或類似表格中提取。格式為 `{{"item": "...", "content": "..."}}`。
+           - **注意事項 (day_notes)**：從 `### Day X 注意事項` 或類似表格中提取。格式為 `{{"icon": "適當的emoji圖標", "title": "標題", "content": "內容"}}`。icon 請根據內容語義選擇（如交通用🚇、餐飲用🍽️、時間用⏰、門票用🎫、天氣用☂️、住宿用🏨、購物用🛒、拍照用📸、預約用📅、注意用⚠️、提醒用💡）。
            - **預估花費 (day_costs)**：從 `💰 Day X 預估花費` 表格中提取。格式為 `{{"item": "...", "amount": "..."}}`。
            - **交通票券 (day_tickets)**：從 `🎫 Day X 交通票券` 列表或表格中提取。格式為 `{{"name": "...", "price": "..."}}`。
         5. **日期感應 (Date Awareness)**：從各天的標題（如 `Day 1 (2/2)`）中提取日期。
@@ -228,7 +289,7 @@ async def parse_markdown(
             "day_metadata": [
                 {{
                     "day_number": 1,
-                    "notes": [{{ "item": "標題", "content": "內容" }}],
+                    "notes": [{{ "icon": "⏰", "title": "標題", "content": "內容" }}],
                     "costs": [{{ "item": "項目", "amount": "金額" }}],
                     "tickets": [{{ "name": "票券名", "price": "價格" }}]
                 }}
@@ -246,6 +307,7 @@ async def parse_markdown(
         cleaned_text = raw_text.replace("```json", "").replace("```", "").strip()
         data = json.loads(cleaned_text)
         data = reconstruct_metadata(data)
+        data = normalize_notes(data)
         data = fix_sub_items_structure(data)
         
         # 🛡️ NaN/Null Guard: 確保 items 絕對不為空
@@ -317,7 +379,7 @@ async def generate_trip(
                 }}
             ],
             "day_metadata": [
-                {{ "day_number": 1, "notes": [], "costs": [], "tickets": [] }}
+                {{ "day_number": 1, "notes": [{{ "icon": "💡", "title": "注意事項標題", "content": "詳細說明" }}], "costs": [{{ "item": "項目", "amount": "金額" }}], "tickets": [{{ "name": "票券名", "price": "價格" }}] }}
             ],
             "ai_review": "給旅行者的專業行前建議..."
         }}
@@ -346,6 +408,7 @@ async def generate_trip(
             data["items"] = flat_items
         
         data = reconstruct_metadata(data)
+        data = normalize_notes(data)
         data = fix_sub_items_structure(data)
         
         # 🆕 v26.1: Wrap with status for Frontend Zod Schema
