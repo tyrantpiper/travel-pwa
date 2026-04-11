@@ -375,12 +375,12 @@ export function ProfileView() {
                         <div className="relative group">
                             {/* Avatar Display - 點擊可預覽 */}
                             <div
-                                className="relative w-28 h-28 border-4 border-white shadow-xl bg-white rounded-full overflow-hidden cursor-pointer hover:ring-4 hover:ring-blue-50 transition-all duration-300"
+                                className="relative w-28 h-28 border-4 border-background shadow-xl bg-card rounded-full overflow-hidden cursor-pointer hover:ring-4 hover:ring-blue-50/10 transition-all duration-300"
                                 onClick={() => profile.avatarUrl && setAvatarPreviewOpen(true)}
                             >
                                 <Avatar className="w-full h-full">
                                     <AvatarImage src={profile.avatarUrl || undefined} className="object-cover" />
-                                    <AvatarFallback className="bg-slate-50 text-slate-300 text-3xl font-bold flex items-center justify-center w-full h-full">
+                                    <AvatarFallback className="bg-muted text-muted-foreground text-3xl font-bold flex items-center justify-center w-full h-full">
                                         {profile.nickname.slice(0, 1).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
@@ -396,10 +396,10 @@ export function ProfileView() {
                                 folder="ryan_travel/avatars"
                                 icon={
                                     <div
-                                        className="w-9 h-9 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center hover:bg-stone-50 active:scale-95 transition-all group"
+                                        className="w-11 h-11 rounded-full bg-card border border-border shadow-sm flex items-center justify-center hover:bg-accent active:scale-95 transition-all group"
                                         title={t('profile_switch_avatar')}
                                     >
-                                        <Camera className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                                        <Camera className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                                     </div>
                                 }
                                 showPreview={false} // Custom trigger
@@ -409,10 +409,10 @@ export function ProfileView() {
                             {profile.avatarUrl && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleRemoveAvatar(); }}
-                                    className="w-9 h-9 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center hover:bg-red-50 hover:border-red-100 active:scale-95 transition-all group"
+                                    className="w-11 h-11 rounded-full bg-card border border-border shadow-sm flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-100 dark:hover:border-red-900/50 active:scale-95 transition-all group"
                                     title={t('profile_preview')}
                                 >
-                                    <Trash2 className="w-4 h-4 text-slate-400 group-hover:text-red-500 transition-colors" />
+                                    <Trash2 className="w-5 h-5 text-muted-foreground group-hover:text-red-500 transition-colors" />
                                 </button>
                             )}
                         </div>
@@ -447,11 +447,11 @@ export function ProfileView() {
                                     placeholder="Enter nickname"
                                 />
                                 <div className="flex gap-2 w-full">
-                                    <Button variant="outline" size="sm" className="flex-1 h-9 rounded-xl border-stone-200" onClick={() => setIsEditing(false)}>
+                                    <Button variant="outline" size="sm" className="flex-1 h-11 rounded-xl border-border" onClick={() => setIsEditing(false)}>
                                         Cancel
                                     </Button>
-                                    <Button size="sm" className="flex-1 h-9 bg-slate-900 text-white rounded-xl shadow-lg" onClick={handleSaveProfile}>
-                                        <Save className="w-3.5 h-3.5 mr-1.5" /> Save
+                                    <Button size="sm" className="flex-1 h-11 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl shadow-lg" onClick={handleSaveProfile}>
+                                        <Save className="w-4 h-4 mr-2" /> Save
                                     </Button>
                                 </div>
                             </div>

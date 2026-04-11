@@ -178,6 +178,7 @@ export function ExpenseDialog({
     const [parseResult, setParseResult] = useState<Partial<Expense> | null>(null)
     const [allCurrencies, setAllCurrencies] = useState<CurrencyInfo[]>([])
     const [currencySearch, setCurrencySearch] = useState("")
+    const [deferredShow, setDeferredShow] = useState(false) // 🆕 Phase 24: 防止主執行緒阻塞
 
     const formInitializedRef = useRef(false)
     const skipRateFetchRef = useRef(false)
@@ -294,11 +295,25 @@ export function ExpenseDialog({
     }, [allCurrencies, currencySearch]);
 
     useEffect(() => {
+        let timer: NodeJS.Timeout;
         const loadAll = async () => {
             const list = await getAllSupportedCurrencies()
             if (list.length > 0) setAllCurrencies(list)
         }
-        if (open) loadAll()
+        
+        if (open) {
+            loadAll()
+            // 🆕 Phase 24: 延遲 150ms 再顯示重型組件，確保 Popover 彈出動畫流暢 (60fps)
+            timer = setTimeout(() => {
+                setDeferredShow(true)
+            }, 150)
+        } else {
+            setDeferredShow(false)
+        }
+
+        return () => {
+            if (timer) clearTimeout(timer)
+        }
     }, [open])
 
     const doAiParse = async () => {
@@ -535,7 +550,7 @@ export function ExpenseDialog({
                                             </div>
                                         </div>
                                         <ScrollArea className="flex-1">
-                                            <div className="p-1">
+                                            <div className="p-1 pb-16">
                                                 {!currencySearch && (
                                                     <>
                                                         <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Popular</div>
@@ -567,38 +582,42 @@ export function ExpenseDialog({
                                                     </>
                                                 )}
                                                 
-                                                <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                    {currencySearch ? `Search Results (${filteredCurrencies.length})` : "All Currencies"}
-                                                </div>
-                                                {filteredCurrencies.slice(0, 100).map(c => (
-                                                    <Button
-                                                        key={c.code}
-                                                        variant="ghost"
-                                                        className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800")}
-                                                        onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
-                                                    >
-                                                        {c.countryCode ? (
-                                                            <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm flex-shrink-0 mr-3">
-                                                                <Image 
-                                                                    src={`https://flagcdn.com/w40/${c.countryCode}.png`} 
-                                                                    alt={c.code}
-                                                                    width={20}
-                                                                    height={14}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <span className="mr-3 text-lg">{c.flag || '🌏'}</span>
-                                                        )}
-                                                        <span className="font-mono font-bold mr-2 w-10 text-left">{c.code}</span>
-                                                        <div className="flex flex-col items-start leading-none overflow-hidden">
-                                                            <span className="text-xs truncate max-w-[150px]">{c.zhName || c.name}</span>
-                                                            {c.zhName && <span className="text-[9px] text-slate-400 truncate max-w-[150px]">{c.name}</span>}
+                                                {deferredShow && (
+                                                    <>
+                                                        <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                            {currencySearch ? `Search Results (${filteredCurrencies.length})` : "All Currencies"}
                                                         </div>
-                                                    </Button>
-                                                ))}
-                                                {filteredCurrencies.length === 0 && (
-                                                    <div className="py-8 text-center text-xs text-slate-400 font-medium">No currencies found</div>
+                                                        {filteredCurrencies.slice(0, 100).map(c => (
+                                                            <Button
+                                                                key={c.code}
+                                                                variant="ghost"
+                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800")}
+                                                                onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
+                                                            >
+                                                                {c.countryCode ? (
+                                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm flex-shrink-0 mr-3">
+                                                                        <Image 
+                                                                            src={`https://flagcdn.com/w40/${c.countryCode}.png`} 
+                                                                            alt={c.code}
+                                                                            width={20}
+                                                                            height={14}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="mr-3 text-lg">{c.flag || '🌏'}</span>
+                                                                )}
+                                                                <span className="font-mono font-bold mr-2 w-10 text-left">{c.code}</span>
+                                                                <div className="flex flex-col items-start leading-none overflow-hidden">
+                                                                    <span className="text-xs truncate max-w-[150px]">{c.zhName || c.name}</span>
+                                                                    {c.zhName && <span className="text-[9px] text-slate-400 truncate max-w-[150px]">{c.name}</span>}
+                                                                </div>
+                                                            </Button>
+                                                        ))}
+                                                        {filteredCurrencies.length === 0 && (
+                                                            <div className="py-8 text-center text-xs text-slate-400 font-medium">No currencies found</div>
+                                                        )}
+                                                    </>
                                                 )}
                                             </div>
                                         </ScrollArea>
