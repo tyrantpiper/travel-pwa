@@ -529,7 +529,7 @@ export function ExpenseDialog({
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[300px] p-0 rounded-xl shadow-2xl overflow-hidden" align="start">
-                                    <div className="flex flex-col h-[400px] max-h-[80vh]">
+                                    <div className="flex flex-col h-[min(400px,70vh)] overscroll-contain">
                                         <div className="p-2 border-b bg-slate-50 dark:bg-slate-900">
                                             <div className="relative">
                                                 <Input
@@ -549,7 +549,7 @@ export function ExpenseDialog({
                                                 )}
                                             </div>
                                         </div>
-                                        <ScrollArea className="flex-1 min-h-0">
+                                        <ScrollArea className="flex-1 min-h-0 touch-pan-y select-none">
                                             <div className="p-1 pb-16">
                                                 {!currencySearch && (
                                                     <>
@@ -558,7 +558,7 @@ export function ExpenseDialog({
                                                             <Button
                                                                 key={c.code}
                                                                 variant="ghost"
-                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800")}
+                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
@@ -591,7 +591,7 @@ export function ExpenseDialog({
                                                             <Button
                                                                 key={c.code}
                                                                 variant="ghost"
-                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800")}
+                                                                className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
