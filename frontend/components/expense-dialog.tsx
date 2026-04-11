@@ -499,7 +499,7 @@ export function ExpenseDialog({
                                 💰 {t('exp_amount')}
                             </Label>
 
-                            <Popover>
+                            <Popover modal={true}>
                                 <PopoverTrigger asChild>
                                     <Button 
                                         variant="outline" 
@@ -549,8 +549,8 @@ export function ExpenseDialog({
                                                 )}
                                             </div>
                                         </div>
-                                        <ScrollArea className="flex-1 min-h-0">
-                                            <div className="p-1 pb-16 touch-pan-y overscroll-contain" onPointerDown={e => e.stopPropagation()}>
+                                        <ScrollArea className="flex-1 min-h-0" onWheel={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()}>
+                                            <div className="p-1 pb-16 touch-pan-y overscroll-contain" onPointerDown={e => e.stopPropagation()} style={{ WebkitOverflowScrolling: 'touch', willChange: 'transform' }}>
                                                 {!currencySearch && (
                                                     <>
                                                         <div className="px-2 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Popular</div>
