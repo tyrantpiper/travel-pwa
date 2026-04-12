@@ -21,6 +21,11 @@ interface EnrichedPOI {
     travel_tips?: string
     official_url?: string
     wikivoyage_url?: string
+    summary?: string
+    must_try?: string[]
+    rating?: number
+    image_url?: string
+    status?: string
 }
 
 // Function call args 結構
@@ -76,8 +81,8 @@ export default function POIPreviewCard({
                     lng: poiData.lng || 0,
                     api_key: getSecureApiKey()
                 }, userId || undefined)
-                if (data && (data.cultural_desc || data.name)) {
-                    setEnriched(data as any)
+                if (data && (data.cultural_desc || data.name || data.summary)) {
+                    setEnriched(data as EnrichedPOI)
                 }
             } catch (error) {
                 debugLog("三源資料獲取失敗 (不影響主流程):", error)

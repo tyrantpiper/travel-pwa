@@ -4,7 +4,9 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
+import { BackToTop } from "@/components/ui/back-to-top" // 🆕
 import { useServiceWorker } from "@/lib/hooks"
+import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
 import { debugLog } from "@/lib/debug"
 
 // 🚀 [Perf Audit 2026] 將最強大的核心視圖 (ItineraryView) 也改為動態載入
@@ -73,6 +75,9 @@ export function AppShell() {
     // 💡 Preheat 旗標：決定是否在背景偷偷加載並渲染隱藏視圖
     const [shouldPreheat, setShouldPreheat] = useState(false)
 
+    // 🆕 滾動狀態監測 (2026 Smart UI)
+    const { isNavVisible, showTopButton, scrollToTop } = useScrollState()
+
     // Register Service Worker in production
     useServiceWorker()
 
@@ -136,7 +141,17 @@ export function AppShell() {
                     </div>
 
                 </main>
-                <BottomNav activeTab={activeView} onTabChange={setActiveView} />
+                <BottomNav 
+                    activeTab={activeView} 
+                    onTabChange={setActiveView} 
+                    isVisible={isNavVisible} // 🆕 滾動時自動隱藏
+                />
+                
+                {/* 🆕 智能回頂部按鈕 */}
+                <BackToTop 
+                    isVisible={showTopButton} 
+                    onClick={scrollToTop} 
+                />
             </div>
         </>
     )
