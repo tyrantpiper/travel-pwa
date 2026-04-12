@@ -8,10 +8,11 @@ import { useTheme } from "@/lib/ThemeContext"
 interface BottomNavProps {
     activeTab: string
     onTabChange: (tab: string) => void
+    onActiveTabClick?: (tab: string) => void // 🆕 當前分頁點擊回調
     isVisible?: boolean // 🆕 滾動狀態監控
 }
 
-export function BottomNav({ activeTab, onTabChange, isVisible = true }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible = true }: BottomNavProps) {
     const { t } = useLanguage()
     const { currentTheme, accentColor } = useTheme()
 
@@ -38,7 +39,13 @@ export function BottomNav({ activeTab, onTabChange, isVisible = true }: BottomNa
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => onTabChange(tab.id)}
+                            onClick={() => {
+                                if (isActive) {
+                                    onActiveTabClick?.(tab.id)
+                                } else {
+                                    onTabChange(tab.id)
+                                }
+                            }}
                             className={cn(
                                 "relative flex flex-col items-center justify-center w-full h-[85%] gap-1 rounded-full transition-colors duration-200 z-10",
                                 isActive 

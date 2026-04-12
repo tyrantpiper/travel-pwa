@@ -4,8 +4,7 @@ import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
-import { BackToTop } from "@/components/ui/back-to-top" // 🆕
-import { useServiceWorker } from "@/lib/hooks"
+import { useServiceWorker, useHaptic } from "@/lib/hooks"
 import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
 import { debugLog } from "@/lib/debug"
 
@@ -76,7 +75,8 @@ export function AppShell() {
     const [shouldPreheat, setShouldPreheat] = useState(false)
 
     // 🆕 滾動狀態監測 (2026 Smart UI)
-    const { isNavVisible, showTopButton, scrollToTop } = useScrollState()
+    const { isNavVisible, isAtTop, scrollToTop } = useScrollState()
+    const haptic = useHaptic() // 🆕 震動回饋
 
     // Register Service Worker in production
     useServiceWorker()
@@ -144,13 +144,17 @@ export function AppShell() {
                 <BottomNav 
                     activeTab={activeView} 
                     onTabChange={setActiveView} 
+                    onActiveTabClick={() => {
+                        if (!isAtTop) {
+                            scrollToTop()
+                            haptic.tap()
+                        } else {
+                            // 已經在頂端，觸發刷新
+                            window.dispatchEvent(new CustomEvent('refresh-active-view'))
+                            haptic.success()
+                        }
+                    }}
                     isVisible={isNavVisible} // 🆕 滾動時自動隱藏
-                />
-                
-                {/* 🆕 智能回頂部按鈕 */}
-                <BackToTop 
-                    isVisible={showTopButton} 
-                    onClick={scrollToTop} 
                 />
             </div>
         </>

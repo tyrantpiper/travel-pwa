@@ -199,6 +199,17 @@ export function ToolsView() {
         }
     }, [swrExpenses, activeTripId])
 
+    // 🆕 2026: Integrated global refresh event listener
+    useEffect(() => {
+        const handleRefresh = () => {
+            console.log("🔄 ToolsView: Global refresh triggered via Tab Hub")
+            reloadExpenses()
+            tripMutate()
+        }
+        window.addEventListener('refresh-active-view', handleRefresh)
+        return () => window.removeEventListener('refresh-active-view', handleRefresh)
+    }, [reloadExpenses, tripMutate])
+
     const [rate, setRate] = useState(0.22)
 
     // 🆕 v22.1: Listen for cross-module import events (from ChatWidget)

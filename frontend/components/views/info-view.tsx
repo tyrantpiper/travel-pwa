@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Plane, Bed, Save, Edit3, Clock, MapPin,
@@ -159,7 +159,7 @@ export function InfoView() {
     }, [activeTripData, activeTripId, isEditing])
 
     // 獨立的刷新函數供 ZenRenew 使用
-    const refreshInfo = async () => {
+    const refreshInfo = useCallback(async () => {
         if (!activeTripId) return
         try {
             await reloadTripDetail() // 🔄 Check server
@@ -168,7 +168,17 @@ export function InfoView() {
             console.error(e)
             throw e
         }
-    }
+    }, [activeTripId, reloadTripDetail, tripMutate])
+
+    // 🆕 2026: Integrated global refresh event listener
+    useEffect(() => {
+        const handleRefresh = () => {
+            console.log("🔄 InfoView: Global refresh triggered via Tab Hub")
+            refreshInfo()
+        }
+        window.addEventListener('refresh-active-view', handleRefresh)
+        return () => window.removeEventListener('refresh-active-view', handleRefresh)
+    }, [refreshInfo])
 
     const updateFlightSegment = (type: 'outbound' | 'inbound', index: number, field: string, value: string | string[]) => {
         setFlights(prev => {

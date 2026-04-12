@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
@@ -85,9 +85,7 @@ export function ProfileView() {
     const [copied, setCopied] = useState(false)
  // 🧠 AI 記憶展開狀態
 
-    useEffect(() => {
-        let isMounted = true
-
+    const fetchProfileData = useCallback(async (isMounted: boolean) => {
         const userId = localStorage.getItem("user_uuid")
         const name = localStorage.getItem("user_nickname")
         const avatar = localStorage.getItem("user_avatar")
@@ -118,17 +116,31 @@ export function ProfileView() {
                 .catch(err => {
                     if (isMounted) console.error("Failed to fetch profile:", err)
                 })
+
+            // 🧠 載入 AI 記憶偏好
+            setIsLoadPrefs(true)
+            usersApi.getPreferences(userId)
+                .then(data => {
+                    if (isMounted) setPreferences(data)
+                })
+                .catch(err => console.error("Failed to load preferences:", err))
+                .finally(() => {
+                    if (isMounted) setIsLoadPrefs(false)
+                })
         }
+    }, [])
+
+    useEffect(() => {
+        let isMounted = true
+        fetchProfileData(isMounted)
 
         // Check keys
         const secureKey = getSecureApiKey()
-
         if (secureKey && isMounted) {
             const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
             setApiKey(devKey === secureKey ? (zh ? "(開發者模式)" : "(Dev Mode)") : secureKey)
             setHasApiKey(true)
             
-            // Auto-migration: If we have a legacy key but no encrypted key, encrypt it now
             if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
                 localStorage.setItem("user_gemini_key", encryptData(secureKey))
                 localStorage.removeItem("gemini_api_key")
@@ -143,23 +155,20 @@ export function ProfileView() {
             } catch { /* ignore */ }
         }
 
-        // 🧠 載入 AI 記憶偏好
-        if (userId) {
-            setIsLoadPrefs(true)
-            usersApi.getPreferences(userId)
-                .then(data => {
-                    if (isMounted) setPreferences(data)
-                })
-                .catch(err => console.error("Failed to load preferences:", err))
-                .finally(() => {
-                    if (isMounted) setIsLoadPrefs(false)
-                })
-        }
-
         return () => {
             isMounted = false
         }
-    }, [zh])
+    }, [zh, fetchProfileData])
+
+    // 🆕 2026: Integrated global refresh event listener
+    useEffect(() => {
+        const handleRefresh = () => {
+            console.log("🔄 ProfileView: Global refresh triggered via Tab Hub")
+            fetchProfileData(true)
+        }
+        window.addEventListener('refresh-active-view', handleRefresh)
+        return () => window.removeEventListener('refresh-active-view', handleRefresh)
+    }, [fetchProfileData])
 
     // 🆕 捐贈進度讀取（獨立 useEffect，不影響現有邏輯）
     useEffect(() => {

@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react"
  */
 export function useScrollState() {
     const [isNavVisible, setIsNavVisible] = useState(true)
+    const [isAtTop, setIsAtTop] = useState(true) // 🆕 頂端感應狀態
     const [showTopButton, setShowTopButton] = useState(false)
     const lastScrollY = useRef(0)
     const scrollContainerRef = useRef<HTMLElement | null>(null)
@@ -25,6 +26,9 @@ export function useScrollState() {
 
             const currentScrollY = target.scrollTop
             
+            // 0. 處理頂端感應 (保留 10px 容錯)
+            setIsAtTop(currentScrollY < 10)
+
             // 1. 處理回頂部按鈕顯示 (絕對位置)
             setShowTopButton(currentScrollY > BUTTON_THRESHOLD)
 
@@ -59,5 +63,5 @@ export function useScrollState() {
         }
     }
 
-    return { isNavVisible, showTopButton, scrollToTop }
+    return { isNavVisible, isAtTop, showTopButton, scrollToTop }
 }
