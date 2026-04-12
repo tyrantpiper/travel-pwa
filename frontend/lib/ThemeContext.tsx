@@ -97,6 +97,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const root = document.documentElement
         const theme = ACCENT_COLORS[accentColor]
         root.style.setProperty("--accent-color", theme.primary)
+        root.style.setProperty("--primary", theme.primary) // 🆕 同步至 Tailwind 核心變數
         root.style.setProperty("--accent-gradient", `linear-gradient(135deg, var(--tw-gradient-stops))`)
     }, [accentColor, mounted])
 
