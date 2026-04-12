@@ -138,6 +138,17 @@ export function ItineraryView() {
 
     const [day, setDay] = useState(1)
 
+    // 🆕 2026: Integrated global refresh event listener
+    useEffect(() => {
+        const handleRefresh = () => {
+            debugLog("🔄 ItineraryView: Global refresh triggered via Tab Hub")
+            reloadTripDetail()
+            reloadTrips()
+        }
+        window.addEventListener('refresh-active-view', handleRefresh)
+        return () => window.removeEventListener('refresh-active-view', handleRefresh)
+    }, [reloadTripDetail, reloadTrips])
+
     // 🆕 2026: Sync local day to global store for AI Adaptive Resolution
     useEffect(() => {
         setFocusedDay(day)
