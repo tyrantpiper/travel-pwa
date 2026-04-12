@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
+import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl, MapLayerMouseEvent } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair } from "lucide-react"
 import { toast } from "sonner"
@@ -101,6 +101,8 @@ export default function FullscreenMapModal({
     const mapRef = useRef<MapRef>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const abortControllerRef = useRef<AbortController | null>(null)  // 🆕 P5: 取消前一個請求
+    const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
     const [mapMode, setMapMode] = useState<'standard' | 'satellite'>('standard')
     const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -444,6 +446,54 @@ export default function FullscreenMapModal({
         setPoiDrawerOpen(true)
     }, [t])
 
+    // 🆕 跨設備長按偵測 (手機/平板/電腦)
+    const handlePointerStart = useCallback((e: MapLayerMouseEvent) => {
+        const isTouchEvent = 'touches' in e.originalEvent
+        if (isTouchEvent && (e.originalEvent as unknown as TouchEvent).touches?.length > 1) return
+
+        const { x, y } = e.point
+        touchStartPosRef.current = { x, y }
+
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+
+        longPressTimerRef.current = setTimeout(() => {
+            handleMapLongPress(e)
+            longPressTimerRef.current = null
+        }, 500)
+    }, [handleMapLongPress])
+
+    const handlePointerMove = useCallback((e: MapLayerMouseEvent) => {
+        if (!touchStartPosRef.current) return
+
+        const { x, y } = e.point
+        const dist = Math.sqrt(
+            Math.pow(x - touchStartPosRef.current.x, 2) +
+            Math.pow(y - touchStartPosRef.current.y, 2)
+        )
+
+        if (dist > 10) {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+            }
+        }
+    }, [])
+
+    const handlePointerEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
+        touchStartPosRef.current = null
+    }, [])
+
+    // 🆕 卸載時清理定時器
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+        }
+    }, [])
+
     if (!isOpen) return null
 
     const showHistory = query.length === 0 && history.length > 0
@@ -468,6 +518,9 @@ export default function FullscreenMapModal({
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={mapMode === 'satellite' ? MAP_STYLES.SATELLITE : MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
+                    onMouseDown={handlePointerStart}
+                    onMouseMove={handlePointerMove}
+                    onMouseUp={handlePointerEnd}
                     onClick={handleMapClick}
                     onContextMenu={(e) => {
                         // 🆕 2026 Logic: 長按/右鍵 取點

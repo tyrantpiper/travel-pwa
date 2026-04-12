@@ -227,6 +227,8 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     const [isSearching, setIsSearching] = useState(false)
     const { history, addToHistory, clearHistory } = useSearchHistory()
     const inputRef = useRef<HTMLInputElement>(null)
+    const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
 
     // 🆕 輸入變更處理（立即回饋）
     const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -731,6 +733,56 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         setPoiDrawerOpen(true)
     }, [t])
 
+    // 🆕 跨設備長按偵測 (手機/平板/電腦)
+    const handlePointerStart = useCallback((e: MapLayerMouseEvent) => {
+        // 僅限單指觸控或滑鼠左鍵
+        const isTouchEvent = 'touches' in e.originalEvent
+        if (isTouchEvent && (e.originalEvent as unknown as TouchEvent).touches?.length > 1) return
+
+        const { x, y } = e.point
+        touchStartPosRef.current = { x, y }
+
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+
+        longPressTimerRef.current = setTimeout(() => {
+            handleMapLongPress(e)
+            longPressTimerRef.current = null
+        }, 500)
+    }, [handleMapLongPress])
+
+    const handlePointerMove = useCallback((e: MapLayerMouseEvent) => {
+        if (!touchStartPosRef.current) return
+
+        const { x, y } = e.point
+        const dist = Math.sqrt(
+            Math.pow(x - touchStartPosRef.current.x, 2) +
+            Math.pow(y - touchStartPosRef.current.y, 2)
+        )
+
+        // 若移動超過 10 像素，判定為平移而非長按，取消計時
+        if (dist > 10) {
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+            }
+        }
+    }, [])
+
+    const handlePointerEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
+        touchStartPosRef.current = null
+    }, [])
+
+    // 🆕 卸載時清理定時器
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+        }
+    }, [])
+
     // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
     const center = markers.length > 0
         ? { longitude: markers[0].lng, latitude: markers[0].lat }
@@ -991,6 +1043,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
+                    onMouseDown={handlePointerStart}
+                    onMouseMove={handlePointerMove}
+                    onMouseUp={handlePointerEnd}
                     onClick={(e) => {
                         // 防止點擊 UI 時觸發地圖點擊
                         if ((e.originalEvent.target as HTMLElement).closest('button')) return
