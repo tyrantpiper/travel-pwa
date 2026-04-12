@@ -729,7 +729,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
         setSelectedPOI(poiData)
         setPoiDrawerOpen(true)
-    }, [t, debugLog])
+    }, [t])
 
     // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
     const center = markers.length > 0
