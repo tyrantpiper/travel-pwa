@@ -441,6 +441,8 @@ class POIEnrichRequest(BaseModel):
     """POI 三源整合請求"""
     name: str
     wikidata_id: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 
 class POIRecommendRequest(BaseModel):

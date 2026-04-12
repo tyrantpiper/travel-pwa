@@ -87,7 +87,9 @@ Output in this EXACT JSON format (Traditional Chinese summary):
         ai_task = call_extraction(api_key, prompt, "POI_ENRICH")
         wiki_task = enrich_poi_complete({
             "name": request.name,
-            "wikidata_id": request.wikidata_id or ""
+            "wikidata_id": request.wikidata_id or "",
+            "lat": request.lat,
+            "lng": request.lng
         }, fastapi_req.app.state.client)
         
         ai_result, wiki_result = await asyncio.gather(ai_task, wiki_task, return_exceptions=True)
@@ -186,7 +188,9 @@ async def enrich_poi(fastapi_req: Request, body: POIEnrichRequest):
     try:
         poi = {
             "name": body.name,
-            "wikidata_id": body.wikidata_id or ""
+            "wikidata_id": body.wikidata_id or "",
+            "lat": body.lat,
+            "lng": body.lng
         }
         
         enriched = await enrich_poi_complete(poi, fastapi_req.app.state.client)
