@@ -76,8 +76,8 @@ export default function POIPreviewCard({
                     lng: poiData.lng || 0,
                     api_key: getSecureApiKey()
                 }, userId || undefined)
-                if (data.success && data.poi) {
-                    setEnriched(data.poi)
+                if (data && (data.cultural_desc || data.name)) {
+                    setEnriched(data as any)
                 }
             } catch (error) {
                 debugLog("三源資料獲取失敗 (不影響主流程):", error)
