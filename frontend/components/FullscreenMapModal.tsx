@@ -112,6 +112,9 @@ export default function FullscreenMapModal({
     const [showSearch, setShowSearch] = useState(false)
     const { history, addToHistory } = useSearchHistory()
 
+    // 📍 紅色大頭針狀態 (搜尋結果或手動點選)
+    const [searchResultMarker, setSearchResultMarker] = useState<{ lat: number; lng: number; name: string } | null>(null)
+
     // POI Drawer 狀態
     const [poiDrawerOpen, setPoiDrawerOpen] = useState(false)
     const [selectedPOI, setSelectedPOI] = useState<POIBasicData | null>(null)
@@ -290,6 +293,9 @@ export default function FullscreenMapModal({
             duration: 1500
         })
 
+        // 🆕 設置標記點（紅色大頭針）
+        setSearchResultMarker({ lat: result.lat, lng: result.lng, name: result.name })
+
         // 建立 POI 並開啟 Drawer
         setSelectedPOI({
             name: result.name,
@@ -404,15 +410,38 @@ export default function FullscreenMapModal({
                 return t('map_location_point')
             }
 
-            setSelectedPOI({
+            const poiData: POIBasicData = {
                 name: getName(),
                 type: props.class || props.subclass || 'place',
                 lat: coords[1] as number,
                 lng: coords[0] as number,
                 address: props.address
-            })
+            }
+
+            // 🆕 設置標記點（紅色大頭針）
+            setSearchResultMarker({ lat: poiData.lat, lng: poiData.lng, name: poiData.name })
+
+            setSelectedPOI(poiData)
             setPoiDrawerOpen(true)
         }
+    }, [t])
+
+    // 🆕 2026 Logic: 處理地圖長按 (任意取點)
+    const handleMapLongPress = useCallback((e: maplibregl.MapLayerMouseEvent) => {
+        const { lng, lat } = e.lngLat
+
+        const poiData: POIBasicData = {
+            name: t('map_location_point'),
+            type: 'place',
+            lat: lat,
+            lng: lng,
+        }
+
+        // 設置標記點（紅色大頭針）
+        setSearchResultMarker({ lat, lng, name: poiData.name })
+
+        setSelectedPOI(poiData)
+        setPoiDrawerOpen(true)
     }, [t])
 
     if (!isOpen) return null
@@ -440,6 +469,11 @@ export default function FullscreenMapModal({
                     mapStyle={mapMode === 'satellite' ? MAP_STYLES.SATELLITE : MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
                     onClick={handleMapClick}
+                    onContextMenu={(e) => {
+                        // 🆕 2026 Logic: 長按/右鍵 取點
+                        e.originalEvent.preventDefault()
+                        handleMapLongPress(e)
+                    }}
                     attributionControl={false}
                     minZoom={3}
                     maxZoom={20}
@@ -492,6 +526,45 @@ export default function FullscreenMapModal({
                             <div className="relative">
                                 <div className="absolute -inset-3 bg-blue-400/30 rounded-full animate-ping" />
                                 <div className="w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg" />
+                            </div>
+                        </Marker>
+                    )}
+
+                    {/* 🆕 搜尋結果標記（紅色大頭針） */}
+                    {searchResultMarker && (
+                        <Marker
+                            key="search-pin"
+                            longitude={searchResultMarker.lng}
+                            latitude={searchResultMarker.lat}
+                            anchor="bottom"
+                        >
+                            <div className="relative animate-bounce" style={{ animationDuration: '0.6s', animationIterationCount: 3 }}>
+                                {/* 陰影 */}
+                                <div
+                                    className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-black/30 rounded-full blur-sm"
+                                />
+                                {/* 大頭針 */}
+                                <div className="relative">
+                                    {/* 針體 */}
+                                    <div
+                                        className="w-8 h-8 bg-red-500 rounded-full border-3 border-white shadow-lg flex items-center justify-center"
+                                        style={{
+                                            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5), 0 2px 4px rgba(0,0,0,0.2)'
+                                        }}
+                                    >
+                                        <div className="w-2 h-2 bg-white rounded-full" />
+                                    </div>
+                                    {/* 針尖 */}
+                                    <div
+                                        className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                                        style={{
+                                            borderLeft: '6px solid transparent',
+                                            borderRight: '6px solid transparent',
+                                            borderTop: '10px solid #ef4444',
+                                            top: '26px'
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </Marker>
                     )}
@@ -699,7 +772,10 @@ export default function FullscreenMapModal({
                 {/* 📍 POI Detail Drawer */}
                 <POIDetailDrawer
                     isOpen={poiDrawerOpen}
-                    onClose={() => setPoiDrawerOpen(false)}
+                    onClose={() => {
+                        setPoiDrawerOpen(false)
+                        setSearchResultMarker(null)
+                    }}
                     poi={selectedPOI}
                     suggestedTime="12:00"
                     onAddToItinerary={(poi, time, aiSummary) => {

@@ -703,10 +703,33 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 opening_hours: props.opening_hours
             }
 
+            // 🆕 設置標記點（紅色大頭針）- 達成點選即出現大頭針需求
+            setSearchResultMarker({ lat: poiData.lat, lng: poiData.lng, name: poiData.name })
+
             setSelectedPOI(poiData)
             setPoiDrawerOpen(true)
         }
     }, [t])
+
+    // 🆕 2026 Logic: 處理地圖長按 (任意取點)
+    const handleMapLongPress = useCallback((e: MapLayerMouseEvent) => {
+        const { lng, lat } = e.lngLat
+
+        const poiData: POIBasicData = {
+            name: t('map_location_point'),
+            type: 'place',
+            lat: lat,
+            lng: lng,
+        }
+
+        debugLog("📍 Long press at:", { lat, lng })
+
+        // 設置標記點（紅色大頭針）
+        setSearchResultMarker({ lat, lng, name: poiData.name })
+
+        setSelectedPOI(poiData)
+        setPoiDrawerOpen(true)
+    }, [t, debugLog])
 
     // 🆕 即使沒有活動也顯示地圖 (優先順序: 活動 -> 當日地點 -> 台灣全景)
     const center = markers.length > 0
@@ -973,6 +996,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         if ((e.originalEvent.target as HTMLElement).closest('button')) return
                         handleMapClick(e)
                     }}
+                    onContextMenu={(e) => {
+                        // 🆕 2026 Logic: 長按/右鍵 取點
+                        e.originalEvent.preventDefault()
+                        handleMapLongPress(e)
+                    }}
                     attributionControl={false}
                     minZoom={3}
                     maxZoom={20}
@@ -1214,7 +1242,10 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 {/* 🆕 POI Detail Drawer (Moved INSIDE container for Local Containment) */}
                 <POIDetailDrawer
                     isOpen={poiDrawerOpen}
-                    onClose={() => setPoiDrawerOpen(false)}
+                    onClose={() => {
+                        setPoiDrawerOpen(false)
+                        setSearchResultMarker(null)
+                    }}
                     poi={selectedPOI}
                     isInternal={true}
                     suggestedTime={(() => {
