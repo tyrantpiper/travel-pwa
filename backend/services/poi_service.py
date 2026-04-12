@@ -526,7 +526,7 @@ async def enrich_poi_with_wikivoyage(poi: Dict, lang: str = "en", client: httpx.
 
 from utils.url_safety import is_safe_url
 
-async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.AsyncClient = None) -> str:
+async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.AsyncClient = None, is_retry: bool = False, lat: float = None, lng: float = None) -> tuple[str, str]:
     """
     從 Wikipedia 獲取景點簡介 (200 字以內，共享 Client 與 Semaphore)
     """
@@ -534,20 +534,67 @@ async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.Async
     allowed_langs = {"en", "zh", "ja", "ko", "fr", "de", "es", "it", "ru", "pt"}
     if lang not in allowed_langs:
         print(f"[POI] Blocked potential SSRF attempt with invalid Wikipedia lang: {lang}")
-        return ""
+        return "", ""
 
     start_time = time.time()
     try:
-        # Wikipedia REST API 規範：空格應轉為下底線 _
-        clean_name = name.strip().replace(' ', '_')
-        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(clean_name)}"
-        if not is_safe_url(url):
-            return ""
-
         headers = {
             "User-Agent": "RyanTravelApp/1.2 (contact@example.com)",
             "Accept": "application/json"
         }
+
+        # 📍 優先權加固 (Phase 6.10)：十倍視野優化，確保密集景區地標不遺漏
+        if lat is not None and lng is not None and not is_retry:
+            geo_url = f"https://{lang}.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord={lat}|{lng}&gsradius=1000&gslimit=10&format=json"
+            if is_safe_url(geo_url): # 🛡️ 安全防護不中斷
+                try:
+                    if client:
+                        geo_resp = await client.get(geo_url, headers=headers)
+                    else:
+                        async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                            geo_resp = await temp_client.get(geo_url, headers=headers)
+                            
+                    if geo_resp.status_code == 200:
+                        geo_data = geo_resp.json()
+                        geosearch_results = geo_data.get("query", {}).get("geosearch", [])
+                        if geosearch_results:
+                            # 🎯 智慧選擇：從附近條目中找名字最契合的 (擴大檢索深度至 10)
+                            best_title = geosearch_results[0]["title"]
+                            
+                            # 第一輪：嘗試全字包含 (掃描前 10 項)
+                            found_exact = False
+                            for entry in geosearch_results[:10]:
+                                t = entry["title"]
+                                if name in t or t in name:
+                                    best_title = t
+                                    found_exact = True
+                                    break
+                            
+                            # 第二輪：智慧分詞比對 (處理中正廟 -> 中正紀念堂, 自由廣場 -> 自由廣場 (台北))
+                            if not found_exact:
+                                # 🧠 智慧分詞：生成所有可能的 2 字片段 (N-grams) 提高命中率
+                                search_fragments = [name[i:i+2] for i in range(len(name)-1)]
+                                # 同時保留原始 split 部份 (針對英文關鍵字)
+                                search_fragments.extend([p for p in name.split() if len(p) >= 2])
+                                
+                                # 擴大比對深度至前 10 名
+                                for entry in geosearch_results[:10]:
+                                    entry_t = entry["title"]
+                                    if any(frag in entry_t for frag in search_fragments):
+                                        best_title = entry_t
+                                        break
+                                
+                                # 如果地理搜尋找到了精確條目，直接跳轉
+                                print(f"📍 [Wiki Geosearch] Found best nearby match: {best_title}")
+                                return await get_wikipedia_summary(best_title, lang=lang, client=client, is_retry=True, lat=lat, lng=lng)
+                except Exception as e:
+                    print(f"⚠️ [Wiki Geosearch] Priority check failed: {e}")
+
+        # Wikipedia REST API 規範：空格應轉為下底線 _
+        clean_name = name.strip().replace(' ', '_')
+        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote(clean_name)}"
+        if not is_safe_url(url):
+            return "", ""
         
         async with WIKI_SEMAPHORE:
             if client:
@@ -572,6 +619,25 @@ async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.Async
             else:
                 _, requests_metric = _get_poi_metrics()
                 requests_metric.labels(source="wikipedia", status="error").inc()
+                
+                # 🆕 智慧搜尋保底：當直接查無結果 (404) 時
+                if response.status_code == 404 and not is_retry:
+                    # 備案：關鍵字搜尋 (OpenSearch)
+                    search_url = f"https://{lang}.wikipedia.org/w/api.php?action=opensearch&search={quote(name)}&limit=1&format=json"
+                    try:
+                        if client:
+                            search_resp = await client.get(search_url, headers=headers)
+                        else:
+                            async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                                search_resp = await temp_client.get(search_url, headers=headers)
+                                
+                        if search_resp.status_code == 200:
+                            search_data = search_resp.json()
+                            if len(search_data) > 1 and search_data[1]:
+                                best_title = search_data[1][0]
+                                return await get_wikipedia_summary(best_title, lang=lang, client=client, is_retry=True, lat=lat, lng=lng)
+                    except Exception as search_err:
+                        print(f"⚠️ [Wiki Search] Fallback search failed for '{name}': {search_err}")
     except Exception as e:
         _, requests_metric = _get_poi_metrics()
         requests_metric.labels(source="wikipedia", status="exception").inc()
@@ -580,7 +646,7 @@ async def get_wikipedia_summary(name: str, lang: str = "zh", client: httpx.Async
     # 語言 fallback: zh → ja → en
     fallback_order = {"zh": "ja", "ja": "en"}
     if lang in fallback_order:
-        return await get_wikipedia_summary(name, fallback_order[lang], client=client)
+        return await get_wikipedia_summary(name, fallback_order[lang], client=client, lat=lat, lng=lng)
     
     return "", "" # 🆕 Phase 5.3.2: Return tuple
 
@@ -700,11 +766,14 @@ async def enrich_poi_complete(poi: Dict, client: httpx.AsyncClient = None) -> Di
     poi["resolved_language"] = "zh-TW" # Default
     poi["image_url"] = ""              # 🆕 Phase 5.3.1 Safety Init
     
+    lat = poi.get("lat")
+    lng = poi.get("lng")
+    
     # 並行查詢三個來源 (每項 3s Timeout 防護)
     try:
         tasks = [
             asyncio.wait_for(get_wikidata_labels(wikidata_id, client=client), 6.0) if wikidata_id else asyncio.sleep(0),
-            asyncio.wait_for(get_wikipedia_summary(name, client=client), 6.0),
+            asyncio.wait_for(get_wikipedia_summary(name, client=client, lat=lat, lng=lng), 6.0),
             asyncio.wait_for(search_wikivoyage(name, client=client), 6.0)
         ]
         
@@ -730,7 +799,7 @@ async def enrich_poi_complete(poi: Dict, client: httpx.AsyncClient = None) -> Di
         # 定義：內部抓取函式 (方便 fallback 時重用)
         async def fetch_wiki(title_to_fetch: str):
             if not title_to_fetch: return "", ""
-            return await get_wikipedia_summary(title_to_fetch, client=client)
+            return await get_wikipedia_summary(title_to_fetch, client=client, lat=lat, lng=lng)
 
         if isinstance(res1, asyncio.TimeoutError):
             poi["warnings"].append("WIKIPEDIA_TIMEOUT")
@@ -766,7 +835,7 @@ async def enrich_poi_complete(poi: Dict, client: httpx.AsyncClient = None) -> Di
             if best_title:
                 try:
                     # 使用 2s timeout 進行二次抓取
-                    res_fallback = await asyncio.wait_for(get_wikipedia_summary(best_title, lang=target_lang, client=client), 2.0)
+                    res_fallback = await asyncio.wait_for(get_wikipedia_summary(best_title, lang=target_lang, client=client, lat=lat, lng=lng), 2.0)
                     if isinstance(res_fallback, tuple):
                         wikipedia_result, wikipedia_image = res_fallback
                         # 如果不是中文且抓取成功，標記需要翻譯
