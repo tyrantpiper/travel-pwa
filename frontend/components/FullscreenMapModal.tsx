@@ -103,6 +103,7 @@ export default function FullscreenMapModal({
     const abortControllerRef = useRef<AbortController | null>(null)  // 🆕 P5: 取消前一個請求
     const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const isMoveDetectedRef = useRef(false)
     const [mapMode, setMapMode] = useState<'standard' | 'satellite'>('standard')
     const [mapLoaded, setMapLoaded] = useState(false)
 
@@ -453,6 +454,7 @@ export default function FullscreenMapModal({
 
         const { x, y } = e.point
         touchStartPosRef.current = { x, y }
+        isMoveDetectedRef.current = false
 
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
 
@@ -471,7 +473,9 @@ export default function FullscreenMapModal({
             Math.pow(y - touchStartPosRef.current.y, 2)
         )
 
-        if (dist > 10) {
+        // 🆕 2026 修復：若移動超過 5 像素，判定為平移並鎖定狀態，取消長按計時
+        if (dist > 5) {
+            isMoveDetectedRef.current = true
             if (longPressTimerRef.current) {
                 clearTimeout(longPressTimerRef.current)
                 longPressTimerRef.current = null
@@ -485,6 +489,15 @@ export default function FullscreenMapModal({
             longPressTimerRef.current = null
         }
         touchStartPosRef.current = null
+    }, [])
+
+    // 🆕 2026 修復：監聽地圖原生移動事件，一旦開始平移則鎖定狀態並取消計時
+    const handleMapMoveStart = useCallback(() => {
+        isMoveDetectedRef.current = true
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
     }, [])
 
     // 🆕 卸載時清理定時器
@@ -518,14 +531,17 @@ export default function FullscreenMapModal({
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={mapMode === 'satellite' ? MAP_STYLES.SATELLITE : MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
+                    onMoveStart={handleMapMoveStart}
                     onMouseDown={handlePointerStart}
                     onMouseMove={handlePointerMove}
                     onMouseUp={handlePointerEnd}
                     onClick={handleMapClick}
                     onContextMenu={(e) => {
-                        // 🆕 2026 Logic: 長按/右鍵 取點
+                        // 🆕 2026 修復：僅在非觸控移動時允許觸發長按邏輯
                         e.originalEvent.preventDefault()
-                        handleMapLongPress(e)
+                        if (!isMoveDetectedRef.current) {
+                            handleMapLongPress(e)
+                        }
                     }}
                     attributionControl={false}
                     minZoom={3}
