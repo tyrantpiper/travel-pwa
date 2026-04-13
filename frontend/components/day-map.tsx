@@ -229,6 +229,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     const inputRef = useRef<HTMLInputElement>(null)
     const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const isMoveDetectedRef = useRef(false)
 
     // 🆕 輸入變更處理（立即回饋）
     const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -741,6 +742,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
         const { x, y } = e.point
         touchStartPosRef.current = { x, y }
+        isMoveDetectedRef.current = false
 
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
 
@@ -759,8 +761,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             Math.pow(y - touchStartPosRef.current.y, 2)
         )
 
-        // 若移動超過 10 像素，判定為平移而非長按，取消計時
-        if (dist > 10) {
+        // 🆕 2026 修復：若移動超過 5 像素，判定為平移並鎖定狀態，取消長按計時
+        if (dist > 5) {
+            isMoveDetectedRef.current = true
             if (longPressTimerRef.current) {
                 clearTimeout(longPressTimerRef.current)
                 longPressTimerRef.current = null
@@ -774,6 +777,15 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             longPressTimerRef.current = null
         }
         touchStartPosRef.current = null
+    }, [])
+
+    // 🆕 2026 修復：監聽地圖原生移動事件，一旦開始平移則鎖定狀態並取消計時
+    const handleMapMoveStart = useCallback(() => {
+        isMoveDetectedRef.current = true
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
     }, [])
 
     // 🆕 卸載時清理定時器
@@ -1043,6 +1055,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     style={{ width: "100%", height: "100%" }}
                     mapStyle={MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
+                    onMoveStart={handleMapMoveStart}
                     onMouseDown={handlePointerStart}
                     onMouseMove={handlePointerMove}
                     onMouseUp={handlePointerEnd}
@@ -1052,9 +1065,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         handleMapClick(e)
                     }}
                     onContextMenu={(e) => {
-                        // 🆕 2026 Logic: 長按/右鍵 取點
+                        // 🆕 2026 修復：僅在非觸控移動時允許觸發長按邏輯
                         e.originalEvent.preventDefault()
-                        handleMapLongPress(e)
+                        if (!isMoveDetectedRef.current) {
+                            handleMapLongPress(e)
+                        }
                     }}
                     attributionControl={false}
                     minZoom={3}
