@@ -10,14 +10,14 @@ import string
 
 def generate_room_code() -> str:
     """
-    產生 4 位數房間代碼
+    產生 6 位數房間代碼 (系統兼容 4~6 位數)
     
     用於行程分享功能，讓用戶可以透過房間碼加入行程。
     
     Returns:
-        str: 4 位數的隨機數字字串 (e.g., "1234", "0987")
+        str: 6 位數的隨機數字字串 (e.g., "123456", "098765")
     """
-    return ''.join(random.choices(string.digits, k=4))
+    return ''.join(random.choices(string.digits, k=6))
 
 def generate_public_id() -> str:
     """
