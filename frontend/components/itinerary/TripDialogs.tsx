@@ -134,8 +134,8 @@ export function JoinTripDialog({
     const [isLoading, setIsLoading] = useState(false)
 
     const handleJoin = async () => {
-        if (joinCode.length !== 4) {
-            toast.warning("Please enter 4-digit code")
+        if (joinCode.length < 4 || joinCode.length > 6) {
+            toast.warning(t('warning_code_length') || "請輸入 4 到 6 位數代碼")
             return
         }
         setIsLoading(true)
@@ -166,14 +166,14 @@ export function JoinTripDialog({
                 <DialogHeader>
                     <DialogTitle>{t('enter_trip_code')}</DialogTitle>
                     <DialogDescription className="sr-only">
-                        輸入 4 位數共享代碼加入現有行程
+                        輸入 4 到 6 位數共享代碼加入現有行程
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <Input
-                        placeholder="8821"
-                        className="text-center text-2xl tracking-[0.5em] font-mono uppercase h-14"
-                        maxLength={4}
+                        placeholder={t('join_trip_placeholder') || "輸入代碼"}
+                        className="text-center text-2xl tracking-[0.3em] font-mono uppercase h-14"
+                        maxLength={6}
                         value={joinCode}
                         onChange={(e) => setJoinCode(e.target.value)}
                     />
