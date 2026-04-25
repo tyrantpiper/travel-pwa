@@ -238,7 +238,22 @@ export const translations = {
         profile_pref_interest: "Interest",
         profile_pref_accommodation: "Accommodation",
         profile_pref_transport: "Transport",
-        profile_pref_other: "Other"
+        profile_pref_other: "Other",
+        // Notifications
+        notif_title: "Notifications",
+        notif_read_all: "Read all",
+        notif_empty: "No notifications yet",
+        notif_just_now: "Just now",
+        notif_enable_title: "Enable Travel Alerts",
+        notif_enable_desc: "Get instant updates when buddies join, expenses are added, and trip countdowns — never miss a beat!",
+        notif_enable_btn: "Enable Notifications",
+        notif_enabling: "Enabling...",
+        notif_later: "Maybe later",
+        notif_enabled: "Notifications Enabled 🎉",
+        notif_enabled_desc: "You won't miss any travel updates",
+        notif_blocked: "Notifications Blocked",
+        notif_blocked_desc: "Please allow notifications in your browser settings, then try again.",
+        notif_got_it: "Got it"
     },
     zh: {
         // Common
@@ -464,6 +479,21 @@ export const translations = {
         ai_one_click_import: "立即匯入行程",
         ai_ready_to_import: "行程已準備好匯入！",
         api_key_required_msg: "請到下方導覽列的「個人檔案」頁面設定 Gemini API Key",
+        // Notifications
+        notif_title: "通知",
+        notif_read_all: "全部已讀",
+        notif_empty: "暫無通知",
+        notif_just_now: "剛剛",
+        notif_enable_title: "開啟旅行通知",
+        notif_enable_desc: "即時收到同伴加入行程、費用更新、出發倒數提醒，不錯過任何旅行動態！",
+        notif_enable_btn: "開啟通知",
+        notif_enabling: "啟用中...",
+        notif_later: "稍後再說",
+        notif_enabled: "通知已開啟 🎉",
+        notif_enabled_desc: "你不會錯過任何旅行動態了",
+        notif_blocked: "通知被封鎖了",
+        notif_blocked_desc: "請在瀏覽器設定中允許通知權限，然後重新開啟此功能。",
+        notif_got_it: "知道了"
     }
 }
 
