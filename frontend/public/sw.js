@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tabidachi-v5'
-const STATIC_CACHE = 'tabidachi-static-v5'
+const CACHE_NAME = 'tabidachi-v6'
+const STATIC_CACHE = 'tabidachi-static-v6'
 
 // 需要緩存的靜態資源
 const STATIC_ASSETS = [
@@ -90,5 +90,44 @@ self.addEventListener('fetch', (event) => {
     // 其他請求：Network First 策略
     event.respondWith(
         fetch(request).catch(() => caches.match(request))
+    )
+})
+
+// === Web Push Notification Handler ===
+// 接收伺服器推播，顯示系統通知
+self.addEventListener('push', (event) => {
+    const data = event.data ? event.data.json() : {}
+    const title = data.title || 'Tabidachi'
+    const options = {
+        body: data.body || '',
+        icon: '/icon.png',
+        badge: '/icon.png',
+        tag: data.tag || 'default',
+        data: { link: data.link || '/' },
+        vibrate: [100, 50, 100]
+    }
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    )
+})
+
+// === Notification Click Handler ===
+// 點擊通知後導航到對應頁面
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close()
+    const link = event.notification.data?.link || '/'
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // 如果已有開啟的視窗，聚焦並導航
+            for (const client of clientList) {
+                if (client.url.includes(self.location.origin) && 'focus' in client) {
+                    client.focus()
+                    client.navigate(link)
+                    return
+                }
+            }
+            // 否則開新視窗
+            return clients.openWindow(link)
+        })
     )
 })
