@@ -373,7 +373,7 @@ export function ActivityEditModal({
                             </div>
 
                             {placeSearchResults.length > 0 && (
-                                <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2 bg-slate-50">
+                                <div className="space-y-1 max-h-40 overflow-y-auto overflow-x-hidden border rounded-lg p-2 bg-slate-50">
                                     {placeSearchResults.map((loc, idx) => {
                                         const icon = TYPE_LABELS[loc.type || ''] || '📍'
                                         return (
@@ -383,13 +383,13 @@ export function ActivityEditModal({
                                                 className="w-full text-left p-3 rounded-lg hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-colors"
                                                 onClick={() => handleSelectLocation(loc)}
                                             >
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 min-w-0">
                                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200">
                                                         {icon} {loc.type || (zh ? '地點' : 'Place')}
                                                     </span>
-                                                    <span className="font-bold text-sm text-slate-800">{loc.name}</span>
+                                                    <span className="font-bold text-sm text-slate-800 truncate">{loc.name}</span>
                                                 </div>
-                                                <div className="text-[10px] text-slate-500 line-clamp-1 truncate">
+                                                <div className="text-[10px] text-slate-500 truncate">
                                                     {loc.display_name}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5">

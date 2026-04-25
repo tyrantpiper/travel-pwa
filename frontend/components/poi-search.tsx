@@ -191,10 +191,10 @@ export function POISearch({ centerLat, centerLng, onSelectPOI, className }: POIS
                                             onClick={() => onSelectPOI?.(poi)}
                                         >
                                             <div className="flex justify-between items-start">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 min-w-0">
                                                         <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                                        <span className="font-medium text-slate-800 text-sm">
+                                                        <span className="font-medium text-slate-800 text-sm truncate">
                                                             {poi.name}
                                                         </span>
                                                     </div>
