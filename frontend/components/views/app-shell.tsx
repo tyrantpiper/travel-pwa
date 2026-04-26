@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { PushPermissionPrompt } from "@/components/notifications/push-permission-prompt"
 import dynamic from "next/dynamic"
 import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
@@ -75,6 +76,23 @@ export function AppShell() {
     // 💡 Preheat 旗標：決定是否在背景偷偷加載並渲染隱藏視圖
     const [shouldPreheat, setShouldPreheat] = useState(false)
 
+    // 🔔 推播授權引導（首次登入 3 秒後顯示）
+    const [showPushPrompt, setShowPushPrompt] = useState(false)
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (
+                typeof window !== "undefined" &&
+                "Notification" in window &&
+                Notification.permission === "default" &&
+                !localStorage.getItem("push_prompt_dismissed")
+            ) {
+                setShowPushPrompt(true)
+            }
+        }, 3000)
+        return () => clearTimeout(timer)
+    }, [])
+
     // 🆕 滾動狀態監測 (2026 Smart UI)
     const { isNavVisible, isAtTop, scrollToTop } = useScrollState()
     const haptic = useHaptic() // 🆕 震動回饋
@@ -120,6 +138,13 @@ export function AppShell() {
     return (
         <>
             <OfflineBanner />
+            <PushPermissionPrompt
+                isOpen={showPushPrompt}
+                onClose={() => {
+                    setShowPushPrompt(false)
+                    localStorage.setItem("push_prompt_dismissed", "1")
+                }}
+            />
             <div className="h-screen bg-background flex flex-col overflow-hidden">
                 <main className="flex-1 flex flex-col min-h-0" data-scroll="true">
                     {/* 🔔 通知鈴鐺 — 右上角固定定位 */}

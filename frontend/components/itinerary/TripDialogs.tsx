@@ -11,6 +11,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { useHaptic } from "@/lib/hooks"
 import { Plus, Hash, Loader2 } from "lucide-react"
 import { tripsApi } from "@/lib/api"
+import { PushPermissionPrompt } from "@/components/notifications/push-permission-prompt"
 
 interface CreateTripModalProps {
     isOpen: boolean
@@ -132,6 +133,7 @@ export function JoinTripDialog({
     const { t } = useLanguage()
     const [joinCode, setJoinCode] = useState("")
     const [isLoading, setIsLoading] = useState(false)
+    const [showPushPrompt, setShowPushPrompt] = useState(false)
 
     const handleJoin = async () => {
         if (joinCode.length < 4 || joinCode.length > 6) {
@@ -150,11 +152,16 @@ export function JoinTripDialog({
             toast.success("Joined!")
             setJoinCode("")
             onSuccess()
+            // 🔔 加入行程成功後，引導推播授權
+            if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+                setTimeout(() => setShowPushPrompt(true), 800)
+            }
         } catch { toast.error("Trip not found") }
         finally { setIsLoading(false) }
     }
 
     return (
+        <>
         <Dialog>
             <DialogTrigger asChild>
                 <Button className="h-24 bg-slate-900 text-white hover:bg-slate-800 rounded-2xl flex flex-col gap-2 shadow-lg">
@@ -183,5 +190,10 @@ export function JoinTripDialog({
                 </div>
             </DialogContent>
         </Dialog>
+        <PushPermissionPrompt
+            isOpen={showPushPrompt}
+            onClose={() => setShowPushPrompt(false)}
+        />
+        </>
     )
 }
