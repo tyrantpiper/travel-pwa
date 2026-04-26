@@ -11,7 +11,7 @@ Zero-Touch Fidelity: This is a NEW file with no impact on existing code.
 
 import re
 from typing import Dict, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, unquote_plus
 
 
 class MolecularParser:
@@ -134,7 +134,7 @@ class MolecularParser:
         for pattern in self.place_patterns:
             match = pattern.search(decoded_url)
             if match:
-                place_name = match.group(1).replace('+', ' ').strip()
+                place_name = unquote_plus(match.group(1)).strip()
                 if place_name:
                     return place_name
         
