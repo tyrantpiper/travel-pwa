@@ -13,7 +13,7 @@ import re
 import httpx
 import asyncio
 from typing import Dict, List, Optional
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, unquote_plus
 
 
 from utils.url_safety import is_safe_url
@@ -91,7 +91,7 @@ class SmartRedirectTracer:
                         name_match = pattern.search(current_url)
                         if name_match:
                             try:
-                                name = unquote(name_match.group(1)).replace("+", " ")
+                                name = unquote_plus(name_match.group(1))
                                 if name and len(name) > 2: # Ignore too short fragments
                                     all_names.append(name)
                                     print(f"[Tracer] Hop {hop}: Captured Name DNA: {name}")
@@ -113,6 +113,15 @@ class SmartRedirectTracer:
                         next_url = resp.headers.get('Location')
                         if not next_url:
                             break
+                        
+                        # 🐞 Fix encoding of Location header (Anti-Acidosis for non-ASCII URLs)
+                        # httpx decodes HTTP headers as ISO-8859-1 (Latin-1) by default.
+                        # If Google Maps returns raw UTF-8 bytes (e.g., Chinese addresses),
+                        # they get mangled. We recover the original bytes and decode as utf-8.
+                        try:
+                            next_url = next_url.encode('latin-1').decode('utf-8')
+                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            pass
                         
                         # Handle relative path redirects
                         if next_url.startswith('/'):

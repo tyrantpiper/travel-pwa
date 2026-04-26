@@ -3,7 +3,8 @@ import re
 import os
 import random
 import time as _time
-import urllib.parse
+from urllib.parse import unquote, unquote_plus
+import urllib.parse  # Keep original for other uses if any
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 from datetime import datetime
@@ -88,6 +89,8 @@ RE_QUERY = re.compile(r'[?&](?:q|query|place_name)=([^&]+)')
 # Pattern D: /place/NAME/... or /search/NAME/... (Modern Google Maps Path Style)
 RE_PLACE_PATH = re.compile(r'/place/([^/@]+)')
 RE_SEARCH_PATH = re.compile(r'/search/([^/?&]+)')
+# Pattern F: staticmap?center=lat,lng (Metadata extraction)
+RE_STATICMAP = re.compile(r'center=(-?\d+\.\d+)(?:%2C|,)(-?\d+\.\d+)')
 
 async def fetch_og_metadata(url: str) -> Dict[str, Any]:
     """
@@ -163,6 +166,15 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
                 if any(icon in metadata["image"] for icon in ["maps_512dp.png", "maps_icon_60.png"]):
                     print(f"[Filter] Generic Google Maps logo skipped: {metadata['image']}")
                     metadata["image"] = None
+                
+                # 🆕 v35.94: Metadata Coordinate Extraction (Tier 2.5)
+                # If image is a staticmap, it contains precise POI coordinates
+                if metadata["image"] and "staticmap" in metadata["image"]:
+                    sm_match = RE_STATICMAP.search(metadata["image"])
+                    if sm_match:
+                        metadata["lat"] = float(sm_match.group(1))
+                        metadata["lng"] = float(sm_match.group(2))
+                        print(f"[MetadataEngine] Found coordinates in staticmap: ({metadata['lat']}, {metadata['lng']})")
             
             # 5. 回退機制 - Title & Description
             if not metadata["title"] and soup.title:
@@ -297,7 +309,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     match_q = RE_QUERY.search(final_url)
     if match_q:
         try:
-            query = urllib.parse.unquote(match_q.group(1))
+            query = unquote_plus(match_q.group(1))
             result["query"] = query
             result["method"] = f"{result['method']}+query"
         except Exception:
@@ -371,8 +383,16 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         except Exception as gas_e:
             print(f"[GAS Rescue] Exception: {gas_e}")
 
-    # Step 4: Fetch Metadata (Visuals)
+    # Step 4: Fetch Metadata (Visuals + 🛰️ Metadata Rescue)
     result["metadata"] = await fetch_og_metadata(final_url)
+    
+    # 🛰️ Metadata Rescue (Tier 2.5)
+    # 如果本地引擎和 GAS 都失敗，但 Metadata 抓到了 StaticMap 座標
+    if not result["lat"] and result["metadata"].get("lat"):
+        result["lat"] = result["metadata"]["lat"]
+        result["lng"] = result["metadata"]["lng"]
+        result["method"] = f"{result.get('method', 'none')}+metadata_rescue"
+        print(f"[MetadataRescue] Recovered coordinates from staticmap: ({result['lat']}, {result['lng']})")
     
     # 🕵️ v35.84: DNA-Level Name Recovery (Full Cascade)
     # If title is generic "Google Maps" or missing, use a priority chain to recover the real name
@@ -392,7 +412,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
             place_match = RE_PLACE_PATH.search(final_url)
             if place_match:
                 try:
-                    recovered_name = urllib.parse.unquote(place_match.group(1)).replace("+", " ")
+                    recovered_name = unquote_plus(place_match.group(1))
                     print(f"[DNA-Recovery] P2 (Place Path): {recovered_name}")
                 except: pass
                 
