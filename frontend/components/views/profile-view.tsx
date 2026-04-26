@@ -5,7 +5,7 @@ import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
     ChevronDown, ChevronUp, Brain, // 🆕 AI 記憶圖示
-    BookOpen, Mail, Check  // 🆕 使用說明與聯絡圖示
+    BookOpen, Mail, Check, BellRing  // 🆕 使用說明、聯絡、推播圖示
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -38,6 +38,7 @@ import { usersApi, appApi } from "@/lib/api"
 import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
 import { encryptData, getSecureApiKey } from "@/lib/security"
+import { usePushNotifications } from "@/lib/hooks/usePushNotifications"
 
 
 
@@ -84,6 +85,9 @@ export function ProfileView() {
     const [contactDialogOpen, setContactDialogOpen] = useState(false)
     const [copied, setCopied] = useState(false)
  // 🧠 AI 記憶展開狀態
+
+    // 🔔 推播通知狀態
+    const { permissionState, isSubscribed, subscribe, unsubscribe, isSupported, isLoading: isPushLoading } = usePushNotifications()
 
     const fetchProfileData = useCallback(async (isMounted: boolean) => {
         const userId = localStorage.getItem("user_uuid")
@@ -1138,6 +1142,40 @@ export function ProfileView() {
                         <Separator />
                         <MenuItem icon={User} label={t('account_settings')} />
                         <Separator />
+                        {/* 🔔 推播通知開關 */}
+                        {isSupported && (
+                            <>
+                                <div className="flex items-center justify-between p-4 text-slate-700 dark:text-slate-200">
+                                    <div className="flex items-center gap-3">
+                                        <BellRing className="w-5 h-5 text-purple-500" />
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">
+                                                {zh ? "推播通知" : "Push Notifications"}
+                                            </span>
+                                            {permissionState === "denied" && (
+                                                <span className="text-[10px] text-red-400">
+                                                    {zh ? "已在瀏覽器設定中封鎖" : "Blocked in browser settings"}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={isSubscribed}
+                                        disabled={permissionState === "denied" || isPushLoading}
+                                        onCheckedChange={async (checked) => {
+                                            if (checked) {
+                                                const ok = await subscribe()
+                                                if (ok) toast.success(zh ? "推播通知已開啟 🔔" : "Notifications enabled 🔔")
+                                            } else {
+                                                await unsubscribe()
+                                                toast.info(zh ? "推播通知已關閉" : "Notifications disabled")
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <Separator />
+                            </>
+                        )}
                         <MenuItem icon={BookOpen} label={t('usage_guide')} onClick={() => setUsageGuideOpen(true)} />
                         <Separator />
                         <MenuItem icon={Smartphone} label={t('app_version')} value="v1.0.0" />
