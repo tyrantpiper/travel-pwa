@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Bell, CheckCheck, Users, DollarSign, Plane, Megaphone, X } from "lucide-react"
+import { Bell, CheckCheck, Users, DollarSign, Plane, Megaphone, X, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -89,15 +89,27 @@ export function NotificationBell() {
                 .on(
                     "postgres_changes" as const,
                     {
-                        event: "INSERT",
+                        event: "*",
                         schema: "public",
                         table: "notifications",
                         filter: `user_id=eq.${userId}`,
                     },
-                    (payload: { new: Notification }) => {
-                        // 新通知即時推入列表頂部
-                        setNotifications((prev) => [payload.new as Notification, ...prev].slice(0, 30))
-                        setUnreadCount((prev) => prev + 1)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (payload: any) => {
+                        if (payload.eventType === "INSERT") {
+                            // 新通知即時推入列表頂部
+                            setNotifications((prev) => [payload.new as Notification, ...prev].slice(0, 30))
+                            setUnreadCount((prev) => prev + 1)
+                        } else if (payload.eventType === "DELETE" && payload.old?.id) {
+                            // 即時移除被刪除的通知
+                            setNotifications((prev) => {
+                                const removed = prev.find((n) => n.id === payload.old.id)
+                                if (removed && !removed.is_read) {
+                                    setUnreadCount((c) => Math.max(0, c - 1))
+                                }
+                                return prev.filter((n) => n.id !== payload.old.id)
+                            })
+                        }
                     }
                 )
                 .subscribe()
@@ -139,6 +151,43 @@ export function NotificationBell() {
 
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
         setUnreadCount(0)
+    }
+
+    // 刪除單筆通知
+    const deleteNotification = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation() // 防止觸發 handleNotificationClick
+        const supabase = getSupabaseClient()
+        if (!supabase) return
+
+        // 先從 UI 移除（樂觀更新）
+        setNotifications((prev) => {
+            const target = prev.find((n) => n.id === id)
+            if (target && !target.is_read) {
+                setUnreadCount((c) => Math.max(0, c - 1))
+            }
+            return prev.filter((n) => n.id !== id)
+        })
+
+        await supabase
+            .from("notifications")
+            .delete()
+            .eq("id", id)
+    }
+
+    // 清除全部通知
+    const clearAllNotifications = async () => {
+        const userId = localStorage.getItem("user_uuid")
+        const supabase = getSupabaseClient()
+        if (!supabase || !userId) return
+
+        // 樂觀更新
+        setNotifications([])
+        setUnreadCount(0)
+
+        await supabase
+            .from("notifications")
+            .delete()
+            .eq("user_id", userId)
     }
 
     const handleNotificationClick = (notif: Notification) => {
@@ -206,6 +255,15 @@ export function NotificationBell() {
                                             {zh ? "全部已讀" : "Read all"}
                                         </button>
                                     )}
+                                    {notifications.length > 0 && (
+                                        <button
+                                            onClick={clearAllNotifications}
+                                            className="text-[11px] text-red-500 dark:text-red-400 hover:underline px-2 py-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5 inline mr-1" />
+                                            {zh ? "清除全部" : "Clear all"}
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setIsOpen(false)}
                                         className="p-1 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
@@ -253,9 +311,18 @@ export function NotificationBell() {
                                                         {timeAgo(notif.created_at, zh)}
                                                     </p>
                                                 </div>
-                                                {!notif.is_read && (
-                                                    <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-2" />
-                                                )}
+                                                <div className="flex items-center gap-1 shrink-0 ml-1">
+                                                    {!notif.is_read && (
+                                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => deleteNotification(notif.id, e)}
+                                                        className="p-1 rounded-md text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                        aria-label={zh ? "刪除通知" : "Delete notification"}
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                             </button>
                                         )
                                     })
