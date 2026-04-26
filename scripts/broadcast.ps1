@@ -44,6 +44,8 @@ if ($BroadcastId) {
 }
 
 $jsonBody = $payload | ConvertTo-Json -Compress
+# 強制 UTF-8 編碼，避免中文/Emoji 在 Windows PowerShell 下被破壞
+$utf8Body = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
 
 Write-Host ""
 Write-Host "📡 Broadcasting to all Tabidachi users..." -ForegroundColor Cyan
@@ -60,9 +62,9 @@ try {
         -Method Post `
         -Headers @{
             "Authorization" = "Bearer $secret"
-            "Content-Type"  = "application/json"
+            "Content-Type"  = "application/json; charset=utf-8"
         } `
-        -Body $jsonBody
+        -Body $utf8Body
 
     Write-Host "✅ Broadcast sent successfully!" -ForegroundColor Green
     Write-Host "   Users notified:   $($response.users_notified)" -ForegroundColor White
