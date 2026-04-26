@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Bell, CheckCheck, Users, DollarSign, Plane, X } from "lucide-react"
+import { Bell, CheckCheck, Users, DollarSign, Plane, Megaphone, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseClient } from "@/lib/supabase"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation"
 interface Notification {
     id: string
     user_id: string
-    type: "trip_invite" | "new_expense" | "trip_countdown"
+    type: "trip_invite" | "new_expense" | "trip_countdown" | "system_announcement"
     title: string
     body: string
     link: string | null
@@ -25,12 +25,14 @@ const TYPE_ICONS: Record<string, typeof Users> = {
     trip_invite: Users,
     new_expense: DollarSign,
     trip_countdown: Plane,
+    system_announcement: Megaphone,
 }
 
 const TYPE_COLORS: Record<string, string> = {
     trip_invite: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
     new_expense: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400",
     trip_countdown: "bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400",
+    system_announcement: "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400",
 }
 
 function timeAgo(dateStr: string, zh: boolean): string {
