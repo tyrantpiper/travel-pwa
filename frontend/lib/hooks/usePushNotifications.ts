@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { getSupabaseClient } from "@/lib/supabase"
 
 /**
@@ -21,20 +21,68 @@ export function usePushNotifications() {
     const [permissionState, setPermissionState] = useState<PermissionState>("default")
     const [isSubscribed, setIsSubscribed] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const autoSubscribedRef = useRef(false)
 
     // 初始化：檢查當前權限與訂閱狀態
     useEffect(() => {
-        if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
-            setPermissionState("unsupported")
-            return
-        }
+        // 利用 Promise.resolve().then 將 setState 放入 Microtask 佇列
+        // 避免 React 報錯：Calling setState synchronously within an effect
+        Promise.resolve().then(() => {
+            if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
+                setPermissionState("unsupported")
+                return
+            }
+            setPermissionState(Notification.permission as PermissionState)
+        })
 
-        setPermissionState(Notification.permission as PermissionState)
+        // 靜默補訂閱函數
+        const performSilentSubscription = async () => {
+            try {
+                const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+                if (!vapidKey) return
+                
+                const registration = await navigator.serviceWorker.ready
+                const newSubscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+                })
+
+                const userId = localStorage.getItem("user_uuid")
+                if (!userId) return
+
+                const subscriptionJson = newSubscription.toJSON()
+                const supabase = getSupabaseClient()
+
+                if (supabase) {
+                    await supabase.from("push_subscriptions").upsert(
+                        {
+                            user_id: userId,
+                            endpoint: subscriptionJson.endpoint,
+                            p256dh: subscriptionJson.keys?.p256dh || "",
+                            auth: subscriptionJson.keys?.auth || "",
+                            user_agent: navigator.userAgent,
+                            updated_at: new Date().toISOString(),
+                        },
+                        { onConflict: "user_id,endpoint" }
+                    )
+                }
+                setIsSubscribed(true)
+            } catch (error) {
+                console.error("[Push] Auto-subscribe failed:", error)
+            }
+        }
 
         // 檢查是否已有訂閱
         navigator.serviceWorker.ready.then((registration) => {
             registration.pushManager.getSubscription().then((subscription) => {
-                setIsSubscribed(!!subscription)
+                if (subscription) {
+                    setIsSubscribed(true)
+                } else if (Notification.permission === "granted" && !autoSubscribedRef.current) {
+                    autoSubscribedRef.current = true
+                    performSilentSubscription()
+                } else {
+                    setIsSubscribed(false)
+                }
             })
         })
     }, [])
