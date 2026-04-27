@@ -105,7 +105,7 @@ export function TripList({
 
     return (
         <div className="space-y-4">
-            {trips.map((trip: Trip) => (
+            {trips.map((trip: Trip, index: number) => (
                 <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
                     <div className="absolute top-2 right-2 z-20">
                         {userId && trip.created_by === userId && (
@@ -123,7 +123,14 @@ export function TripList({
                         <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                             {trip.cover_image ? (
                                 <div className="relative w-full h-full">
-                                    <Image src={trip.cover_image} alt="cover" fill className="object-cover opacity-80" unoptimized />
+                                    <Image 
+                                        src={trip.cover_image} 
+                                        alt="cover" 
+                                        fill 
+                                        className="object-cover opacity-80" 
+                                        unoptimized 
+                                        priority={index === 0}
+                                    />
                                 </div>
                             ) : (
                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
