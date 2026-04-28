@@ -4,6 +4,7 @@ import path from "path";
 const { GET: serwistGET } = createSerwistRoute({
   swSrc: path.join(process.cwd(), "app/sw.ts"),
   globDirectory: path.join(process.cwd(), "public"),
+  useNativeEsbuild: true, // 強制原生 esbuild，避免 Vercel (Linux) 嘗試 import esbuild-wasm 失敗
 });
 
 export const GET = async (request: Request) => {

@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
     reactStrictMode: true,
     reactCompiler: true,      // 自動 Memoization
+    outputFileTracingRoot: __dirname, // 與 turbopack.root 統一，消除 Vercel 警告
     turbopack: {
         root: __dirname,      // 物理座標鎖定
     },
