@@ -40,9 +40,6 @@ export const metadata: Metadata = {
     apple: "/icon.png",
   },
   keywords: ["Generative AI", "Travel AI", "PWA", "Offline Maps", "Itinerary Planner", "AI Agent", "Innovation", "Travel Tech"],
-  other: {
-    "agd-partner-manual-verification": "",
-  },
   authors: [{ name: "Ryan Su" }],
   openGraph: {
     title: "Tabidachi - AI Travel Planner",
@@ -58,6 +55,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="agd-partner-manual-verification" />
+      </head>
       <body className={inter.className} suppressHydrationWarning>
         {process.env.NEXT_PUBLIC_TP_DRIVE_URL && (
           <Script 
