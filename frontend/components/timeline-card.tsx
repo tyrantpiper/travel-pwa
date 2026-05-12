@@ -5,7 +5,7 @@ import {
     MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
 } from "lucide-react"
-import { cn, formatCurrency } from "@/lib/utils"
+import { cn, formatCurrency, openExternalLink } from "@/lib/utils"
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -64,7 +64,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         const url = activity.link_url?.startsWith('http')
             ? activity.link_url
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.link_url || activity.place || "")}`;
-        window.open(url, '_blank')
+        openExternalLink(url)
     }
 
     const getIcon = () => {
@@ -200,7 +200,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                                             <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
                                                 <button
                                                     className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                                    onClick={(e) => { e.stopPropagation(); window.open(item.link, '_blank'); }}
+                                                    onClick={(e) => { e.stopPropagation(); openExternalLink(item.link); }}
                                                 >
                                                     <ExternalLink className="w-3 h-3" />
                                                 </button>
@@ -561,7 +561,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                                                 {item.link && (
                                                                     <button
                                                                         className="p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
-                                                                        onClick={(e) => { e.stopPropagation(); window.open(item.link, '_blank'); }}
+                                                                        onClick={(e) => { e.stopPropagation(); openExternalLink(item.link); }}
                                                                     >
                                                                         <ExternalLink className="w-3 h-3" />
                                                                     </button>

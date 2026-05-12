@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { MapPin, Clock, Star, Check, X, Map, Loader2, ExternalLink, BookOpen } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, openExternalLink } from "@/lib/utils"
 import { toast } from "sonner"
 import { useTripContext } from "@/lib/trip-context"
 import { itemsApi, poiApi } from "@/lib/api"
@@ -165,11 +165,11 @@ export default function POIPreviewCard({
     const handlePreviewOnMap = () => {
         if (poiData.lat && poiData.lng) {
             const url = `https://www.google.com/maps/search/?api=1&query=${poiData.lat},${poiData.lng}`
-            window.open(url, "_blank")
+            openExternalLink(url)
         } else {
             // 用地名搜尋
             const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(poiData.place_name)}`
-            window.open(url, "_blank")
+            openExternalLink(url)
         }
     }
 
