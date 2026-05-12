@@ -93,7 +93,7 @@ def test_sanitize_keeps_config_for_gemini_3():
 def test_sanitize_enforces_temperature_for_gemini_3():
     """Gemini 3 的 temperature < 1.0 時應被強制為 1.0"""
     config = types.GenerateContentConfig(temperature=0.3)
-    safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite-preview", "LITE")
+    safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite", "LITE")
     assert safe.temperature == 1.0
 
 

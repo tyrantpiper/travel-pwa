@@ -22,13 +22,13 @@ from typing import List
 # ═══════════════════════════════════════════════════════════════
 
 DAILY_ROUTING: List[str] = [
-    "gemini-3.1-flash-lite-preview",  # 500 RPD, 極速、支援思考/搜尋/結構化
+    "gemini-3.1-flash-lite",          # 500 RPD, GA — 極速、支援思考/搜尋/結構化
     "gemini-3-flash-preview",          # 20 RPD, 全能型
     "gemini-2.5-flash",                # 20 RPD, 穩定版兜底
 ]
 
 HEAVY_ROUTING: List[str] = [
-    "gemini-3.1-flash-lite-preview",   # 500 RPD, 高額度優先 (解決部分金鑰 400 錯誤)
+    "gemini-3.1-flash-lite",           # 500 RPD, GA — 高額度優先 (解決部分金鑰 400 錯誤)
     "gemini-3-flash-preview",          # 20 RPD, 次選
     "gemini-2.5-flash",                # 穩定版兜底
 ]
