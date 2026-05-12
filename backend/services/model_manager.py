@@ -48,7 +48,7 @@ class ModelCaps:
 
 
 MODEL_CAPS: Dict[str, ModelCaps] = {
-    "gemini-3.1-flash-lite-preview": ModelCaps(
+    "gemini-3.1-flash-lite": ModelCaps(
         supports_schema=True,
         supports_tools=False,      # 🛡️ 暫時禁用以防 429
         supports_media_resolution=False,

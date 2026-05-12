@@ -87,7 +87,7 @@ async def main():
         return
 
     models = [
-        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-lite",
         "gemini-2.0-flash-exp", # Known working model for comparison
     ]
     

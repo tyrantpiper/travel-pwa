@@ -42,7 +42,7 @@ class ModelCaps:
     family: str
 
 MODEL_CAPS = {
-    "gemini-3.1-flash-lite-preview": ModelCaps(True, False, False, True, False, True, "gemini"),
+    "gemini-3.1-flash-lite": ModelCaps(True, False, False, True, False, True, "gemini"),
     "gemini-3-flash-preview": ModelCaps(True, False, True, True, False, True, "gemini"),
     "gemini-2.5-flash": ModelCaps(True, True, False, False, False, True, "gemini"),
     "gemma-3-27b-it": ModelCaps(True, True, False, False, False, False, "gemma"),
