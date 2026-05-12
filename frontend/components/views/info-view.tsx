@@ -17,7 +17,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useLanguage } from "@/lib/LanguageContext"
 import { ImageUpload } from "@/components/ui/image-upload"
-import { cn } from "@/lib/utils"
+import { cn, openExternalLink } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
@@ -26,6 +26,8 @@ import { COUNTRY_REGIONS } from "@/lib/constants"
 import { tripsApi, geocodeApi } from "@/lib/api"
 import { useHaptic, useTripDetail } from "@/lib/hooks"
 import { FlightCard } from "./info/FlightCard"
+import { BookingTab } from "./info/BookingTab"
+import { buildTripContext } from "@/lib/affiliate-utils"
 import { extractCoordsFromUrl, isGoogleMapsShortlink, getDistanceKm } from "@/lib/location-utils"
 
 // --- 🛡️ Step 1: Type Infrastructure ---
@@ -85,7 +87,7 @@ interface PlaceSearchResult {
 }
 
 export function InfoView() {
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
     const { activeTripId, activeTrip, mutate: tripMutate, userId } = useTripContext()
     const haptic = useHaptic()
     const [isEditing, setIsEditing] = useState(false)
@@ -404,10 +406,11 @@ export function InfoView() {
                     ) : (
                         <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-6">
                             {/* 🆕 v4.8: Segmented Sliding Tab Menu */}
-                            <div className="grid grid-cols-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-lg rounded-2xl p-1.5 mb-8 border border-white/50 dark:border-slate-700/50">
+                            <div className="grid grid-cols-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md shadow-lg rounded-2xl p-1.5 mb-8 border border-white/50 dark:border-slate-700/50">
                                 {[
                                     { value: 'flights', label: '✈️ ' + t('flight_details') },
-                                    { value: 'hotels', label: '🏨 ' + t('accommodation') }
+                                    { value: 'hotels', label: '🏨 ' + t('accommodation') },
+                                    { value: 'booking', label: '🛒 ' + t('booking_center') }
                                 ].map((tab) => (
                                     <button
                                         key={tab.value}
@@ -810,6 +813,20 @@ export function InfoView() {
                                     </div>
                                 </motion.section>
                             </TabsContent>
+
+                            {/* 🛒 Booking Tab — Affiliate Monetization Hub */}
+                            <TabsContent value="booking" className="mt-0 focus-visible:ring-0">
+                                <motion.section
+                                    initial={{ opacity: 0, scale: 0.98 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    <BookingTab
+                                        tripContext={buildTripContext(activeTrip, activeTripData)}
+                                        lang={lang as 'en' | 'zh'}
+                                    />
+                                </motion.section>
+                            </TabsContent>
                         </Tabs>
                     )}
                 </div>
@@ -950,7 +967,7 @@ export function InfoView() {
                                                         </div>
                                                     </div>
                                                     <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 shadow-sm cursor-pointer active:scale-95 transition-transform"
-                                                        onClick={() => { if (hotels[currentHotelIdx].phone) window.open(`tel:${hotels[currentHotelIdx].phone}`) }}
+                                                        onClick={() => { if (hotels[currentHotelIdx].phone) openExternalLink(`tel:${hotels[currentHotelIdx].phone}`) }}
                                                     >
                                                         <span className="text-[10px] text-slate-400 uppercase font-black flex items-center gap-1.5 mb-2">
                                                             <Phone className="w-3 h-3" /> Contact
@@ -1031,7 +1048,7 @@ export function InfoView() {
                                                         const url = item.link_url?.startsWith('http')
                                                             ? item.link_url
                                                             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.link_url || item.address || item.name || '')}`;
-                                                        window.open(url, '_blank');
+                                                        openExternalLink(url);
                                                     }}
                                                 >
                                                     <Navigation2 className="w-4 h-4 mr-2" /> Navigate Now
