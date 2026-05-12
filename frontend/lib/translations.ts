@@ -98,6 +98,24 @@ export const translations = {
         departure: "Departure",
         arrival: "Arrival",
 
+        // Booking Tab (Affiliate)
+        booking_center: "Booking",
+        booking_smart_recommend: "Smart Picks for You",
+        booking_all: "All",
+        booking_hotel: "Hotels",
+        booking_flight: "Flights",
+        booking_activity: "Activities",
+        booking_transport: "Transport",
+        booking_esim: "eSIM",
+        booking_insurance: "Insurance",
+        booking_affiliate_notice: "Affiliate Partner",
+        booking_open_in: "Open in",
+        booking_view_deals: "View Deals",
+        booking_based_on_trip: "Based on your trip",
+        booking_explore: "Explore Travel Deals",
+        booking_coming_soon: "Coming Soon",
+        booking_disclosure: "This section contains affiliate links. We may earn a commission at no cost to you.",
+
         // Tools
         tools: "Tools",
         expense_ai: "Expense Tracker & AI Tools",
@@ -353,6 +371,24 @@ export const translations = {
         seat: "座位",
         departure: "起飛",
         arrival: "抵達",
+
+        // Booking Tab (Affiliate)
+        booking_center: "訂購",
+        booking_smart_recommend: "為你智慧推薦",
+        booking_all: "全部",
+        booking_hotel: "住宿",
+        booking_flight: "機票",
+        booking_activity: "體驗活動",
+        booking_transport: "交通票券",
+        booking_esim: "eSIM 網卡",
+        booking_insurance: "旅遊保險",
+        booking_affiliate_notice: "聯盟合作",
+        booking_open_in: "前往",
+        booking_view_deals: "查看優惠",
+        booking_based_on_trip: "根據你的行程推薦",
+        booking_explore: "探索旅遊優惠",
+        booking_coming_soon: "即將推出",
+        booking_disclosure: "此區域包含聯盟行銷連結，你的消費不會增加任何費用。",
 
         // Tools
         tools: "工具",
