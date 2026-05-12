@@ -13,6 +13,7 @@ import { useHaptic } from "@/lib/hooks"
 import { poiApi } from "@/lib/api"
 import { useLanguage } from "@/lib/LanguageContext"
 import { getSecureApiKey } from "@/lib/security"
+import { openExternalLink } from "@/lib/utils"
 
 export interface ClusterItem {
     id?: string;
@@ -130,7 +131,7 @@ export default function POIDetailDrawer({
     const handleNavigate = () => {
         haptic.tap()
         const url = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`
-        window.open(url, "_blank")
+        openExternalLink(url)
     }
 
     // 深層連結：Google Image 搜尋（包含位置資訊）
@@ -151,7 +152,7 @@ export default function POIDetailDrawer({
         }
         const query = encodeURIComponent(`${poi.name} ${locationHint}`.trim())
         const url = `https://www.google.com/search?tbm=isch&q=${query}`
-        window.open(url, "_blank")
+        openExternalLink(url)
     }
 
     // Web Share API
@@ -584,7 +585,7 @@ export default function POIDetailDrawer({
                                         onClick={() => {
                                             // 使用精確坐標開啟 Google Maps
                                             const url = `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lng}`
-                                            window.open(url, "_blank")
+                                            openExternalLink(url)
                                         }}
                                         variant="ghost"
                                         size="sm"

@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { TranslationKey } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { cn, openExternalLink } from "@/lib/utils"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
 
 import { useLanguage } from "@/lib/LanguageContext"
@@ -319,7 +319,7 @@ export function ProfileView() {
         
         // 🚀 GMAIL DIRECT COMPOSE: Bypasses system-level mailto issues
         const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=ryanpig228@gmail.com"
-        window.open(gmailUrl, '_blank')
+        openExternalLink(gmailUrl)
     }
 
     const handleSaveApiKey = () => {
