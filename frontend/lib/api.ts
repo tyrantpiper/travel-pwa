@@ -43,6 +43,7 @@ export const API = {
     ACTUARY: `${API_HOST}/api/ai/actuary`,
     SMART_SEARCH: `${API_HOST}/api/ai/smart-search`,
     RESOLVE_ADDRESS: `${API_HOST}/api/geocode/resolve-address`,
+    TRAVEL_DATA: `${API_HOST}/api/travel-data`,
 }
 
 export { API_HOST }
@@ -628,6 +629,49 @@ export const aiApi = {
         }
         return res.json()
     }
+}
+
+/**
+ * 🔍 Travel Data API (Phase 2A)
+ * Fetches real-time flight prices via backend proxy
+ */
+export const travelDataApi = {
+    /** Get lowest flight prices for a route */
+    getFlightPrices: async (params: {
+        origin: string
+        destination: string
+        departure_at?: string
+        currency?: string
+    }) => {
+        const searchParams = new URLSearchParams()
+        searchParams.set('origin', params.origin)
+        searchParams.set('destination', params.destination)
+        if (params.departure_at) searchParams.set('departure_at', params.departure_at)
+        if (params.currency) searchParams.set('currency', params.currency)
+
+        try {
+            const res = await fetch(
+                `${API.TRAVEL_DATA}/flight-prices?${searchParams.toString()}`
+            )
+            if (!res.ok) return null  // Non-blocking: price lookup failure won't break UI
+            return await res.json() as {
+                origin: string
+                destination: string
+                currency: string
+                prices: Array<{
+                    price: number
+                    airline: string
+                    departure_at: string
+                    return_at: string | null
+                    transfers: number
+                }>
+                lowest_price: number | null
+                cached: boolean
+            }
+        } catch {
+            return null  // Network error — silent fail
+        }
+    },
 }
 
 /**

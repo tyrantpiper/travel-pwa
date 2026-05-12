@@ -1,5 +1,6 @@
 import useSWR from "swr"
 import { useState, useEffect, useCallback, useMemo } from "react"
+import { travelDataApi } from './api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -68,6 +69,44 @@ export function useTripDetail(tripId: string | null, userId?: string | null, ref
         isValidating,  // 🆕 Indicates SWR is fetching fresh data (even with cache)
         isError: error,
         mutate
+    }
+}
+
+/**
+ * 🔍 SWR Hook: Real-time lowest flight price (Phase 2A)
+ * Only triggers when both origin and destination IATA codes are available.
+ */
+export function useFlightPrice(
+    origin?: string,
+    destination?: string,
+    departureAt?: string
+) {
+
+    const key = origin && destination
+        ? `flight-price-${origin}-${destination}-${departureAt || ''}`
+        : null
+
+    const { data, error, isLoading } = useSWR(
+        key,
+        () => travelDataApi.getFlightPrices({
+            origin: origin!,
+            destination: destination!,
+            departure_at: departureAt,
+            currency: 'twd',
+        }),
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 300000,   // 5 min dedup
+            errorRetryCount: 1,
+        }
+    )
+
+    return {
+        lowestPrice: data?.lowest_price ?? null,
+        prices: data?.prices ?? [],
+        currency: data?.currency ?? 'TWD',
+        isLoading,
+        error,
     }
 }
 
