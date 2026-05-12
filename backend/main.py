@@ -151,6 +151,7 @@ from routers.users import router as users_router
 from routers.app import router as app_router
 from routers.sample_trip import router as sample_trip_router
 from routers.ledger import router as ledger_router
+from routers.travel_data import router as travel_data_router
 
 app.include_router(geocode_router)
 app.include_router(expenses_router)
@@ -163,6 +164,7 @@ app.include_router(users_router)
 app.include_router(app_router)
 app.include_router(sample_trip_router)
 app.include_router(ledger_router)
+app.include_router(travel_data_router)
 print("[Routers] ✅ All systems registered")
 
 # 2. CORS 設定 (嚴格模式)
@@ -493,6 +495,66 @@ SYSTEM_PROMPT = """
 3.  **多模態處理**：如果使用者上傳照片（如菜單、藥盒、街景），請優先針對圖片內容進行深度解析。
 """
 
+async def _build_price_context(itinerary: dict) -> str:
+    """
+    [Phase 2B] Build real-time price context for AI chat.
+    Queries Travelpayouts for flight prices based on trip's flight info.
+    """
+    try:
+        import httpx
+        import os
+        flight_info = itinerary.get("flight_info", {})
+        outbound = flight_info.get("outbound", [])
+        if not outbound:
+            return ""
+        
+        first_leg = outbound[0] if isinstance(outbound, list) and len(outbound) > 0 else {}
+        origin = first_leg.get("dep_airport", "")
+        destination = first_leg.get("arr_airport", "")
+        
+        if not origin or not destination:
+            return ""
+        
+        tp_token = os.getenv("TP_API_TOKEN", "")
+        if not tp_token:
+            return ""
+        
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                "https://api.travelpayouts.com/aviasales/v3/prices_for_dates",
+                params={
+                    "origin": origin.upper(),
+                    "destination": destination.upper(),
+                    "currency": "twd",
+                    "sorting": "price",
+                    "limit": 3,
+                },
+                headers={"X-Access-Token": tp_token},
+            )
+            if resp.status_code != 200:
+                return ""
+            
+            data = resp.json()
+            prices = data.get("data", [])
+            if not prices:
+                return ""
+            
+            lines = [f"\n\n💰 **即時機票參考價格 ({origin}→{destination}, TWD):**"]
+            for p in prices[:3]:
+                transfers = p.get('transfers', 0)
+                transfer_str = "直飛" if transfers == 0 else f"{transfers}轉"
+                lines.append(
+                    f"- {p.get('departure_at', '?')[:10]} | "
+                    f"{p.get('airline', '?')} | "
+                    f"TWD {p.get('price', '?'):,} | {transfer_str}"
+                )
+            lines.append("（以上為 Travelpayouts 即時數據，僅供參考）")
+            return "\n".join(lines)
+    
+    except Exception as e:
+        print(f"⚠️ [Price Context] Failed: {e}")
+        return ""
+
 @app.post("/api/chat")
 @limiter.limit("20/minute")
 async def chat_with_ryan(
@@ -574,9 +636,16 @@ async def chat_with_ryan(
                 body.focused_day
             )
             print(f"📅 注入行程上下文: {body.current_itinerary.get('title', '?')}")
+            
+        # [Phase 2B] 注入即時票價上下文
+        price_context = ""
+        if body.current_itinerary:
+            price_context = await _build_price_context(body.current_itinerary)
+            if price_context:
+                print(f"💰 注入即時票價上下文")
         
-        # 處理當前訊息 (包含 POI 上下文 + 行程上下文 + 記憶上下文)
-        enhanced_message = body.message + poi_context + itinerary_context + memory_context
+        # 處理當前訊息 (包含 POI 上下文 + 行程上下文 + 記憶上下文 + 價格上下文)
+        enhanced_message = body.message + poi_context + itinerary_context + memory_context + price_context
         
         # [TEST] Step 3: 行程診斷 (Diagnosis) Intent Detection
         # v3.5: 只有當 message 看起來像在問行程好不好時才觸發
