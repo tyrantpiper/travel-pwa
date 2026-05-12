@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
+import Script from "next/script";
 
 import { LanguageProvider } from "@/lib/LanguageContext"
 import { ThemeProvider } from "@/lib/ThemeContext"
@@ -39,6 +40,9 @@ export const metadata: Metadata = {
     apple: "/icon.png",
   },
   keywords: ["Generative AI", "Travel AI", "PWA", "Offline Maps", "Itinerary Planner", "AI Agent", "Innovation", "Travel Tech"],
+  other: {
+    "agd-partner-manual-verification": "",
+  },
   authors: [{ name: "Ryan Su" }],
   openGraph: {
     title: "Tabidachi - AI Travel Planner",
@@ -55,6 +59,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
+        {process.env.NEXT_PUBLIC_TP_DRIVE_URL && (
+          <Script 
+            src={process.env.NEXT_PUBLIC_TP_DRIVE_URL} 
+            strategy="afterInteractive" 
+          />
+        )}
         {/* 🚀 Global PWA Install Event Trap (Pre-Hydration) */}
         <script
           dangerouslySetInnerHTML={{
