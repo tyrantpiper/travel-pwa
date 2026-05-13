@@ -232,6 +232,12 @@ CHAR_EQUIVALENTS = {
     "機": "机", "鐵": "铁", "線": "线", "場": "场",
     "島": "岛", "灣": "湾", "濟": "济", "雲": "云",
     "麵": "面", "飯": "饭", "館": "馆",
+    # 🆕 P1-A: 台灣異體字統一 (兩字皆為正體，統一向常用字形)
+    "臺": "台",  # 臺→台 (最高頻：臺北→台北、臺中→台中)
+    "裏": "裡",  # 裏→裡
+    "峯": "峰",  # 峯→峰
+    "燈": "灯",  # 燈→灯 (與日式標準化一致)
+    "縣": "県",  # 縣→県 (與日式標準化一致)
 }
 
 
@@ -248,6 +254,32 @@ def normalize_for_fuzzy(text: str) -> str:
     for char, equiv in CHAR_EQUIVALENTS.items():
         text = text.replace(char, equiv)
     return text
+
+
+# 🆕 P1-B: CJK 異體字搜尋展開（一→多）
+# normalize_for_fuzzy 做的是「多→一」標準化（用於 LANDMARKS_DB 比對）
+# expand_cjk_variants 做的是「一→多」展開（用於送給 Photon/Nominatim 的搜尋詞）
+CJK_VARIANT_PAIRS = [
+    ("台", "臺"),  # 台灣最高頻異體字
+    ("裡", "裏"),
+    ("峰", "峯"),
+    ("線", "綫"),
+    ("群", "羣"),
+]
+
+def expand_cjk_variants(query: str) -> list[str]:
+    """生成 CJK 異體字搜尋變體（一→多展開）
+    
+    例：「台中一中」→ [「台中一中」, 「臺中一中」]
+    不做笛卡爾積，每對只做單次替換，避免變體爆炸。
+    """
+    variants = {query}
+    for a, b in CJK_VARIANT_PAIRS:
+        if a in query:
+            variants.add(query.replace(a, b))
+        if b in query:
+            variants.add(query.replace(b, a))
+    return list(variants)
 
 
 # 🌍 地理編碼雙引擎系統 (ArcGIS + Nominatim)
@@ -703,6 +735,83 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
     except Exception as e:
         print(f"[Photon] Error for '{place_name}': {e}")
     return None
+
+
+# 🆕 P3: Overpass API 名稱搜尋（CJK 友好的最後防線）
+async def search_overpass_by_name(
+    name: str,
+    country_code: str = None,
+    limit: int = 3
+) -> list | None:
+    """透過 OSM 原始資料的 name/name:zh tag 進行 regex 匹配，
+    繞過 Photon/Nominatim 的分詞限制。
+    
+    只在 Photon+Nominatim 結果不足時觸發，作為 fallback。
+    """
+    import re
+    
+    # 生成搜尋 regex（包含異體字變體）
+    variants = expand_cjk_variants(name)
+    name_regex = "|".join(re.escape(v) for v in variants)
+    
+    # 建構 area 限制（如果有國碼）
+    area_filter = ""
+    scope = ""
+    if country_code:
+        area_filter = f'area["ISO3166-1"="{country_code.upper()}"]->.searchArea;'
+        scope = "(area.searchArea)"
+    
+    query = f"""
+    [out:json][timeout:10];
+    {area_filter}
+    (
+      nwr["name"~"{name_regex}",i]{scope};
+      nwr["name:zh"~"{name_regex}",i]{scope};
+      nwr["alt_name"~"{name_regex}",i]{scope};
+    );
+    out center {limit};
+    """
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(
+                "https://overpass-api.de/api/interpreter",
+                data={"data": query},
+                headers={"User-Agent": "RyanTravelApp/3.0"}
+            )
+            data = orjson.loads(res.content)
+            elements = data.get("elements", [])
+            if not elements:
+                return None
+            
+            results = []
+            for el in elements[:limit]:
+                tags = el.get("tags", {})
+                el_lat = el.get("lat") or el.get("center", {}).get("lat")
+                el_lng = el.get("lon") or el.get("center", {}).get("lon")
+                if not el_lat or not el_lng:
+                    continue
+                
+                display_name = (
+                    tags.get("name:zh") or
+                    tags.get("name") or
+                    tags.get("name:en") or
+                    name
+                )
+                results.append({
+                    "lat": el_lat, "lng": el_lng,
+                    "name": display_name,
+                    "address": tags.get("addr:full", ""),
+                    "type": tags.get("amenity") or tags.get("tourism") or "place",
+                    "source": "overpass"
+                })
+            
+            if results:
+                print(f"[Overpass] {name} -> {len(results)} results")
+            return results or None
+    except Exception as e:
+        print(f"[Overpass] Error for '{name}': {e}")
+        return None
 
 
 async def reverse_geocode_with_photon(lat: float, lng: float):
@@ -1604,9 +1713,10 @@ async def smart_geocode_logic(
         search_queries = translation_task.result()
         log_debug(f"   🔤 AI Translated: {search_queries}")
     
-    # 如果搜尋關鍵字中還沒有原始名稱，加進去作為保險
-    if query not in search_queries:
-        search_queries.append(query)
+    # 🆕 P1-B: 展開 CJK 異體字變體（如「台中一中」→「臺中一中」）加入搜尋
+    for variant in expand_cjk_variants(query):
+        if variant not in search_queries:
+            search_queries.append(variant)
 
     if not country_code:
         log_debug("   ⚠️ No country detected, using broad search")
@@ -1635,43 +1745,64 @@ async def smart_geocode_logic(
             found_source = "photon"
             log_debug(f"   ⚡ Using {len(photon_spec)} speculative results")
     
+    # 🆕 P0 Pre-filter: 提前清除境外 Speculative 垃圾結果
+    # 防止中國「台州」等結果佔滿 effective_limit，導致後續 Nominatim 搜尋被 break 跳過
+    if country_code and all_results:
+        pre_filtered = filter_results_by_country(all_results, country_code, strict=False)
+        if len(pre_filtered) < len(all_results):
+            log_debug(f"   🧹 Pre-filter: {len(all_results)} → {len(pre_filtered)} (removed off-country speculative)")
+            all_results = pre_filtered
+
     # 限定結果數量 (國名搜尋時放寬席位，避免被在地店家擠掉)
     effective_limit = limit * 2 if user_explicit_country else limit
+    
+    nominatim_calls = 0  # 🆕 P0: Nominatim 呼叫計數器（遵守 1req/s 政策，最多 2 次）
     
     for q in search_queries:
         if len(all_results) >= effective_limit:
             break
-            
-        # 如果是原生查詢，在之前的 parallel 階段已經查過兩種版本（在地+全域）了，直接跳過
-        if q == query:
-            continue
-
-        # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
-        photon = await geocode_with_photon(q, limit, lat, lng, zoom)
-        if photon:
-            for r in photon: r["source"] = "photon"
-            all_results.extend(photon)
-            found_source = "photon"
-
         
-        # Nominatim
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                params = {"q": q, "format": "json", "limit": limit, "addressdetails": 1}
-                if country_code: params["countrycodes"] = country_code.lower()
-                res = await client.get("https://nominatim.openstreetmap.org/search", params=params, headers={"User-Agent": "RyanTravelApp/2.0"})
-                data = res.json()
-                if data:
-                    for item in data:
-                        all_results.append({
-                            "lat": float(item["lat"]), "lng": float(item["lon"]),
-                            "name": item.get("name") or item.get("display_name", "").split(",")[0],
-                            "address": item.get("display_name", ""), "type": item.get("type", "place"),
-                            "source": "nominatim"
-                        })
-                    found_source = "nominatim"
-        except Exception as e:
-            print(f"   ⚠️ Nominatim error: {e}")
+        # 🆕 P0 修復：Photon 只對「非原始查詢」執行（原始已 Speculative 搜過）
+        # 但 Nominatim 對「所有查詢」執行，因為 Nominatim 的 CJK 能力遠優於 Photon
+        if q != query:
+            # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
+            photon = await geocode_with_photon(q, limit, lat, lng, zoom)
+            if photon:
+                for r in photon: r["source"] = "photon"
+                all_results.extend(photon)
+                found_source = "photon"
+
+        # Nominatim（所有查詢都執行，包括原始中文查詢）
+        if nominatim_calls < 2:
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    params = {"q": q, "format": "json", "limit": limit, "addressdetails": 1}
+                    if country_code: params["countrycodes"] = country_code.lower()
+                    res = await client.get("https://nominatim.openstreetmap.org/search", params=params, headers={
+                        "User-Agent": "RyanTravelApp/2.0",
+                        "Accept-Language": "zh-TW,zh,en"  # 🆕 P0: 確保中文結果優先回傳
+                    })
+                    data = res.json()
+                    if data:
+                        for item in data:
+                            all_results.append({
+                                "lat": float(item["lat"]), "lng": float(item["lon"]),
+                                "name": item.get("name") or item.get("display_name", "").split(",")[0],
+                                "address": item.get("display_name", ""), "type": item.get("type", "place"),
+                                "source": "nominatim"
+                            })
+                        found_source = "nominatim"
+                    nominatim_calls += 1
+            except Exception as e:
+                print(f"   ⚠️ Nominatim error: {e}")
+
+    # 🆕 P3: Overpass 名稱搜尋（當 Photon + Nominatim 結果不足時啟動）
+    if len(all_results) < 2 and country_code:
+        overpass_results = await search_overpass_by_name(query, country_code, limit)
+        if overpass_results:
+            all_results.extend(overpass_results)
+            found_source = "overpass"
+            log_debug(f"   🗺️ Overpass fallback: {len(overpass_results)} results")
 
     # ArcGIS Fallback
     if not all_results and ARCGIS_API_KEY:
