@@ -10,6 +10,7 @@ import { itemsApi, poiApi } from "@/lib/api"
 import { debugLog } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
 import { getSecureApiKey } from "@/lib/security"
+import { useSWRConfig } from "swr"
 
 // 三源整合資料結構
 interface EnrichedPOI {
@@ -39,6 +40,8 @@ interface POIData {
     duration?: string  // 預估停留時間
     day_number?: number
     time_slot?: string
+    link_url?: string  // 官網或相關連結
+    sub_items?: { name: string; desc?: string; link?: string }[]  // 子項目（推薦菜品、必看展品等）
 }
 
 interface POIPreviewCardProps {
@@ -59,6 +62,7 @@ export default function POIPreviewCard({
     onDismiss
 }: POIPreviewCardProps) {
     const { activeTripId, mutate, userId } = useTripContext()
+    const { mutate: globalMutate } = useSWRConfig()
     const { lang } = useLanguage()
     const zh = lang === 'zh'
     const [isAdding, setIsAdding] = useState(false)
@@ -70,6 +74,13 @@ export default function POIPreviewCard({
     useEffect(() => {
         const fetchEnrichedData = async () => {
             if (!poiData.place_name) return
+
+            // 🛡️ 防空虛島：當 AI 沒給有效座標時跳過三源豐富化，避免 (0,0) 查到 Null Island
+            const hasValidCoords = !!(poiData.lat && poiData.lng && !(poiData.lat === 0 && poiData.lng === 0))
+            if (!hasValidCoords) {
+                debugLog("跳過三源豐富化：無有效座標", poiData.place_name)
+                return
+            }
 
             setIsLoadingEnrich(true)
             try {
@@ -141,6 +152,8 @@ export default function POIPreviewCard({
                 desc: poiData.desc || "",
                 lat: poiData.lat,
                 lng: poiData.lng,
+                link_url: poiData.link_url,
+                sub_items: poiData.sub_items,
                 user_id: userId || undefined
             })
 
@@ -150,6 +163,12 @@ export default function POIPreviewCard({
 
             // 刷新行程列表
             mutate()
+
+            // 🟢 [BUGFIX]: 顯式刷新行程詳情快取，即時更新時間軸與地圖標記，消除快取空洞
+            if (userId) {
+                globalMutate([`/api/trips/${activeTripId}`, userId])
+            }
+
             onAdded?.()
 
         } catch (error) {
@@ -233,9 +252,9 @@ export default function POIPreviewCard({
                     </p>
                 )}
 
-                {/* 描述：優先使用三源資料，fallback 到原始 desc */}
+                {/* 描述：AI 描述優先，三源資料為 fallback */}
                 <p className="text-xs text-slate-600 line-clamp-2">
-                    {enriched?.cultural_desc || poiData.desc || ""}
+                    {poiData.desc || enriched?.cultural_desc || ""}
                 </p>
 
                 {/* 旅遊指南摘要 */}
@@ -338,22 +357,34 @@ export default function POIPreviewCard({
 /**
  * 從 rawParts 中偵測 function_call 並提取 POI 資料
  */
-export function extractFunctionCall(rawParts: { function_call?: { name: string; args: Record<string, unknown> } }[]): POIData | null {
+export function extractFunctionCall(rawParts: unknown[]): POIData | null {
     if (!rawParts || !Array.isArray(rawParts)) return null
 
     for (const part of rawParts) {
-        if (part.function_call && part.function_call.name === "add_itinerary_item") {
-            const args = part.function_call.args
-            return {
-                place_name: String(args.place_name || args.name || ""),
-                category: String(args.category || "sightseeing"),
-                desc: String(args.desc || args.description || ""),
-                lat: typeof args.lat === "number" ? args.lat : undefined,
-                lng: typeof args.lng === "number" ? args.lng : undefined,
-                rating: typeof args.rating === "number" ? args.rating : undefined,
-                duration: String(args.duration || ""),
-                day_number: typeof args.day_number === "number" ? args.day_number : 1,
-                time_slot: String(args.time_slot || "12:00")
+        if (part && typeof part === 'object') {
+            // 🟢 雙格式相容：相容 camelCase 與 snake_case 命名
+            const partObj = part as {
+                functionCall?: { name: string; args?: Record<string, unknown> }
+                function_call?: { name: string; args?: Record<string, unknown> }
+            }
+            const fc = partObj.functionCall || partObj.function_call
+            if (fc && fc.name === "add_itinerary_item") {
+                const args = fc.args || {}
+                
+                // 🟢 參數降級鏈：支援 day_number, dayNumber, day 等各種 AI 產出的欄位變體
+                const dayVal = args.day_number ?? args.dayNumber ?? args.day ?? 1
+                
+                return {
+                    place_name: String(args.place_name || args.name || ""),
+                    category: String(args.category || "sightseeing"),
+                    desc: String(args.desc || args.description || ""),
+                    lat: typeof args.lat === "number" ? args.lat : undefined,
+                    lng: typeof args.lng === "number" ? args.lng : undefined,
+                    rating: typeof args.rating === "number" ? args.rating : undefined,
+                    duration: String(args.duration || ""),
+                    day_number: typeof dayVal === "number" ? dayVal : parseInt(String(dayVal)) || 1,
+                    time_slot: String(args.time_slot || args.timeSlot || "12:00")
+                }
             }
         }
     }

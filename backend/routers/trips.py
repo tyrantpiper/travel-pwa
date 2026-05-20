@@ -1298,6 +1298,23 @@ async def create_item(
         if not member_check.data:
             raise HTTPException(status_code=403, detail="您沒有權限在此行程新增項目")
 
+        lat_val = request.lat
+        lng_val = request.lng
+        
+        # 🟢 自動地理編碼點亮地圖 (增量防禦性優化)
+        if not lat_val or not lng_val or lat_val == 0.0 or lng_val == 0.0:
+            try:
+                from services.geocode_service import smart_geocode_logic
+                print(f"🔍 [AutoGeocode] Empty coords for '{request.place_name}'. Invoking geocoder...")
+                geo_res = await smart_geocode_logic(query=request.place_name, limit=1)
+                if geo_res and geo_res.get("results"):
+                    first_match = geo_res["results"][0]
+                    lat_val = first_match["lat"]
+                    lng_val = first_match["lng"]
+                    print(f"✅ [AutoGeocode] Success: {lat_val}, {lng_val} via {geo_res.get('source')}")
+            except Exception as geo_err:
+                print(f"⚠️ [AutoGeocode] Non-critical geocoding fallback failed: {geo_err}")
+
         data = {
             "itinerary_id": request.itinerary_id,
             "day_number": request.day_number,
@@ -1305,8 +1322,8 @@ async def create_item(
             "place_name": request.place_name,
             "category": request.category,
             "notes": request.notes,
-            "location_lat": request.lat,
-            "location_lng": request.lng,
+            "location_lat": lat_val,
+            "location_lng": lng_val,
             "image_url": request.image_url,
             "image_urls": request.image_urls or ([request.image_url] if request.image_url else []),
             "tags": request.tags,

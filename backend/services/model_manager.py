@@ -50,7 +50,7 @@ class ModelCaps:
 MODEL_CAPS: Dict[str, ModelCaps] = {
     "gemini-3.1-flash-lite": ModelCaps(
         supports_schema=True,
-        supports_tools=False,      # 🛡️ 暫時禁用以防 429
+        supports_tools=True,       # 🟢 啟用神經連結能力
         supports_media_resolution=False,
         supports_thinking=True,
         supports_grounding=False,
@@ -109,6 +109,79 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         family="gemma",
     ),
 }
+
+# 宣告 AI 可用的神經連結卡片 (Neural Link Tools)
+# 🔒 必須使用 types.Tool(function_declarations=[...]) 包裝，裸列表會被 SDK 忽略
+NEURAL_LINK_TOOLS = [
+    types.Tool(
+        function_declarations=[
+            types.FunctionDeclaration(
+                name="add_itinerary_item",
+                description="Add a new point of interest to the user's itinerary for a specific day. Include as much detail as possible.",
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
+                        "place_name": types.Schema(type=types.Type.STRING, description="Name of the place"),
+                        "category": types.Schema(type=types.Type.STRING, description="Category: restaurant, attraction, hotel, transport, shopping, cafe, bar, park, museum, temple, etc."),
+                        "desc": types.Schema(type=types.Type.STRING, description="Brief description of the place (1-2 sentences)"),
+                        "lat": types.Schema(type=types.Type.NUMBER, description="Latitude coordinate of the place"),
+                        "lng": types.Schema(type=types.Type.NUMBER, description="Longitude coordinate of the place"),
+                        "time_slot": types.Schema(type=types.Type.STRING, description="Suggested visit time in HH:MM format (e.g., '10:00', '14:30')"),
+                        "duration": types.Schema(type=types.Type.STRING, description="Estimated visit duration (e.g., '1-2 hours', '30 min')"),
+                        "rating": types.Schema(type=types.Type.NUMBER, description="Place rating from 0.0 to 5.0 if known"),
+                        "estimated_cost": types.Schema(type=types.Type.INTEGER, description="Estimated cost in local currency"),
+                        "link_url": types.Schema(type=types.Type.STRING, description="Official website URL or relevant link for the place (e.g., 'https://www.senso-ji.jp/')"),
+                        "sub_items": types.Schema(
+                            type=types.Type.ARRAY,
+                            description="List of notable sub-items: recommended dishes for restaurants, must-see exhibits for museums, key shops for malls, etc.",
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "name": types.Schema(type=types.Type.STRING, description="Sub-item name (e.g., 'Tonkotsu Ramen', 'Mona Lisa')"),
+                                    "desc": types.Schema(type=types.Type.STRING, description="Brief note about this sub-item"),
+                                    "link": types.Schema(type=types.Type.STRING, description="URL for this sub-item if available"),
+                                },
+                                required=["name"]
+                            )
+                        ),
+                    },
+                    required=["day", "place_name", "category", "lat", "lng", "desc"]
+                )
+            ),
+            types.FunctionDeclaration(
+                name="add_expense",
+                description="Add a new estimated expense to the user's daily budget.",
+                parameters=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
+                        "title": types.Schema(type=types.Type.STRING, description="Description of the expense"),
+                        "amount": types.Schema(type=types.Type.NUMBER, description="Amount in local currency (supports decimals)"),
+                        "currency": types.Schema(type=types.Type.STRING, description="Currency code (e.g., 'JPY', 'USD', 'TWD')"),
+                        "category": types.Schema(type=types.Type.STRING, description="Expense category: food, transport, accommodation, ticket, shopping, other"),
+                        "payment_method": types.Schema(type=types.Type.STRING, description="Payment method: cash, card, ic_card, other"),
+                        "notes": types.Schema(type=types.Type.STRING, description="Additional notes about the expense"),
+                        "items": types.Schema(
+                            type=types.Type.ARRAY,
+                            description="Itemized breakdown of the expense (e.g., individual dishes, tickets, products)",
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "original_name": types.Schema(type=types.Type.STRING, description="Item name in original language"),
+                                    "translated_name": types.Schema(type=types.Type.STRING, description="Item name translated to user's language"),
+                                    "amount": types.Schema(type=types.Type.NUMBER, description="Price of this item"),
+                                },
+                                required=["original_name", "amount"]
+                            )
+                        ),
+                    },
+                    required=["day", "title", "amount", "currency"]
+                )
+            ),
+        ]
+    )
+]
 
 # 意圖分群
 INTENTS_REQUIRING_JSON = {"EXTRACTION", "PLANNING"}
@@ -293,6 +366,7 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
             temperature=1.0,
             max_output_tokens=8192,  # 🚀 Maximize for deep analysis
             media_resolution="media_resolution_high",
+            tools=NEURAL_LINK_TOOLS,  # 🆕 注入行程神經連結工具集
         ),
         "EXTRACTION": types.GenerateContentConfig(
             temperature=1.0,
@@ -307,6 +381,11 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
         "GEOCODE": types.GenerateContentConfig(
             temperature=0,
             max_output_tokens=150,
+        ),
+        "CHAT": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=2048,
+            tools=NEURAL_LINK_TOOLS,  # 🟢 注入神經連結卡片
         ),
     }
 
@@ -362,14 +441,10 @@ def sanitize_config_for_model(
     if caps.supports_grounding and intent_type in ["CHAT", "DIAGNOSIS"]:
         if not safe.tools:
             safe.tools = []
-        # 使用 2026 最新 GoogleSearchRetrieval 配置
+        # 2026 官方 GoogleSearch API（無參數，模型自行決定搜尋時機）
         safe.tools.append(
             types.Tool(
-                google_search=types.GoogleSearchRetrieval(
-                    dynamic_retrieval_config=types.DynamicRetrievalConfig(
-                        dynamic_threshold=0.6
-                    )
-                )
+                google_search=types.GoogleSearch()
             )
         )
 
@@ -528,7 +603,7 @@ async def call_with_fallback(
 ) -> Dict[str, Any]:
     """智能對話式呼叫 (v21 版)"""
     client = get_cached_client(api_key)
-    chat_history = _build_chat_history(history)
+    chat_history = build_chat_history(history)
     base_config = get_generation_config(intent_type)
     routing = build_effective_routing(intent_type, routing_strategy)
     require_json = intent_type in INTENTS_REQUIRING_JSON
@@ -738,32 +813,74 @@ async def call_extraction_server(
 # 🔧 Internal Helpers
 # ═══════════════════════════════════════════════════════════════
 
-def _build_chat_history(history: List[Dict]) -> List[types.Content]:
-    """建構對話歷史 — 轉換為新 SDK 格式"""
+def build_chat_history(history: List[Dict]) -> List[types.Content]:
+    """建構對話歷史 — 轉換為新 SDK 格式 (無損解析，相容思想簽名與工具呼叫)"""
     chat_history = []
 
     for msg in history:
         role = "user" if msg.get("role") == "user" else "model"
-
-        # 提取文字內容 (多源兼容)
-        text_content = ""
+        
+        # 取得原始 parts
+        parts_list = []
         if "rawParts" in msg and msg["rawParts"]:
-            for part in msg["rawParts"]:
-                if isinstance(part, dict) and "text" in part:
-                    text_content += part["text"]
+            parts_list = msg["rawParts"]
         elif "parts" in msg and msg["parts"]:
-            for part in msg["parts"]:
-                if isinstance(part, dict) and "text" in part:
-                    text_content += part["text"]
-                elif isinstance(part, str):
-                    text_content += part
+            parts_list = msg["parts"]
         else:
-            text_content = msg.get("content") or msg.get("displayContent") or ""
+            content = msg.get("content") or msg.get("displayContent") or ""
+            parts_list = [{"text": content}] if content else []
 
-        if text_content:
+        sdk_parts = []
+        for part in parts_list:
+            if isinstance(part, str):
+                sdk_parts.append(types.Part.from_text(text=part))
+            elif isinstance(part, dict):
+                # 1. 處理文字 (含思想簽名)
+                if "text" in part and part["text"]:
+                    if "thought" in part and part["thought"]:
+                        sdk_parts.append(types.Part(
+                            thought=True,
+                            text=part["text"]
+                        ))
+                    else:
+                        sdk_parts.append(types.Part.from_text(text=part["text"]))
+                
+                # 2. 處理獨立思想簽名 (字串降級相容)
+                elif "thought" in part and part["thought"]:
+                    sdk_parts.append(types.Part(
+                        thought=True,
+                        text=part["thought"] if isinstance(part["thought"], str) else "Thinking..."
+                    ))
+                
+                # 3. 處理 Function Call (雙格式相容)
+                elif "functionCall" in part or "function_call" in part:
+                    fc = part.get("functionCall") or part.get("function_call")
+                    if fc and "name" in fc:
+                        sdk_parts.append(types.Part(
+                            function_call=types.FunctionCall(
+                                name=fc["name"],
+                                args=dict(fc.get("args") or {})
+                            )
+                        ))
+                
+                # 4. 處理 Function Response (雙格式相容)
+                elif "functionResponse" in part or "function_response" in part:
+                    fr = part.get("functionResponse") or part.get("function_response")
+                    if fr and "name" in fr:
+                        resp_data = fr.get("response") or {}
+                        if not isinstance(resp_data, dict):
+                            resp_data = {"result": resp_data}
+                        sdk_parts.append(types.Part(
+                            function_response=types.FunctionResponse(
+                                name=fr["name"],
+                                response=resp_data
+                            )
+                        ))
+
+        if sdk_parts:
             chat_history.append(types.Content(
                 role=role,
-                parts=[types.Part.from_text(text=text_content)]
+                parts=sdk_parts
             ))
 
     return chat_history
@@ -771,7 +888,11 @@ def _build_chat_history(history: List[Dict]) -> List[types.Content]:
 
 def _extract_response(response, model_used: str) -> Dict[str, Any]:
     """從 Response 中提取完整資訊"""
-    text = response.text if hasattr(response, 'text') else ""
+    # 🛡️ response.text 是 property，純 function_call 回應時會拋 ValueError
+    try:
+        text = response.text or ""
+    except (ValueError, AttributeError):
+        text = ""
     raw_parts = []
 
     if hasattr(response, 'candidates') and response.candidates:
@@ -792,17 +913,26 @@ def _extract_response(response, model_used: str) -> Dict[str, Any]:
 
 
 def _serialize_part(part) -> Dict:
-    """序列化 Part 物件"""
+    """序列化 Part 物件 (雙相容輸出，確保前端 camelCase 與後端 snake_case 全相容)"""
     serialized = {}
 
     if hasattr(part, 'text') and part.text:
         serialized["text"] = part.text
 
+    # 相容新舊 SDK 的屬性名稱
+    fc = None
     if hasattr(part, 'function_call') and part.function_call:
-        serialized["function_call"] = {
-            "name": part.function_call.name,
-            "args": dict(part.function_call.args) if part.function_call.args else {}
+        fc = part.function_call
+    elif hasattr(part, 'functionCall') and part.functionCall:
+        fc = part.functionCall
+
+    if fc:
+        serialized["functionCall"] = {
+            "name": fc.name,
+            "args": dict(fc.args) if fc.args else {}
         }
+        # 向上相容舊版本
+        serialized["function_call"] = serialized["functionCall"]
 
     # 思想簽名 (Thought Signatures)
     if hasattr(part, 'thought') and part.thought:

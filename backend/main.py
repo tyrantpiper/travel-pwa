@@ -62,7 +62,7 @@ from services.geocode_service import HTTPX_CLIENT
 from services.model_manager import (
     call_with_fallback, call_verifier, call_extraction, 
     detect_diagnosis_intent, sanitize_config_for_model,
-    build_effective_routing
+    build_effective_routing, NEURAL_LINK_TOOLS, build_chat_history
 )
 from services.poi_service import (
     detect_poi_query, search_poi_combined, format_pois_for_ai, 
@@ -493,6 +493,15 @@ SYSTEM_PROMPT = """
 1.  **排版精美**：使用 Markdown 語法，善用 **粗體** 強調重點，使用條列式清單讓資訊易於掃描（考量手機螢幕閱讀）。
 2.  **行動導向**：在回覆的最後，盡量提供一個「下一步建議」（例如：「需要我幫你把這段日文存成圖片嗎？」）。
 3.  **多模態處理**：如果使用者上傳照片（如菜單、藥盒、街景），請優先針對圖片內容進行深度解析。
+
+### 🛠️ 行程與記帳工具呼叫指南 (Critical Tooling Instructions)
+當用戶在對話中表達以下意圖時，你必須**主動且立刻**調用對應的函數工具：
+1.  **新增景點/餐廳到行程**：當用戶說「幫我把東京鐵塔加到第一天行程」、「把這家拉麵店存到 day 2」等。
+    *   👉 必須調用 `add_itinerary_item(day: int, place_name: str, category: str, estimated_cost: Optional[int])`。
+2.  **記帳/新增費用**：當用戶說「幫我記一筆 day 3 吃拉麵 1500 日圓」、「把今天買藥花 2000 元記下來」等。
+    *   👉 必須調用 `add_expense(day: int, title: str, amount: int)`。
+
+*注意*：如果用戶沒有指定天數 (day)，請預設使用當前正處於聚焦的焦點天數（即 `[用戶當前行程]` 中標記為 `👉` 的天數）。調用工具後，系統會在前端介面自動為用戶渲染對應的確認/預覽卡片，不需要你手動輸出卡片 HTML。
 """
 
 async def _build_price_context(itinerary: dict) -> str:
@@ -611,20 +620,60 @@ async def chat_with_ryan(
         
         # 處理對話歷史 (向後相容)
         processed_history = []
+        pending_function_calls = [] # 🟢 改用列表追蹤所有未處理的工具名稱以支援 Parallel Tool Calls
+        
         for msg in body.history:
             role = "user" if msg.get("role") == "user" else "model"
             
-            # [NEW] 優先使用 rawParts (含思想簽名)
             if "rawParts" in msg and msg["rawParts"]:
                 parts = msg["rawParts"]
             elif "parts" in msg and msg["parts"]:
                 parts = msg["parts"]
             else:
-                # 向後相容：舊格式只有 content
                 content = msg.get("content") or msg.get("displayContent") or ""
                 parts = [{"text": content}]
             
+            # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱
+            if role == "model":
+                for p in parts:
+                    if isinstance(p, dict):
+                        fc = p.get("functionCall") or p.get("function_call")
+                        if fc and isinstance(fc, dict) and "name" in fc:
+                            pending_function_calls.append(fc["name"])
+            
+            # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱的 functionResponse，防禦 400 狀態機錯誤
+            if role == "user" and pending_function_calls:
+                response_parts = []
+                for func_name in pending_function_calls:
+                    response_parts.append({
+                        "functionResponse": {
+                            "name": func_name,
+                            "response": {"status": "User interacted with UI to handle this suggestion"}
+                        }
+                    })
+                processed_history.append({
+                    "role": "user", 
+                    "parts": response_parts
+                })
+                pending_function_calls = [] # 重置
+                
             processed_history.append({"role": role, "parts": parts})
+        
+        # 🟢 歷史尾部收尾：如果對話最後是 model 的 functionCall，補上 functionResponse 防止 400
+        if pending_function_calls:
+            response_parts = []
+            for func_name in pending_function_calls:
+                response_parts.append({
+                    "functionResponse": {
+                        "name": func_name,
+                        "response": {"status": "User interacted with UI to handle this suggestion"}
+                    }
+                })
+            processed_history.append({
+                "role": "user",
+                "parts": response_parts
+            })
+            pending_function_calls = []
         
         full_history = system_history + processed_history
         
@@ -762,29 +811,8 @@ async def stream_chat_generator(
         yield 'event: thinking\ndata: {"status": "processing"}\n\n'
         await asyncio.sleep(0)
         
-        # 建構 history
-        chat_history = []
-        for msg in history:
-            role = "user" if msg.get("role") == "user" else "model"
-            text_content = ""
-            if "rawParts" in msg and msg["rawParts"]:
-                for part in msg["rawParts"]:
-                    if isinstance(part, dict) and "text" in part:
-                        text_content += part["text"]
-            elif "parts" in msg and msg["parts"]:
-                for part in msg["parts"]:
-                    if isinstance(part, dict) and "text" in part:
-                        text_content += part["text"]
-                    elif isinstance(part, str):
-                        text_content += part
-            else:
-                text_content = msg.get("content") or msg.get("displayContent") or ""
-            
-            if text_content:
-                chat_history.append(genai.types.Content(
-                    role=role,
-                    parts=[genai.types.Part.from_text(text=text_content)]
-                ))
+        # 建構對話歷史 — 呼叫 model_manager 的無損解析歷史格式 (相容並恢復過去所有 Tool Calls / Thought 節點)
+        chat_history = build_chat_history(history)
         
         # 設定心跳任務
         last_heartbeat = asyncio.get_event_loop().time()
@@ -794,11 +822,11 @@ async def stream_chat_generator(
         model_name = DAILY_ROUTING[0]
         last_chunk = None
         
-        # 構建串流 config（含 Google Search Grounding）
+        # 構建串流 config（注入神經連結卡片，供後續自動過濾與搜尋增強疊加）
         stream_config = genai.types.GenerateContentConfig(
             max_output_tokens=2048,
             temperature=1.0,
-            tools=[{"google_search": {}}],
+            tools=NEURAL_LINK_TOOLS,
         )
         
         contents = chat_history + [genai.types.Content(
@@ -810,6 +838,7 @@ async def stream_chat_generator(
         effective_routing = build_effective_routing("CHAT", DAILY_ROUTING)
         stream_success = False
         full_text = ""
+        collected_function_calls = []  # 🟢 準備收集所有 Function Calls
         for i, candidate_model in enumerate(effective_routing):
             try:
                 safe_config = sanitize_config_for_model(stream_config, candidate_model, intent_type="CHAT")
@@ -840,6 +869,27 @@ async def stream_chat_generator(
                         full_text += chunk.text
                         yield f'event: text\ndata: {json.dumps({"text": chunk.text})}\n\n'
                         await asyncio.sleep(0)
+                        
+                    # 🟢 新增：提取 Parallel Function Calls (相容屬性 function_calls 與 functionCalls)
+                    fcs = None
+                    if hasattr(chunk, 'function_calls') and chunk.function_calls:
+                        fcs = chunk.function_calls
+                    elif hasattr(chunk, 'functionCalls') and chunk.functionCalls:
+                        fcs = chunk.functionCalls
+                        
+                    if fcs:
+                        for fc in fcs:
+                            # 轉換為前端預期的 rawParts 格式 (提供駝峰與蛇形雙相容欄位)
+                            collected_function_calls.append({
+                                "functionCall": {
+                                    "name": fc.name,
+                                    "args": dict(fc.args) if fc.args else {}
+                                },
+                                "function_call": {
+                                    "name": fc.name,
+                                    "args": dict(fc.args) if fc.args else {}
+                                }
+                            })
                 
                 stream_success = True
                 break  # 成功，跳出降級迴圈
@@ -848,6 +898,7 @@ async def stream_chat_generator(
                 print(f"⚠️ {candidate_model} 串流失敗: {gen_error}")
                 yield f'event: thinking\ndata: {json.dumps({"status": "fallback", "model": candidate_model})}\n\n'
                 full_text = ""  # 重置，避免拼接到殘片
+                collected_function_calls = []  # 重置
                 last_chunk = None
                 continue
         
@@ -855,7 +906,12 @@ async def stream_chat_generator(
             yield f'event: error\ndata: {json.dumps({"message": "所有模型均不可用", "code": 503})}\n\n'
             return
         
-        raw_parts = [{"text": full_text}]
+        # 🟢 重構：將 function_calls 合併回 raw_parts 以供歷史紀錄與前端使用
+        raw_parts = []
+        if full_text:
+            raw_parts.append({"text": full_text})
+        if collected_function_calls:
+            raw_parts.extend(collected_function_calls)
         
         # [NEW] v5.0: 從最後一個 chunk 提取 grounding_metadata（引文來源）
         citations = []
@@ -957,8 +1013,11 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
     
     # 處理對話歷史
     processed_history = []
+    pending_function_calls = [] # 🟢 改用列表追蹤所有未處理的工具名稱以支援 Parallel Tool Calls
+    
     for msg in body.history:
         role = "user" if msg.get("role") == "user" else "model"
+        
         if "rawParts" in msg and msg["rawParts"]:
             parts = msg["rawParts"]
         elif "parts" in msg and msg["parts"]:
@@ -966,7 +1025,48 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
         else:
             content = msg.get("content") or msg.get("displayContent") or ""
             parts = [{"text": content}]
+            
+        # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱
+        if role == "model":
+            for p in parts:
+                if isinstance(p, dict):
+                    fc = p.get("functionCall") or p.get("function_call")
+                    if fc and isinstance(fc, dict) and "name" in fc:
+                        pending_function_calls.append(fc["name"])
+            
+        # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱的 functionResponse，防禦 400 狀態機錯誤
+        if role == "user" and pending_function_calls:
+            response_parts = []
+            for func_name in pending_function_calls:
+                response_parts.append({
+                    "functionResponse": {
+                        "name": func_name,
+                        "response": {"status": "User interacted with UI to handle this suggestion"}
+                    }
+                })
+            processed_history.append({
+                "role": "user", 
+                "parts": response_parts
+            })
+            pending_function_calls = [] # 重置
+            
         processed_history.append({"role": role, "parts": parts})
+    
+    # 🟢 歷史尾部收尾：如果對話最後是 model 的 functionCall，補上 functionResponse 防止 400
+    if pending_function_calls:
+        response_parts = []
+        for func_name in pending_function_calls:
+            response_parts.append({
+                "functionResponse": {
+                    "name": func_name,
+                    "response": {"status": "User interacted with UI to handle this suggestion"}
+                }
+            })
+        processed_history.append({
+            "role": "user",
+            "parts": response_parts
+        })
+        pending_function_calls = []
     
     full_history = system_history + processed_history
     
