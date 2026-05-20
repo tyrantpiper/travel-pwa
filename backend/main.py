@@ -637,22 +637,26 @@ async def chat_with_ryan(
                 content = msg.get("content") or msg.get("displayContent") or ""
                 parts = [{"text": content}]
             
-            # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱
+            # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱與 id
             if role == "model":
                 for p in parts:
                     if isinstance(p, dict):
                         fc = p.get("functionCall") or p.get("function_call")
                         if fc and isinstance(fc, dict) and "name" in fc:
-                            pending_function_calls.append(fc["name"])
+                            pending_function_calls.append({
+                                "name": fc["name"],
+                                "id": fc.get("id")
+                            })
             
-            # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱的 functionResponse，防禦 400 狀態機錯誤
+            # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱與 id 的 functionResponse，防禦 400 狀態機錯誤
             if role == "user" and pending_function_calls:
                 response_parts = []
-                for func_name in pending_function_calls:
+                for fc_info in pending_function_calls:
                     response_parts.append({
                         "functionResponse": {
-                            "name": func_name,
-                            "response": {"status": "User interacted with UI to handle this suggestion"}
+                            "name": fc_info["name"],
+                            "response": {"status": "User interacted with UI to handle this suggestion"},
+                            **({"id": fc_info["id"]} if fc_info.get("id") else {})
                         }
                     })
                 processed_history.append({
@@ -666,11 +670,12 @@ async def chat_with_ryan(
         # 🟢 歷史尾部收尾：如果對話最後是 model 的 functionCall，補上 functionResponse 防止 400
         if pending_function_calls:
             response_parts = []
-            for func_name in pending_function_calls:
+            for fc_info in pending_function_calls:
                 response_parts.append({
                     "functionResponse": {
-                        "name": func_name,
-                        "response": {"status": "User interacted with UI to handle this suggestion"}
+                        "name": fc_info["name"],
+                        "response": {"status": "User interacted with UI to handle this suggestion"},
+                        **({"id": fc_info["id"]} if fc_info.get("id") else {})
                     }
                 })
             processed_history.append({
@@ -883,15 +888,18 @@ async def stream_chat_generator(
                         
                     if fcs:
                         for fc in fcs:
-                            # 轉換為前端預期的 rawParts 格式 (提供駝峰與蛇形雙相容欄位)
+                            fc_id = getattr(fc, 'id', None)
+                            # 轉換為前端預期的 rawParts 格式 (提供駝峰與蛇形雙相容欄位，包含 id)
                             collected_function_calls.append({
                                 "functionCall": {
                                     "name": fc.name,
-                                    "args": dict(fc.args) if fc.args else {}
+                                    "args": dict(fc.args) if fc.args else {},
+                                    **({"id": fc_id} if fc_id else {})
                                 },
                                 "function_call": {
                                     "name": fc.name,
-                                    "args": dict(fc.args) if fc.args else {}
+                                    "args": dict(fc.args) if fc.args else {},
+                                    **({"id": fc_id} if fc_id else {})
                                 }
                             })
                 
@@ -1030,22 +1038,26 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
             content = msg.get("content") or msg.get("displayContent") or ""
             parts = [{"text": content}]
             
-        # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱
+        # 🟢 收集 model 訊息中所有 functionCall/function_call 的名稱與 id
         if role == "model":
             for p in parts:
                 if isinstance(p, dict):
                     fc = p.get("functionCall") or p.get("function_call")
                     if fc and isinstance(fc, dict) and "name" in fc:
-                        pending_function_calls.append(fc["name"])
+                        pending_function_calls.append({
+                            "name": fc["name"],
+                            "id": fc.get("id")
+                        })
             
-        # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱的 functionResponse，防禦 400 狀態機錯誤
+        # 🟢 官方最佳實踐：在 User 回話前，強制插入對應名稱與 id 的 functionResponse，防禦 400 狀態機錯誤
         if role == "user" and pending_function_calls:
             response_parts = []
-            for func_name in pending_function_calls:
+            for fc_info in pending_function_calls:
                 response_parts.append({
                     "functionResponse": {
-                        "name": func_name,
-                        "response": {"status": "User interacted with UI to handle this suggestion"}
+                        "name": fc_info["name"],
+                        "response": {"status": "User interacted with UI to handle this suggestion"},
+                        **({"id": fc_info["id"]} if fc_info.get("id") else {})
                     }
                 })
             processed_history.append({
@@ -1059,11 +1071,12 @@ async def chat_stream(request: Request, body: ChatRequest, api_key: str = Depend
     # 🟢 歷史尾部收尾：如果對話最後是 model 的 functionCall，補上 functionResponse 防止 400
     if pending_function_calls:
         response_parts = []
-        for func_name in pending_function_calls:
+        for fc_info in pending_function_calls:
             response_parts.append({
                 "functionResponse": {
-                    "name": func_name,
-                    "response": {"status": "User interacted with UI to handle this suggestion"}
+                    "name": fc_info["name"],
+                    "response": {"status": "User interacted with UI to handle this suggestion"},
+                    **({"id": fc_info["id"]} if fc_info.get("id") else {})
                 }
             })
         processed_history.append({
