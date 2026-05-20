@@ -16,6 +16,7 @@ import { getLeanItinerary, LeanItinerary } from "@/lib/getLeanItinerary"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
+import ExpensePreviewCard, { extractExpenseFunctionCall } from "@/components/chat/ExpensePreviewCard"
 import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
 import { useWeatherStore } from "@/lib/stores/weatherStore"
@@ -708,6 +709,14 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                     const poiData = extractFunctionCall(msg.rawParts)
                                                     if (poiData) {
                                                         return <POIPreviewCard poiData={poiData} />
+                                                    }
+                                                    return null
+                                                })()}
+                                                {/* 🆕 記帳預覽卡片 (如果有 function_call) */}
+                                                {(() => {
+                                                    const expenseData = extractExpenseFunctionCall(msg.rawParts)
+                                                    if (expenseData) {
+                                                        return <ExpensePreviewCard expenseData={expenseData} />
                                                     }
                                                     return null
                                                 })()}
