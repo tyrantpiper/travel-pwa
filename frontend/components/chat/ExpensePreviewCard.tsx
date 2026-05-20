@@ -134,6 +134,22 @@ export default function ExpensePreviewCard({ expenseData, onDismiss }: ExpensePr
                         </span>
                     </div>
 
+                    {/* 🆕 發票點陣明細 (items) */}
+                    {expenseData.items && expenseData.items.length > 0 && (
+                        <div className="border-t border-dashed border-slate-200/60 my-1.5 pt-1.5 space-y-1 text-[10px] font-mono text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 p-1.5 rounded">
+                            {expenseData.items.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between">
+                                    <span className="truncate max-w-[200px] text-slate-600 dark:text-slate-400">
+                                        {item.translated_name ? `${item.original_name} (${item.translated_name})` : item.original_name}
+                                    </span>
+                                    <span className="shrink-0 font-bold">
+                                        {item.amount.toLocaleString()}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-y-1.5 text-xs text-slate-500 pt-1">
                         <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 text-slate-400" />
@@ -208,7 +224,17 @@ export function extractExpenseFunctionCall(rawParts: unknown[]): ExpenseData | n
                     category: String(args.category || "其他"),
                     payment_method: String(args.payment_method || "現金"),
                     expense_date: String(args.expense_date || args.date || ""),
-                    notes: String(args.notes || args.desc || args.description || "")
+                    notes: String(args.notes || args.desc || args.description || ""),
+                    items: Array.isArray(args.items) ? (args.items as unknown[]).map((item) => {
+                        const it = item as { original_name?: unknown; name?: unknown; translated_name?: unknown; amount?: unknown } | null | undefined
+                        const origName = String(it?.original_name || it?.name || "")
+                        const amtVal = it?.amount
+                        return {
+                            original_name: origName,
+                            translated_name: it?.translated_name ? String(it.translated_name) : undefined,
+                            amount: typeof amtVal === "number" ? amtVal : parseFloat(String(amtVal || 0)) || 0,
+                        }
+                    }).filter(item => item.original_name) : undefined
                 }
             }
         }
