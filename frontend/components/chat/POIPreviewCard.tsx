@@ -266,16 +266,51 @@ export default function POIPreviewCard({
                 )}
 
                 {/* 官網連結 */}
-                {enriched?.official_url && (
+                {(poiData.link_url || enriched?.official_url) && (
                     <a
-                        href={enriched.official_url}
+                        href={poiData.link_url || enriched?.official_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1"
+                        className="text-[10px] text-indigo-600 hover:underline inline-flex items-center gap-1 font-medium bg-indigo-50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded w-fit"
                     >
                         <ExternalLink className="w-3 h-3" />
                         {zh ? '官方網站' : 'Official Site'}
                     </a>
+                )}
+
+                {/* 🆕 景點子項目/必看推薦 (sub_items) */}
+                {poiData.sub_items && poiData.sub_items.length > 0 && (
+                    <div className="mt-1.5 p-1.5 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800/80 space-y-1">
+                        <span className="text-[9px] font-bold text-slate-400 block tracking-wider uppercase">
+                            {poiData.category === "food" || poiData.category === "restaurant" ? (zh ? "🍽️ 推薦品項" : "🍽️ Recommended") : (zh ? "✨ 必看/特色" : "✨ Highlights")}
+                        </span>
+                        <div className="space-y-1">
+                            {poiData.sub_items.map((sub, idx) => (
+                                <div key={idx} className="text-[10px] leading-normal flex items-start justify-between gap-2">
+                                    <div className="flex-1">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                            • {sub.name}
+                                        </span>
+                                        {sub.desc && (
+                                            <span className="text-slate-500 ml-1">
+                                                ({sub.desc})
+                                            </span>
+                                        )}
+                                    </div>
+                                    {sub.link && (
+                                        <a
+                                            href={sub.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-500 hover:underline shrink-0"
+                                        >
+                                            {zh ? '詳情' : 'Link'}
+                                        </a>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 )}
 
                 {/* Loading 指示器 */}
@@ -383,7 +418,16 @@ export function extractFunctionCall(rawParts: unknown[]): POIData | null {
                     rating: typeof args.rating === "number" ? args.rating : undefined,
                     duration: String(args.duration || ""),
                     day_number: typeof dayVal === "number" ? dayVal : parseInt(String(dayVal)) || 1,
-                    time_slot: String(args.time_slot || args.timeSlot || "12:00")
+                    time_slot: String(args.time_slot || args.timeSlot || "12:00"),
+                    link_url: args.link_url ? String(args.link_url) : undefined,
+                    sub_items: Array.isArray(args.sub_items) ? (args.sub_items as unknown[]).map((item) => {
+                        const sub = item as { name?: unknown; desc?: unknown; link?: unknown } | null | undefined
+                        return {
+                            name: sub?.name ? String(sub.name) : "",
+                            desc: sub?.desc ? String(sub.desc) : undefined,
+                            link: sub?.link ? String(sub.link) : undefined,
+                        }
+                    }).filter(item => item.name) : undefined
                 }
             }
         }

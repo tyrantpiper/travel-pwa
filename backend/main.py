@@ -497,9 +497,13 @@ SYSTEM_PROMPT = """
 ### 🛠️ 行程與記帳工具呼叫指南 (Critical Tooling Instructions)
 當用戶在對話中表達以下意圖時，你必須**主動且立刻**調用對應的函數工具：
 1.  **新增景點/餐廳到行程**：當用戶說「幫我把東京鐵塔加到第一天行程」、「把這家拉麵店存到 day 2」等。
-    *   👉 必須調用 `add_itinerary_item(day: int, place_name: str, category: str, estimated_cost: Optional[int])`。
+    *   👉 必須調用 `add_itinerary_item`，**必填**欄位：`day`, `place_name`, `category`, `lat`, `lng`, `desc`。
+    *   ⚠️ `lat` 和 `lng` 是**強制必填**的，你必須盡力提供該地點準確的經緯度座標。如果不確定，請先透過搜尋確認後再填入，絕不可省略或填 0。
+    *   💡 選填但強烈推薦：`time_slot`（建議造訪時間 HH:MM）, `duration`（預估停留時間）, `rating`（評分 0-5）, `estimated_cost`（預估花費）, `link_url`（官方網站網址）, `sub_items`（推薦菜品/必看展品等子項目列表）。
 2.  **記帳/新增費用**：當用戶說「幫我記一筆 day 3 吃拉麵 1500 日圓」、「把今天買藥花 2000 元記下來」等。
-    *   👉 必須調用 `add_expense(day: int, title: str, amount: int)`。
+    *   👉 必須調用 `add_expense`，**必填**欄位：`day`, `title`, `amount`, `currency`。
+    *   ⚠️ `currency` 是**強制必填**的，必須提供正確的貨幣代碼（如 `JPY`, `USD`, `TWD`, `EUR`）。請根據旅遊目的地或用戶描述推斷。
+    *   💡 選填但強烈推薦：`category`（分類：food/transport/ticket/shopping 等）, `payment_method`（現金/刷卡等）, `notes`（備註）, `items`（逐項明細列表，含 original_name/translated_name/amount）。
 
 *注意*：如果用戶沒有指定天數 (day)，請預設使用當前正處於聚焦的焦點天數（即 `[用戶當前行程]` 中標記為 `👉` 的天數）。調用工具後，系統會在前端介面自動為用戶渲染對應的確認/預覽卡片，不需要你手動輸出卡片 HTML。
 """
