@@ -58,6 +58,16 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         allow_extraction_fallback=True,
         family="gemini",
     ),
+    "gemini-3.5-flash": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,       # 🟢 啟用頂級神經連結能力
+        supports_media_resolution=True,
+        supports_thinking=True,
+        supports_grounding=False,
+        requires_property_ordering=False,
+        allow_extraction_fallback=True,
+        family="gemini",
+    ),
     "gemini-3-flash-preview": ModelCaps(
         supports_schema=True,
         supports_tools=False,      # 🛡️ 暫時禁用以防 429
@@ -452,11 +462,14 @@ def sanitize_config_for_model(
     if hasattr(safe, 'thinking_config') and not caps.supports_thinking:
         safe.thinking_config = None
 
-    # 4. Gemini 3 溫度限制
+    # 4. Gemini 3.x 取樣參數完全移除 (2026 官方最佳實踐)
     if caps.family == "gemini" and model_name.startswith("gemini-3"):
-        if hasattr(safe, 'temperature') and safe.temperature is not None:
-            if safe.temperature < 1.0:
-                safe.temperature = 1.0
+        if hasattr(safe, 'temperature'):
+            safe.temperature = None
+        if hasattr(safe, 'top_p'):
+            safe.top_p = None
+        if hasattr(safe, 'top_k'):
+            safe.top_k = None
 
     # 5. Schema 降級與隱式修正 (關鍵核心)
     require_json = intent_type in INTENTS_REQUIRING_JSON
@@ -859,7 +872,8 @@ def build_chat_history(history: List[Dict]) -> List[types.Content]:
                         sdk_parts.append(types.Part(
                             function_call=types.FunctionCall(
                                 name=fc["name"],
-                                args=dict(fc.get("args") or {})
+                                args=dict(fc.get("args") or {}),
+                                id=fc.get("id")
                             )
                         ))
                 
@@ -873,7 +887,8 @@ def build_chat_history(history: List[Dict]) -> List[types.Content]:
                         sdk_parts.append(types.Part(
                             function_response=types.FunctionResponse(
                                 name=fr["name"],
-                                response=resp_data
+                                response=resp_data,
+                                id=fr.get("id")
                             )
                         ))
 
@@ -927,9 +942,11 @@ def _serialize_part(part) -> Dict:
         fc = part.functionCall
 
     if fc:
+        fc_id = getattr(fc, 'id', None)
         serialized["functionCall"] = {
             "name": fc.name,
-            "args": dict(fc.args) if fc.args else {}
+            "args": dict(fc.args) if fc.args else {},
+            **({"id": fc_id} if fc_id else {})
         }
         # 向上相容舊版本
         serialized["function_call"] = serialized["functionCall"]

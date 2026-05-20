@@ -81,20 +81,20 @@ def test_sanitize_removes_tools_for_gemma():
 def test_sanitize_keeps_config_for_gemini_3():
     """Gemini 3 應被強制移除 google_search 以防止 429 Error"""
     config = types.GenerateContentConfig(
-        temperature=0.5,  # 會被強制為 1.0
+        temperature=0.5,  # 會被移除
         tools=[{"google_search": {}}],
     )
     
     safe = sanitize_config_for_model(config, "gemini-3-flash-preview", "HEAVY")
     assert safe.tools is None
-    assert safe.temperature == 1.0  # 強制調高
+    assert safe.temperature is None  # 2026 最佳實踐：重設為 None
 
 
 def test_sanitize_enforces_temperature_for_gemini_3():
-    """Gemini 3 的 temperature < 1.0 時應被強制為 1.0"""
+    """Gemini 3.x 家族應被直接移除自訂 temperature"""
     config = types.GenerateContentConfig(temperature=0.3)
     safe = sanitize_config_for_model(config, "gemini-3.1-flash-lite", "LITE")
-    assert safe.temperature == 1.0
+    assert safe.temperature is None
 
 
 # ═══════════════════════════════════════════════════════════════
