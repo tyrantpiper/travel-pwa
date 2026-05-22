@@ -71,7 +71,8 @@ export function parseSSE(chunk: string, buffer: string): { events: SSEEvent[]; r
 /**
  * 處理 SSE 事件，呼叫對應的 handler
  */
-export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): void {
+export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): boolean {
+    let isTerminal = false
     try {
         switch (event.event) {
             case "start":
@@ -101,6 +102,7 @@ export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): void {
             case "done":
                 const doneData = JSON.parse(event.data)
                 handlers.onDone?.(doneData)
+                isTerminal = true  // done 也是終結事件
                 break
 
             case "error":
@@ -110,6 +112,7 @@ export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): void {
                 } catch {
                     handlers.onError?.({ message: event.data || "Unknown SSE streaming error", code: 500 })
                 }
+                isTerminal = true  // 🛡️ error 是終結事件
                 break
 
             case "heartbeat":
@@ -119,6 +122,7 @@ export function handleSSEEvent(event: SSEEvent, handlers: SSEHandlers): void {
     } catch (e) {
         console.error("SSE event parse error:", e, event)
     }
+    return isTerminal
 }
 
 /**
@@ -170,12 +174,13 @@ export async function streamChat(
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
+    let streamTerminated = false  // 🛡️ 終結旗標
 
     try {
         while (true) {
             // 🆕 v3.7: 檢查是否已被 abort
-            if (signal?.aborted) {
-                console.log("🛑 SSE 已被用戶中斷")
+            if (signal?.aborted || streamTerminated) {
+                if (signal?.aborted) console.log("🛑 SSE 已被用戶中斷")
                 break
             }
 
@@ -194,13 +199,17 @@ export async function streamChat(
 
             for (const event of events) {
                 // 🆕 處理事件前也檢查 abort
-                if (signal?.aborted) break
-                handleSSEEvent(event, handlers)
+                if (signal?.aborted || streamTerminated) break
+                const isTerminal = handleSSEEvent(event, handlers)
+                if (isTerminal) {
+                    streamTerminated = true
+                    break
+                }
             }
         }
 
-        // 處理最後剩餘的 buffer（只在未 abort 時）
-        if (buffer.trim() && !signal?.aborted) {
+        // 處理最後剩餘的 buffer（只在未 abort 且未終結時）
+        if (buffer.trim() && !signal?.aborted && !streamTerminated) {
             const { events } = parseSSE(buffer + "\n\n", "")
             for (const event of events) {
                 handleSSEEvent(event, handlers)
