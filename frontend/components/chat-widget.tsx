@@ -505,7 +505,21 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 historySource = messages.slice(-MAX_HISTORY)
             }
         }
-        const history = historySource.map(m => ({
+        // 🛡️ 歷史衛生檢查：防止連續相同 role 導致 Gemini 400 錯誤
+        const sanitizedSource: typeof historySource = []
+        for (const m of historySource) {
+            const prev = sanitizedSource[sanitizedSource.length - 1]
+            if (prev && prev.role === m.role) {
+                // 連續相同 role → 插入一個空的對方佔位訊息
+                const placeholderRole = m.role === "user" ? "model" : "user"
+                sanitizedSource.push(hydrateMessage({
+                    role: placeholderRole as "user" | "model",
+                    displayContent: placeholderRole === "model" ? "[AI 處理中]" : "[繼續]"
+                }))
+            }
+            sanitizedSource.push(m)
+        }
+        const history = sanitizedSource.map(m => ({
             role: m.role,
             rawParts: m.rawParts,
             displayContent: m.displayContent
@@ -555,23 +569,37 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                             streamingRawParts = data.raw_parts
                             streamingSuccess = true
 
-                            // 更新最終訊息 (🆕 v3.7.1: 包含來源)
+                            // 更新最終訊息 (🆕 v5.3: 修復純 Tool Call 回應時佔位訊息缺失)
+                            const groundingSources = data.sources?.map(s => ({
+                                title: s.title,
+                                uri: s.uri || s.url || ""
+                            }))
                             setMessages(prev => {
                                 const updated = [...prev]
                                 const lastMsg = updated[updated.length - 1]
-                                if (lastMsg?.role === "model") {
+                                if (lastMsg?.role === "model" && lastMsg.modelUsed === "__streaming__") {
+                                    // 已有串流佔位訊息 → 原地更新
                                     lastMsg.displayContent = streamingText
                                     lastMsg.rawParts = streamingRawParts
                                     lastMsg.modelUsed = data.model_used
-                                    lastMsg.groundingSources = data.sources?.map(s => ({
-                                        title: s.title,
-                                        uri: s.uri || s.url || ""
+                                    lastMsg.groundingSources = groundingSources
+                                } else {
+                                    // 🟢 純 Tool Call 回應（無 text chunk）→ 新增 model 訊息
+                                    updated.push(hydrateMessage({
+                                        role: "model",
+                                        displayContent: streamingText || "",
+                                        rawParts: streamingRawParts,
+                                        modelUsed: data.model_used,
+                                        groundingSources
                                     }))
                                 }
                                 return updated
                             })
                         },
                         onError: (error) => {
+                            // 🛡️ 如果 onDone 已經成功處理，忽略後續 error 事件
+                            if (streamingSuccess) return
+                            
                             console.error("🔴 SSE 錯誤:", JSON.stringify(error, null, 2))
                             // 若已經接收到文字，則強迫終止 Fallback 並保留半殘對話
                             if (streamingText.trim().length > 0) {
