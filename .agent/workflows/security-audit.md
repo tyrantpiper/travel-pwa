@@ -41,6 +41,38 @@ Run `npm ls --all --json | Select-Object -First 50` to snapshot top dependencies
 
 ---
 
+## 🌐 Phase 3.5: API Security Hardening
+
+Check backend API security posture:
+
+### 3.5.1 CORS Configuration
+Search `backend/main.py` for CORS middleware:
+- Verify `allow_origins` is NOT `["*"]` in production
+- Confirm only explicitly listed domains
+
+### 3.5.2 Rate Limiting Coverage
+// turbo
+Run `Select-String -Path "backend/routers/*.py" -Pattern "@limiter" | Measure-Object | Select-Object Count` to count rate-limited endpoints.
+
+Cross-reference with total endpoint count:
+// turbo
+Run `Select-String -Path "backend/routers/*.py" -Pattern "@router\.(get|post|put|delete|patch)" | Measure-Object | Select-Object Count`
+
+**Flag**: Any unprotected public endpoint as 🟡 HIGH risk.
+
+### 3.5.3 Authentication Header Validation
+Search for BYOK API key handling:
+- Verify `X-API-Key` or `Authorization` header is validated
+- Confirm no endpoint bypasses auth without explicit `public=True`
+
+### 3.5.4 Error Response Sanitization
+Ensure error responses do NOT leak:
+- Stack traces to client
+- Internal file paths
+- Database connection strings
+
+---
+
 ## 🆕 Phase 4: React Compiler Security Audit (2026 Deep Research)
 
 ### 4.1 React Version Security Check
@@ -110,6 +142,45 @@ For apps using React Server Components:
 
 ---
 
+## 🎯 Phase 5.5: Injection & SSRF Scan
+
+### 5.5.1 SQL Injection Detection
+Search for string-interpolated SQL (Python backend):
+```grep
+Pattern: f".*SELECT|f".*INSERT|f".*UPDATE|f".*DELETE
+Risk: 🔴 CRITICAL - String interpolation in SQL queries
+Fix: Use parameterized queries or Supabase client
+```
+
+### 5.5.2 SSRF Protection Verification
+Verify all external URL access goes through safety checks:
+```grep
+Pattern: httpx\.(get|post|put|delete)\(
+Files: backend/**/*.py
+```
+
+For each match, verify it either:
+- Uses `utils/url_safety.py` validation, OR
+- Targets a hardcoded, trusted domain (e.g., `api.openai.com`)
+
+**Flag**: Any `httpx` call without URL validation as 🔴 CRITICAL.
+
+### 5.5.3 Command Injection Check
+Search for shell execution patterns:
+```grep
+Pattern: subprocess\.|os\.system\(|os\.popen\(
+Risk: 🔴 CRITICAL - Potential command injection
+```
+
+### 5.5.4 Path Traversal Check
+Search for user-controlled file path access:
+```grep
+Pattern: open\(.*request|Path\(.*request
+Risk: 🟡 HIGH - Potential path traversal
+```
+
+---
+
 ## 📊 Phase 6: Generate Security Report
 Create artifact: `security_report_{date}.md`
 
@@ -120,7 +191,15 @@ Create artifact: `security_report_{date}.md`
 4. **Secret Scan Results**: Filenames with potential leaks
 5. **Data Integrity Matrix**: Risk assessment results
 6. **XSS/Injection Audit**: Dangerous patterns found
-7. **Recommendations**: Prioritized action items
+7. **API Security Posture**: CORS, Rate Limiting, Auth coverage
+8. **Injection & SSRF Scan**: SQL injection, SSRF, command injection findings
+9. **Red-Team Summary**: 5-category threat assessment
+   - Direct Prompt Injection risk: LOW/MED/HIGH
+   - Indirect Prompt Injection risk: LOW/MED/HIGH
+   - Information Extraction risk: LOW/MED/HIGH
+   - Tool Abuse risk: LOW/MED/HIGH
+   - Goal Hijacking risk: LOW/MED/HIGH
+10. **Recommendations**: Prioritized action items
 
 ---
 
