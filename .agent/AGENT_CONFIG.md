@@ -35,6 +35,7 @@ The following workflows MUST be triggered based on context:
 | **System Governance (L3)** | `/sentinel-report` | Read `.agent/workflows/sentinel-report.md` |
 | **Migration Wizard** | `/migration-wizard` | Read `.agent/workflows/migration-wizard.md` |
 | **Incident Response** | `/incident-playbook` | Read `.agent/workflows/incident-playbook.md` |
+| **Skill Installation** | `/skill-security-scan` | Read `.agent/workflows/skill-security-scan.md` |
 
 ## 🎯 Skill Auto-Activation
 
@@ -46,10 +47,23 @@ The following workflows MUST be triggered based on context:
 | "回歸", "regression", "broken" | `regression-guardian` |
 | "元件", "component", "UI 元件" | `component-generator` |
 | "優化 skill", "refine", "演化" | `skill-refiner` |
-| "生成測試", "auto test" | `auto-test-gen` |
+| "建立 skill", "create skill", "新 skill" | `skill-creator` |
 | "生成測試", "auto test" | `auto-test-gen` |
 | "自動修復", "self heal", "fix build" | `self-healing-agent` |
 | "debug", "root cause", "分析錯誤", "why broken" | `debug-detective` |
+
+## 🤖 Agent Personas
+
+> Full definitions: `agents.md`
+
+| Context | Active Persona | Handoff |
+|:---|:---|:---|
+| Feature building | @dev | → @qa for verification |
+| Security concerns | @security | Report only |
+| Architecture decisions | @architect | → human approval → @dev |
+| Bug fixing | @dev + `debug-detective` | — |
+| Code review | @qa + `code-reviewer` | — |
+| Skill installation | @security + `/skill-security-scan` | — |
 
 ## 📋 Pre-Task Checklist
 
@@ -60,7 +74,7 @@ Before starting ANY coding task:
 
 ## ⚙️ Project Context
 
-- **Framework**: Next.js 15 + React 19 + TypeScript
+- **Framework**: Next.js 16 + React 19 + TypeScript
 - **Styling**: Tailwind CSS v4 (with dark mode via `.dark` class)
 - **Backend**: FastAPI + Supabase
 - **PWA**: Full offline support, service worker enabled
@@ -73,10 +87,48 @@ Before starting ANY coding task:
 2. **Use `pwa-auditor` skill for any styling work**
 3. **Never skip TypeScript verification**
 4. **Check dark mode compatibility for all UI changes**
+5. **Run `/skill-security-scan` before installing any third-party skill**
+6. **Consult `agents.md` for persona routing on complex tasks**
+
+## 📊 Skill Ecosystem Health
+
+> Monitored by `/sentinel-report` (L3 Governor)
+
+| Metric | Target | Current |
+|:---|:---|:---|
+| Global Skills count | 12-18 | 16 |
+| Project Skills count | 8-15 | 10 |
+| Total active Skills | < 30 | 26 |
+| Third-party skills scanned | 100% | 100% |
+| Skills with >30 days no usage | Flag for review | — |
+| Max SKILL.md size | < 500 lines | ✅ |
+| Context-Window saturation risk | LOW | LOW |
+
+## 🛡️ Token Optimization (3-Layer Defense)
+
+> Prevents context-window saturation across all conversations.
+
+### Layer 1: Progressive Disclosure
+- SKILL.md contains **core logic only** (< 500 lines)
+- Detailed examples → `references/EXAMPLES.md`
+- Advanced edge cases → `references/ADVANCED.md`
+- Agent reads references **only when needed**, not upfront
+
+### Layer 2: Size Enforcement
+- Hard limit: **500 lines** per SKILL.md
+- Skills exceeding limit must be split or simplified
+- `/skill-refiner` enforces this during optimization
+
+### Layer 3: Lazy Loading
+- Skills are **not pre-loaded** into context
+- Activated **only** when user intent matches trigger keywords
+- Multiple skills never loaded simultaneously unless explicitly chained
+- If total loaded context > 2000 lines → warn and prioritize
 
 ## 📁 Key Paths
 
-- Skills: `.agent/skills/`
+- Global Skills: `~/.gemini/antigravity/skills/`
+- Project Skills: `.agent/skills/`
 - Workflows: `.agent/workflows/`
 - Frontend: `frontend/`
 - Backend: `backend/`
