@@ -307,10 +307,14 @@ async def get_trip_by_id(
                     "reservation_code": item.get("reservation_code"),
                     "tags": item.get("tags", []),
                     "link_url": item.get("link_url"), 
+                    "website_link": item.get("website_link"),
+                    "preview_metadata": item.get("preview_metadata") or {},
                     "sub_items": item.get("sub_items") or [],
                     "image_url": item.get("image_url"),
                     "image_urls": item.get("image_urls") or ([item.get("image_url")] if item.get("image_url") else []),
                     "hide_navigation": item.get("hide_navigation", False),
+                    "sort_order": item.get("sort_order", 0),
+                    "is_highlight": item.get("is_highlight", False),
                     "is_private": is_private,
                     "private_owner_id": owner_id
                 })

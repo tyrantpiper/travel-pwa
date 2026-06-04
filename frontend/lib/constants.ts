@@ -83,3 +83,33 @@ export const MAP_LOCALIZATION = {
     // POI 名稱優先級順序
     CHINESE_NAME_KEYS: ['name:zh-Hant', 'name:zh', 'name', 'name_en'] as const,
 }
+
+/**
+ * Mapillary 街景配置
+ * Token 為 Client Token (MLY|...)，可安全暴露在前端
+ * 使用 getter 避免 template literal + as const 的型別推導問題
+ */
+export const MAPILLARY = {
+    TOKEN: process.env.NEXT_PUBLIC_MAPILLARY_TOKEN || '',
+
+    API_BASE: 'https://graph.mapillary.com',
+
+    // ⚠️ Vector Tiles 必須帶 access_token，否則 HTTP 401
+    get TILES_URL(): string {
+        return `https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=${this.TOKEN}`
+    },
+
+    // 圖層可見性門檻
+    COVERAGE_MIN_ZOOM: 6,
+    COVERAGE_MAX_ZOOM: 14,
+    IMAGE_POINT_MIN_ZOOM: 14,
+
+    // 影像搜尋參數
+    SEARCH_RADIUS: 50,         // 搜尋半徑 (公尺)
+    SEARCH_LIMIT: 1,           // 預設搜尋數量
+    THUMB_SIZE: 'thumb_1024_url' as const,
+
+    // 快取與併發控制
+    CACHE_TTL_DAYS: 30,
+    MAX_CONCURRENT: 3,
+} as const

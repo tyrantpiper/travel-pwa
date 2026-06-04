@@ -2,10 +2,10 @@
 
 import { useState, useEffect, memo } from "react"
 import {
-    MapPin, Utensils, Train, ShoppingBag, Bed, Camera,
+    MapPin, Utensils, Train, ShoppingBag, Bed, Camera, Copy,
     StickyNote, MoreHorizontal, Edit, Trash2, ExternalLink, Lightbulb, X, Info, Plus
 } from "lucide-react"
-import { cn, formatCurrency, openExternalLink } from "@/lib/utils"
+import { cn, formatCurrency, openExternalLink, getOptimizedImageUrl } from "@/lib/utils"
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table"
 
 import { Activity, SubItem } from "@/lib/itinerary-types"
+import { searchNearbyImage, uploadMapillaryToCloudinary } from "@/lib/mapillary"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
 
@@ -87,6 +88,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
         const previewImage = activity.preview_metadata?.map_image
             || activity.preview_metadata?.og_image
+            || activity.preview_metadata?.mapillary_thumb
 
         const images = uploadedImages.length > 0
             ? uploadedImages
@@ -104,7 +106,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                         {/* 🆕 底部模糊層：增加質感並填充空白 */}
                         <div className="absolute inset-0 opacity-30 blur-2xl scale-110">
                             <Image
-                                src={images[0]}
+                                src={getOptimizedImageUrl(images[0])}
                                 alt=""
                                 fill
                                 className="object-cover"
@@ -115,13 +117,15 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                         {/* 🆕 主圖片層：不裁切 (Contain) */}
                         <div className="relative w-full h-48 sm:h-64 flex justify-center">
                             <Image
-                                src={images[0]}
+                                src={getOptimizedImageUrl(images[0])}
                                 alt={activity.place || "Activity"}
                                 fill
                                 className="object-contain z-10 drop-shadow-md"
                                 unoptimized
                                 decoding="async"
-                                onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none'
+                                }}
                             />
                         </div>
 
@@ -130,6 +134,28 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                             <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg ring-1 ring-white/20 z-20">
                                 <Camera className="w-3 h-3" />
                                 <span>1 / {images.length}</span>
+                            </div>
+                        )}
+                        {/* 📸 Mapillary Badge & Attribution */}
+                        {images[0] === activity.preview_metadata?.mapillary_thumb && (
+                            <div className="absolute bottom-2 left-2 z-20">
+                                {activity.preview_metadata?.mapillary_image_id ? (
+                                    <a
+                                        href={`https://www.mapillary.com/app/?pKey=${activity.preview_metadata.mapillary_image_id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="bg-emerald-600/80 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-emerald-500 transition-colors shadow-lg ring-1 ring-white/20"
+                                    >
+                                        📷 {t('mapillary_photo_badge') || 'Street View'}
+                                        {activity.preview_metadata?.mapillary_is_pano && ' · 360°'}
+                                    </a>
+                                ) : (
+                                    <div className="bg-emerald-600/80 backdrop-blur text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg ring-1 ring-white/20">
+                                        📷 {t('mapillary_photo_badge') || 'Street View'}
+                                        {activity.preview_metadata?.mapillary_is_pano && ' · 360°'}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -301,6 +327,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
     // 👇 新增：連結列表狀態
     const [links, setLinks] = useState<SubItem[]>(activity.sub_items || [])
     const [saving, setSaving] = useState(false)
+    const [fetchingMapillary, setFetchingMapillary] = useState(false) // 🆕 抓取街景中
     // 🔧 FIX: Use proper useEffect for state sync (was causing render-during-render)
     useEffect(() => {
         // Reset state when dialog opens or activity changes
@@ -342,6 +369,36 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
         setLinks(prev => prev.map((link, i) =>
             i === idx ? { ...link, [field]: val } : link
         ))
+    }
+
+    const handleFetchMapillary = async () => {
+        if (!activity.lat || !activity.lng) return;
+        setFetchingMapillary(true);
+        try {
+            const image = await searchNearbyImage(activity.lat, activity.lng);
+            if (image) {
+                // 上傳至 Cloudinary 獲取永久 URL
+                const permanentUrl = await uploadMapillaryToCloudinary(image.thumb_1024_url, image.id);
+                
+                const success = await onUpdateActivity(activity.id!, {
+                    preview_metadata: {
+                        ...activity.preview_metadata,
+                        mapillary_thumb: permanentUrl || image.thumb_1024_url,
+                        mapillary_image_id: image.id,
+                        mapillary_is_pano: image.is_pano
+                    }
+                });
+                if (success) {
+                    toast.success(t('mapillary_fetch_success') || 'Street view image fetched');
+                }
+            } else {
+                toast.error(t('mapillary_no_coverage') || 'No street imagery available');
+            }
+        } catch {
+            toast.error('Failed to fetch street view');
+        } finally {
+            setFetchingMapillary(false);
+        }
     }
 
     // 🆕 核心解析邏輯 (神經網絡連動)
@@ -442,6 +499,52 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                 )}
                             </div>
 
+                            {/* 📷 Mapillary 街景座標卡牌 — 有座標就顯示，不需要編輯模式 */}
+                            {activity.lat && activity.lng && (
+                                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-800 space-y-2.5">
+                                    <div className="flex items-center gap-1.5">
+                                        <Camera className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold tracking-wider">
+                                            {t('mapillary_streetview') || 'Street View'}
+                                        </span>
+                                        {activity.preview_metadata?.mapillary_is_pano && (
+                                            <span className="text-[9px] bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-bold">360°</span>
+                                        )}
+                                    </div>
+                                    {/* Row 1: [Copy] [Coordinates] */}
+                                    <div className="flex gap-1.5 items-center">
+                                        <button
+                                            className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                                            onClick={() => {
+                                                const lat = typeof activity.lat === 'string' ? parseFloat(activity.lat) : activity.lat
+                                                const lng = typeof activity.lng === 'string' ? parseFloat(activity.lng) : activity.lng
+                                                navigator.clipboard.writeText(`${lat}, ${lng}`)
+                                                toast.success('座標已複製 ✓')
+                                            }}
+                                            title="Copy coordinates"
+                                        >
+                                            <Copy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        </button>
+                                        <div className="h-8 text-xs flex-1 flex items-center px-3 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-700 rounded-md text-slate-600 dark:text-slate-300 font-mono">
+                                            {(typeof activity.lat === 'string' ? parseFloat(activity.lat) : activity.lat)?.toFixed(5)}, {(typeof activity.lng === 'string' ? parseFloat(activity.lng) : activity.lng)?.toFixed(5)}
+                                        </div>
+                                    </div>
+                                    {/* Row 2: [Fetch Street View Button] — 滿版 */}
+                                    <Button
+                                        size="sm"
+                                        className="w-full h-9 text-xs bg-emerald-500 hover:bg-emerald-600 text-white border-0 gap-1.5"
+                                        onClick={handleFetchMapillary}
+                                        disabled={fetchingMapillary}
+                                    >
+                                        <Camera className="w-3.5 h-3.5" />
+                                        {fetchingMapillary ? '...' : (t('fetch_streetview') || 'Fetch Street View')}
+                                    </Button>
+                                    {activity.preview_metadata?.mapillary_thumb && (
+                                        <p className="text-[10px] text-emerald-500/60 dark:text-emerald-400/50 text-center">✓ Street view image loaded</p>
+                                    )}
+                                </div>
+                            )}
+
                             {/* 🆕 解析按鈕 UI 組件 (用於編輯模式) - 目前已屏蔽隱藏 (2026-03) */}
                             {false && isEditing && (
                                 <div className="space-y-4 pt-2">
@@ -486,6 +589,27 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                             </Button>
                                         </div>
                                     </div>
+
+                                    {/* 🆕 3. Mapillary 手動抓取街景按鈕 */}
+                                    {activity.lat && activity.lng && (
+                                        <div className="space-y-2 p-3 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-800 mt-2">
+                                            <Label className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-bold">📷 {t('mapillary_streetview') || 'Street View'}</Label>
+                                            <div className="flex gap-2">
+                                                <div className="h-9 text-xs flex-1 flex items-center px-3 bg-white dark:bg-slate-900 border rounded-md text-slate-500">
+                                                    {activity.lat?.toFixed(5)}, {activity.lng?.toFixed(5)}
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-9 text-[10px] bg-emerald-500 text-white hover:bg-emerald-600 hover:text-white border-0"
+                                                    onClick={handleFetchMapillary}
+                                                    disabled={fetchingMapillary}
+                                                >
+                                                    {fetchingMapillary ? "..." : (t('fetch_streetview') || 'Fetch Image')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -609,6 +733,7 @@ function PhotoGalleryPreview({ activity, onClose }: PhotoGalleryPreviewProps) {
 
     const previewImage = activity.preview_metadata?.map_image
         || activity.preview_metadata?.og_image
+        || activity.preview_metadata?.mapillary_thumb
 
     const images = uploadedImages.length > 0
         ? uploadedImages
@@ -621,7 +746,7 @@ function PhotoGalleryPreview({ activity, onClose }: PhotoGalleryPreviewProps) {
     return (
         <div className="relative w-full h-[80vh] flex flex-col justify-center">
             <ZoomableImage
-                src={images[currentIndex]}
+                src={getOptimizedImageUrl(images[currentIndex], 1024)}
                 alt={activity.place || "Preview"}
                 onClose={onClose}
             />

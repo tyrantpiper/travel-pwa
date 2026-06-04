@@ -12,6 +12,7 @@ import { Activity, Trip } from "@/lib/itinerary-types"
 import { POIBasicData } from "@/components/POIDetailDrawer"
 import { useLanguage } from "@/lib/LanguageContext"
 import dynamic from "next/dynamic"
+import { useMapillaryAutoFill } from "@/hooks/useMapillaryAutoFill"
 
 type DndSensorDescriptor = SensorDescriptor<SensorOptions>;
 
@@ -56,6 +57,9 @@ export function ItineraryTimeline({
 }: ItineraryTimelineProps) {
     const { lang } = useLanguage()
     const zh = lang === 'zh'
+
+    // 🆕 背景自動抓取 Mapillary 街景補齊空白圖片
+    useMapillaryAutoFill(currentDayData, onUpdateActivity)
 
     // 預先計算每個項目的 realIndex
     const realIndices: number[] = [];
