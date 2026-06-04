@@ -81,18 +81,20 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
 
     const renderContent = () => {
         // 🆕 支援多圖片：優先使用 image_urls，fallback 到 image_url
-        // 🆕 Image Hunter: 若無上傳圖片，fallback 到 preview_metadata 的 OG/Map 圖片
+        // 🆕 Image Hunter: 結合上傳的圖片與自動抓取的街景/預覽圖，讓它們共存
         const uploadedImages = activity.image_urls?.length
             ? activity.image_urls
             : (activity.image_url ? [activity.image_url] : [])
 
-        const previewImage = activity.preview_metadata?.map_image
+        const previewImage = activity.preview_metadata?.mapillary_thumb
+            || activity.preview_metadata?.map_image
             || activity.preview_metadata?.og_image
-            || activity.preview_metadata?.mapillary_thumb
 
-        const images = uploadedImages.length > 0
-            ? uploadedImages
-            : (previewImage ? [previewImage] : [])
+        // 合併陣列：上傳圖片優先，最後補上系統預覽圖 (如果還不在清單中的話)
+        const images = [...uploadedImages]
+        if (previewImage && !images.includes(previewImage)) {
+            images.push(previewImage)
+        }
 
         return (
             <>
@@ -726,18 +728,20 @@ interface PhotoGalleryPreviewProps {
 }
 
 function PhotoGalleryPreview({ activity, onClose }: PhotoGalleryPreviewProps) {
-    // 🆕 Image Hunter: 與 renderContent() 保持一致的圖片來源邏輯
+    // 🆕 Image Hunter: 結合上傳的圖片與自動抓取的街景/預覽圖，讓它們共存
     const uploadedImages = activity.image_urls?.length
         ? activity.image_urls
         : (activity.image_url ? [activity.image_url] : [])
 
-    const previewImage = activity.preview_metadata?.map_image
+    const previewImage = activity.preview_metadata?.mapillary_thumb
+        || activity.preview_metadata?.map_image
         || activity.preview_metadata?.og_image
-        || activity.preview_metadata?.mapillary_thumb
 
-    const images = uploadedImages.length > 0
-        ? uploadedImages
-        : (previewImage ? [previewImage] : [])
+    // 合併陣列：上傳圖片優先，最後補上系統預覽圖 (如果還不在清單中的話)
+    const images = [...uploadedImages]
+    if (previewImage && !images.includes(previewImage)) {
+        images.push(previewImage)
+    }
 
     const [currentIndex, setCurrentIndex] = useState(0)
 
