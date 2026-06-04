@@ -149,9 +149,9 @@
 ## 📐 Technical Architecture / 系統架構圖
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph Client["🖥️ PWA Client (Next.js 16)"]
-        UI["Interative UI (React 19)"]
+        UI["Interactive UI (React 19)"]
         SW["Serwist (Offline Engine)"]
         Cache["IndexedDB / Browser Cache"]
     end
@@ -169,8 +169,10 @@ graph TB
         CDN["Cloudinary (Media)"]
     end
     
-    UI <--> Backend
-    Backend <--> Cloud
+    UI <--> Router
+    Router <--> DB
+    Router <--> AI
+    Geo <--> DB
     UI <--> SW
     SW <--> Cache
 ```
