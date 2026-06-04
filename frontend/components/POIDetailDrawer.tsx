@@ -14,6 +14,8 @@ import { poiApi } from "@/lib/api"
 import { useLanguage } from "@/lib/LanguageContext"
 import { getSecureApiKey } from "@/lib/security"
 import { openExternalLink } from "@/lib/utils"
+import { isMapillaryAvailable } from "@/lib/mapillary"
+import { Camera } from "lucide-react"
 
 export interface ClusterItem {
     id?: string;
@@ -63,10 +65,11 @@ interface POIDetailDrawerProps {
     isOpen: boolean
     onClose: () => void
     poi: POIBasicData | null
-    onAddToItinerary: (poi: POIBasicData, time: string, aiSummary?: POIEnrichData) => void
+    onAddToItinerary?: (poi: POIBasicData, time: string, aiSummary?: POIEnrichData) => void
     suggestedTime?: string  // 建議時間 (來自父組件計算)
     isInternal?: boolean    // 🆕 是否在容器內部 (例如地圖內)
     onSelectClusterItem?: (item: ClusterItem) => void // 🆕 點擊群聚項目
+    onOpenStreetView?: (lat: number, lng: number) => void // 📸 街景按鈕
 }
 
 export default function POIDetailDrawer({
@@ -76,7 +79,8 @@ export default function POIDetailDrawer({
     onAddToItinerary,
     suggestedTime = "10:00",
     isInternal = false,
-    onSelectClusterItem
+    onSelectClusterItem,
+    onOpenStreetView
 }: POIDetailDrawerProps) {
     const haptic = useHaptic()
     const { t } = useLanguage()
@@ -182,7 +186,7 @@ export default function POIDetailDrawer({
     // 加入行程
     const handleAddToItinerary = () => {
         haptic.success()
-        onAddToItinerary(poi, selectedTime, aiData || undefined)
+        onAddToItinerary?.(poi, selectedTime, aiData || undefined)
         onClose()
     }
 
@@ -280,7 +284,7 @@ export default function POIDetailDrawer({
                                                 if (onSelectClusterItem) {
                                                     onSelectClusterItem(item);
                                                 } else {
-                                                    onAddToItinerary({
+                                                    onAddToItinerary?.({
                                                         name: item.place,
                                                         type: item.category || 'sightseeing',
                                                         lat: item.lat,
@@ -390,6 +394,18 @@ export default function POIDetailDrawer({
                                         <Navigation className="w-4 h-4" />
                                         {t('tc_navigate')}
                                     </Button>
+                                    {onAddToItinerary && (
+                                        <Button
+                                            onClick={handleAddToItinerary}
+                                            className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                            {t('poi_add_to_trip')}
+                                        </Button>
+                                    )}
+                                </div>
+                                {/* 次要操作按鈕 */}
+                                <div className="flex gap-2 mt-2">
                                     <Button
                                         onClick={handleShare}
                                         variant="outline"
@@ -398,13 +414,16 @@ export default function POIDetailDrawer({
                                         <Share2 className="w-4 h-4" />
                                         {t('share')}
                                     </Button>
-                                    <Button
-                                        onClick={handleAddToItinerary}
-                                        className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        {t('poi_add_to_trip')}
-                                    </Button>
+                                    {isMapillaryAvailable() && onOpenStreetView && (
+                                        <Button
+                                            onClick={() => onOpenStreetView(poi.lat, poi.lng)}
+                                            variant="outline"
+                                            className="flex-1 gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-900/50 dark:hover:bg-emerald-900/20"
+                                        >
+                                            <Camera className="w-4 h-4" />
+                                            {t('mapillary_streetview')}
+                                        </Button>
+                                    )}
                                 </div>
 
                                 {/* ========== Layer 2: AI 智慧層 ========== */}

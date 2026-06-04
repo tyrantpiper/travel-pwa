@@ -11,7 +11,10 @@ import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionContro
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
-import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
+import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
+import MapillaryViewer from "@/components/MapillaryViewer"
+import { isMapillaryAvailable } from "@/lib/mapillary"
+import { Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
@@ -250,7 +253,13 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     // 🆕 搜尋結果標記（紅色大頭針）
     const [searchResultMarker, setSearchResultMarker] = useState<{ lat: number; lng: number; name: string } | null>(null)
 
-
+    // 📸 Mapillary 街景狀態
+    const [showMapillaryCoverage, setShowMapillaryCoverage] = useState(false)
+    const [mapillaryViewerOpen, setMapillaryViewerOpen] = useState(false)
+    const [mapillaryTarget, setMapillaryTarget] = useState<{
+        imageId?: string; lat?: number; lng?: number
+    } | null>(null)
+    const [streetViewLocation, setStreetViewLocation] = useState<{ lat: number; lng: number; bearing: number } | null>(null)
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
@@ -587,13 +596,14 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             }, firstLayerId)
         }
 
+        // 找出文字標籤層的 ID (確保 3D 建築與軌跡插在文字下面)
+        const layers = map.getStyle()?.layers || []
+        const labelLayerId = layers.find(
+            (layer) => layer.type === 'symbol' && 'layout' in layer && layer.layout?.['text-field']
+        )?.id
+
         // 🆕 3D 建築層 (OpenMapTiles Schema)
         if (!map.getLayer('3d-buildings')) {
-            // 找出文字標籤層的 ID (確保 3D 建築插在文字下面)
-            const layers = map.getStyle()?.layers || []
-            const labelLayerId = layers.find(
-                (layer) => layer.type === 'symbol' && 'layout' in layer && layer.layout?.['text-field']
-            )?.id
 
             map.addLayer({
                 id: '3d-buildings',
@@ -627,6 +637,50 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         MAP_STYLES.BUILDING_3D.MIN_ZOOM, 0,
                         MAP_STYLES.BUILDING_3D.MIN_ZOOM + 0.5, MAP_STYLES.BUILDING_3D.OPACITY
                     ]
+                }
+            }, labelLayerId)
+        }
+
+        // 📸 Mapillary Coverage Tiles (帶 token 的 Vector Tiles URL)
+        if (MAPILLARY.TOKEN && !map.getSource('mapillary-coverage')) {
+            map.addSource('mapillary-coverage', {
+                type: 'vector',
+                tiles: [MAPILLARY.TILES_URL],
+                minzoom: MAPILLARY.COVERAGE_MIN_ZOOM,
+                maxzoom: MAPILLARY.COVERAGE_MAX_ZOOM,
+            })
+        }
+
+        // Mapillary 軌跡線 (綠色)
+        if (MAPILLARY.TOKEN && !map.getLayer('mapillary-sequences')) {
+            map.addLayer({
+                id: 'mapillary-sequences',
+                type: 'line',
+                source: 'mapillary-coverage',
+                'source-layer': 'sequence',
+                layout: { visibility: 'none' },
+                paint: {
+                    'line-color': '#05CB63',
+                    'line-width': 2,
+                    'line-opacity': 0.7,
+                }
+            }, labelLayerId)
+        }
+
+        // Mapillary 影像點 (綠色圓點，zoom >= 14 才顯示)
+        if (MAPILLARY.TOKEN && !map.getLayer('mapillary-images')) {
+            map.addLayer({
+                id: 'mapillary-images',
+                type: 'circle',
+                source: 'mapillary-coverage',
+                'source-layer': 'image',
+                minzoom: MAPILLARY.IMAGE_POINT_MIN_ZOOM,
+                layout: { visibility: 'none' },
+                paint: {
+                    'circle-radius': 4,
+                    'circle-color': '#05CB63',
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#fff',
                 }
             }, labelLayerId)
         }
@@ -669,12 +723,32 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         const map = mapRef.current?.getMap()
         if (!map) return
 
-        // 查詢點擊位置的 POI (使用 5px 緩衝區增加命中率)
+        // 查詢點擊位置 (使用 5px 緩衝區增加命中率)
         const bbox: [[number, number], [number, number]] = [
             [e.point.x - 5, e.point.y - 5],
             [e.point.x + 5, e.point.y + 5]
         ]
 
+        // ① 優先查詢 Mapillary 影像點 (circle 圖層，僅在覆蓋層可見時)
+        if (showMapillaryCoverage && map.getLayer('mapillary-images')) {
+            const mlyFeatures = map.queryRenderedFeatures(bbox, {
+                layers: ['mapillary-images']
+            })
+            if (mlyFeatures.length > 0) {
+                // Vector tile feature ID 可能在 properties.id 或 feature.id
+                const feat = mlyFeatures[0]
+                const rawId = feat.properties?.id ?? feat.id
+                const imageId = rawId ? String(rawId) : ''
+                console.log('[Mapillary] Click green dot:', { rawId, imageId, properties: feat.properties })
+                if (imageId) {
+                    setMapillaryTarget({ imageId })
+                    setMapillaryViewerOpen(true)
+                    return  // 攔截，不繼續查 POI
+                }
+            }
+        }
+
+        // ② 原有 POI symbol 查詢
         const features = map.queryRenderedFeatures(bbox, {
             layers: map.getStyle()?.layers
                 ?.filter(l => l.type === 'symbol' && l.layout?.['text-field'])
@@ -712,7 +786,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             setSelectedPOI(poiData)
             setPoiDrawerOpen(true)
         }
-    }, [t])
+    }, [t, showMapillaryCoverage])
 
     // 🆕 2026 Logic: 處理地圖長按 (任意取點)
     const handleMapLongPress = useCallback((e: MapLayerMouseEvent) => {
@@ -859,6 +933,34 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             <><Satellite className="w-3.5 h-3.5" /> {t('map_satellite')}</>
                         )}
                     </button>
+                    {/* 📸 Mapillary 街景覆蓋 toggle */}
+                    {isMapillaryAvailable() && (
+                        <button
+                            onClick={() => {
+                                setShowMapillaryCoverage(prev => {
+                                    const next = !prev
+                                    const map = mapRef.current?.getMap()
+                                    if (map) {
+                                        if (map.getLayer('mapillary-sequences')) {
+                                            map.setLayoutProperty('mapillary-sequences', 'visibility', next ? 'visible' : 'none')
+                                        }
+                                        if (map.getLayer('mapillary-images')) {
+                                            map.setLayoutProperty('mapillary-images', 'visibility', next ? 'visible' : 'none')
+                                        }
+                                    }
+                                    return next
+                                })
+                            }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${showMapillaryCoverage
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                            }`}
+                            title={t('mapillary_coverage')}
+                        >
+                            <Eye className="w-3.5 h-3.5" />
+                            {t('mapillary_coverage')}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -1262,6 +1364,43 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         </Marker>
                     )}
 
+                    {/* 🆕 街景視角同步標記 (視角扇形) */}
+                    {streetViewLocation && mapillaryViewerOpen && (
+                        <Marker
+                            longitude={streetViewLocation.lng}
+                            latitude={streetViewLocation.lat}
+                            anchor="center"
+                            style={{ pointerEvents: 'none' }} // 避免阻擋點擊
+                        >
+                            <div 
+                                className="relative flex items-center justify-center transition-transform duration-300 ease-out"
+                                style={{ transform: `rotate(${streetViewLocation.bearing}deg)` }}
+                            >
+                                {/* 視角扇形 (View Cone) SVG */}
+                                <svg 
+                                    width="80" 
+                                    height="80" 
+                                    viewBox="0 0 100 100" 
+                                    fill="none" 
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="absolute -top-[35px] opacity-70"
+                                >
+                                    <path d="M50 100 L10 0 C 30 -10, 70 -10, 90 0 Z" fill="url(#cone-gradient)" />
+                                    <defs>
+                                        <linearGradient id="cone-gradient" x1="50" y1="0" x2="50" y2="100" gradientUnits="userSpaceOnUse">
+                                            <stop stopColor="#05CB63" stopOpacity="0.8"/>
+                                            <stop offset="1" stopColor="#05CB63" stopOpacity="0"/>
+                                        </linearGradient>
+                                    </defs>
+                                </svg>
+                                {/* 中心點相機圖示 (綠色圓點) */}
+                                <div className="w-5 h-5 bg-[#05CB63] border-2 border-white rounded-full shadow-md z-10 relative flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                                </div>
+                            </div>
+                        </Marker>
+                    )}
+
 
                     {/* 彈出視窗 */}
                     {popupInfo && (
@@ -1359,8 +1498,36 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         })
                         // 注意：這裡不關閉 Drawer，而是切換它進入單點顯示模式 (POIDetailDrawer 內部會自動切換，因為 poi.type 不再是 'cluster')
                     }}
+                    onOpenStreetView={(lat, lng) => {
+                        setMapillaryTarget({ lat, lng })
+                        setMapillaryViewerOpen(true)
+                    }}
                 />
             </div>
+
+            {/* 📸 Mapillary Street View Drawer — 必須在 overflow-hidden 容器外部 */}
+            {/* MapLibre GL 的 transform 會建立 containing block，導致 fixed 定位失效 */}
+            <MapillaryViewer
+                isOpen={mapillaryViewerOpen}
+                onClose={() => {
+                    setMapillaryViewerOpen(false)
+                    setStreetViewLocation(null) // 清除街景標記
+                }}
+                imageId={mapillaryTarget?.imageId}
+                lat={mapillaryTarget?.lat}
+                lng={mapillaryTarget?.lng}
+                onPositionChange={(lat, lng, bearing) => {
+                    setStreetViewLocation({ lat, lng, bearing })
+                    // 平滑跟隨地圖 (Auto-pan)
+                    if (mapRef.current) {
+                        mapRef.current.easeTo({
+                            center: [lng, lat],
+                            duration: 300,
+                            easing: (t) => t * (2 - t) // 簡單的 ease-out
+                        })
+                    }
+                }}
+            />
         </div >
     )
 }

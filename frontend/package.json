@@ -45,6 +45,7 @@
     "leaflet": "^1.9.4",
     "leaflet-routing-machine": "^3.2.12",
     "lucide-react": "^0.561.0",
+    "mapillary-js": "^4.1.2",
     "maplibre-gl": "^5.15.0",
     "minisearch": "^7.2.0",
     "next": "^16.2.6",

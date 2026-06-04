@@ -453,6 +453,19 @@ export const remainingTranslations = {
         poi_expand: "◀ Expand",
         poi_collapse: "▶ Collapse",
 
+        // Mapillary Street View
+        mapillary_streetview: "Street View",
+        mapillary_no_coverage: "No street imagery available here",
+        mapillary_loading: "Loading street view...",
+        mapillary_coverage: "Street Coverage",
+        mapillary_fetch_photo: "Fetch Street Photo",
+        mapillary_photo_badge: "Street View",
+        mapillary_auto_filled: "Street photo auto-filled",
+        mapillary_captured: "Captured",
+        mapillary_webgl_unsupported: "Street view not supported on this device",
+        mapillary_fetch_success: "Street view image fetched successfully",
+        fetch_streetview: "Fetch Street View",
+
         // Sprint 5: map
         map_rain: "Rain",
         map_walk: "Walk",
@@ -1033,6 +1046,19 @@ export const remainingTranslations = {
         poi_add_time: "加入行程",
         poi_expand: "◀ 展開",
         poi_collapse: "▶ 收起",
+
+        // Mapillary 街景
+        mapillary_streetview: "街景預覽",
+        mapillary_no_coverage: "此地暫無街景影像",
+        mapillary_loading: "載入街景中...",
+        mapillary_coverage: "街景覆蓋",
+        mapillary_fetch_photo: "抓取街景照片",
+        mapillary_photo_badge: "街景照片",
+        mapillary_auto_filled: "已自動填入街景照片",
+        mapillary_captured: "拍攝於",
+        mapillary_webgl_unsupported: "此裝置不支援街景功能",
+        mapillary_fetch_success: "成功抓取街景圖片",
+        fetch_streetview: "抓取街景",
 
         // Sprint 5: map
         map_rain: "雨",

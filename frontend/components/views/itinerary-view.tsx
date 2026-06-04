@@ -930,7 +930,7 @@ export function ItineraryView() {
         }
     }
 
-    const handleUpdateActivity = useCallback(async (id: string, updates: Partial<Activity>): Promise<boolean> => {
+    const handleUpdateActivity = useCallback(async (id: string, updates: Partial<Activity>, skipRevalidation?: boolean): Promise<boolean> => {
         // 🚀 Optimistic Update: Immediately reflect changes in UI
         if (currentTrip?.days) {
             const optimisticData = {
@@ -948,13 +948,17 @@ export function ItineraryView() {
         try {
             await itemsApi.update(id, updates, userId || "")
             // Finish by revalidating with server data
-            await reloadTripDetail()
+            if (!skipRevalidation) {
+                await reloadTripDetail()
+            }
             return true
         } catch (e) {
             console.error("🔥 handleUpdateActivity error:", e)
             toast.error(e instanceof Error ? `${t('iv_update_failed_prefix')}${e.message}` : t('iv_update_failed_short'))
             // 🛡️ Rollback to last known good state from server
-            await reloadTripDetail()
+            if (!skipRevalidation) {
+                await reloadTripDetail()
+            }
             return false
         }
     }, [currentTrip, reloadTripDetail, userId, t])

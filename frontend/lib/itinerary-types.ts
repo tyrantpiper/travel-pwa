@@ -22,6 +22,11 @@ export interface PreviewMetadata {
     map_image?: string
     custom_order?: string[]
     hidden_images?: string[]
+    // Mapillary 街景 (PR1: 基礎設施)
+    mapillary_thumb?: string
+    mapillary_image_id?: string
+    mapillary_captured_at?: number   // Unix timestamp (ms)
+    mapillary_is_pano?: boolean      // 360° 全景標記
 }
 
 export interface ItineraryItemState {
