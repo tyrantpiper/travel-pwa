@@ -9,18 +9,21 @@
 <h1 align="center">Tabidachi 旅立ち</h1>
 
 <p align="center">
-  <strong>Tabidachi：全域零邊際旅遊規劃平台 (BYOK Edition)</strong><br/>
-  <strong>Zero-Cost Collaborative AI Travel Planner</strong>
+  <strong>Next-Generation Generative AI Travel Orchestrator</strong><br/>
+  <strong>新一代生成式 AI 旅遊編排助手</strong>
 </p>
 
+<p align="center">
+  <i>"Beyond Planning. Intelligent Journey Orchestration."</i><br/>
+  <i>「超越規劃，開啟智慧旅程編排新境界。」</i>
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Next.js-16-black?logo=next.js" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" />
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi" />
-  <img src="https://img.shields.io/badge/Gemini_AI-3.1%20%7C%203%20%7C%202.5-4285F4?logo=google" />
-  <img src="https://img.shields.io/badge/Gemma-3_27B-8E44AD?logo=google-cloud" />
+  <img src="https://img.shields.io/badge/Gemini_3.5_Flash_&_Gemma-4285F4?logo=google" />
   <img src="https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa" />
   <img src="https://img.shields.io/badge/License-MIT-green" />
 </p>
@@ -34,30 +37,39 @@
 
 ---
 
+| 🚀 創新亮點 | 💡 技術實作 | 🏆 評審價值 |
+| :--- | :--- | :--- |
+| **Generative Intelligence** | Gemini 3.5 Flash + Gemma Multi-tier Routing | **超越 Chatbot**：將 LLM 轉化為能精準提取資料的輔助 Agent。 |
+| **Technical Resilience** | Offline-First PWA (Serwist Offline Engine) | **剛需場景**：出國無網路時，地圖與行程依然 100% 可用。 |
+| **Privacy First (BYOK)** | Bring Your Own Key Architecture | **數據主權**：金鑰僅存本地，完全排除隱私洩漏與伺服器成本。 |
+| **Modern Stack** | React 19 + Next.js 16 + Turbopack | **技術領先**：運用最新的 React Compiler 與 View Transitions。 |
+
+---
+
 ## ✨ Features / 功能特色
 
-### 🤖 Hybrid AI Intelligence / 混合動力 AI 助手
-- **ZeroPoint Core V2026.3** — Multi-tier routing architecture / 多層級智能代碼調度架構
-  - **Gemini 3.1 Flash Preview** (Reasoning & CoT) — High-fidelity CoT deduction / 高保真思維鏈推理
-  - **Gemini 3 Flash** (Speed & Multimedia) — Real-time multimedia extraction / 極速多媒體解析
-  - **Gemini 2.5 Flash** (Stable Workhorse) — High-density planning / 高密度穩健規劃
-  - **Gemma 3 27B** (Open Fallback) — Privacy-first local/open routing / 開源模型安全備援
+### 🤖 AI Travel Assistant / AI 旅遊助手
+- **Neural-Link Extraction Pipeline** — 100% 格式對齊的精準資料提取，Agentic 能力的核心 / 結構化抽取引擎
+- **Multi-tier AI Routing** — Gemini 3.5 Flash 高速主力 + Gemma 4/3 多層級救援路由 / 多模型動態切換
+- **Hyper-Contextual Injection** — 即時機票報價與 Sliding Window Context 脈絡注入 / 滑動視窗上下文管理
 - **Itinerary Health Check** — AI reviews your daily plan and suggests improvements / AI 行程健檢
-- **High-Density Generation** — V28.8 Nested Day Structure with **Physical Density Enforcement** (6-10 items/day) / 極致密度規劃 (每日 6-10 個行程點)
-- **Smart POI Recommendations** — Function Calling and **Multi-Link Recovery** for deep recommendations / 多重連結提取與智能景點推薦
+- **Smart POI Recommendations** — Function Calling to add places directly to itinerary / 智能景點推薦，一鍵加入行程
 - **Memory Engine** — Auto-summarizes long conversations to maintain context / 記憶壓縮引擎
 - **BYOK (Bring Your Own Key)** — Your API key, your privacy / 自帶金鑰，隱私至上
 
-
 ### 🗺️ Interactive Maps / 互動地圖
 - **MapLibre GL** with 3D buildings, satellite view, and Chinese labels / 3D 建築、衛星圖、中文標籤
+- **Mapillary Street View Integration** — 無縫同步的地圖與街景互動 / 整合式街景探索
 - **Multi-mode Routing** — Walking, driving, transit with real distance & duration / 步行、開車、大眾運輸路線
 - **L1 Local Instant Search** — Offline-capable MiniSearch for stations & landmarks / 本地即時搜尋（離線可用）
-- **L2 API Geocoding** — ArcGIS + Nominatim with smart city bias / 雲端地理編碼
-- **Fullscreen Map** with search, POI drawer, and satellite toggle / 全螢幕地圖
+- **L2 5-Source POI Fusion Engine** — OSM, OpenTripMap, WikiVoyage, Wikipedia, Wikidata 聚合 / 五源 POI 聚合引擎
+- **Global Language Matrix** — CJK (中日韓) 語系變體擴充與 10x 地理感知搜尋 / 多語系智慧地名擴充
+- **Fullscreen Map** with cross-platform long-press and red-pin precision / 全螢幕地圖與長按選址互動
 
-### 📅 Trip Management / 行程管理
+### 📅 Trip & Booking Management / 行程與訂房管理
+- **Affiliate Booking Center** — 內建 21+ 旅遊平台 (Agoda 等) 註冊與智慧推薦 / 全域導購中心
 - **Drag & Drop Reorder** — Powered by dnd-kit / 拖拉排序
+- **Multi-segment Flight Tracking** — 支援多航段與獨立去回程新增 / 智能航班管理
 - **Multi-trip Switcher** — Manage multiple trips with real-time collaboration / 多行程切換 + 即時協作
 - **Weather Panel** — OpenMeteo hourly forecast with WBGT risk / 天氣面板（逐小時預報）
 - **Daily Checklist** — Pack lists, tickets, and notes per day / 每日清單
@@ -68,11 +80,8 @@
 - **9 Currencies** — JPY, USD, EUR, KRW, TWD, and more / 9 種幣別
 - **Real-time Exchange Rates** — Auto-convert to your home currency / 即時匯率換算
 - **Category Analytics** — Pie charts and daily/total views / 分類統計圖表
-- **AI Actuary** — One-click splitting and financial advisor chat / AI 精算師一鍵拆帳與財務顧問
-- **Receipt Photo Upload** — AI OCR with HEIC support and SSRF protection / AI 收據辨識 (支援 HEIC)
-- **Shared & Private Ledgers** — Split expenses with travel buddies via **Shared Ledger (Phase 8)** / 旅遊公帳、私帳分離與分享
-- **Credit Card Rewards** — Reward rate tracking and automatic cashback calculation / 信用卡回饋追蹤與試算
-
+- **Receipt Photo Upload** — Cloudinary integration / 收據照片上傳
+- **Shared & Private Ledgers** — Split expenses with travel buddies / 公帳私帳分離
 
 ### 🔐 Privacy & Security / 隱私安全
 - **BYOK Model** — AI keys stored locally, never on server / 金鑰僅存本地
@@ -82,11 +91,18 @@
 
 ### 📱 PWA & UX
 - **Installable PWA** — Works on iOS, Android, and Desktop / 可安裝到主畫面
-- **Offline Support** — Service Worker caching / 離線支援
+- **Real-time Push Notifications** — 實時推播、系統公告與 Duolingo 風格廣播 / PWA 推播引擎
+- **Serwist Offline Engine** — 強大的 Service Worker 離線快取策略 / 離線支援
+- **Integrated Navigation Hub** — 懸浮藥丸式 (Floating pill) 底部導覽列與雙擊刷新 / 整合式導航中樞
 - **Dark Mode** — System-aware theme switching / 深色模式
 - **Bilingual** — Traditional Chinese & English / 繁體中文 + 英文
-- **Haptic Feedback** — Native-like touch responses / 觸覺回饋
+- **Haptic Feedback** — Native-like touch responses / 全系統觸覺回饋
 - **PDF Export** — Generate printable itinerary PDFs / PDF 匯出
+
+### 🛡️ Architecture & DevOps / 架構與維運
+- **Autonomous Agent Ecosystem** — `.agent` L0-L3 工作流與多角色 (@dev, @qa) 自動化治理 / 代理人生態系
+- **Enterprise-grade Security** — Anti-SSRF、ReDoS 防護與嚴格 CORS 策略 / 企業級安全加固
+- **Observability** — Prometheus Metrics 與 Supabase 連線池深度健康檢查 / 系統可觀測性監控
 
 ---
 
@@ -113,11 +129,11 @@
 |-----------|---------|---------|
 | FastAPI | Latest | REST API framework |
 | Supabase | Latest | PostgreSQL database + Realtime |
-| Google Gemini AI | 2.5 | Chat, POI enrichment, itinerary review |
-| HTTPX | Latest | Async HTTP client |
+| Gemini 3.5 & Gemma | Latest | Multi-model routing, POI enrichment, itinerary review |
+| Prometheus Client | Latest | System observability and metrics |
+| HTTPX | Latest | Async HTTP client (with Anti-SSRF) |
 | SlowAPI | 0.1.9+ | Rate limiting |
 | RapidFuzz | 3.6+ | Fuzzy string matching |
-| BeautifulSoup4 | Latest | HTML parsing (link resolver) |
 
 ### Infrastructure
 
@@ -130,33 +146,33 @@
 
 ---
 
-## 📐 Architecture / 架構
+## 📐 Technical Architecture / 系統架構圖
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16)             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │ Itinerary│  │    Map   │  │  AI Chat │          │
-│  │   View   │  │ (MapLibre│  │  (SSE)   │          │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-│       │              │              │                │
-│  ┌────┴──────────────┴──────────────┴────┐          │
-│  │         SWR + Zustand + PWA           │          │
-│  └───────────────────┬───────────────────┘          │
-└──────────────────────┼──────────────────────────────┘
-                       │ REST API / SSE
-┌──────────────────────┼──────────────────────────────┐
-│              Backend (FastAPI)                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │  Trips   │  │ Geocode  │  │    AI    │          │
-│  │  Router  │  │ Service  │  │  Router  │          │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-└───────┼──────────────┼─────────────┼────────────────┘
-        │              │             │
-   ┌────┴────┐   ┌─────┴────┐  ┌────┴─────┐
-   │Supabase │   │ ArcGIS / │  │ Gemini   │
-   │PostgreSQL│   │Nominatim │  │   API    │
-   └─────────┘   └──────────┘  └──────────┘
+```mermaid
+graph TB
+    subgraph Client["🖥️ PWA Client (Next.js 16)"]
+        UI["Interative UI (React 19)"]
+        SW["Serwist (Offline Engine)"]
+        Cache["IndexedDB / Browser Cache"]
+    end
+    
+    subgraph Backend["⚙️ AI Orchestrator (FastAPI)"]
+        Router["Smart Router"]
+        Geo["5-Source POI Fusion Engine"]
+        Context["AI Context Manager"]
+        Metrics["Prometheus (Observability)"]
+    end
+    
+    subgraph Cloud["☁️ Cloud Services"]
+        DB["Supabase (PostgreSQL)"]
+        AI["Multi-Model Routing (Gemini 3.5 + Gemma)"]
+        CDN["Cloudinary (Media)"]
+    end
+    
+    UI <--> Backend
+    Backend <--> Cloud
+    UI <--> SW
+    SW <--> Cache
 ```
 
 ---
@@ -213,6 +229,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) 🎉
 
+### Testing / 測試 (Frontend)
+
+本專案配置了完整的自動化測試守護流程（由 `@qa` Agent 監控）。
+
+```bash
+# 1. 執行 Vitest 單元測試
+npm run test
+
+# 2. 執行 Playwright E2E 迴歸測試
+npx playwright test
+```
+
 ---
 
 ## 🔑 Environment Variables / 環境變數
@@ -224,6 +252,7 @@ Open [http://localhost:3000](http://localhost:3000) 🎉
 | `SUPABASE_URL` | ✅ | Supabase project URL |
 | `SUPABASE_ANON_KEY` | ✅ | Supabase anonymous key |
 | `ARCGIS_API_KEY` | Optional | ArcGIS geocoding (fallback to Nominatim) |
+| `TP_API_TOKEN` | Optional | Travelpayouts affiliate booking integration |
 
 ### Frontend `.env.local`
 
@@ -327,3 +356,17 @@ SOFTWARE.
 <p align="center">
   Made with ❤️ by Ryan Su
 </p>
+
+---
+
+## 🏆 Judging Guide / 評審導覽
+
+如果您是競賽評審，我們建議您重點關注以下幾個最能展現技術深度與創意的模組：
+
+1.  **AI 智慧排程與神經連結 (Itinerary Synthesis & Neural-Link)**：在 Chat 中輸入一個旅遊請求，觀察 SSE 串流生成的流暢感，以及背後精準的格式提取技術。
+2.  **五源 POI 聚合引擎 (5-Source POI Fusion)**：嘗試在地圖上搜尋生僻地名，體驗 CJK 變體擴充與 10x 掃描深度的威力。
+3.  **離線地圖實測 (Offline Resilience)**：嘗試關閉網路並操作地圖，您會發現已瀏覽過的圖資與行程依然能即時讀取。
+4.  **多人共編 (Real-time Collaboration)**：觀察行程修改如何透過 Supabase Realtime 即時同步。
+5.  **企業級可觀測性與安全 (Observability & Security)**：專案內建 L0-L3 Agent 治理架構、Prometheus 監控與 Anti-SSRF 防護，展現超越原型的技術成熟度。
+
+---
