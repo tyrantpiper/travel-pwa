@@ -163,7 +163,14 @@ async def fetch_og_metadata(url: str) -> Dict[str, Any]:
                 if metadata["image"].startswith("//"):
                     metadata["image"] = "https:" + metadata["image"]
                 
-                if any(icon in metadata["image"] for icon in ["maps_512dp.png", "maps_icon_60.png"]):
+                generic_icons = [
+                    "maps_512dp.png", 
+                    "maps_icon_60.png",
+                    "place_api/icons/",
+                    "play-lh.googleusercontent.com",
+                    "/images/branding/product/"
+                ]
+                if any(icon in metadata["image"] for icon in generic_icons):
                     print(f"[Filter] Generic Google Maps logo skipped: {metadata['image']}")
                     metadata["image"] = None
                 
@@ -478,13 +485,12 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
         if arcgis_key:
             # ArcGIS Static Map API
             # Size: 800x600, Zoom: 16 (Street Level), Style: World_Street_Map
-            marker_str = f"{result['lng']},{result['lat']}"
             static_url = (
-                f"https://static.arcgis.com/staticmap?"
-                f"center={result['lng']},{result['lat']}&"
-                f"zoom=16&size=800,600&"
-                f"marker=color:red;{marker_str}&"
-                f"token={arcgis_key}"
+                f"https://static-maps-api.arcgis.com/arcgis/rest/services/static-maps-service/beta/static-maps/arcgis/streets/with-point?"
+                f"pointX={result['lng']}&pointY={result['lat']}&"
+                f"zoom=16&width=800&height=600&"
+                f"markerColor=red&"
+                f"token={arcgis_key}&_type=staticmap"
             )
             result["metadata"]["image"] = static_url
             print(f"[ArcGIS] Engine 2 Fallback: Generated static map: {static_url[:60]}...")
