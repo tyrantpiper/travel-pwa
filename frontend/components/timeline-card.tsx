@@ -42,6 +42,15 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
     const { t } = useLanguage()
     const [showDetail, setShowDetail] = useState(false)
     const [showPhotoPreview, setShowPhotoPreview] = useState(false)  // 🆕 圖片預覽狀態
+    const [imageError, setImageError] = useState(false) // 🆕 圖片載入失敗狀態
+
+    const firstImageUrl = activity?.image_urls?.[0] || activity?.image_url || activity?.preview_metadata?.mapillary_thumb || activity?.preview_metadata?.map_image || activity?.preview_metadata?.og_image;
+    const [lastImageUrl, setLastImageUrl] = useState(firstImageUrl)
+
+    if (firstImageUrl !== lastImageUrl) {
+        setImageError(false)
+        setLastImageUrl(firstImageUrl)
+    }
 
     if (!activity) return null;
 
@@ -99,7 +108,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         return (
             <>
                 {/* Spot Photo - 可點擊預覽 */}
-                {images.length > 0 && (
+                {images.length > 0 && !imageError && (
                     <div
                         className="mb-3 rounded-lg overflow-hidden w-full relative cursor-pointer hover:opacity-95 transition-opacity bg-slate-100/50 flex items-center justify-center border border-slate-200/10"
                         style={{ height: 'auto', minHeight: '160px', maxHeight: '400px' }}
@@ -126,6 +135,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                                 unoptimized
                                 decoding="async"
                                 onError={(e) => {
+                                    setImageError(true)
                                     e.currentTarget.style.display = 'none'
                                 }}
                             />
