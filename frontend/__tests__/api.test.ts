@@ -16,7 +16,7 @@ describe('API Constants', () => {
 
     it('should have all required API endpoints', () => {
         expect(API.TRIPS).toContain('/api/trips')
-        expect(API.ITEMS).toContain('/api/items')
+        expect(API.ITEMS).toContain('/api/trips/items')
         expect(API.GEOCODE).toContain('/api/geocode')
         expect(API.EXPENSES).toContain('/api/expenses')
     })
@@ -42,7 +42,7 @@ describe('tripsApi', () => {
             })
 
             expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/trip/create-manual'),
+                expect.stringContaining('/api/trips/create-manual'),
                 expect.objectContaining({
                     method: 'POST',
                     headers: expect.objectContaining({
@@ -82,7 +82,7 @@ describe('tripsApi', () => {
             })
 
             expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/join-trip'),
+                expect.stringContaining('/api/trips/join-trip'),
                 expect.objectContaining({
                     method: 'POST',
                     headers: expect.objectContaining({
@@ -143,7 +143,7 @@ describe('itemsApi', () => {
             })
 
             expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/items'),
+                expect.stringContaining('/api/trips/items'),
                 expect.objectContaining({
                     method: 'POST',
                     headers: expect.objectContaining({
@@ -169,7 +169,7 @@ describe('itemsApi', () => {
             const result = await itemsApi.update('item-123', { place: 'Updated Place' }, 'user-123')
 
             expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/items/item-123'),
+                expect.stringContaining('/api/trips/items/item-123'),
                 expect.objectContaining({
                     method: 'PATCH',
                     headers: expect.objectContaining({
@@ -191,7 +191,7 @@ describe('itemsApi', () => {
             await itemsApi.delete('item-123', 'user-123')
 
             expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/items/item-123'),
+                expect.stringContaining('/api/trips/items/item-123'),
                 expect.objectContaining({
                     method: 'DELETE',
                     headers: expect.objectContaining({

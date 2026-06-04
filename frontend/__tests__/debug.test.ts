@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 describe('debug utilities', () => {
     beforeEach(() => {
         vi.restoreAllMocks()
+        vi.resetModules()
     })
 
     // vi.unstubAllEnvs() automatically restores original env values
