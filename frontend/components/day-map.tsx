@@ -964,8 +964,8 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                 </div>
             </div>
 
-            {/* 地圖容器 - 全裝置統一加大 h-[480px]，防止捲動干擾 + 消除震動 */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[480px] w-full z-0 relative overscroll-none">
+            {/* 地圖容器 - 全裝置統一加大 h-[480px] 向上調整為響應式 500~600px，防止捲動干擾 + 消除震動 */}
+            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[500px] sm:h-[540px] lg:h-[600px] w-full z-0 relative overscroll-none">
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}
