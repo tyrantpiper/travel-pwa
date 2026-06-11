@@ -508,7 +508,7 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     },
     badge: { en: 'Global', zh: '全球理賠' },
     buildUrl: () => {
-      return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 5869, 'https://ektatraveling.com/')
+      return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 4552, 'https://www.visitorscoverage.com/')
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
   },
