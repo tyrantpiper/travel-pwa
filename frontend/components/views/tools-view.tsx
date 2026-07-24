@@ -63,6 +63,7 @@ interface Expense {
     amount: number         // Legacy/Fallback field
     payment_method?: string
     category?: string
+    custom_icon?: string   // 🆕 Custom category icon (Emoji)
     is_public: boolean
     image_url?: string
     expense_date?: string
@@ -75,6 +76,7 @@ interface Expense {
     card_name?: string
     creator_name?: string
     payer_id?: string | null
+    payer_name?: string    // 🆕 Guest payer name
     items?: { original_name: string, translated_name?: string, amount: number }[] // 🆕 Replacing 'details'
     details?: { name: string, price: number }[] // ⚠️ Legacy fallback
 }
@@ -1519,20 +1521,29 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
     const CatIcon = catInfo.icon
+    const isCustomIcon = Boolean(item.custom_icon && item.custom_icon.trim())
     const usedRate = item.exchange_rate || rate
     const standardizedAmount = item.total_amount !== undefined ? item.total_amount : item.amount
     const cashback = item.cashback_rate ? ((standardizedAmount || 0) * usedRate * item.cashback_rate / 100) : 0
     const finalTWD = Math.round((standardizedAmount || 0) * usedRate - cashback)
 
     // 🆕 Hybrid Payer Logic
-    const member = members?.find(m => m.user_id === item.payer_id)
-    const displayName = member ? member.user_name : (item.payer_id || null)
+    const member = members?.find(m => (item.payer_id && m.user_id === item.payer_id) || (item.payer_name && m.user_name === item.payer_name))
+    const displayName = member 
+        ? member.user_name 
+        : (item.payer_name || (item.payer_id && !item.payer_id.includes('-') ? item.payer_id : null) || item.creator_name || null)
 
     return (
         <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
             <div className="flex justify-between items-center w-full">
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <div className={cn("p-2 rounded-full shrink-0", catInfo.color)}><CatIcon className="w-4 h-4" /></div>
+                    <div className={cn("p-2 rounded-full shrink-0 flex items-center justify-center min-w-[32px] min-h-[32px]", catInfo.color)}>
+                        {isCustomIcon ? (
+                            <span className="text-sm leading-none">{item.custom_icon}</span>
+                        ) : (
+                            <CatIcon className="w-4 h-4" />
+                        )}
+                    </div>
                     <div className="min-w-0">
                         <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm flex items-center gap-2">
                             {item.title}

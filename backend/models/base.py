@@ -117,6 +117,7 @@ class ExpenseRequest(BaseModel):
     custom_icon: Optional[str] = None                    # Emoji or custom icon
     notes: Optional[str] = None                          # User-provided notes/remarks
     payer_id: Optional[str] = None                       # ID of the person who paid
+    payer_name: Optional[str] = None                     # Guest payer display name
 
 
 class UpdateExpenseRequest(BaseModel):
@@ -143,6 +144,7 @@ class UpdateExpenseRequest(BaseModel):
     custom_icon: Optional[str] = None
     notes: Optional[str] = None
     payer_id: Optional[str] = None
+    payer_name: Optional[str] = None
 
 
 class ExpenseResponse(BaseModel):
@@ -175,6 +177,7 @@ class ExpenseResponse(BaseModel):
     custom_icon: Optional[str] = None     # Display icon
     notes: Optional[str] = None           # Persistent remarks
     payer_id: Optional[str] = None        # Payer UUID
+    payer_name: Optional[str] = None      # Guest payer display name
 
 
 # === 地理編碼模型 ===

@@ -25,6 +25,62 @@ def is_valid_uuid(val: Any) -> bool:
         return False
 
 
+async def sanitize_payer(
+    supabase, 
+    payer_id: Optional[str], 
+    payer_name: Optional[str] = None, 
+    itinerary_id: Optional[str] = None
+) -> tuple[Optional[str], Optional[str]]:
+    """
+    🛡️ 健壯的付款人資料淨化 (Sanitize Payer Data)
+    防止 23503 外鍵違規 (expenses_payer_id_fkey):
+    1. 若 payer_id 不是合法 UUID 字串，轉為 payer_name 儲存，payer_id 設為 None。
+    2. 若 payer_id 是合法 UUID，檢查 public.users 表是否存在該 ID：
+       - 若存在：作為安全外鍵使用 (payer_id=pid, payer_name=name)。
+       - 若不存在 (例如 trip_member / 訪客 UUID)：查詢 trip_members 獲取成員顯示名稱，
+         將 payer_id 設為 None，將成員名稱寫入 payer_name，徹底避免 23503 500 錯誤！
+    """
+    p_name = payer_name.strip() if (payer_name and isinstance(payer_name, str) and payer_name.strip()) else None
+
+    if not payer_id or not is_valid_uuid(str(payer_id)):
+        if payer_id and isinstance(payer_id, str) and payer_id.strip():
+            return None, payer_id.strip()
+        return None, p_name
+
+    pid = str(payer_id).strip()
+    
+    # 1. 檢查是否存在於 public.users 表中
+    try:
+        user_res = supabase.table("users").select("id, name").eq("id", pid).execute()
+        if user_res.data:
+            u_name = user_res.data[0].get("name") or p_name
+            return pid, u_name
+    except Exception as e:
+        print(f"⚠️ User lookup error in sanitize_payer: {e}")
+
+    # 2. 若 pid 不在 users 表中，尋找對應的成員顯示名稱
+    target_name = p_name
+    if itinerary_id:
+        try:
+            mem_res = supabase.table("trip_members")\
+                .select("user_id, user_name, id")\
+                .eq("itinerary_id", itinerary_id)\
+                .execute()
+            if mem_res.data:
+                for m in mem_res.data:
+                    if m.get("user_id") == pid or str(m.get("id")) == pid:
+                        target_name = m.get("user_name") or target_name
+                        break
+        except Exception as e:
+            print(f"⚠️ Trip members lookup error in sanitize_payer: {e}")
+
+    # 3. 若仍無名稱，且非 UUID, 退回 pid 字串或預設稱呼
+    if not target_name:
+        target_name = p_name if p_name else None
+
+    return None, target_name
+
+
 def normalize_items(details: Any, version: int) -> List[ExpenseItem]:
     """將 DB details 轉換為標準化的 ExpenseItem 列表 (v1 -> v2)"""
     if not details:
@@ -164,14 +220,14 @@ async def add_expense(
             final_total = computed_total
             validation_msg = ""
 
-        # 🛡️ Payer ID Sanitization: Only accept valid UUIDs. 
-        # If frontend sends a guest name, move it to notes.
-        actual_payer_id = request.payer_id
-        actual_notes = request.notes
-        if actual_payer_id and not is_valid_uuid(actual_payer_id):
-            guest_info = f"[Payer: {actual_payer_id}]"
-            actual_notes = f"{guest_info} {actual_notes}" if actual_notes else guest_info
-            actual_payer_id = None
+        # 🛡️ Payer ID & Name Sanitization:
+        # Prevents 23503 foreign key error if payer_id is not in users table.
+        actual_payer_id, actual_payer_name = await sanitize_payer(
+            supabase, 
+            request.payer_id, 
+            request.payer_name, 
+            request.itinerary_id
+        )
 
         # Mapping Layer
         items_json = [item.dict() for item in request.items] if request.items else []
@@ -203,12 +259,22 @@ async def add_expense(
             "validation_code": request.diagnostics.code if request.diagnostics else None,
             "validation_message": "[BACKEND_VERIFIED] " + validation_msg if validation_msg == "" else validation_msg,
             "mismatch_amount": request.diagnostics.mismatch_amount if request.diagnostics else 0.0,
-            "notes": actual_notes,
+            "notes": request.notes,
             "custom_icon": request.custom_icon,
-            "payer_id": actual_payer_id
+            "payer_id": actual_payer_id,
+            "payer_name": actual_payer_name
         }
         
-        res = supabase.table("expenses").insert(payload).execute()
+        try:
+            res = supabase.table("expenses").insert(payload).execute()
+        except Exception as db_err:
+            if "23503" in str(db_err) or "payer_id" in str(db_err):
+                print(f"⚠️ FK 23503 fallback triggered on insert! Clearing payer_id (was {payload.get('payer_id')})")
+                payload['payer_id'] = None
+                # 嚴禁清空或強制覆寫 payer_name
+                res = supabase.table("expenses").insert(payload).execute()
+            else:
+                raise db_err
         
         # 🚨 Explicit Validation: Verify that data was actually written
         if not res.data:
@@ -279,7 +345,8 @@ async def get_expenses(
                 cashback_rate=exp.get("cashback_rate", 0.0),
                 custom_icon=exp.get("custom_icon"),
                 notes=exp.get("notes"),
-                payer_id=exp.get("payer_id")
+                payer_id=exp.get("payer_id"),
+                payer_name=exp.get("payer_name")
             )
             filtered.append(expense_resp.dict())
                 
@@ -322,7 +389,7 @@ async def update_expense(
         simple_fields = [
             'title', 'currency', 'is_public', 'payment_method', 'category', 
             'image_url', 'exchange_rate', 'card_name', 'cashback_rate',
-            'custom_icon', 'notes', 'payer_id'
+            'custom_icon', 'notes', 'payer_id', 'payer_name'
         ]
         for f in simple_fields:
             if f in raw_data: data[f] = raw_data[f]
@@ -341,12 +408,18 @@ async def update_expense(
             data['details'] = [item.dict() for item in request.items] if request.items else []
             data['details_schema_version'] = 2
             
-        # 🛡️ Payer ID Sanitization for Update
-        if 'payer_id' in data and data['payer_id'] and not is_valid_uuid(data['payer_id']):
-            guest_info = f"[Payer: {data['payer_id']}]"
-            curr_notes = data.get('notes') or exp_data.get('notes') or ""
-            data['notes'] = f"{guest_info} {curr_notes}".strip()
-            data['payer_id'] = None
+        # 🛡️ Payer ID & Name Sanitization for Update
+        if 'payer_id' in raw_data or 'payer_name' in raw_data or 'payer_id' in data:
+            req_pid = raw_data.get('payer_id') or data.get('payer_id')
+            req_pname = raw_data.get('payer_name') or data.get('payer_name')
+            actual_pid, actual_pname = await sanitize_payer(
+                supabase, 
+                req_pid, 
+                req_pname, 
+                itinerary_id=exp_data.get('itinerary_id')
+            )
+            data['payer_id'] = actual_pid
+            data['payer_name'] = actual_pname
             
         # 1. First, merge diagnostics from the request (if any)
         if 'diagnostics' in raw_data:
@@ -399,7 +472,16 @@ async def update_expense(
                 data['validation_message'] = "[BACKEND_VERIFIED] Fallback to computed total."
                 data['validation_status'] = "pass"
 
-        res = supabase.table("expenses").update(data).eq("id", expense_id).execute()
+        try:
+            res = supabase.table("expenses").update(data).eq("id", expense_id).execute()
+        except Exception as db_err:
+            if "23503" in str(db_err) or "payer_id" in str(db_err):
+                print(f"⚠️ FK 23503 fallback triggered on update! Clearing payer_id (was {data.get('payer_id')})")
+                data['payer_id'] = None
+                # 嚴禁清空或強制覆寫 payer_name
+                res = supabase.table("expenses").update(data).eq("id", expense_id).execute()
+            else:
+                raise db_err
         
         # 🚨 Explicit Validation for Update
         if not res.data:

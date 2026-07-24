@@ -137,6 +137,26 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"\n==================== 🚨 BACKEND 500 ERROR DETECTED 🚨 ====================")
+    print(f"URL: {request.method} {request.url}")
+    print(f"Error Type: {type(exc).__name__}")
+    print(f"Error Message: {str(exc)}")
+    print(f"Traceback:\n{tb}")
+    print(f"========================================================================\n")
+    return ORJSONResponse(
+        status_code=500,
+        content={
+            "detail": f"Internal Server Error: {str(exc)}",
+            "error_type": type(exc).__name__,
+            "path": str(request.url.path),
+            "traceback": tb.splitlines()[-10:]
+        }
+    )
+
 app.add_middleware(SlowAPIMiddleware)
 
 # [NEW] Phase 4: 註冊 Routers (保持在頂層但延遲部分內部依賴)

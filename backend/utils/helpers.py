@@ -6,6 +6,7 @@ Centralized utility functions for use across all routers.
 
 import random
 import string
+import re
 
 
 def generate_room_code() -> str:
@@ -56,3 +57,33 @@ async def ensure_user_exists(supabase, user_id: str, name: str = None):
     except Exception as e:
         # 僅記錄錯誤而不拋出，以免主流程中斷 (容錯設計)
         print(f"⚠️ Auto-Activation failed for {user_id}: {e}")
+
+def resolve_payer_name(expense: dict, member_map: dict) -> str:
+    """
+    統一付款人名稱解析邏輯
+    Priority:
+    1. Member lookup by payer_id (群組成員)
+    2. Explicit payer_name column (訪客名稱)
+    3. Legacy [Payer: xxx] tag in notes (舊資料相容)
+    4. Creator name (記帳者即墊款者)
+    5. "訪客" (最終 Fallback)
+    """
+    payer_id = expense.get("payer_id")
+    if payer_id and payer_id in member_map:
+        return member_map[payer_id]
+    
+    payer_name = expense.get("payer_name")
+    if payer_name and isinstance(payer_name, str) and payer_name.strip() and payer_name.strip() != "未知付款人":
+        return payer_name.strip()
+    
+    notes = expense.get("notes") or ""
+    match = re.search(r'\[Payer:\s*(.+?)\]', notes)
+    if match:
+        return match.group(1).strip()
+    
+    creator = expense.get("creator_name")
+    if creator:
+        return creator
+    
+    return "訪客"
+
