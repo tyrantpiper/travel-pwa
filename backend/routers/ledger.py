@@ -4,6 +4,8 @@ from .expenses import normalize_items
 from utils.deps import get_supabase
 from models.base import ExpenseItem
 
+from utils.helpers import resolve_payer_name
+
 router = APIRouter(prefix="/api/ledger", tags=["ledger"])
 
 @router.get("/{code}")
@@ -58,13 +60,8 @@ async def get_public_ledger(
             amount_twd = round(amount * rate)
             total_twd += amount_twd
             
-            # 👤 Payer 名稱解析
-            payer_id = exp.get("payer_id")
-            payer_name = member_map.get(payer_id, "訪客") if payer_id else "訪客"
-            
-            # 如果 payer_id 沒名字，嘗試從 creator_name 拿
-            if payer_name == "訪客" and exp.get("creator_name"):
-                payer_name = exp.get("creator_name")
+            # 👤 Payer 名稱解析 (使用統一 resolve_payer_name 工具)
+            payer_name = resolve_payer_name(exp, member_map)
 
             # 📅 日期格式化
             raw_date = exp.get('incurred_at') or ''

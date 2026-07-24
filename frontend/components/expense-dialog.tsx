@@ -105,6 +105,7 @@ interface Expense {
     custom_icon?: string | null
     notes?: string | null
     payer_id?: string | null
+    payer_name?: string | null
 }
 
 interface TripMember {
@@ -148,6 +149,7 @@ export function ExpenseDialog({
     const [title, setTitle] = useState("")
     const [amountJPY, setAmountJPY] = useState("")
     const [method, setMethod] = useState("Cash")
+    const [customMethod, setCustomMethod] = useState("")
     const [category, setCategory] = useState("general")
     const [isPublic, setIsPublic] = useState(true)
     const [cardName, setCardName] = useState("")
@@ -209,7 +211,14 @@ export function ExpenseDialog({
             if (editItem) {
                 setTitle(editItem.title)
                 setAmountJPY((editItem.total_amount ?? editItem.amount ?? editItem.amount_jpy ?? 0).toString())
-                setMethod(editItem.payment_method || "Cash")
+                const pm = editItem.payment_method || "Cash"
+                if (PAYMENT_METHODS.some(m => m.id === pm)) {
+                    setMethod(pm)
+                    setCustomMethod("")
+                } else {
+                    setMethod("Custom")
+                    setCustomMethod(pm)
+                }
                 setCategory(editItem.category || "general")
                 setIsPublic(editItem.is_public)
                 setCardName(editItem.card_name || "")
@@ -226,7 +235,7 @@ export function ExpenseDialog({
                 setDiagnostics(editItem.diagnostics)
                 setCustomIcon(editItem.custom_icon || "")
                 setNotes(editItem.notes || "")
-                setPayerId(editItem.payer_id || "")
+                setPayerId(editItem.payer_id || editItem.payer_name || "")
                 
                 const rawDate = editItem.expense_date || editItem.created_at || ''
                 const dbDate = rawDate.split('T')[0]
@@ -241,6 +250,7 @@ export function ExpenseDialog({
                 setTitle("")
                 setAmountJPY("")
                 setMethod("Cash")
+                setCustomMethod("")
                 setCategory("general")
                 setIsPublic(true)
                 setCardName("")
@@ -416,7 +426,7 @@ export function ExpenseDialog({
             amount_jpy: cleanAmount(amountJPY),
             exchange_rate: inputRate,
             currency: inputCurrency,
-            payment_method: method,
+            payment_method: method === "Custom" ? (customMethod || "Cash") : method,
             category: category,
             is_public: isPublic,
             created_by: userId || undefined,
@@ -445,7 +455,16 @@ export function ExpenseDialog({
             } : undefined,
             custom_icon: customIcon || null,
             notes: notes || null,
-            payer_id: payerId || null
+            payer_id: (() => {
+                const m = activeTrip?.members?.find(mem => (mem.user_id && mem.user_id === payerId) || mem.user_name === payerId);
+                if (m) return m.user_id || null;
+                return (payerId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payerId)) ? payerId : null;
+            })(),
+            payer_name: (() => {
+                const m = activeTrip?.members?.find(mem => (mem.user_id && mem.user_id === payerId) || mem.user_name === payerId);
+                if (m) return m.user_name;
+                return (payerId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payerId)) ? payerId : null;
+            })()
         }
 
         try {
@@ -459,6 +478,7 @@ export function ExpenseDialog({
             onOpenChange(false)
             onSaveSuccess(payload.expense_date)
         } catch (e) {
+            console.error("❌ [EXPENSE SAVE ERROR]", e)
             haptic.error()
             toast.error(e instanceof Error ? `${t('exp_save_failed')}: ${e.message}` : t('exp_save_failed'))
         } finally {
@@ -777,19 +797,23 @@ export function ExpenseDialog({
                                         >
                                             {payerId ? (
                                                 <div className="flex items-center gap-2 overflow-hidden truncate">
-                                                    {activeTrip?.members?.find(m => m.user_id === payerId) ? (
-                                                        <>
-                                                            <Avatar className="h-5 w-5 shrink-0">
-                                                                <AvatarImage src={activeTrip.members.find(m => m.user_id === payerId)?.user_avatar} />
-                                                                <AvatarFallback className="text-[10px] bg-slate-100 uppercase">
-                                                                    {activeTrip.members.find(m => m.user_id === payerId)?.user_name[0]}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                            <span className="truncate text-sm font-bold">{activeTrip.members.find(m => m.user_id === payerId)?.user_name}</span>
-                                                        </>
-                                                    ) : (
-                                                        <span className="truncate text-sm font-bold">{payerId}</span>
-                                                    )}
+                                                    {(() => {
+                                                        const m = activeTrip?.members?.find(mem => mem.user_id === payerId || mem.user_name === payerId);
+                                                        if (m) {
+                                                            return (
+                                                                <>
+                                                                    <Avatar className="h-5 w-5 shrink-0">
+                                                                        <AvatarImage src={m.user_avatar} />
+                                                                        <AvatarFallback className="text-[10px] bg-slate-100 uppercase">
+                                                                            {m.user_name[0]}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span className="truncate text-sm font-bold">{m.user_name}</span>
+                                                                </>
+                                                            );
+                                                        }
+                                                        return <span className="truncate text-sm font-bold">{payerId}</span>;
+                                                    })()}
                                                 </div>
                                             ) : (
                                                 <span className="text-slate-400 text-sm font-normal truncate">{t('exp_payer_placeholder')}</span>
@@ -817,18 +841,19 @@ export function ExpenseDialog({
                                                 )}
                                                 {activeTrip?.members?.filter(m =>
                                                     m.user_name.toLowerCase().includes(payerSearch.toLowerCase())
-                                                ).map((member) => (
+                                                ).map((member, idx) => (
                                                     <Button
-                                                        key={member.user_id}
+                                                        key={member.user_id || member.user_name || idx}
                                                         variant="ghost"
                                                         className="w-full justify-start h-11 px-3 font-normal rounded-none border-b border-slate-50 last:border-0"
-                                                        onClick={() => {
-                                                            setPayerId(member.user_id)
+                                                        onPointerDown={(e) => {
+                                                            e.preventDefault()
+                                                            setPayerId(member.user_id || member.user_name)
                                                             setPayerOpen(false)
                                                             setPayerSearch("")
                                                         }}
                                                     >
-                                                        <Check className={cn("mr-2 h-4 w-4 text-emerald-500", payerId === member.user_id ? "opacity-100" : "opacity-0")} />
+                                                        <Check className={cn("mr-2 h-4 w-4 text-emerald-500", (payerId && (payerId === member.user_id || payerId === member.user_name)) ? "opacity-100" : "opacity-0")} />
                                                         <Avatar className="h-6 w-6 mr-2 shrink-0">
                                                             <AvatarImage src={member.user_avatar} />
                                                             <AvatarFallback className="text-[10px] bg-slate-100 uppercase">{member.user_name[0]}</AvatarFallback>
@@ -840,7 +865,8 @@ export function ExpenseDialog({
                                                     <Button
                                                         variant="ghost"
                                                         className="w-full justify-start h-12 px-3 font-normal rounded-none bg-blue-50/30"
-                                                        onClick={() => {
+                                                        onPointerDown={(e) => {
+                                                            e.preventDefault()
                                                             setPayerId(payerSearch)
                                                             setPayerOpen(false)
                                                             setPayerSearch("")
@@ -941,7 +967,30 @@ export function ExpenseDialog({
                                         <m.icon className="w-5 h-5 mb-1" />{m.label}
                                     </button>
                                 ))}
+                                <button
+                                    onClick={() => setMethod("Custom")}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center p-2.5 rounded-xl border-2 text-[10px] font-bold transition-all",
+                                        method === "Custom"
+                                            ? "border-slate-800 bg-slate-800 text-white shadow-md"
+                                            : "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 hover:border-slate-300"
+                                    )}
+                                >
+                                    <span className="text-lg mb-0.5">✍️</span>
+                                    <span>自訂</span>
+                                </button>
                             </div>
+                            {method === "Custom" && (
+                                <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <Input
+                                        placeholder="輸入自訂付款方式 (如: 街口支付, 現金轉帳)"
+                                        value={customMethod}
+                                        onChange={(e) => setCustomMethod(e.target.value)}
+                                        className="h-11 border-slate-200 dark:border-slate-600 focus-visible:ring-1"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
 
                             {(method === "JCB" || method === "VisaMaster") && (
                                 <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 animate-in slide-in-from-top-2">

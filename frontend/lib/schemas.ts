@@ -135,6 +135,9 @@ export const ExpenseSchema = z.object({
     custom_icon: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
     payer_id: z.string().optional().nullable(),
+    payer_name: z.string().optional().nullable(),
+    created_at: z.string().optional().nullable(),
+    image_url: z.string().optional().nullable(),
 });
 
 export type ReceiptDiagnostics = z.infer<typeof ReceiptDiagnosticsSchema>;

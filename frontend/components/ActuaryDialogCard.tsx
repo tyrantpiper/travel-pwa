@@ -14,11 +14,19 @@ import remarkGfm from "remark-gfm"
 interface Expense {
     id: string
     title: string
-    amount: number
+    total_amount?: number          // 🆕 V23.1 primary amount
+    amount: number                 // Legacy/Fallback
     exchange_rate?: number
     currency?: string
     payer_id?: string | null
+    payer_name?: string
+    creator_name?: string
     notes?: string
+    expense_date?: string          // 🆕 消費日期
+    incurred_at?: string           // 🆕 發生時間
+    created_at?: string            // 🆕 建立時間
+    category?: string              // 🆕 分類
+    items?: { original_name: string, translated_name?: string, amount: number }[]  // 🆕 細項
 }
 
 interface TripMember {
@@ -80,13 +88,38 @@ export function ActuaryDialogCard({ open, onOpenChange, expenses, members }: Act
 
         try {
             // 組裝 Payload：包含 TWD 預鑄，以配合精算師
-            const enrichedExpenses = expenses.map(e => ({
-                id: e.id,
-                title: e.title,
-                amount_twd: Math.round(e.amount * (e.exchange_rate || 1)),
-                payer_name: members.find(m => m.user_id === e.payer_id)?.user_name || "Unknown",
-                notes: e.notes || ""
-            }))
+            const enrichedExpenses = expenses.map(e => {
+                const notePayerMatch = e.notes ? e.notes.match(/\[Payer:\s*([^\]]+)\]/) : null
+                const resolvedPayer = members.find(m => m.user_id === e.payer_id)?.user_name 
+                    || e.payer_name 
+                    || (notePayerMatch ? notePayerMatch[1] : null) 
+                    || (e.payer_id && !e.payer_id.includes('-') ? e.payer_id : null) 
+                    || e.creator_name 
+                    || "訪客"
+                const amount = e.total_amount ?? e.amount  // V23.1 相容
+                const result: Record<string, unknown> = {
+                    id: e.id,
+                    title: e.title,
+                    date: e.expense_date || e.incurred_at || e.created_at || "未知日期",
+                    amount_twd: Math.round(amount * (e.exchange_rate || 1)),
+                    original_amount: amount,
+                    currency: e.currency || "JPY",
+                    category: e.category,
+                    payer_name: resolvedPayer,
+                    notes: e.notes || ""
+                }
+                // 只有當 items 存在且非空時才傳，避免 AI Token 浪費
+                if (e.items && e.items.length > 0) {
+                    result.items = e.items.map(i => ({
+                        name: i.translated_name || i.original_name,
+                        amount: i.amount
+                    }))
+                }
+                // 清除 undefined 值，保持 JSON 乾淨
+                return Object.fromEntries(
+                    Object.entries(result).filter(([, v]) => v !== undefined)
+                )
+            })
 
             const memberContext = members.map(m => ({
                 uid: m.user_id,

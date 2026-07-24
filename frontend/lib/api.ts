@@ -704,10 +704,10 @@ async function offlineFetch(url: string, options: RequestInit) {
             headers: options.headers as Record<string, string>
         });
 
-        return {
-            ok: true,
-            json: async () => ({ status: 'queued', offline: true, type: isFormData ? 'formData' : 'json' })
-        };
+        return new Response(
+            JSON.stringify({ status: 'queued', offline: true, type: isFormData ? 'formData' : 'json' }),
+            { status: 200, statusText: 'OK', headers: { 'Content-Type': 'application/json' } }
+        );
     }
     return fetch(url, options);
 }
@@ -998,12 +998,30 @@ export const expensesApi = {
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId
 
+        console.log("📡 [EXPENSE API POST] Submitting new expense payload:", { data, userId })
+
         const res = await offlineFetch(API.EXPENSES, {
             method: "POST",
             headers,
             body: JSON.stringify(data)
         })
-        if (!res.ok) throw new Error("Failed to create expense")
+        if (!res.ok) {
+            let errorBody: unknown = ""
+            try {
+                errorBody = await res.json()
+            } catch {
+                errorBody = await res.text().catch(() => "")
+            }
+            console.error("🚨 [EXPENSE API CREATE FAIL]", {
+                status: res.status,
+                statusText: res.statusText,
+                url: API.EXPENSES,
+                payload: data,
+                responseBody: errorBody
+            })
+            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as any).detail) : String(errorBody)
+            throw new Error(`Failed to create expense (${res.status}): ${detailMsg || res.statusText}`)
+        }
         return res.json()
     },
 
@@ -1012,12 +1030,30 @@ export const expensesApi = {
         const headers: Record<string, string> = { "Content-Type": "application/json" }
         if (userId) headers["X-User-ID"] = userId
 
+        console.log("📡 [EXPENSE API PATCH] Submitting update payload:", { expenseId, data, userId })
+
         const res = await offlineFetch(`${API.EXPENSES}/${expenseId}`, {
-            method: "PATCH", // Backend specifies PATCH/PUT in different places, but it's typically PATCH for updates
+            method: "PATCH",
             headers,
             body: JSON.stringify(data)
         })
-        if (!res.ok) throw new Error("Failed to update expense")
+        if (!res.ok) {
+            let errorBody: unknown = ""
+            try {
+                errorBody = await res.json()
+            } catch {
+                errorBody = await res.text().catch(() => "")
+            }
+            console.error("🚨 [EXPENSE API UPDATE FAIL]", {
+                status: res.status,
+                statusText: res.statusText,
+                url: `${API.EXPENSES}/${expenseId}`,
+                payload: data,
+                responseBody: errorBody
+            })
+            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as any).detail) : String(errorBody)
+            throw new Error(`Failed to update expense (${res.status}): ${detailMsg || res.statusText}`)
+        }
         return res.json()
     },
 

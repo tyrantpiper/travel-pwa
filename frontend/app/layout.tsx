@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
 import Script from "next/script";
-
 import { LanguageProvider } from "@/lib/LanguageContext"
 import { ThemeProvider } from "@/lib/ThemeContext"
 import { TripProvider } from "@/lib/trip-context"
@@ -54,8 +53,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh-Hant" translate="no" suppressHydrationWarning>
       <head>
+        <meta name="google" content="notranslate" />
         <meta name="agd-partner-manual-verification" />
       </head>
       <body className={inter.className} suppressHydrationWarning>

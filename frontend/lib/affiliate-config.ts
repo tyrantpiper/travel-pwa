@@ -510,7 +510,8 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     buildUrl: () => {
       return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 4552, 'https://www.visitorscoverage.com/')
     },
-    enabled: !!AFFILIATE_IDS.travelpayouts,
+    // ⚠️ Temporarily disabled — EKTA website under maintenance (TP announcement June 2026)
+    enabled: false,
   },
 
   // ============================================================
