@@ -1019,7 +1019,7 @@ export const expensesApi = {
                 payload: data,
                 responseBody: errorBody
             })
-            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as any).detail) : String(errorBody)
+            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as Record<string, unknown>).detail) : String(errorBody)
             throw new Error(`Failed to create expense (${res.status}): ${detailMsg || res.statusText}`)
         }
         return res.json()
@@ -1051,7 +1051,7 @@ export const expensesApi = {
                 payload: data,
                 responseBody: errorBody
             })
-            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as any).detail) : String(errorBody)
+            const detailMsg = typeof errorBody === "object" && errorBody !== null && "detail" in errorBody ? JSON.stringify((errorBody as Record<string, unknown>).detail) : String(errorBody)
             throw new Error(`Failed to update expense (${res.status}): ${detailMsg || res.statusText}`)
         }
         return res.json()
