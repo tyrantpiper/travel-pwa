@@ -87,8 +87,8 @@ async def lifespan(app: FastAPI):
         # In production (Cloud Run), we might want to fail hard here
     
     # 2. 初始化 Supabase
-    supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_KEY")
+    supabase_url = os.getenv("SUPABASE_URL", "").strip()
+    supabase_key = os.getenv("SUPABASE_KEY", "").strip()
     if supabase_url and supabase_key:
         try:
             app.state.supabase = create_client(supabase_url, supabase_key)

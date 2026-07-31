@@ -134,8 +134,8 @@ async def update_user_profile(
         
         # 🛡️ Direct HTTP approach - Optimized with async httpx
         
-        supabase_url = os.getenv("SUPABASE_URL")
-        supabase_key = os.getenv("SUPABASE_KEY")
+        supabase_url = os.getenv("SUPABASE_URL", "").strip()
+        supabase_key = os.getenv("SUPABASE_KEY", "").strip()
         
         if not supabase_url or not supabase_key:
             print("❌ Missing Supabase credentials in .env")
