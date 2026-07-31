@@ -814,7 +814,7 @@ async def call_extraction_server(
 ) -> str:
     """Server-side key 版本的 call_extraction，優先使用傳入的 api_key"""
     # 優先級：參數傳入的 Key > 系統環境變數
-    effective_key = api_key or os.getenv("GEMINI_API_KEY")
+    effective_key = api_key or (os.getenv("GEMINI_API_KEY") or "").strip()
     
     if not effective_key:
         raise ValueError("GEMINI_API_KEY 環境變數未設定，且未提供用戶端 API Key")

@@ -28,7 +28,7 @@ from services.model_manager import call_extraction_server
 import json
 
 # Load API Key
-ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+ARCGIS_API_KEY = (os.getenv("ARCGIS_API_KEY") or "").strip()
 
 # 🌐 Country Name → ISO 3166-1 Alpha-2 (動態 Nominatim countrycodes 鎖定)
 COUNTRY_TO_ISO = {
@@ -353,7 +353,7 @@ _NOMINATIM_CACHE = {}
 
 async def _gemma_parse_address(address: str, user_key: str = None) -> dict:
     """使用 Gemma 3 27B 零成本暴力拆解地址為 Structured Query 參數"""
-    api_key = user_key or os.getenv("GEMINI_API_KEY")
+    api_key = user_key or (os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:
         return {}
         
@@ -413,7 +413,7 @@ _DEAD_URL_CACHE = {}
 
 async def geocode_with_gas(place_name: str) -> dict | None:
     """🛡️ Tier 0: GAS 無代理伺服器輪詢引擎 (Zero-Cost Load Balancer)"""
-    urls_str = os.getenv("GAS_GEOCODE_URLS", "")
+    urls_str = os.getenv("GAS_GEOCODE_URLS", "").strip()
     if not urls_str:
         return None
         
@@ -516,7 +516,7 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
         if clean_addr in _NOMINATIM_CACHE and (now - _NOMINATIM_CACHE[clean_addr]["time"] < 3600):
             return _NOMINATIM_CACHE[clean_addr]["data"]
 
-        base_url = os.getenv("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org/search")
+        base_url = os.getenv("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org/search").strip()
         user_agent = os.getenv("APP_USER_AGENT", "RyanTravelApp/2.0 (contact@ryantravel.app)")
         
         # 🧠 Gemma 3 降維解構

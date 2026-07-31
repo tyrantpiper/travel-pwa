@@ -15,7 +15,7 @@ from models.base import RouteStop, RouteRequest
 router = APIRouter(prefix="/api", tags=["route"])
 
 # 載入 ArcGIS API Key
-ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+ARCGIS_API_KEY = (os.getenv("ARCGIS_API_KEY") or "").strip()
 
 
 async def route_with_arcgis(stops: List[RouteStop], mode: str, optimize: bool) -> dict:

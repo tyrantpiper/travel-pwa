@@ -305,7 +305,7 @@ async def health_check(request: Request):
     }
 
 # 4. 載入 ArcGIS API Key (地理編碼用，可選)
-ARCGIS_API_KEY = os.getenv("ARCGIS_API_KEY")
+ARCGIS_API_KEY = (os.getenv("ARCGIS_API_KEY") or "").strip()
 if ARCGIS_API_KEY:
     print("[ArcGIS] Geocoding: Enabled")
 else:
@@ -548,7 +548,7 @@ async def _build_price_context(itinerary: dict) -> str:
         if not origin or not destination:
             return ""
         
-        tp_token = os.getenv("TP_API_TOKEN", "")
+        tp_token = os.getenv("TP_API_TOKEN", "").strip()
         if not tp_token:
             return ""
         
