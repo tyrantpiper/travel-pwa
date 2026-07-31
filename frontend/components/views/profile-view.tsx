@@ -231,7 +231,7 @@ export function ProfileView() {
             // Rollback
             localStorage.setItem("user_nickname", previousNickname)
             setProfile(prev => ({ ...prev, nickname: previousNickname }))
-            toast.error("Failed to update profile on server")
+            toast.error(error instanceof Error ? error.message : "Failed to update profile on server")
         }
     }
 
