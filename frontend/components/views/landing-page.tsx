@@ -129,7 +129,7 @@ export function LandingPage() {
             // Call API via usersApi (Unified)
             try {
                 const data = await usersApi.getProfile(recoverCode)
-                if (data.nickname) fetchedName = data.nickname
+                if (data.name) fetchedName = data.name
                 if (data.avatar_url) fetchedAvatar = data.avatar_url
             } catch (err) {
                 debugWarn("Profile fetch failed, using fallback", err)
@@ -140,6 +140,9 @@ export function LandingPage() {
             if (fetchedAvatar) {
                 localStorage.setItem("user_avatar", fetchedAvatar)
             }
+
+            // 🆕 通知 App 身分已切換，觸發 SWR 重新 fetch 行程
+            window.dispatchEvent(new CustomEvent('user-login-state-changed'))
 
             toast.dismiss(toastId)
             toast.success(`Welcome back, ${fetchedName}!`)

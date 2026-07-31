@@ -110,11 +110,11 @@ export function ProfileView() {
                     if (!isMounted) return
                     setProfile(prev => ({
                         ...prev,
-                        nickname: data.nickname || prev.nickname,
+                        nickname: data.name || prev.nickname,
                         avatarUrl: data.avatar_url || prev.avatarUrl
                     }))
                     // Sync cache
-                    if (data.nickname) localStorage.setItem("user_nickname", data.nickname)
+                    if (data.name) localStorage.setItem("user_nickname", data.name)
                     if (data.avatar_url) localStorage.setItem("user_avatar", data.avatar_url)
                 })
                 .catch(err => {
@@ -216,6 +216,8 @@ export function ProfileView() {
             return
         }
 
+        const previousNickname = localStorage.getItem("user_nickname") || "Traveler"
+
         try {
             // Optimistic update
             localStorage.setItem("user_nickname", profile.nickname)
@@ -226,6 +228,9 @@ export function ProfileView() {
             toast.success(t('profile_updated'))
         } catch (error) {
             console.error(error)
+            // Rollback
+            localStorage.setItem("user_nickname", previousNickname)
+            setProfile(prev => ({ ...prev, nickname: previousNickname }))
             toast.error("Failed to update profile on server")
         }
     }
