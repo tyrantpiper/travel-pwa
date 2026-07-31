@@ -59,7 +59,7 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
             
             return {
                 "id": user_id,
-                "nickname": nickname,
+                "name": nickname,
                 "avatar_url": avatar_url
             }
             
@@ -78,7 +78,7 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
             print(f"✅ (Fallback) 找到暱稱: {nickname}")
             return {
                 "id": user_id,
-                "nickname": nickname,
+                "name": nickname,
                 "avatar_url": None
             }
 
@@ -86,7 +86,7 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
         print("⚠️ 找不到任何記錄，回傳預設值")
         return {
             "id": user_id,
-            "nickname": "New Traveler", 
+            "name": "New Traveler", 
             "avatar_url": None
         }
 
@@ -95,7 +95,7 @@ async def get_user_profile(user_id: str, supabase=Depends(get_supabase)):
         # 不回傳 500，以免卡死前端，回傳預設值即可
         return {
             "id": user_id,
-            "nickname": "Traveler",
+            "name": "Traveler",
             "avatar_url": None
         }
 
