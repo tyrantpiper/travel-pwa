@@ -1060,9 +1060,9 @@ export function ToolsView() {
                                 )}
 
                                 {/* Summary Card - Unified for both Summary and Daily views */}
-                                <Card className="border-0 shadow-sm">
-                                    <CardContent className="p-4">
-                                        <div className="space-y-4">
+                                <Card className="border-0 shadow-sm dark:bg-slate-900">
+                                    <CardContent className="p-5">
+                                        <div className="space-y-5">
                                             <ExpenseChart
                                                 data={categoryData}
                                                 total={totalTWD}
@@ -1071,31 +1071,31 @@ export function ToolsView() {
                                                 onCategoryClick={setActiveCategory}
                                             />
 
-                                            <div className="flex flex-col items-center gap-3 pt-2 border-t">
+                                            <div className="flex flex-col items-center gap-3 pt-3 border-t dark:border-slate-800">
                                                 {/* 🆕 Phase 9: Multi-Currency Foreign Totals */}
                                                 {foreignTotals.length > 0 && (
                                                     <div className="flex flex-wrap justify-center gap-3">
                                                         {foreignTotals.map(([code, info]) => (
-                                                            <div key={code} className="text-center px-3 py-1 bg-slate-50 rounded-lg">
-                                                                <span className="text-lg mr-1">{info.flag}</span>
-                                                                <span className="font-mono font-bold text-slate-800">
+                                                            <div key={code} className="text-center px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-transparent dark:border-slate-800">
+                                                                <span className="text-lg mr-1.5">{info.flag}</span>
+                                                                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
                                                                     {info.symbol}{Math.round(info.amount).toLocaleString()}
                                                                 </span>
-                                                                <span className="text-xs text-slate-500 ml-1">{code}</span>
+                                                                <span className="text-xs text-slate-500 dark:text-slate-400 ml-1.5 font-medium">{code}</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 )}
 
                                                 <div className="text-center">
-                                                    <p className="text-xs text-slate-500">
+                                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
                                                         {/* Phase 17: Show date for Daily view, category/total for Summary */}
                                                         {expenseView === 'daily'
                                                             ? formatDateDisplay(selectedDate)
                                                             : (activeCategory ? (CATEGORIES[activeCategory]?.label || activeCategory) : t('total'))
                                                         }
                                                     </p>
-                                                    <div className="text-3xl font-bold text-slate-900">
+                                                    <div className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
                                                         <CountingNumber
                                                             value={activeCategory ? (categoryData.find(c => c.category === activeCategory)?.amount || 0) : totalTWD}
                                                             prefix="NT$"

@@ -1,7 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { motion } from "framer-motion"
+import { cn } from "@/lib/utils"
+import { useLanguage } from "@/lib/LanguageContext"
 
 interface ExpenseChartProps {
     data: { category: string; amount: number; color: string }[]
@@ -58,6 +60,9 @@ function describeArc(x: number, y: number, innerRadius: number, outerRadius: num
 }
 
 export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategory, onCategoryClick }: ExpenseChartProps) {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const { t } = useLanguage()
+
     // 智慧格式化金額
     const formatAmount = (amount: number) => {
         const symbol = currencySymbol
@@ -74,9 +79,9 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
         if (total === 0 || data.length === 0) return { paths: [], centerTotal: 0 }
 
         let currentAngle = 0
-        const radius = 56 // w-28 = 112px / 2
-        const innerRadius = 35 // Thicker donut
-        const center = 56
+        const radius = 64 // w-32 = 128px / 2
+        const innerRadius = 42 // Thicker donut
+        const center = 64
 
         const paths = data.map(item => {
             const percent = item.amount / total
@@ -101,17 +106,17 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
 
     if (total === 0 || data.length === 0) {
         return (
-            <div className="flex items-center justify-center h-40 text-slate-400 text-sm">
+            <div className="flex items-center justify-center h-40 text-slate-400 dark:text-slate-500 text-sm font-medium">
                 No expenses to display
             </div>
         )
     }
 
     return (
-        <div className="flex gap-4 items-start">
+        <div className="flex gap-5 items-center">
             {/* SVG Exploded Donut Chart */}
-            <div className="flex-shrink-0 relative w-28 h-28">
-                <svg width="112" height="112" viewBox="0 0 112 112" className="overflow-visible">
+            <div className="flex-shrink-0 relative w-32 h-32 drop-shadow-sm">
+                <svg width="128" height="128" viewBox="0 0 128 128" className="overflow-visible">
                     {paths.map((item) => {
                         const isActive = activeCategory === item.category
                         const isDimmed = activeCategory && !isActive
@@ -130,7 +135,7 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
                                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
                                 onClick={() => onCategoryClick?.(isActive ? "" : item.category)}
                                 className="cursor-pointer hover:drop-shadow-md transition-shadow"
-                                style={{ transformOrigin: "56px 56px" }}
+                                style={{ transformOrigin: "64px 64px" }}
                             />
                         )
                     })}
@@ -143,57 +148,69 @@ export function ExpenseChart({ data, total, currencySymbol = "¥", activeCategor
                             key={activeCategory || 'total'} // Trigger animation on switch
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-sm font-bold text-slate-800"
+                            className="text-base font-bold text-slate-800 dark:text-slate-100"
                         >
                             {formatAmount(centerTotal)}
                         </motion.div>
-                        <div className="text-[9px] text-slate-400">
-                            {activeCategory ? (CATEGORY_ICONS[activeCategory] || '類別') : "總支出"}
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                            {activeCategory ? (CATEGORY_ICONS[activeCategory] || t('exp_category')) : t('exp_total_expense')}
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Legend / List */}
-            <div className="flex-1 space-y-1.5">
-                <div className="text-[10px] text-slate-400 font-medium flex justify-between items-center">
-                    <span>📊 類別排行</span>
+            <div className="flex-1 space-y-2">
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex justify-between items-center px-1">
+                    <span>📊 {t('exp_category_ranking')}</span>
                     {activeCategory && (
                         <button
                             onClick={() => onCategoryClick?.("")}
-                            className="text-xs text-blue-500 hover:underline"
+                            className="text-xs text-blue-500 dark:text-blue-400 hover:underline transition-colors"
                         >
-                            清除篩選
+                            {t('exp_clear_filter')}
                         </button>
                     )}
                 </div>
-                {paths.slice(0, 5).map((item, idx) => {
-                    const isActive = activeCategory === item.category
-                    const isDimmed = activeCategory && !isActive
+                <div className="space-y-1.5">
+                    {paths.slice(0, isExpanded ? paths.length : 5).map((item, idx) => {
+                        const isActive = activeCategory === item.category
+                        const isDimmed = activeCategory && !isActive
 
-                    return (
-                        <div
-                            key={idx}
-                            className={`flex items-center gap-2 cursor-pointer p-1 rounded transition-colors ${isActive ? 'bg-slate-100 ring-1 ring-slate-200' : 'hover:bg-slate-50'}`}
-                            style={{ opacity: isDimmed ? 0.5 : 1 }}
-                            onClick={() => onCategoryClick?.(isActive ? "" : item.category)}
-                        >
+                        return (
                             <div
-                                className="w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: CATEGORY_COLORS[item.category] || CATEGORY_COLORS.general }}
-                            />
-                            <span className="text-[11px] text-slate-600 flex-1 flex items-center gap-1">
-                                <span>{CATEGORY_ICONS[item.category] || '📦'}</span>
-                                <span className={isActive ? 'font-bold' : ''}>{item.percent}%</span>
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                                {currencySymbol}{Math.round(item.amount).toLocaleString()}
-                            </span>
-                        </div>
-                    )
-                })}
+                                key={idx}
+                                className={cn(
+                                    "flex items-center gap-2.5 cursor-pointer p-1.5 rounded-md transition-all",
+                                    isActive 
+                                        ? "bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700" 
+                                        : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                                )}
+                                style={{ opacity: isDimmed ? 0.4 : 1 }}
+                                onClick={() => onCategoryClick?.(isActive ? "" : item.category)}
+                            >
+                                <div
+                                    className="w-3 h-3 rounded-sm shrink-0 shadow-sm"
+                                    style={{ backgroundColor: CATEGORY_COLORS[item.category] || CATEGORY_COLORS.general }}
+                                />
+                                <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 flex items-center gap-1.5">
+                                    <span>{CATEGORY_ICONS[item.category] || '📦'}</span>
+                                    <span className={isActive ? 'font-bold text-slate-900 dark:text-white' : ''}>{item.percent}%</span>
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono font-medium">
+                                    {currencySymbol}{Math.round(item.amount).toLocaleString()}
+                                </span>
+                            </div>
+                        )
+                    })}
+                </div>
                 {paths.length > 5 && (
-                    <div className="text-[10px] text-slate-400 text-center">+{paths.length - 5} more</div>
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="w-full text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 text-center pt-1 transition-colors"
+                    >
+                        {isExpanded ? t('exp_show_less') : t('exp_show_more', { n: paths.length - 5 })}
+                    </button>
                 )}
             </div>
         </div>

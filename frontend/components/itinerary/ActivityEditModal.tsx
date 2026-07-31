@@ -275,9 +275,9 @@ export function ActivityEditModal({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{isAddMode ? "Add Activity" : "Edit Activity"}</DialogTitle>
+                    <DialogTitle>{isAddMode ? (zh ? "新增行程" : "Add Activity") : (zh ? "編輯行程" : "Edit Activity")}</DialogTitle>
                     <DialogDescription className="sr-only">
-                        {isAddMode ? "Fill in the details to add a new activity to your itinerary." : "Update the details of this itinerary activity."}
+                        {isAddMode ? (zh ? "填寫詳細資訊以新增行程。" : "Fill in the details to add a new activity to your itinerary.") : (zh ? "更新此行程的詳細資訊。" : "Update the details of this itinerary activity.")}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -298,13 +298,13 @@ export function ActivityEditModal({
                             type="time"
                             value={editItem.time || ""}
                             onChange={(e) => setEditItem({ ...editItem, time: e.target.value })}
-                            className="w-full"
+                            className="w-36 text-center"
                         />
                     </div>
 
                     {/* Filter: Country/Region */}
                     <div className="space-y-1.5">
-                        <Label>Filter</Label>
+                        <Label>{zh ? "篩選條件" : "Filter"}</Label>
                         <div className="grid grid-cols-2 gap-2">
                             <select
                                 className="w-full h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -314,7 +314,7 @@ export function ActivityEditModal({
                                     setSearchRegion("")
                                 }}
                             >
-                                <option value="">🌍 Country</option>
+                                <option value="">🌍 {zh ? "國家" : "Country"}</option>
                                 <option value="Japan">🇯🇵 Japan</option>
                                 <option value="Taiwan">🇹🇼 Taiwan</option>
                                 <option value="South Korea">🇰🇷 Korea</option>
@@ -334,14 +334,14 @@ export function ActivityEditModal({
                                     value={searchRegion}
                                     onChange={(e) => setSearchRegion(e.target.value)}
                                 >
-                                    <option value="">🏙️ Region (All)</option>
+                                    <option value="">🏙️ {zh ? "地區 (全部)" : "Region (All)"}</option>
                                     {COUNTRY_REGIONS[searchCountry].map(region => (
                                         <option key={region} value={region}>{region}</option>
                                     ))}
                                 </select>
                             ) : (
                                 <Input
-                                    placeholder="🏙️ Region"
+                                    placeholder={zh ? "🏙️ 地區" : "🏙️ Region"}
                                     className="w-full"
                                     value={searchRegion}
                                     onChange={(e) => setSearchRegion(e.target.value)}
@@ -556,19 +556,19 @@ export function ActivityEditModal({
                     {/* Reservation & Cost Grid */}
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-dashed">
                         <div className="space-y-1.5">
-                            <Label className="text-xs">Reservation Code</Label>
+                            <Label className="text-xs">{zh ? "預約代碼" : "Reservation Code"}</Label>
                             <Input
-                                placeholder="PDR / Code"
+                                placeholder={zh ? "訂位代號 / PNR" : "PDR / Code"}
                                 className="text-xs"
                                 value={editItem.reservation_code || ''}
                                 onChange={(e) => setEditItem({ ...editItem, reservation_code: e.target.value })}
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs">Estimated Cost</Label>
+                            <Label className="text-xs">{zh ? "預計花費" : "Estimated Cost"}</Label>
                             <Input
                                 type="number"
-                                placeholder="Amount"
+                                placeholder={zh ? "金額" : "Amount"}
                                 className="text-xs"
                                 value={editItem.cost || ''}
                                 onChange={(e) => setEditItem({ ...editItem, cost: e.target.value ? parseFloat(e.target.value) : undefined })}
@@ -578,7 +578,7 @@ export function ActivityEditModal({
 
                     {/* Category */}
                     <div className="space-y-1.5">
-                        <Label>Category</Label>
+                        <Label>{zh ? "分類" : "Category"}</Label>
                         <div className="flex flex-wrap gap-2">
                             {ACTIVITY_CATEGORIES.map(cat => (
                                 <button
