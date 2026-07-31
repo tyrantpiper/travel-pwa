@@ -42,6 +42,11 @@ export const expenseTranslations = {
         exp_diagnostic_warning: "AI Amount Mismatch",
         exp_diagnostic_mismatch_desc: "The detected total amount doesn't match the sum of items.",
         exp_notes_placeholder: "Notes/Description...",
+        exp_show_less: "Show less",
+        exp_show_more: "+{n} Expand",
+        exp_category_ranking: "Category Ranking",
+        exp_clear_filter: "Clear Filter",
+        exp_total_expense: "Total Expense",
 
         // Phase 8: Ledger
         share_ledger_btn: "Share Ledger",
@@ -129,6 +134,11 @@ export const expenseTranslations = {
         exp_diagnostic_warning: "AI 金額不符",
         exp_diagnostic_mismatch_desc: "偵測到的總金額與細項總和不符。",
         exp_notes_placeholder: "備註/說明...",
+        exp_show_less: "收起",
+        exp_show_more: "+{n} 展開全部",
+        exp_category_ranking: "類別排行",
+        exp_clear_filter: "清除篩選",
+        exp_total_expense: "總支出",
 
         // Phase 8: Ledger
         share_ledger_btn: "分享公帳",
