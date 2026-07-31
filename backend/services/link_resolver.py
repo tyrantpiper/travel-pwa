@@ -34,7 +34,7 @@ async def resolve_via_gas(short_url: str) -> Dict[str, Any] | None:
         成功: {"lat": float, "lng": float, "title": str|None, ...}
         失敗: None
     """
-    urls_str = os.getenv("GAS_RESOLVE_LINK_URLS", "")
+    urls_str = os.getenv("GAS_RESOLVE_LINK_URLS", "").strip()
     if not urls_str:
         return None
     
@@ -481,7 +481,7 @@ async def resolve_google_maps_link(url: str) -> Dict[str, Any]:
     # 🆕 v35.46: Engine 2 Fallback - ArcGIS Static Map Snapshot
     # If no real photo found, generate a static map preview if coords exist
     if not result["metadata"].get("image") and result.get("lat") and result.get("lng"):
-        arcgis_key = os.getenv("ARCGIS_API_KEY")
+        arcgis_key = (os.getenv("ARCGIS_API_KEY") or "").strip()
         if arcgis_key:
             # ArcGIS Static Map API
             # Size: 800x600, Zoom: 16 (Street Level), Style: World_Street_Map

@@ -16,7 +16,7 @@ logger = logging.getLogger("ryan-travel-api")
 router = APIRouter(prefix="/api/travel-data", tags=["travel-data"])
 
 TP_BASE = "https://api.travelpayouts.com"
-TP_TOKEN = os.getenv("TP_API_TOKEN", "")
+TP_TOKEN = os.getenv("TP_API_TOKEN", "").strip()
 
 # In-memory cache (TTL: 1 hour)
 _price_cache: dict[str, tuple[float, dict]] = {}
