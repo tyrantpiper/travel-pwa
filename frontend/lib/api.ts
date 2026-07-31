@@ -1098,7 +1098,10 @@ export const usersApi = {
             },
             body: JSON.stringify(data)
         })
-        if (!res.ok) throw new Error("Failed to update profile")
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => "Unknown Server Error")
+            throw new Error(`[${res.status}] ${errorText}`)
+        }
         return res.json()
     },
 
