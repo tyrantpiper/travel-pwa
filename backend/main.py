@@ -3,7 +3,7 @@
 # Fix Windows console Unicode encoding issues (prevents cp950 crash on emoji)
 import sys
 import io
-if sys.stdout and hasattr(sys.stdout, 'buffer'):
+if sys.stdout and hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
     try:
         if sys.stdout.encoding != 'utf-8':
             sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
