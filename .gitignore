@@ -28,7 +28,7 @@ Thumbs.db
 *.log
 
 # AI Agent Workspace
-.agent/
+/.agents/*.log
 
 backend/migrations/20260308_security_hardening.sql
 *.json
