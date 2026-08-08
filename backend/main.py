@@ -220,7 +220,8 @@ ALLOWED_HOSTS = [
     "travel-pwa-five.vercel.app",
     "antigravity-backend-589255638719.us-central1.run.app",
     "localhost",
-    "127.0.0.1"
+    "127.0.0.1",
+    "testserver"
 ]
 
 app.add_middleware(
@@ -466,7 +467,8 @@ def format_itinerary_context(itinerary: dict, focused_day: int = None) -> str:
                 # Notes/Guide/Memo (僅限 Focused Day)
                 notes = item.get("notes")
                 if notes:
-                    lines.append(f"    [Guide] {notes.replace('\n', ' ')}")
+                    clean_notes = notes.replace('\n', ' ')
+                    lines.append(f"    [Guide] {clean_notes}")
                 
                 memo = item.get("memo")
                 if memo:
