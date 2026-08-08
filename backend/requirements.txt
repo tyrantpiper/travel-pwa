@@ -22,3 +22,4 @@ uvicorn
 # Testing
 pytest
 pytest-asyncio
+pytest-mock==3.14.0
