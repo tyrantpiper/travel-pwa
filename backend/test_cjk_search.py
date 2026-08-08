@@ -9,8 +9,9 @@ import json
 import io
 
 # 強制 UTF-8 輸出
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+if sys.stdout and hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # 確保能 import backend modules
 sys.path.insert(0, os.path.dirname(__file__))
