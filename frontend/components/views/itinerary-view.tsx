@@ -428,7 +428,10 @@ export function ItineraryView() {
                 const tripDateUTC = new Date(Date.UTC(y, m - 1, d + (day - 1)))
                 targetDate = tripDateUTC.toISOString().split('T')[0]
 
-                daysFromNow = Math.floor((tripDateUTC.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                // 🛡️ Fix daysFromNow Off-by-one: 比較相對於 UTC 午夜的時間，避免時區偏移
+                const now = new Date()
+                const nowUTCMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+                daysFromNow = Math.round((tripDateUTC.getTime() - nowUTCMidnight.getTime()) / (1000 * 60 * 60 * 24))
 
                 // 決定天氣模式
                 if (daysFromNow < 0) {
@@ -744,7 +747,11 @@ export function ItineraryView() {
                 const targetDate = new Date(currentTrip.start_date)
                 targetDate.setDate(targetDate.getDate() + (dayNum - 1))
                 const dateStr = targetDate.toISOString().split('T')[0]
-                const daysFromNow = Math.floor((targetDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                
+                // 🛡️ Fix daysFromNow Off-by-one: 對齊當前的 UTC 午夜進行計算
+                const now = new Date()
+                const nowUTCMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+                const daysFromNow = Math.round((targetDate.getTime() - nowUTCMidnight.getTime()) / (1000 * 60 * 60 * 24))
 
                 // 2026 策略：僅預熱未來 14 天的精準預報
                 if (daysFromNow < 0 || daysFromNow > 14) continue
