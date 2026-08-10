@@ -1,3 +1,8 @@
+---
+name: Daily Report
+description: Generates a master-level daily report using deterministic data gathering and tiered memory consolidation.
+---
+
 # Daily Report Workflow (/daily-report)
 
 > **架構守則 (Master-Level Doctrine)**: 
