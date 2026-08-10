@@ -350,9 +350,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     limit: 5,
                     tripTitle,
                     lat: nearestCity?.lat ?? center?.lat,
-                    lng: nearestCity?.lng ?? center?.lng,
-                    country: nearestCity?.country,
-                    region: nearestCity?.region
+                    lng: nearestCity?.lng ?? center?.lng
                 })
                 // 🆕 只在 query 仍然匹配時更新
                 if (currentQuery === query) {
@@ -965,7 +963,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             </div>
 
             {/* 地圖容器 - 全裝置統一加大 h-[480px] 向上調整為響應式 500~600px，防止捲動干擾 + 消除震動 */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-[500px] sm:h-[540px] lg:h-[600px] w-full z-0 relative overscroll-none">
+            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-125 sm:h-135 lg:h-150 w-full z-0 relative overscroll-none">
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}
@@ -1270,7 +1268,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                                 exit={{ opacity: 0, scale: 0.8 }}
                                                 className="mb-1.5 px-2 py-0.5 bg-white/85 dark:bg-slate-900/90 backdrop-blur-md border border-white/60 dark:border-slate-800 rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.1)] pointer-events-none z-20"
                                             >
-                                                <span className="text-[10px] font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap block max-w-[120px] truncate">
+                                                <span className="text-[10px] font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap block max-w-30 truncate">
                                                     {m.place} {isCluster && <span className="text-indigo-500 ml-1">(+{cluster.length - 1})</span>}
                                                 </span>
                                             </motion.div>
@@ -1282,7 +1280,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                         {/* 🎨 [BACK] Stack Layers Visual Effect */}
                                         {isCluster && (
                                             <>
-                                                <div className="absolute top-[-3px] left-[3px] w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-700 border-2 border-white dark:border-slate-800 opacity-60 scale-95" />
+                                                <div className="absolute -top-0.75 left-0.75 w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-700 border-2 border-white dark:border-slate-800 opacity-60 scale-95" />
                                                 <div className="absolute top-[-1.5px] left-[1.5px] w-6 h-6 rounded-full bg-slate-400 dark:bg-slate-600 border-2 border-white dark:border-slate-800 opacity-80" />
                                             </>
                                         )}
@@ -1383,7 +1381,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     viewBox="0 0 100 100" 
                                     fill="none" 
                                     xmlns="http://www.w3.org/2000/svg"
-                                    className="absolute -top-[35px] opacity-70"
+                                    className="absolute -top-8.75 opacity-70"
                                 >
                                     <path d="M50 100 L10 0 C 30 -10, 70 -10, 90 0 Z" fill="url(#cone-gradient)" />
                                     <defs>
@@ -1411,7 +1409,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             onClose={() => setPopupInfo(null)}
                             closeOnClick={false}
                         >
-                            <div className="min-w-[150px] p-1">
+                            <div className="min-w-37.5 p-1">
                                 <div className="font-bold text-sm">{popupInfo.number}. {popupInfo.place}</div>
                                 {popupInfo.time && <div className="text-xs text-slate-500 mt-1">🕐 {popupInfo.time}</div>}
                                 {popupInfo.desc && <div className="text-xs text-slate-600 mt-1">{popupInfo.desc}</div>}

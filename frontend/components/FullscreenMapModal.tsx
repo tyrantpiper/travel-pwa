@@ -199,8 +199,6 @@ export default function FullscreenMapModal({
                     tripTitle,
                     lat: nearestCity?.lat ?? initialViewState.latitude,
                     lng: nearestCity?.lng ?? initialViewState.longitude,
-                    country: nearestCity?.country,
-                    region: nearestCity?.region,
                     zoom: currentZoom,  // 🆕 P1: 傳遞縮放層級
                     signal  // 🆕 P5: 傳遞 AbortSignal
                 })
@@ -522,7 +520,7 @@ export default function FullscreenMapModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="fixed inset-0 z-[9999] bg-black"
+                className="fixed inset-0 z-9999 bg-black"
             >
                 {/* 🗺️ 全螢幕地圖 */}
                 <Map

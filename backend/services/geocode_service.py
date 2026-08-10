@@ -651,7 +651,7 @@ async def resolve_address_pipeline(address: str, user_gemini_key: str = None):
     return None
 
 
-async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None, zoom: float = None, location_bias_scale: float = None, osm_tag: str = None):
+async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None, lng: float = None, zoom: float = None, location_bias_scale: float = None, osm_tag: str = None, country_code: str = None):
     """Photon 地理編碼 (基於 OpenStreetMap + Elasticsearch，模糊搜尋強)
     
     Args:
@@ -683,6 +683,10 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                 "q": query_text,
                 "limit": limit
             }
+            
+            # 🆕 Country Bias
+            if country_code:
+                params["countrycode"] = country_code.lower()
             
             # 🆕 P7: 添加 osm_tag 過濾
             if osm_tag:
@@ -1596,6 +1600,7 @@ async def smart_geocode_logic(
     
     # 🧠 Step 0: 智能國家判斷和翻譯
     country_code = None
+    api_country_lock = None # 🆕 只有明確指定時才物理鎖死 API
     search_queries = [query]
     chinese_display = None  # 🆕 中文顯示名稱
     
@@ -1606,7 +1611,8 @@ async def smart_geocode_logic(
         found_code = next((v for k, v in COUNTRY_TO_ISO.items() if k.lower() == normalized_country), None)
         country_code = found_code
         if country_code:
-            log_debug(f"   🎯 Frontend Country Filter → {country_code}")
+            api_country_lock = country_code
+            log_debug(f"   🎯 Frontend Country Filter (Lock) → {country_code}")
     
     # 🆕 0.1 優先級：偵測搜尋詞本身是否就是國家名（明確導向）
     user_explicit_country = False
@@ -1616,7 +1622,8 @@ async def smart_geocode_logic(
     if found_explicit_code:
         country_code = found_explicit_code
         user_explicit_country = True
-        log_debug(f"   🌍 Explicit Country Query Detected → {country_code}")
+        api_country_lock = country_code
+        log_debug(f"   🌍 Explicit Country Query Detected (Lock) → {country_code}")
     
     # 第一優先級：關鍵字規則（確定性，零延遲，無需 API Key）
     if not country_code:
@@ -1686,7 +1693,9 @@ async def smart_geocode_logic(
         tasks.append(translation_task)
     
     # 任務 B: 原始名稱初步搜尋 (Speculative Photon)
-    speculative_task = asyncio.create_task(geocode_with_photon(query, limit, lat, lng, zoom))
+    region_term = extract_region_for_search(region) if region else ""
+    speculative_query = f"{query} {region_term}".strip() if region_term else query
+    speculative_task = asyncio.create_task(geocode_with_photon(speculative_query, limit, lat, lng, zoom, country_code=api_country_lock))
     tasks.append(speculative_task)
     
     # 🆕 任務 C: 全域觀察者任務 (Global Observer)
@@ -1696,7 +1705,7 @@ async def smart_geocode_logic(
         # 使用低強度 Bias (0.1) 確保全球範圍的權威結果能排到最前面
         # 🆕 橋階關鍵字：利用純國碼 (如 AU) 進行強攻，直接定位主權實體，不帶地緣偏見
         global_q = country_code.upper() if country_code else query
-        global_task = asyncio.create_task(geocode_with_photon(global_q, limit, None, None, None, location_bias_scale=None, osm_tag="place:country"))
+        global_task = asyncio.create_task(geocode_with_photon(global_q, limit, None, None, None, location_bias_scale=None, osm_tag="place:country", country_code=api_country_lock))
         tasks.append(global_task)
 
     log_debug(f"   🚀 Starting Speculative Searches for '{query}'...")
@@ -1747,10 +1756,11 @@ async def smart_geocode_logic(
     
     # 🆕 P0 Pre-filter: 提前清除境外 Speculative 垃圾結果
     # 防止中國「台州」等結果佔滿 effective_limit，導致後續 Nominatim 搜尋被 break 跳過
+    is_strict = bool(api_country_lock) # 只有硬性鎖定時才進行嚴格過濾
     if country_code and all_results:
-        pre_filtered = filter_results_by_country(all_results, country_code, strict=False)
+        pre_filtered = filter_results_by_country(all_results, country_code, strict=is_strict)
         if len(pre_filtered) < len(all_results):
-            log_debug(f"   🧹 Pre-filter: {len(all_results)} → {len(pre_filtered)} (removed off-country speculative)")
+            log_debug(f"   🧹 Pre-filter: {len(all_results)} → {len(pre_filtered)} (strict={is_strict})")
             all_results = pre_filtered
 
     # 限定結果數量 (國名搜尋時放寬席位，避免被在地店家擠掉)
@@ -1766,7 +1776,7 @@ async def smart_geocode_logic(
         # 但 Nominatim 對「所有查詢」執行，因為 Nominatim 的 CJK 能力遠優於 Photon
         if q != query:
             # Photon (🆕 P1: 傳遞 zoom 用於動態 bias scale)
-            photon = await geocode_with_photon(q, limit, lat, lng, zoom)
+            photon = await geocode_with_photon(q, limit, lat, lng, zoom, country_code=api_country_lock)
             if photon:
                 for r in photon: r["source"] = "photon"
                 all_results.extend(photon)
@@ -1777,7 +1787,7 @@ async def smart_geocode_logic(
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     params = {"q": q, "format": "json", "limit": limit, "addressdetails": 1}
-                    if country_code: params["countrycodes"] = country_code.lower()
+                    if api_country_lock: params["countrycodes"] = api_country_lock.lower()
                     res = await client.get("https://nominatim.openstreetmap.org/search", params=params, headers={
                         "User-Agent": "RyanTravelApp/2.0",
                         "Accept-Language": "zh-TW,zh,en"  # 🆕 P0: 確保中文結果優先回傳
@@ -1834,10 +1844,9 @@ async def smart_geocode_logic(
 
     # 🗺️ 搜尋過濾策略 (2026 寬容化)
     if country_code and all_results:
-        # 如果是「關鍵字命中」或「前端指定」，維持嚴格過濾 (用戶期望精確控制)
-        # 如果是「標題推測」，改為鬆散過濾 (維持全球視野)
-        is_contextual = not user_explicit_country and not country
-        is_strict = not is_contextual # 背景推測不使用嚴格過濾
+        # 如果有 api_country_lock，維持嚴格過濾 (用戶期望精確控制)
+        # 如果是「關鍵字推測」，改為鬆散過濾 (維持全球視野)
+        is_strict = bool(api_country_lock)
         
         all_results = filter_results_by_country(all_results, country_code, strict=is_strict)
 
