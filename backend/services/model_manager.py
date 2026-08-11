@@ -58,6 +58,16 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         allow_extraction_fallback=True,
         family="gemini",
     ),
+    "gemini-3.6-flash": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,
+        supports_media_resolution=True,
+        supports_thinking=True,
+        supports_grounding=True,
+        requires_property_ordering=False,
+        allow_extraction_fallback=True,
+        family="gemini",
+    ),
     "gemini-3.5-flash": ModelCaps(
         supports_schema=True,
         supports_tools=True,       # 🟢 啟用頂級神經連結能力
@@ -613,6 +623,7 @@ async def call_with_fallback(
     thought_signatures: Optional[List[Dict]] = None,
     intent_type: str = "CHAT",
     routing_strategy: Optional[List[str]] = None,
+    system_instruction: Optional[str] = None,
 ) -> Dict[str, Any]:
     """智能對話式呼叫 (v21 版)"""
     client = get_cached_client(api_key)
@@ -634,6 +645,8 @@ async def call_with_fallback(
 
         try:
             config = sanitize_config_for_model(base_config, model_name, intent_type)
+            if system_instruction:
+                config.system_instruction = system_instruction
             label = "Primary" if i == 0 else f"Fallback#{i}"
             print(f"[{label}] {model_name} (intent={intent_type})...")
 
@@ -712,7 +725,9 @@ async def call_verifier(
             print(f"⚠️ [Verifier] {model_name} 未預期錯誤: {e}")
 
     print(f"❌ [Verifier] 所有模型均不可用")
-    raise last_error
+    if last_error:
+        raise last_error
+    raise RuntimeError("No models available for VERIFY routing")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -724,6 +739,7 @@ async def call_extraction(
     prompt: Union[str, List[Any]],
     intent_type: str = "CHAT",
     routing_strategy: Optional[List[str]] = None,
+    system_instruction: Optional[str] = None,
 ) -> str:
     """
     統一的 AI 提取/生成函數 (v21 版)
@@ -761,6 +777,8 @@ async def call_extraction(
 
         try:
             config = sanitize_config_for_model(base_config, model_name, intent_type)
+            if system_instruction:
+                config.system_instruction = system_instruction
             label = "Primary" if i == 0 else f"Fallback#{i}"
             print(f"[{label}] {model_name} (intent={intent_type})...")
 
@@ -810,7 +828,8 @@ async def call_extraction_server(
     prompt: str,
     intent_type: str = "GEOCODE",
     routing_strategy: Optional[List[str]] = None,
-    api_key: Optional[str] = None  # 🆕 允許從外部傳入 Key
+    api_key: Optional[str] = None,  # 🆕 允許從外部傳入 Key
+    system_instruction: Optional[str] = None,
 ) -> str:
     """Server-side key 版本的 call_extraction，優先使用傳入的 api_key"""
     # 優先級：參數傳入的 Key > 系統環境變數
@@ -819,7 +838,7 @@ async def call_extraction_server(
     if not effective_key:
         raise ValueError("GEMINI_API_KEY 環境變數未設定，且未提供用戶端 API Key")
         
-    return await call_extraction(effective_key, prompt, intent_type, routing_strategy)
+    return await call_extraction(effective_key, prompt, intent_type, routing_strategy, system_instruction)
 
 
 # ═══════════════════════════════════════════════════════════════
