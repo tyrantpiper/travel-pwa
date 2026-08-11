@@ -553,7 +553,11 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 const updated = [...prev]
                                 const lastMsg = updated[updated.length - 1]
                                 if (lastMsg?.role === "model" && lastMsg.modelUsed === "__streaming__") {
-                                    lastMsg.displayContent = streamingText
+                                    // 🟢 修復 React State Mutation 導致的重複渲染/錯誤
+                                    updated[updated.length - 1] = {
+                                        ...lastMsg,
+                                        displayContent: streamingText
+                                    }
                                 } else {
                                     updated.push(hydrateMessage({
                                         role: "model",
@@ -578,11 +582,14 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 const updated = [...prev]
                                 const lastMsg = updated[updated.length - 1]
                                 if (lastMsg?.role === "model" && lastMsg.modelUsed === "__streaming__") {
-                                    // 已有串流佔位訊息 → 原地更新
-                                    lastMsg.displayContent = streamingText
-                                    lastMsg.rawParts = streamingRawParts
-                                    lastMsg.modelUsed = data.model_used
-                                    lastMsg.groundingSources = groundingSources
+                                    // 已有串流佔位訊息 → 🟢 取代整個 Object 防止 Mutation 錯誤
+                                    updated[updated.length - 1] = {
+                                        ...lastMsg,
+                                        displayContent: streamingText,
+                                        rawParts: streamingRawParts,
+                                        modelUsed: data.model_used,
+                                        groundingSources
+                                    }
                                 } else {
                                     // 🟢 純 Tool Call 回應（無 text chunk）→ 新增 model 訊息
                                     updated.push(hydrateMessage({
@@ -698,10 +705,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         <>
             {/* Chat Window - Fixed Center */}
             {isOpen && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-sm h-[70vh] max-h-[500px] flex flex-col border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-sm h-[70vh] max-h-125 flex flex-col border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Header - No longer draggable */}
-                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white">
+                        <div className="bg-linear-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white">
                             <div className="flex items-center gap-2">
                                 <div className="bg-white/20 p-1.5 rounded-full">
                                     <Bot className="w-5 h-5 text-white" />
@@ -897,7 +904,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             {/* Toggle Button - Edge Draggable */}
             <div
                 ref={dragRef}
-                className="fixed z-[110]"
+                className="fixed z-110"
                 style={{
                     right: position.x,
                     bottom: position.y,
@@ -908,7 +915,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                     size="icon"
                     className={cn(
                         "h-14 w-14 rounded-full shadow-lg transition-all duration-300 hover:scale-105 touch-manipulation",
-                        isOpen ? "bg-slate-200 text-slate-600 hover:bg-slate-300" : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white",
+                        isOpen ? "bg-slate-200 text-slate-600 hover:bg-slate-300" : "bg-linear-to-r from-blue-600 to-indigo-600 text-white",
                         isDragging && "scale-110 shadow-2xl"
                     )}
                     onClick={() => !isDragging && setIsOpen(!isOpen)}

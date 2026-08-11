@@ -596,7 +596,7 @@ export const aiApi = {
             "Content-Type": "application/json",
             "X-Gemini-API-Key": apiKey
         }
-        if (params.user_id) headers["X-User-ID"] = params.user_id
+        if (params.user_id) headers["X-User-ID"] = encodeURI(params.user_id)
 
         const res = await fetch(API.GENERATE_TRIP, {
             method: "POST",

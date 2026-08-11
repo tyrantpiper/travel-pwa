@@ -650,10 +650,21 @@ export function ToolsView() {
             
             // 🆕 v22.1: Align nested structure. API returns { status, data: { items, ... } }
             const itineraryData = response.data || response
+            
+            // 🛑 [防呆阻斷] 如果沒有生成任何景點，視為失敗，不要彈出綠色通知
+            if (!itineraryData.items || itineraryData.items.length === 0) {
+                setAiResult(null)
+                toast.error("AI 未能生成有效的景點列表，請再試一次")
+                return
+            }
+
             setAiResult(itineraryData)
             toast.success(t('tv_ai_generated', { count: String(itineraryData.items?.length || 0) }))
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Generate failed")
+            // 讓後端拋出的 422 錯誤能顯示出來
+            const msg = error instanceof Error ? error.message : "Generate failed"
+            toast.error(`生成失敗: ${msg}`)
+            setAiResult(null)
         } finally {
             setAiLoading(false)
             setGenerateProgress(null)
@@ -868,7 +879,7 @@ export function ToolsView() {
         <>
             <div className="h-full bg-stone-50 dark:bg-slate-950 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
                 <div className="min-h-screen pb-32">
-                    <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
+                    <div className="bg-linear-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                         <div className="space-y-3">
                             <div className="flex justify-between items-start">
                                 <div>
@@ -951,7 +962,7 @@ export function ToolsView() {
                                                         </button>
                                                         <div
                                                             onClick={() => setViewingCard(card)}
-                                                            className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-all border border-slate-600/30 active:scale-[0.98]"
+                                                            className="bg-linear-to-r from-slate-800 to-slate-700 rounded-xl p-4 text-white cursor-pointer hover:shadow-lg transition-all border border-slate-600/30 active:scale-[0.98]"
                                                         >
                                                             <div className="flex justify-between items-start gap-2">
                                                                 <div className="min-w-0 flex-1">
@@ -993,7 +1004,7 @@ export function ToolsView() {
                             <TabsContent value="expense" className="mt-4 space-y-4">
                                 {/* View Mode Toggle and Share Action */}
                                 <div className="flex items-center justify-between gap-2">
-                                    <div className="flex gap-2 flex-1 max-w-[220px]">
+                                    <div className="flex gap-2 flex-1 max-w-55">
                                         <Button
                                             variant={expenseView === 'summary' ? 'default' : 'outline'}
                                             size="sm"
@@ -1119,7 +1130,7 @@ export function ToolsView() {
                                     <Button
                                         onClick={() => setActuaryOpen(true)}
                                         disabled={!activeTripId}
-                                        className="w-full gap-2 bg-gradient-to-r from-violet-500 hover:from-violet-600 to-indigo-500 hover:to-indigo-600 text-white font-bold h-11 rounded-xl shadow-lg border-0 transition-all active:scale-[0.98]"
+                                        className="w-full gap-2 bg-linear-to-r from-violet-500 hover:from-violet-600 to-indigo-500 hover:to-indigo-600 text-white font-bold h-11 rounded-xl shadow-lg border-0 transition-all active:scale-[0.98]"
                                         variant="outline"
                                     >
                                         🤖 {t('actuary_btn') || "AI 一鍵精算"}
@@ -1173,7 +1184,7 @@ export function ToolsView() {
                             <TabsContent value="ai" className="mt-4 space-y-4">
                                 {/* API Key Prompt */}
                                 {!hasApiKey && (
-                                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                                    <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
                                         <div className="flex items-center gap-2">
                                             <div className="bg-amber-100 p-2 rounded-full">
                                                 <Key className="w-4 h-4 text-amber-600" />
@@ -1220,7 +1231,7 @@ export function ToolsView() {
                                     <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
                                         <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
                                         <div className="flex-1 space-y-4 py-4">
-                                            <Textarea placeholder={t('describe_trip')} className="min-h-[100px]" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
+                                            <Textarea placeholder={t('describe_trip')} className="min-h-25" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
                                             <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
                                             {aiResult?.items && (
                                                 <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
@@ -1273,7 +1284,7 @@ export function ToolsView() {
                                                     <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
                                                 </div>
                                             </div>
-                                            <Textarea placeholder={t('paste_markdown')} className="min-h-[200px] font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
+                                            <Textarea placeholder={t('paste_markdown')} className="min-h-50 font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
                                             <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
                                             {mdResult?.items && (
                                                 <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
@@ -1356,7 +1367,7 @@ export function ToolsView() {
                     {viewingCard && (
                         <div className="flex flex-col h-full max-h-[95dvh]">
                             {/* Decorative Header - 增加高度與內部間距 (Breathing Room) */}
-                            <SheetHeader className="relative pt-10 pb-8 px-8 bg-gradient-to-br from-indigo-600 via-indigo-700 to-slate-900 overflow-hidden shrink-0">
+                            <SheetHeader className="relative pt-10 pb-8 px-8 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 overflow-hidden shrink-0">
                                 {/* Background Decorative Element */}
                                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
 
@@ -1423,7 +1434,7 @@ export function ToolsView() {
                                 <div className="flex gap-4 pt-4">
                                     <Button
                                         variant="outline"
-                                        className="flex-[3] bg-white text-slate-900 hover:bg-slate-200 border-0 h-14 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-all"
+                                        className="flex-3 bg-white text-slate-900 hover:bg-slate-200 border-0 h-14 rounded-2xl font-bold text-base shadow-lg active:scale-95 transition-all"
                                         onClick={() => openEditCardDialog(viewingCard)}
                                     >
                                         <Edit2 className="w-5 h-5 mr-2" /> {t('tv_edit_card')}
@@ -1537,7 +1548,7 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
         <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
             <div className="flex justify-between items-center w-full">
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <div className={cn("p-2 rounded-full shrink-0 flex items-center justify-center min-w-[32px] min-h-[32px]", catInfo.color)}>
+                    <div className={cn("p-2 rounded-full shrink-0 flex items-center justify-center min-w-8 min-h-8", catInfo.color)}>
                         {isCustomIcon ? (
                             <span className="text-sm leading-none">{item.custom_icon}</span>
                         ) : (
@@ -1565,7 +1576,7 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
                                     ) : (
                                         <User className="w-2.5 h-2.5 text-slate-500" />
                                     )}
-                                    <span className="font-bold truncate max-w-[60px]">{displayName}</span>
+                                    <span className="font-bold truncate max-w-15">{displayName}</span>
                                 </div>
                             )}
                             {item.card_name ? <span className="bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-1.5 rounded font-medium">{item.card_name}</span> : <span className="bg-stone-100 dark:bg-slate-700 text-stone-500 dark:text-slate-400 px-1.5 rounded">{methodInfo.label}</span>}

@@ -80,8 +80,11 @@ export function decryptData(encryptedData: string | null): string | null {
  * Handles Decryption -> Legacy Fallback -> Dev Key logic in one place.
  */
 export function getSecureApiKey(): string {
+    // 🛑 移除非 ASCII 字元，防止 'Failed to read headers property' 的 Fetch 崩潰
+    const sanitize = (key: string) => key.replace(/[^\x20-\x7E]/g, '').trim();
+
     if (typeof window === 'undefined') {
-        return process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "";
+        return sanitize(process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "");
     }
 
     try {
@@ -89,18 +92,18 @@ export function getSecureApiKey(): string {
         const secureKey = localStorage.getItem("user_gemini_key");
         if (secureKey) {
             const decrypted = decryptData(secureKey);
-            if (decrypted) return decrypted;
+            if (decrypted) return sanitize(decrypted);
         }
 
         // 2. Try Legacy Keys (Plain text fallback)
         const legacyKey = localStorage.getItem("gemini_api_key");
-        if (legacyKey) return legacyKey;
+        if (legacyKey) return sanitize(legacyKey);
 
         // 3. Final Fallback (Environment Variable)
-        return process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "";
+        return sanitize(process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "");
     } catch (e) {
         console.error("Critical error in key provider:", e);
-        return process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "";
+        return sanitize(process.env.NEXT_PUBLIC_DEV_GEMINI_KEY || "");
     }
 }
 
