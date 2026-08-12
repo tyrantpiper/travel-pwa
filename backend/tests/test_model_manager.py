@@ -127,7 +127,7 @@ async def test_call_with_fallback_routing_array(mock_get_client):
     
     # 結果來自第二個模型
     assert result["text"] == "降級成功！"
-    assert result["model_used"] == DAILY_ROUTING[1]
+    assert result["model_used"] == HEAVY_ROUTING[1]
     assert mock_client.aio.chats.create.call_count == 2
 
 
