@@ -15,6 +15,7 @@ import copy
 import time
 import os
 import asyncio
+import base64
 import json
 from dataclasses import dataclass
 from google import genai
@@ -871,33 +872,56 @@ def build_chat_history(history: List[Dict]) -> List[types.Content]:
             if isinstance(part, str):
                 sdk_parts.append(types.Part.from_text(text=part))
             elif isinstance(part, dict):
+                # 提取與解碼 thought_signature (相容 bytes 與 Base64 str)
+                ts_val = part.get("thought_signature") or part.get("thoughtSignature")
+                ts_bytes = None
+                if ts_val:
+                    try:
+                        ts_bytes = base64.b64decode(ts_val) if isinstance(ts_val, str) else ts_val
+                    except Exception:
+                        ts_bytes = ts_val.encode("utf-8") if isinstance(ts_val, str) else None
+
                 # 1. 處理文字 (含思想簽名)
                 if "text" in part and part["text"]:
                     if "thought" in part and part["thought"]:
                         sdk_parts.append(types.Part(
                             thought=True,
-                            text=part["text"]
+                            text=part["text"],
+                            **({"thought_signature": ts_bytes} if ts_bytes else {})
                         ))
                     else:
-                        sdk_parts.append(types.Part.from_text(text=part["text"]))
+                        sdk_parts.append(types.Part(
+                            text=part["text"],
+                            **({"thought_signature": ts_bytes} if ts_bytes else {})
+                        ))
                 
                 # 2. 處理獨立思想簽名 (字串降級相容)
                 elif "thought" in part and part["thought"]:
                     sdk_parts.append(types.Part(
                         thought=True,
-                        text=part["thought"] if isinstance(part["thought"], str) else "Thinking..."
+                        text=part["thought"] if isinstance(part["thought"], str) else "Thinking...",
+                        **({"thought_signature": ts_bytes} if ts_bytes else {})
                     ))
                 
-                # 3. 處理 Function Call (雙格式相容)
+                # 3. 處理 Function Call (雙格式相容 + 思想簽名存檔點)
                 elif "functionCall" in part or "function_call" in part:
                     fc = part.get("functionCall") or part.get("function_call")
                     if fc and "name" in fc:
+                        fc_ts = fc.get("thought_signature") or fc.get("thoughtSignature") or ts_val
+                        fc_ts_bytes = None
+                        if fc_ts:
+                            try:
+                                fc_ts_bytes = base64.b64decode(fc_ts) if isinstance(fc_ts, str) else fc_ts
+                            except Exception:
+                                fc_ts_bytes = fc_ts.encode("utf-8") if isinstance(fc_ts, str) else None
+
                         sdk_parts.append(types.Part(
                             function_call=types.FunctionCall(
                                 name=fc["name"],
                                 args=dict(fc.get("args") or {}),
                                 id=fc.get("id")
-                            )
+                            ),
+                            **({"thought_signature": fc_ts_bytes} if fc_ts_bytes else {})
                         ))
                 
                 # 4. 處理 Function Response (雙格式相容)
@@ -977,6 +1001,12 @@ def _serialize_part(part) -> Dict:
     # 思想簽名 (Thought Signatures)
     if hasattr(part, 'thought') and part.thought:
         serialized["thought"] = part.thought
+
+    # 🛡️ 2026: 原生思想簽名 (Native Thought Signature Passthrough)
+    ts = getattr(part, 'thought_signature', None) or getattr(part, 'thoughtSignature', None)
+    if ts is not None:
+        serialized["thought_signature"] = base64.b64encode(ts).decode("utf-8") if isinstance(ts, bytes) else str(ts)
+        serialized["thoughtSignature"] = serialized["thought_signature"]
 
     return serialized
 

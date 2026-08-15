@@ -216,3 +216,45 @@ async def test_call_extraction_custom_routing(mock_get_client):
     # 應使用 DAILY_ROUTING[0] 而非預設的 HEAVY_ROUTING[0]
     call_kwargs = mock_client.aio.models.generate_content.call_args.kwargs
     assert call_kwargs['model'] == DAILY_ROUTING[0]
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🧪 Thought Signature End-to-End Tests
+# ═══════════════════════════════════════════════════════════════
+
+def test_thought_signature_end_to_end():
+    """
+    測試: 原生思想簽名端到端『二進位 ➔ Base64 ➔ 原生二進位』無損閉環。
+    """
+    import base64
+    from services.model_manager import _serialize_part, build_chat_history
+
+    sample_sig_bytes = b"\x00\x01\x02\x03\x04\x05_gemini_thought_save_state_token_xyz"
+    part_with_sig = types.Part(
+        text="規劃東京拉麵行程中...",
+        thought=True,
+        thought_signature=sample_sig_bytes
+    )
+
+    # 1. 序列化測試
+    serialized = _serialize_part(part_with_sig)
+    assert serialized.get("thought_signature") == base64.b64encode(sample_sig_bytes).decode("utf-8")
+    assert serialized.get("thoughtSignature") == serialized.get("thought_signature")
+
+    # 2. 文字 Part 還原測試
+    mock_client_history = [{"role": "model", "rawParts": [serialized]}]
+    reconstructed = build_chat_history(mock_client_history)
+    reconstructed_part = reconstructed[0].parts[0]
+    assert reconstructed_part.thought_signature == sample_sig_bytes
+    assert isinstance(reconstructed_part.thought_signature, bytes)
+
+    # 3. Function Call Part 還原測試
+    fc_part = types.Part(
+        function_call=types.FunctionCall(name="add_itinerary_item", args={"place": "Tokyo Tower"}),
+        thought_signature=sample_sig_bytes
+    )
+    fc_serialized = _serialize_part(fc_part)
+    fc_reconstructed = build_chat_history([{"role": "model", "rawParts": [fc_serialized]}])[0].parts[0]
+    assert fc_reconstructed.thought_signature == sample_sig_bytes
+    assert fc_reconstructed.function_call.name == "add_itinerary_item"
+
