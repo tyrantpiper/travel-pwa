@@ -62,7 +62,8 @@ from services.geocode_service import HTTPX_CLIENT
 from services.model_manager import (
     call_with_fallback, call_verifier, call_extraction, 
     detect_diagnosis_intent, sanitize_config_for_model,
-    build_effective_routing, NEURAL_LINK_TOOLS, build_chat_history
+    build_effective_routing, NEURAL_LINK_TOOLS, build_chat_history,
+    classify_api_error, get_cached_client
 )
 from services.poi_service import (
     detect_poi_query, search_poi_combined, format_pois_for_ai, 
@@ -960,6 +961,10 @@ async def stream_chat_generator(
                 
             except (genai_errors.APIError, Exception) as gen_error:
                 print(f"⚠️ {candidate_model} 串流失敗: {gen_error}")
+                # 🛡️ 2026 金鑰安全防護：若為金鑰失效 (401/403/Blocked)，所有模型必定全滅，立即中止並回傳明確代碼
+                if isinstance(gen_error, genai_errors.APIError) and classify_api_error(gen_error) == "auth_fail":
+                    yield f'event: error\ndata: {json.dumps({"message": "API_KEY_INVALID", "code": 401, "detail": "您的 Google Gemini API Key 已失效或已被 Google 廢棄，請至 Google AI Studio 重新生成授權金鑰 (Auth Key)"})}\n\n'
+                    return
                 yield f'event: thinking\ndata: {json.dumps({"status": "fallback", "model": candidate_model})}\n\n'
                 full_text = ""  # 重置，避免拼接到殘片
                 collected_function_calls = []  # 重置
@@ -1061,6 +1066,33 @@ async def summarize_history(request: SummarizeRequest, api_key: str = Depends(ge
 # - POST /api/poi/ai-enrich
 # - POST /api/poi/enrich
 # 
+
+@app.post("/api/ai/test-key")
+@limiter.limit("15/minute")
+async def test_gemini_api_key(request: Request, api_key: str = Depends(get_gemini_key)):
+    """
+    🧪 Gemini API Key 健檢端點 (支援 2026 Google Auth Key 檢測)
+    使用極輕量 1-token 探針進行連線驗證，近乎 0 成本
+    """
+    try:
+        client = get_cached_client(api_key)
+        # 發送極簡 Ping 請求 (使用 flash-lite 驗證連線)
+        res = await client.aio.models.generate_content(
+            model="gemini-3.1-flash-lite",
+            contents="ping",
+            config=types.GenerateContentConfig(max_output_tokens=1)
+        )
+        return {"status": "ok", "message": "API Key 有效且已連線"}
+    except genai_errors.APIError as e:
+        kind = classify_api_error(e)
+        if kind == "auth_fail":
+            raise HTTPException(
+                status_code=401, 
+                detail="API Key 無效、已過期或被 Google 封鎖。請至 Google AI Studio 重新生成 Auth Key。"
+            )
+        raise HTTPException(status_code=400, detail=f"API 測試失敗: {e.message}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"金鑰測試伺服器錯誤: {str(e)}")
 
 @app.post("/api/chat/stream")
 @limiter.limit("20/minute")

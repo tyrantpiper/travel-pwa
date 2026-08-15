@@ -1187,6 +1187,22 @@ export const poiApi = {
             throw new Error(errorData.detail || "POI 資訊預載失敗")
         }
         return res.json()
+    },
+
+    /** 🧪 測試 Gemini API Key 連線狀態 (支援 2026 Auth Key) */
+    testApiKey: async (apiKey: string): Promise<{ status: string; message: string }> => {
+        const res = await fetch(`${API_HOST}/api/ai/test-key`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Gemini-API-Key": apiKey
+            }
+        })
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: "API Key 測試連線失敗" }))
+            throw new Error(err.detail || "API Key 測試連線失敗")
+        }
+        return res.json()
     }
 }
 

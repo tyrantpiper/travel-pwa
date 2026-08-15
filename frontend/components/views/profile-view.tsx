@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
-    Shield, Copy, Globe, Key, Sparkles, ExternalLink, AlertCircle, Moon, Sun, Palette, AlertTriangle,
+    Shield, Copy, Globe, Sparkles, Moon, Sun, Palette, AlertTriangle,
     ChevronDown, ChevronUp, Brain, // 🆕 AI 記憶圖示
     BookOpen, Mail, Check, BellRing  // 🆕 使用說明、聯絡、推播圖示
 } from "lucide-react"
@@ -26,9 +26,6 @@ import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
-import {
-    Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-} from "@/components/ui/accordion"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { TaskCard } from "@/components/onboarding/TaskCard"
@@ -37,8 +34,9 @@ import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
 import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
-import { encryptData, getSecureApiKey } from "@/lib/security"
+import { getSecureApiKey } from "@/lib/security"
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications"
+import { AIKeyDialog } from "@/components/ai/ai-key-dialog"
 
 
 
@@ -50,7 +48,6 @@ export function ProfileView() {
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
     const [memoryToDelete, setMemoryToDelete] = useState<UserPreference | null>(null)
     const [isDeletingMemory, setIsDeletingMemory] = useState(false)
-    const [apiKey, setApiKey] = useState("")
     const [hasApiKey, setHasApiKey] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
@@ -138,18 +135,15 @@ export function ProfileView() {
         let isMounted = true
         fetchProfileData(isMounted)
 
-        // Check keys
-        const secureKey = getSecureApiKey()
-        if (secureKey && isMounted) {
-            const devKey = process.env.NEXT_PUBLIC_DEV_GEMINI_KEY
-            setApiKey(devKey === secureKey ? (zh ? "(開發者模式)" : "(Dev Mode)") : secureKey)
-            setHasApiKey(true)
-            
-            if (!devKey && !localStorage.getItem("user_gemini_key") && localStorage.getItem("gemini_api_key")) {
-                localStorage.setItem("user_gemini_key", encryptData(secureKey))
-                localStorage.removeItem("gemini_api_key")
+        // Check keys & listen for updates
+        const updateKeyStatus = () => {
+            const secureKey = getSecureApiKey()
+            if (isMounted) {
+                setHasApiKey(!!secureKey)
             }
         }
+        updateKeyStatus()
+        window.addEventListener("apiKeyUpdated", updateKeyStatus)
 
         // 🆕 載入 POI 偏好設定
         const savedPoiPrefs = localStorage.getItem("poi_preferences")
@@ -161,6 +155,7 @@ export function ProfileView() {
 
         return () => {
             isMounted = false
+            window.removeEventListener("apiKeyUpdated", updateKeyStatus)
         }
     }, [zh, fetchProfileData])
 
@@ -327,22 +322,6 @@ export function ProfileView() {
         openExternalLink(gmailUrl)
     }
 
-    const handleSaveApiKey = () => {
-        if (!apiKey.trim()) return
-        // 🛡️ Security Hardened: Encrypt key before storage
-        localStorage.setItem("user_gemini_key", encryptData(apiKey))
-        setHasApiKey(true)
-        setApiKeyDialogOpen(false)
-        toast.success(t('profile_key_set'))
-    }
-
-    const handleClearApiKey = () => {
-        setApiKey("")
-        localStorage.removeItem("user_gemini_key")
-        setHasApiKey(false)
-        toast.info(t('profile_key_cleared'))
-    }
-
     const handleDeleteAllData = async () => {
         if (deleteConfirmText !== "DELETE") {
             toast.error(t('profile_type_delete'))
@@ -382,9 +361,9 @@ export function ProfileView() {
         <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
             <div className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900">
 
-                <div className={cn("h-48 relative overflow-hidden bg-gradient-to-br", currentTheme.gradient)}>
+                <div className={cn("h-48 relative overflow-hidden bg-linear-to-br", currentTheme.gradient)}>
                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-stone-50/90 dark:to-slate-900/90"></div>
+                    <div className="absolute inset-0 bg-linear-to-b from-transparent to-stone-50/90 dark:to-slate-900/90"></div>
                 </div>
 
                 <div className="px-6 relative -mt-20">
@@ -457,7 +436,7 @@ export function ProfileView() {
 
                     <div className="mt-4 text-center space-y-1 w-full flex flex-col items-center">
                         {isEditing ? (
-                            <div className="flex flex-col items-center gap-3 w-full max-w-[280px]">
+                            <div className="flex flex-col items-center gap-3 w-full max-w-70">
                                 <Input
                                     value={profile.nickname}
                                     onChange={e => setProfile({ ...profile, nickname: e.target.value })}
@@ -576,7 +555,7 @@ export function ProfileView() {
                         <div
                             className={cn(
                                 "mt-6 rounded-xl p-5 shadow-lg relative overflow-hidden transition-all duration-500",
-                                `bg-gradient-to-br ${status.color}`
+                                `bg-linear-to-br ${status.color}`
                             )}
                         >
                             {/* 裝飾圖示 */}
@@ -805,7 +784,7 @@ export function ProfileView() {
                         {t('recovery_key_desc')}
                     </p>
                     <div className="bg-black/30 rounded-lg p-3 flex items-center justify-between border border-white/10">
-                        <code className="text-xs font-mono text-amber-400 truncate max-w-[200px]">
+                        <code className="text-xs font-mono text-amber-400 truncate max-w-50">
                             {typeof window !== 'undefined' ? localStorage.getItem("user_uuid") || "Loading..." : "Loading..."}
                         </code>
                         <Button
@@ -864,7 +843,7 @@ export function ProfileView() {
                                         onClick={() => setAccentColor(color)}
                                         className={cn(
                                             "w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all",
-                                            `bg-gradient-to-br ${ACCENT_COLORS[color].gradient}`,
+                                            `bg-linear-to-br ${ACCENT_COLORS[color].gradient}`,
                                             accentColor === color
                                                 ? "ring-2 ring-offset-2 ring-slate-900 dark:ring-white scale-110"
                                                 : "opacity-70 hover:opacity-100"
@@ -912,7 +891,7 @@ export function ProfileView() {
                                 <div className="relative group/memory">
                                     <div className={cn(
                                         "ml-11 flex flex-wrap gap-2 transition-all duration-500 ease-in-out relative",
-                                        !memoryExpanded && preferences.length > 3 ? "max-h-24 overflow-hidden" : "max-h-[1000px]"
+                                        !memoryExpanded && preferences.length > 3 ? "max-h-24 overflow-hidden" : "max-h-250"
                                     )}>
                                         {preferences.map((pref) => (
                                             <div
@@ -927,7 +906,7 @@ export function ProfileView() {
                                                         <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{pref.preference}</span>
                                                     </div>
                                                     {pref.reasoning && (
-                                                        <span className="text-[8px] text-slate-400 leading-tight max-w-[150px] truncate">{pref.reasoning}</span>
+                                                        <span className="text-[8px] text-slate-400 leading-tight max-w-37.5 truncate">{pref.reasoning}</span>
                                                     )}
                                                 </div>
                                                 <button
@@ -943,7 +922,7 @@ export function ProfileView() {
 
                                     {/* 🆕 漸層遮罩 (僅在收合且有更多資料時顯示) */}
                                     {!memoryExpanded && preferences.length > 3 && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-slate-800 to-transparent pointer-events-none z-10" />
+                                        <div className="absolute bottom-0 left-0 right-0 h-12 bg-linear-to-t from-white dark:from-slate-800 to-transparent pointer-events-none z-10" />
                                     )}
 
                                     {/* 🆕 展開/收合輔助按鈕 (僅在條目較多時顯示) */}
@@ -969,82 +948,23 @@ export function ProfileView() {
                         </div>
 
                         <Separator />
-                        <Dialog open={apiKeyDialogOpen} onOpenChange={setApiKeyDialogOpen}>
-                            <DialogTrigger asChild>
-                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 transition-colors text-slate-700">
-                                    <div className="flex items-center gap-3">
-                                        <Sparkles className="w-5 h-5 text-amber-500" />
-                                        <span className="text-sm font-medium">{t('profile_gemini_api_key')}</span>
-                                    </div>
-                                    <span className={cn("text-xs px-2 py-1 rounded", hasApiKey ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600")}>
-                                        {hasApiKey ? t('profile_key_active') : t('profile_key_inactive')}
-                                    </span>
-                                </div>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[450px]">
-                                <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                        <Key className="w-5 h-5 text-amber-500" />
-                                        {t('profile_api_key_settings')}
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                        {t('profile_api_key_desc')}<br />
-                                        <span className="text-xs text-slate-400">({t('profile_api_key_local_only')})</span>
-                                    </DialogDescription>
-                                </DialogHeader>
+                        <div 
+                            onClick={() => setApiKeyDialogOpen(true)}
+                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-slate-800/60 transition-colors text-slate-700 dark:text-slate-200"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Sparkles className="w-5 h-5 text-amber-500" />
+                                <span className="text-sm font-medium">{t('profile_gemini_api_key')}</span>
+                            </div>
+                            <span className={cn("text-xs px-2 py-1 rounded font-medium", hasApiKey ? "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300")}>
+                                {hasApiKey ? t('profile_key_active') : t('profile_key_inactive')}
+                            </span>
+                        </div>
 
-                                <div className="grid gap-4 py-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="apiKey" className="text-xs font-bold text-slate-500 uppercase">{t('profile_your_api_key')}</Label>
-                                        <Input
-                                            id="apiKey"
-                                            type="password"
-                                            value={apiKey}
-                                            onChange={(e) => setApiKey(e.target.value)}
-                                            placeholder="AIzaSy**************************"
-                                            className="font-mono text-sm"
-                                        />
-                                    </div>
-
-                                    <Accordion type="single" collapsible className="w-full bg-slate-50 rounded-lg px-4 border border-slate-200">
-                                        <AccordionItem value="item-1" className="border-b-0">
-                                            <AccordionTrigger className="text-sm text-slate-600 hover:no-underline py-3">
-                                                🤔 {t('profile_how_to_get_api')}
-                                            </AccordionTrigger>
-                                            <AccordionContent className="text-xs text-slate-500 space-y-3 pb-4">
-                                                <div className="flex gap-3">
-                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">1</div>
-                                                    <div>
-                                                        {zh ? '前往' : 'Go to'} <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold inline-flex items-center">Google AI Studio <ExternalLink className="w-3 h-3 ml-0.5" /></a> {zh ? '並登入 Google 帳號。' : 'and sign in with Google.'}
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">2</div>
-                                                    <div>{zh ? '點擊左側選單的' : 'Click'} <b>Get API key</b>{zh ? '。' : ' in the left menu.'}</div>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold shrink-0">3</div>
-                                                    <div>{zh ? '點擊' : 'Click'} <b>Create API key</b>{zh ? '，複製' : ', copy the code starting with'} <code>AIza...</code> {zh ? '開頭的代碼。' : '.'}</div>
-                                                </div>
-                                                <div className="bg-amber-50 text-amber-700 p-2 rounded border border-amber-100 flex items-start gap-2 mt-2">
-                                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                                    <span>{zh ? '完全免費！每日可用 1,500 次。' : 'Completely free! 1,500 calls/day.'}</span>
-                                                </div>
-                                            </AccordionContent>
-                                        </AccordionItem>
-                                    </Accordion>
-                                </div>
-
-                                <DialogFooter className="flex flex-row justify-between sm:justify-between gap-2">
-                                    <Button variant="outline" onClick={handleClearApiKey} className="text-slate-400 hover:text-red-500">
-                                        清除
-                                    </Button>
-                                    <Button onClick={handleSaveApiKey} className="bg-slate-900 text-white hover:bg-slate-800 flex-1 sm:flex-none">
-                                        <Key className="w-4 h-4 mr-2" /> {zh ? '儲存設定' : 'Save'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
+                        <AIKeyDialog
+                            open={apiKeyDialogOpen}
+                            onOpenChange={setApiKeyDialogOpen}
+                        />
 
                         {/* 🧠 AI 記憶移除確認視窗 */}
                         <Dialog 
@@ -1053,7 +973,7 @@ export function ProfileView() {
                                 if (!isDeletingMemory) setMemoryToDelete(null)
                             }}
                         >
-                            <DialogContent className="sm:max-w-[400px]">
+                            <DialogContent className="sm:max-w-100">
                                 <DialogHeader>
                                     <DialogTitle className="flex items-center gap-2 text-red-600">
                                         <Brain className="w-5 h-5 text-blue-500" />
@@ -1087,7 +1007,7 @@ export function ProfileView() {
                                         variant="destructive"
                                         onClick={() => handleConfirmDeleteMemory()}
                                         disabled={isDeletingMemory}
-                                        className="min-w-[100px]"
+                                        className="min-w-25"
                                     >
                                         {isDeletingMemory ? (
                                             <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('profile_memory_deleting')}</>
@@ -1206,7 +1126,7 @@ export function ProfileView() {
                                     <span className="text-xs text-red-400">GDPR</span>
                                 </div>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[400px]">
+                            <DialogContent className="sm:max-w-100">
                                 <DialogHeader>
                                     <DialogTitle className="flex items-center gap-2 text-red-600">
                                         <AlertTriangle className="w-5 h-5" />
@@ -1252,7 +1172,7 @@ export function ProfileView() {
 
                         {/* ✉️ 聯絡開發者 Dialog */}
                         <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-                            <DialogContent className="sm:max-w-[400px] border-blue-100/50 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90 dark:border-slate-800">
+                            <DialogContent className="sm:max-w-100 border-blue-100/50 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90 dark:border-slate-800">
                                 <DialogHeader>
                                     <DialogTitle className="flex items-center gap-2 text-blue-600">
                                         <Mail className="w-5 h-5" />
