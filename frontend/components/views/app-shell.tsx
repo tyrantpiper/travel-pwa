@@ -9,6 +9,7 @@ import { useServiceWorker, useHaptic } from "@/lib/hooks"
 import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
 import { debugLog } from "@/lib/debug"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import { AIStatusButton } from "@/components/ai/ai-status-button"
 
 // 🚀 [Perf Audit 2026] 將最強大的核心視圖 (ItineraryView) 也改為動態載入
 // 配合 Stealth Preheat 機制，達成「啟動極速」與「切換即時」
@@ -147,8 +148,13 @@ export function AppShell() {
             />
             <div className="h-screen bg-background flex flex-col overflow-hidden">
                 <main className="flex-1 flex flex-col min-h-0" data-scroll="true">
+                    {/* ✨ 全域 AI 狀態按鈕 — 左上角固定定位 (與右上角通知對稱) */}
+                    <div className="absolute top-3 left-3 z-100">
+                        <AIStatusButton />
+                    </div>
+
                     {/* 🔔 通知鈴鐺 — 右上角固定定位 */}
-                    <div className="absolute top-3 right-3 z-[100]">
+                    <div className="absolute top-3 right-3 z-100">
                         <NotificationBell />
                     </div>
 

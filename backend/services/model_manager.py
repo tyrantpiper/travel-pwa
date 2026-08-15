@@ -576,7 +576,11 @@ def classify_api_error(err: errors.APIError) -> str:
     code = getattr(err, "code", None)
     msg = (getattr(err, "message", "") or "").lower()
 
-    if code in (401, 403):
+    # 🛡️ 2026 金鑰遷移增強：精準辨識 401/403、未授權金鑰、已廢棄或被封鎖 (Blocked) 金鑰
+    if code in (401, 403) or any(k in msg for k in [
+        "api_key_invalid", "permission_denied", "api key not valid", 
+        "blocked", "key expired", "unauthenticated", "invalid api key"
+    ]):
         return "auth_fail"
     if code in (429, 500, 502, 503, 504):
         return "retryable"
