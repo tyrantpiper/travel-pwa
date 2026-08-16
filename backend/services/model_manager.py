@@ -49,6 +49,26 @@ class ModelCaps:
 
 
 MODEL_CAPS: Dict[str, ModelCaps] = {
+    "gemini-3.7-flash": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,       # 🟢 啟用頂級神經連結能力
+        supports_media_resolution=True,
+        supports_thinking=True,    # 🚀 64K 超長推論
+        supports_grounding=True,   # 🚀 Google Search & Maps Grounding
+        requires_property_ordering=False,
+        allow_extraction_fallback=True,
+        family="gemini",
+    ),
+    "gemini-3.5-flash-lite": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,       # 🟢 啟用極速神經連結能力
+        supports_media_resolution=False,
+        supports_thinking=True,
+        supports_grounding=True,   # 🚀 500 RPD Map Grounding & 1.5K Search Grounding
+        requires_property_ordering=False,
+        allow_extraction_fallback=True,
+        family="gemini",
+    ),
     "gemini-3.1-flash-lite": ModelCaps(
         supports_schema=True,
         supports_tools=True,       # 🟢 啟用神經連結能力
@@ -442,14 +462,14 @@ def sanitize_config_for_model(
         if not caps.supports_tools:
             safe.tools = None
         elif not caps.supports_grounding:
-            # 如果不支援 Grounding，過濾掉 google_search 工具，保留自定義函數等
+            # 如果不支援 Grounding，過濾掉 google_search / google_maps 工具，保留自定義函數等
             new_tools = []
             for tool in safe.tools:
                 # 處理 SDK 物件格式
-                if hasattr(tool, 'google_search') and tool.google_search:
+                if (hasattr(tool, 'google_search') and tool.google_search) or (hasattr(tool, 'google_maps') and tool.google_maps):
                     continue
                 # 處理 字典格式
-                if isinstance(tool, dict) and "google_search" in tool:
+                if isinstance(tool, dict) and ("google_search" in tool or "google_maps" in tool):
                     continue
                 new_tools.append(tool)
             safe.tools = new_tools if new_tools else None
@@ -458,14 +478,15 @@ def sanitize_config_for_model(
     if hasattr(safe, 'media_resolution') and not caps.supports_media_resolution:
         safe.media_resolution = None
 
-    # 3. 🚀 2026 搜尋增強注入 (僅限非結構化任務)
+    # 3. 🚀 2026 搜尋與地圖雙增強注入 (僅限非結構化任務)
     if caps.supports_grounding and intent_type in ["CHAT", "DIAGNOSIS"]:
         if not safe.tools:
             safe.tools = []
-        # 2026 官方 GoogleSearch API（無參數，模型自行決定搜尋時機）
+        # 2026 官方 Tool Combination: 同時注入 Google Search 與 Google Maps
         safe.tools.append(
             types.Tool(
-                google_search=types.GoogleSearch()
+                google_search=types.GoogleSearch(),
+                google_maps=types.GoogleMaps(enable_widget=True)
             )
         )
 
