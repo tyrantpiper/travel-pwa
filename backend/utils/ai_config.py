@@ -22,17 +22,21 @@ from typing import List
 # ═══════════════════════════════════════════════════════════════
 
 DAILY_ROUTING: List[str] = [
-    "gemini-3.1-flash-lite",          # 500 RPD, GA — 極速、支援思考/搜尋/結構化
-    "gemini-3.6-flash",               # 🆕 v3.6-flash: 具備 Grounding 的首要備援
-    "gemini-3.5-flash",                # 🆕 v3.5-flash: 頂級 Agentic 模型 (BYOK 降級第二順位)
+    "gemini-3.1-flash-lite",          # 500 RPD, GA — 極速、支援思考/地圖/結構化
+    "gemini-3.5-flash-lite",          # 🆕 v3.5-flash-lite: 地圖增強快速備援 (500 RPD Map Grounding)
+    "gemini-3.7-flash",               # 🚀 v3.7-flash: 次世代 SOTA 推論旗艦 (64K 輸出)
+    "gemini-3.6-flash",               # 具備 Grounding 的備援
+    "gemini-3.5-flash",                # 頂級 Agentic 模型
     "gemini-3-flash-preview",          # 20 RPD, 全能型
     "gemini-2.5-flash",                # 20 RPD, 穩定版兜底
 ]
 
 HEAVY_ROUTING: List[str] = [
-    "gemini-3.6-flash",               # 🆕 首選 3.6 處理複雜規劃
-    "gemini-3.1-flash-lite",           # 500 RPD, GA — 高額度優先 (解決部分金鑰 400 錯誤)
-    "gemini-3.5-flash",                # 🆕 v3.5-flash: 頂級 Agentic 模型 (BYOK 降級第二順位)
+    "gemini-3.7-flash",               # 🚀 3.7 首選：超長多天複雜行程規劃 (64K 輸出)
+    "gemini-3.6-flash",               # 3.6 穩定次選
+    "gemini-3.5-flash-lite",          # 🆕 3.5 Lite: 快速低延遲備援
+    "gemini-3.1-flash-lite",           # 500 RPD, 高額度優先
+    "gemini-3.5-flash",                # 頂級 Agentic 模型
     "gemini-3-flash-preview",          # 20 RPD, 次選
     "gemini-2.5-flash",                # 穩定版兜底
 ]

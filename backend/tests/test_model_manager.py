@@ -142,13 +142,14 @@ async def test_call_with_fallback_total_collapse(mock_get_client):
     mock_chat = MagicMock()
     mock_client.aio.chats.create.return_value = mock_chat
     
-    # 所有模型全部失敗 (3 Gemini + 2 Gemma)
+    # 所有模型全部失敗 (Gemini + Gemma 救援層)
+    effective_routing = build_effective_routing("CHAT")
     mock_chat.send_message = AsyncMock()
     mock_chat.send_message.side_effect = [
-        Exception(f"Model {i+1} 也掛了") for i in range(5)
+        Exception(f"Model {i+1} 也掛了") for i in range(len(effective_routing))
     ]
     
-    with pytest.raises(Exception, match="Model 5 也掛了"):
+    with pytest.raises(Exception, match=f"Model {len(effective_routing)} 也掛了"):
         await call_with_fallback(
             api_key="fake_key",
             history=[],
@@ -257,4 +258,34 @@ def test_thought_signature_end_to_end():
     fc_reconstructed = build_chat_history([{"role": "model", "rawParts": [fc_serialized]}])[0].parts[0]
     assert fc_reconstructed.thought_signature == sample_sig_bytes
     assert fc_reconstructed.function_call.name == "add_itinerary_item"
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🧪 Google Maps & Search Grounding Tests
+# ═══════════════════════════════════════════════════════════════
+
+def test_google_maps_grounding_sanitization():
+    """
+    測試: 支援 Grounding 的模型自動注入 Google Search 與 Google Maps 工具；
+    不支援 Grounding 的模型自動淨化移除。
+    """
+    from services.model_manager import sanitize_config_for_model
+
+    # 1. 測試 Grounding 支援模型 (Gemini 3.7 Flash)
+    config_in = types.GenerateContentConfig()
+    safe_config = sanitize_config_for_model(config_in, "gemini-3.7-flash", "CHAT")
+    assert safe_config.tools is not None
+    assert len(safe_config.tools) == 1
+    tool = safe_config.tools[0]
+    assert tool.google_search is not None
+    assert tool.google_maps is not None
+    assert tool.google_maps.enable_widget is True
+
+    # 2. 測試非 Grounding 支援模型 (Gemma 3)
+    gemma_config = sanitize_config_for_model(safe_config, "gemma-3-27b-it", "CHAT")
+    if gemma_config.tools:
+        for t in gemma_config.tools:
+            assert getattr(t, 'google_search', None) is None
+            assert getattr(t, 'google_maps', None) is None
+
 

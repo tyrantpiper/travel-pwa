@@ -1066,7 +1066,14 @@ async def stream_chat_generator(
                         if hasattr(gc, 'web') and gc.web:
                             citations.append({
                                 "title": gc.web.title if hasattr(gc.web, 'title') else "Source",
-                                "uri": gc.web.uri if hasattr(gc.web, 'uri') else ""
+                                "uri": gc.web.uri if hasattr(gc.web, 'uri') else "",
+                                "type": "web"
+                            })
+                        elif hasattr(gc, 'maps') and gc.maps:
+                            citations.append({
+                                "title": getattr(gc.maps, 'title', None) or getattr(gc.maps, 'name', "Google Maps"),
+                                "uri": getattr(gc.maps, 'uri', "") or getattr(gc.maps, 'url', ""),
+                                "type": "maps"
                             })
         
         # 發送完成事件（含引文來源，確保格式統一為 {title, uri}）
