@@ -329,8 +329,6 @@ def build_json_schema_for_intent(intent_type: str) -> Optional[Dict[str, Any]]:
                             "day_number": {"type": "integer"},
                             "activities": {
                                 "type": "array",
-                                "minItems": 6,
-                                "maxItems": 10,
                                 "items": {
                                     "type": "object",
                                     "properties": {
@@ -396,7 +394,6 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
             ),
             media_resolution="media_resolution_high",
             response_mime_type="application/json",
-            response_schema=build_json_schema_for_intent("PLANNING")
         ),
         "VERIFY": types.GenerateContentConfig(
             temperature=1.0,
@@ -413,7 +410,6 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
             temperature=1.0,
             max_output_tokens=8192,  # 🚀 Maximize for large receipt/text imports
             response_mime_type="application/json",
-            response_schema=build_json_schema_for_intent("EXTRACTION")
         ),
         "SUMMARIZE": types.GenerateContentConfig(
             temperature=1.0,

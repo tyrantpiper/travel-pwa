@@ -17,6 +17,7 @@ import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
 import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
 import ExpensePreviewCard, { extractExpenseFunctionCall } from "@/components/chat/ExpensePreviewCard"
+import DeepResearchCard, { type DeepResearchData } from "@/components/chat/DeepResearchCard"
 import { streamChat } from "@/lib/sse-parser"
 import { toast } from "sonner"
 import { useWeatherStore } from "@/lib/stores/weatherStore"
@@ -66,6 +67,7 @@ interface Message {
     groundingSources?: GroundingSource[]  // 來源標籤 (如有)
     modelUsed?: string        // 使用的模型 (調試用)
     sources?: Array<{ title: string; url: string }>  // 🆕 v3.7.1: 三源引用
+    researchData?: DeepResearchData // 🆕 v2026: Antigravity 深度研究數據
 }
 
 interface Position {
@@ -97,9 +99,11 @@ function getSafeAreaBottom(): number {
 }
 
 export default function ChatWidget() {
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
+    const zh = lang === "zh"
     // 🔒 登錄狀態檢查 - 未登錄時不顯示聊天氣泡
     const [isLoggedIn, setIsLoggedIn] = useState(false)
+    const [isDeepResearch, setIsDeepResearch] = useState(false)
 
     useEffect(() => {
         // 初始檢查
@@ -213,7 +217,8 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         displayContent: msg.displayContent || msg.content || "",
         rawParts: msg.rawParts || [{ text: msg.displayContent || msg.content || "" }],
         groundingSources: msg.groundingSources || msg.sources?.map(s => ({ title: s.title, uri: s.url })),
-        modelUsed: msg.modelUsed
+        modelUsed: msg.modelUsed,
+        researchData: msg.researchData
     })
 
     const [messages, setMessages] = useState<Message[]>([
@@ -525,6 +530,88 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             displayContent: m.displayContent
         }))
 
+        // 🔬 Antigravity System 2: 深度研究模式分流
+        const isDeepIntent = isDeepResearch || userMsg.startsWith("/research") || userMsg.includes("深度研究") || userMsg.includes("演算法精算")
+        if (isDeepIntent && apiKey) {
+            setIsLoading(true)
+            const cleanPrompt = userMsg.replace(/^\/research\s*/, "").trim()
+            try {
+                const res = await fetch(`${API_BASE}/api/agents/research`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Gemini-API-Key": apiKey
+                    },
+                    body: JSON.stringify({
+                        prompt: cleanPrompt,
+                        destination: activeTrip?.title || undefined,
+                        booking_context: tripDetail ? `Trip: ${tripDetail.title}, Items: ${tripDetail.items?.length || 0}` : undefined
+                    })
+                })
+                if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                const data = await res.json()
+                const interactionId = data.interaction_id
+
+                // 插入初始卡片狀態
+                const initialResearchData: DeepResearchData = {
+                    id: interactionId,
+                    status: "running",
+                    prompt: cleanPrompt,
+                    engine: data.engine
+                }
+                setMessages(prev => [...prev, hydrateMessage({
+                    role: "model",
+                    displayContent: "",
+                    researchData: initialResearchData
+                })])
+
+                // 背景輪詢狀態
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const pollRes = await fetch(`${API_BASE}/api/agents/interactions/${interactionId}`, {
+                            headers: { "X-Gemini-API-Key": apiKey }
+                        })
+                        if (!pollRes.ok) return
+                        const pollData = await pollRes.json()
+                        if (pollData.status === "completed" || pollData.status === "failed" || pollData.status === "cancelled") {
+                            clearInterval(pollInterval)
+                            setMessages(prev => {
+                                const updated = [...prev]
+                                const targetIdx = updated.findIndex(m => m.researchData?.id === interactionId)
+                                const idxToUpdate = targetIdx !== -1 ? targetIdx : updated.length - 1
+                                if (idxToUpdate >= 0) {
+                                    updated[idxToUpdate] = {
+                                        ...updated[idxToUpdate],
+                                        displayContent: pollData.output_text || "",
+                                        researchData: {
+                                            id: interactionId,
+                                            status: pollData.status,
+                                            prompt: cleanPrompt,
+                                            outputText: pollData.output_text,
+                                            engine: pollData.engine,
+                                            error: pollData.error
+                                        }
+                                    }
+                                }
+                                return updated
+                            })
+                            setIsLoading(false)
+                        }
+                    } catch (err) {
+                        console.error("Polling interaction failed:", err)
+                    }
+                }, 2000)
+
+                setIsDeepResearch(false)
+                return
+            } catch (err) {
+                console.error("Failed to start deep research:", err)
+                toast.error(zh ? "啟動深度研究失敗" : "Failed to start research")
+                setIsLoading(false)
+                setIsDeepResearch(false)
+            }
+        }
+
         // 🆕 嘗試使用 Streaming API
         let streamingText = ""
         let streamingRawParts: Part[] = []
@@ -703,12 +790,12 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
 
     return (
         <>
-            {/* Chat Window - Fixed Center */}
+            {/* Chat Window - Fullscreen Immersive with Desktop Centering */}
             {isOpen && (
-                <div className="fixed inset-0 z-110 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-[90vw] max-w-sm h-[70vh] max-h-125 flex flex-col border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-110 flex flex-col bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="w-full max-w-3xl mx-auto h-full flex flex-col bg-white shadow-2xl md:border-x md:border-slate-200 overflow-hidden">
                         {/* Header - No longer draggable */}
-                        <div className="bg-linear-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white">
+                        <div className="bg-linear-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
                             <div className="flex items-center gap-2">
                                 <div className="bg-white/20 p-1.5 rounded-full">
                                     <Bot className="w-5 h-5 text-white" />
@@ -724,9 +811,9 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 scroll-smooth">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 bg-slate-50 scroll-smooth">
                             {messages.map((msg, idx) => (
-                                <div key={idx} className={cn("flex gap-3 max-w-[85%]", msg.role === "user" ? "ml-auto flex-row-reverse" : "")}>
+                                <div key={idx} className={cn("flex gap-3 min-w-0", msg.role === "user" ? "max-w-[85%] ml-auto flex-row-reverse" : "max-w-[95%]")}>
                                     <div className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
                                         msg.role === "model" ? "bg-indigo-100 text-indigo-600" : "bg-slate-200 text-slate-500"
@@ -734,7 +821,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                         {msg.role === "model" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                                     </div>
                                     <div className={cn(
-                                        "p-3 rounded-2xl text-sm shadow-sm",
+                                        "p-3.5 md:p-4 rounded-2xl text-sm shadow-sm min-w-0 wrap-anywhere",
                                         msg.role === "model" ? "bg-white text-slate-700 rounded-tl-none border border-slate-200" : "bg-blue-600 text-white rounded-tr-none"
                                     )}>
                                         {msg.role === "model" ? (
@@ -755,7 +842,35 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                     }
                                                     return null
                                                 })()}
-                                                <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600">
+                                                {/* 🔬 Antigravity 深度研究任務卡片 */}
+                                                {msg.researchData && (
+                                                    <DeepResearchCard
+                                                        data={msg.researchData}
+                                                        onCancel={async (id) => {
+                                                            try {
+                                                                const k = await getSecureApiKey()
+                                                                if (k) {
+                                                                    await fetch(`${API_BASE}/api/agents/interactions/${id}/cancel`, {
+                                                                        method: "POST",
+                                                                        headers: { "X-Gemini-API-Key": k }
+                                                                    })
+                                                                    toast.info(zh ? "已取消深度研究任務" : "Research cancelled")
+                                                                }
+                                                            } catch (e) {
+                                                                console.error("Cancel failed:", e)
+                                                            }
+                                                        }}
+                                                        onAddToItinerary={(content) => {
+                                                            const event = new CustomEvent("ai-import-itinerary", { detail: { content } })
+                                                            window.dispatchEvent(event)
+                                                            toast.success(zh ? "已將研究成果傳送至行程匯入器" : "Sent to itinerary importer")
+                                                            const navEvent = new CustomEvent("navigate-to-tools")
+                                                            window.dispatchEvent(navEvent)
+                                                            setIsOpen(false)
+                                                        }}
+                                                    />
+                                                )}
+                                                <div className="markdown-body prose prose-sm max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-a:text-blue-600 wrap-anywhere">
                                                     {(() => {
                                                         const itinerary = tryParseItinerary(msg.displayContent)
                                                         if (itinerary) {
@@ -783,9 +898,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                                 })
                                                                 window.dispatchEvent(event)
                                                                 toast.success(t('ai_sending_to_import' as TranslationKey))
-                                                                // 自動開啟 ToolsView (假設有導航邏輯)
+                                                                // 自動開啟 ToolsView
                                                                 const navEvent = new CustomEvent('navigate-to-tools')
                                                                 window.dispatchEvent(navEvent)
+                                                                setIsOpen(false)
                                                             }}
                                                         >
                                                             ✨ {t('ai_one_click_import' as TranslationKey) || "立即匯入行程"}
@@ -800,7 +916,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
 
                                             </>
                                         ) : (
-                                            <div className="whitespace-pre-wrap">{msg.displayContent}</div>
+                                            <div className="whitespace-pre-wrap wrap-anywhere">{msg.displayContent}</div>
                                         )}
                                     </div>
                                 </div>
@@ -846,7 +962,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 bg-white border-t border-slate-200">
+                        <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                             {selectedImage && (
                                 <div className="mb-2 relative inline-block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -874,6 +990,22 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <ImageIcon className="w-5 h-5" />
+                                </Button>
+                                {/* 🔬 深度研究模式晶片 Toggle */}
+                                <Button
+                                    type="button"
+                                    variant={isDeepResearch ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => {
+                                        setIsDeepResearch(!isDeepResearch)
+                                        toast.info(!isDeepResearch ? (zh ? "已啟用 🔬 AI 深度研究模式" : "Deep Research Enabled") : (zh ? "已切換回即時對話模式" : "Real-time Mode Enabled"))
+                                    }}
+                                    className={cn(
+                                        "h-8 px-2.5 text-xs rounded-xl font-medium transition-all shrink-0",
+                                        isDeepResearch ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm" : "text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:border-indigo-900/60 dark:text-indigo-300"
+                                    )}
+                                >
+                                    🔬 {zh ? "深度研究" : "Deep"}
                                 </Button>
                                 <Input
                                     placeholder={t('ai_ask_placeholder')}

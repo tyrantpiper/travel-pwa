@@ -941,15 +941,32 @@ COUNTRY_BOUNDS = {
     "VN": {"lat_min": 8.2, "lat_max": 23.4, "lng_min": 102.1, "lng_max": 109.5, "lang": "vi", "name": "越南"},
     "SG": {"lat_min": 1.15, "lat_max": 1.47, "lng_min": 103.6, "lng_max": 104.0, "lang": "en", "name": "新加坡"},
     "HK": {"lat_min": 22.15, "lat_max": 22.56, "lng_min": 113.8, "lng_max": 114.4, "lang": "zh-HK", "name": "香港"},
+    "US": {"lat_min": 24.5, "lat_max": 49.4, "lng_min": -125.0, "lng_max": -66.9, "lang": "en", "name": "美國"},
+    "GB": {"lat_min": 49.9, "lat_max": 60.9, "lng_min": -8.6, "lng_max": 1.8, "lang": "en", "name": "英國"},
+    "FR": {"lat_min": 41.3, "lat_max": 51.1, "lng_min": -5.1, "lng_max": 9.6, "lang": "fr", "name": "法國"},
+    "IT": {"lat_min": 35.5, "lat_max": 47.1, "lng_min": 6.6, "lng_max": 18.5, "lang": "it", "name": "義大利"},
+    "DE": {"lat_min": 47.3, "lat_max": 55.1, "lng_min": 5.9, "lng_max": 15.0, "lang": "de", "name": "德國"},
+    "ES": {"lat_min": 36.0, "lat_max": 43.8, "lng_min": -9.3, "lng_max": 3.3, "lang": "es", "name": "西班牙"},
+    "CH": {"lat_min": 45.8, "lat_max": 47.8, "lng_min": 5.9, "lng_max": 10.5, "lang": "de", "name": "瑞士"},
+    "IS": {"lat_min": 63.3, "lat_max": 66.6, "lng_min": -24.5, "lng_max": -13.5, "lang": "is", "name": "冰島"},
+    "AU": {"lat_min": -43.7, "lat_max": -10.0, "lng_min": 113.3, "lng_max": 153.6, "lang": "en", "name": "澳洲"},
+    "CA": {"lat_min": 41.7, "lat_max": 83.1, "lng_min": -141.0, "lng_max": -52.6, "lang": "en", "name": "加拿大"},
+    "MY": {"lat_min": 0.8, "lat_max": 7.4, "lng_min": 99.6, "lng_max": 119.3, "lang": "ms", "name": "馬來西亞"},
+    "ID": {"lat_min": -11.0, "lat_max": 6.1, "lng_min": 95.0, "lng_max": 141.0, "lang": "id", "name": "印尼"},
+    "PH": {"lat_min": 4.6, "lat_max": 21.3, "lng_min": 116.9, "lng_max": 126.6, "lang": "en", "name": "菲律賓"},
 }
 
 # 🆕 關鍵字 → 國家代碼 映射 (確定性規則，無需 AI)
 LOCATION_KEYWORDS = {
     "JP": [
-        # 城市
+        # 城市與主要觀光大區
         "東京", "tokyo", "大阪", "osaka", "京都", "kyoto", "北海道", "hokkaido",
         "沖繩", "okinawa", "札幌", "sapporo", "名古屋", "nagoya", "福岡", "fukuoka",
         "奈良", "nara", "神戶", "kobe", "橫濱", "yokohama", "廣島", "hiroshima",
+        "函館", "hakodate", "小樽", "otaru", "旭川", "asahikawa", "富良野", "furano",
+        "二世谷", "新雪谷", "niseko", "金澤", "kanazawa", "仙台", "sendai", "青森", "aomori",
+        "輕井澤", "karuizawa", "日光", "nikko", "河口湖", "kawaguchiko", "那霸", "naha",
+        "石垣島", "ishigaki", "宮古島", "miyako",
         # 著名景點
         "迪士尼", "disney", "淺草", "asakusa", "箱根", "hakone", "富士", "fuji",
         "新宿", "shinjuku", "澀谷", "shibuya", "涩谷", "銀座", "ginza",
@@ -957,7 +974,7 @@ LOCATION_KEYWORDS = {
         "上野", "ueno", "池袋", "ikebukuro", "品川", "shinagawa",
         "清水寺", "金閣寺", "伏見稻荷", "嵐山", "arashiyama",
         "環球影城", "universal", "心齋橋", "道頓堀", "通天閣",
-        "日本", "japan", "関西", "関東", "九州", "四國",
+        "日本", "japan", "関西", "関東", "九州", "四國", "東北",
     ],
     "KR": [
         "首爾", "seoul", "釜山", "busan", "濟州", "jeju", "仁川", "incheon",
@@ -1536,6 +1553,10 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
 
 # 🆕 國家名稱 → 代碼映射 (全小寫，大小寫不敏感)
 COUNTRY_NAME_TO_CODE = {
+    # 2位 ISO 碼自我映射 (支援大小寫無縫直通)
+    "jp": "JP", "tw": "TW", "kr": "KR", "th": "TH", "vn": "VN", "sg": "SG", "hk": "HK",
+    "us": "US", "gb": "GB", "fr": "FR", "it": "IT", "de": "DE", "es": "ES", "is": "IS",
+    "ch": "CH", "ca": "CA", "au": "AU", "nz": "NZ", "my": "MY", "id": "ID", "ph": "PH",
     # 日本
     "japan": "JP", "日本": "JP",
     # 台灣 (兩種寫法)
@@ -1576,13 +1597,18 @@ COUNTRY_NAME_TO_CODE = {
     "philippines": "PH", "菲律賓": "PH", "菲律宾": "PH",
 }
 
+# 🆕 別名兼容：確保呼叫 COUNTRY_TO_ISO 時能正確取得國家代碼
+COUNTRY_TO_ISO = COUNTRY_NAME_TO_CODE
+
 def extract_region_for_search(region: str) -> str:
-    """從 'Tokyo 東京' 提取英文部分 'Tokyo'"""
+    """從 'Tokyo 東京' 或 '北海道5日遊' 提取乾淨的地域關鍵字 'Tokyo' 或 '北海道'"""
     if not region:
         return ""
-    # 取第一個空格前的部分（英文）
-    parts = region.split(" ")
-    return parts[0] if parts else region
+    import re
+    # 移除常見行程後綴 (如 5日遊, 自由行, 之旅, 深度遊等)
+    clean = re.sub(r'(\d+日遊|\d+天\d+夜|自由行|之旅|極致之旅|深度遊|行程|冬日遊|夏日遊)$', '', region).strip()
+    parts = clean.split(" ")
+    return parts[0] if parts else clean
 
 async def smart_geocode_logic(
     query: str, 
@@ -1604,12 +1630,14 @@ async def smart_geocode_logic(
     search_queries = [query]
     chinese_display = None  # 🆕 中文顯示名稱
     
-    # 🆕 第零優先級：前端明確指定的國家 (最高優先，大小寫不敏感)
+    # 🆕 第零優先級：前端明確指定的國家 (最高優先，大小寫不敏感，支援 2 位 ISO 與全名)
     if country:
-        normalized_country = country.strip().lower()
-        # 修正：使用正確的變數名稱 COUNTRY_TO_ISO，並支援大小寫不敏感查詢
-        found_code = next((v for k, v in COUNTRY_TO_ISO.items() if k.lower() == normalized_country), None)
-        country_code = found_code
+        c_upper = country.strip().upper()
+        if c_upper in COUNTRY_BOUNDS:
+            country_code = c_upper
+        else:
+            normalized_country = country.strip().lower()
+            country_code = next((v for k, v in COUNTRY_TO_ISO.items() if k.lower() == normalized_country), None)
         if country_code:
             api_country_lock = country_code
             log_debug(f"   🎯 Frontend Country Filter (Lock) → {country_code}")
@@ -1625,9 +1653,13 @@ async def smart_geocode_logic(
         api_country_lock = country_code
         log_debug(f"   🌍 Explicit Country Query Detected (Lock) → {country_code}")
     
-    # 第一優先級：關鍵字規則（確定性，零延遲，無需 API Key）
+    # 第一優先級：關鍵字規則（確定性，零延遲，依序校驗：景點名稱 ➔ 母體行程標題 ➔ 目標區域）
     if not country_code:
         country_code = detect_country_from_keywords(query)
+        if not country_code and trip_title:
+            country_code = detect_country_from_keywords(trip_title)
+        if not country_code and region:
+            country_code = detect_country_from_keywords(region)
         if country_code:
             log_debug(f"   🔑 Keyword Match → {country_code}")
 
@@ -1693,8 +1725,12 @@ async def smart_geocode_logic(
         tasks.append(translation_task)
     
     # 任務 B: 原始名稱初步搜尋 (Speculative Photon)
-    region_term = extract_region_for_search(region) if region else ""
-    speculative_query = f"{query} {region_term}".strip() if region_term else query
+    region_term = extract_region_for_search(region or trip_title) if (region or trip_title) else ""
+    # 🛡️ 區域前綴消歧義：若地名本身不含區域前綴，優先以前綴組裝搜尋 (例如 "北海道 朝市")
+    if region_term and region_term not in query:
+        speculative_query = f"{region_term} {query}".strip()
+    else:
+        speculative_query = query
     speculative_task = asyncio.create_task(geocode_with_photon(speculative_query, limit, lat, lng, zoom, country_code=api_country_lock))
     tasks.append(speculative_task)
     

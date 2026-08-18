@@ -755,18 +755,21 @@ async def save_itinerary(
         room_code = generate_room_code()
         pub_id = generate_public_id()
         
-        # 🆕 自動計算 end_date (如果未提供)
-        start_date = request.start_date or "2026-01-01"
-        if request.end_date:
-            end_date = request.end_date
-        elif request.items:
-            # 從 items 中找最大的 day_number，計算 end_date
-            max_day = max(item.day_number for item in request.items)
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            end = start + timedelta(days=max_day - 1)
-            end_date = end.strftime("%Y-%m-%d")
-            print(f"   🆕 自動計算 end_date: {end_date} (Day {max_day})")
-        else:
+        # 🆕 自動計算 end_date (支援天數防禦性展延，絕不截斷)
+        start_date = request.start_date or datetime.now().strftime("%Y-%m-%d")
+        max_day = max((item.day_number for item in request.items), default=1) if request.items else 1
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            calculated_end = (start_dt + timedelta(days=max_day - 1)).strftime("%Y-%m-%d")
+            if request.end_date:
+                req_end_dt = datetime.strptime(request.end_date, "%Y-%m-%d")
+                req_days = (req_end_dt - start_dt).days + 1
+                # 🛡️ 守衛：若傳入天數小於 items 最大天數，強制以 max_day 展延，絕不截斷！
+                end_date = request.end_date if req_days >= max_day else calculated_end
+            else:
+                end_date = calculated_end
+            print(f"   🆕 行程天數確認: {start_date} ~ {end_date} (總計 {max_day} 天)")
+        except Exception:
             end_date = start_date
         
         # 2. 建立主行程 (Parent) - 將每日資訊存入 content
