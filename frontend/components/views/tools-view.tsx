@@ -693,11 +693,19 @@ export function ToolsView() {
 
         try {
             if (selectedImportTripId === "new") {
-                // 1. 建立新行程 - 使用 standardized tripsApi
+                // 1. 建立新行程 - 計算實際最大天數避免 end_date 截斷
+                const maxDay = result.items?.length > 0 ? Math.max(...result.items.map((it: { day_number?: number; day?: number }) => it.day_number || it.day || 1)) : 1
+                const startDateStr = result.start_date || new Date().toISOString().split('T')[0]
+                const startDateObj = new Date(startDateStr)
+                const calculatedEndDateObj = new Date(startDateObj)
+                calculatedEndDateObj.setDate(calculatedEndDateObj.getDate() + (maxDay - 1))
+                const endDateStr = result.end_date || calculatedEndDateObj.toISOString().split('T')[0]
+
+                // 使用 standardized tripsApi
                 const data = await tripsApi.saveItinerary({
                     title: result.title || "New Trip",
-                    start_date: result.start_date || new Date().toISOString().split('T')[0],
-                    end_date: result.end_date || new Date().toISOString().split('T')[0],
+                    start_date: startDateStr,
+                    end_date: endDateStr,
                     items: result.items,
                     user_id: userId,
                     creator_name: userName,

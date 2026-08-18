@@ -125,6 +125,21 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* 🛡️ Markdown Table & Pre Code Overflow Protection */
+  .markdown-body table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .markdown-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 }
 
 /* 🔧 PWA 優化：禁止滑動回彈，讓操作更像 App */

@@ -351,9 +351,9 @@ async def generate_trip(
         務必確認每一天的行程從 08:00 開始到 22:00 結束。
         
         ### 世界級規劃核心指令 (v28.8 - Physical Density):
-        1. **強制高密度 (Mandatory 6-10 Items per day)**: 
-           - 每一天必須產出 6-10 個行程點。
-           - 嚴禁跳過任何時段。若景點間行程較長，請務必排入具體的交通說明或中繼休息點。
+        1. **充實且靈活的節奏安排 (Recommended 4-8 Items per day)**: 
+           - 建議每一天安排 4-8 個活動點（包含早餐、上午景點、午餐、下午景點、晚餐、夜間活動與中繼休息），依據使用者輸入的天數與節奏靈活調配。
+           - 若景點間行程較長，請務必排入具體的交通說明或中繼休息點。
         2. **時間流對齊**: 從早餐 (08:30) 開始，直到夜間活動 (21:00+) 結束。
         3. **專業標題與描述**: 
            - 標題應簡潔有力。排除藥師(💊)人設噪聲。
@@ -412,15 +412,43 @@ async def generate_trip(
                     a["desc"] = a["desc"][:57] + "..."
                 flat_items.append(a)
         
-        # 🌍 [批次地理編碼] 自動為沒有座標的景點補齊經緯度
-        from services.geocode_service import smart_geocode_logic
+        # 🌍 [批次地理編碼] 自動為沒有座標的景點補齊經緯度 (支援全域動態目的地空間錨點)
+        from services.geocode_service import smart_geocode_logic, extract_region_for_search, detect_country_from_keywords
         import asyncio
+
+        # 🧠 Step 1: 動態解析行程母體目的地全球中心點座標與國家代碼 (作為 Proximity Bias)
+        raw_dest = data.get("destination") or data.get("title") or ""
+        dest_query = extract_region_for_search(raw_dest) or raw_dest
+        bias_lat = None
+        bias_lng = None
+        # 🆕 P0 修復：優先以確定性關鍵字獨立解析母體國碼，不依賴搜尋結果物件
+        dest_country = detect_country_from_keywords(dest_query) or detect_country_from_keywords(raw_dest)
+
+        if dest_query:
+            try:
+                dest_geo = await smart_geocode_logic(query=dest_query, limit=1)
+                if dest_geo and dest_geo.get("results"):
+                    first_dest = dest_geo["results"][0]
+                    bias_lat = first_dest.get("lat")
+                    bias_lng = first_dest.get("lng")
+                    dest_country = first_dest.get("country") or dest_country
+                    print(f"📍 [Dynamic Anchor] Destination '{dest_query}' resolved → ({bias_lat}, {bias_lng}) Country: {dest_country}")
+            except Exception as e:
+                print(f"⚠️ [Dynamic Anchor] Destination anchor resolution skipped: {e}")
 
         async def _geocode_item(item):
             if not item.get("lat") or not item.get("lng") or item.get("lat") == 0.0 or item.get("lng") == 0.0:
                 place_name = item.get("place_name")
                 if place_name:
-                    geo_res = await smart_geocode_logic(query=place_name, limit=1)
+                    geo_res = await smart_geocode_logic(
+                        query=place_name,
+                        limit=1,
+                        trip_title=data.get("title"),
+                        region=dest_query,
+                        lat=bias_lat,
+                        lng=bias_lng,
+                        country=dest_country
+                    )
                     if geo_res and geo_res.get("results"):
                         first_match = geo_res["results"][0]
                         item["lat"] = first_match["lat"]
@@ -438,6 +466,17 @@ async def generate_trip(
         data = reconstruct_metadata(data)
         data = normalize_notes(data)
         data = fix_sub_items_structure(data)
+        
+        # 🆕 自動根據 items 天數精準推算 start_date 與 end_date
+        from datetime import datetime, timedelta
+        max_day = max((item.get("day_number", 1) for item in flat_items), default=1)
+        raw_start = data.get("start_date") or datetime.now().strftime("%Y-%m-%d")
+        try:
+            start_dt = datetime.strptime(raw_start, "%Y-%m-%d")
+        except Exception:
+            start_dt = datetime.now()
+        data["start_date"] = start_dt.strftime("%Y-%m-%d")
+        data["end_date"] = (start_dt + timedelta(days=max_day - 1)).strftime("%Y-%m-%d")
         
         # 🆕 v26.1: Wrap with status for Frontend Zod Schema
         return {

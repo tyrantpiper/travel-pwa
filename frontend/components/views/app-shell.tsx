@@ -104,8 +104,13 @@ export function AppShell() {
     // Listen for navigation events from other components
     useEffect(() => {
         const handleNavigateToProfile = () => setActiveView("profile")
+        const handleNavigateToTools = () => setActiveView("tools")
         window.addEventListener('navigate-to-profile', handleNavigateToProfile)
-        return () => window.removeEventListener('navigate-to-profile', handleNavigateToProfile)
+        window.addEventListener('navigate-to-tools', handleNavigateToTools)
+        return () => {
+            window.removeEventListener('navigate-to-profile', handleNavigateToProfile)
+            window.removeEventListener('navigate-to-tools', handleNavigateToTools)
+        }
     }, [])
 
     // 🕵️‍♂️ [Stealth Preheat] 隱形預熱機制 (Idle-Until-Urgent)
@@ -149,12 +154,12 @@ export function AppShell() {
             <div className="h-screen bg-background flex flex-col overflow-hidden">
                 <main className="flex-1 flex flex-col min-h-0" data-scroll="true">
                     {/* ✨ 全域 AI 狀態按鈕 — 左上角固定定位 (與右上角通知對稱) */}
-                    <div className="absolute top-3 left-3 z-100">
+                    <div className="absolute top-2 left-3 z-100">
                         <AIStatusButton />
                     </div>
 
                     {/* 🔔 通知鈴鐺 — 右上角固定定位 */}
-                    <div className="absolute top-3 right-3 z-100">
+                    <div className="absolute top-2 right-3 z-100">
                         <NotificationBell />
                     </div>
 
