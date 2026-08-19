@@ -455,11 +455,15 @@ async def generate_trip(
                         item["lng"] = first_match["lng"]
             return item
         
-        # 限制 5 個並發，避免 Rate Limit (Nominatim 要求 1 req/sec，但我們有 Photon 負載均衡)
-        sem = asyncio.Semaphore(5)
+        # 限制 10 個並發，並為單一景點加上 2.5 秒硬超時熔斷，防止單點卡死拖垮整個行程生成
+        sem = asyncio.Semaphore(10)
         async def _safe_geocode(item):
             async with sem:
-                return await _geocode_item(item)
+                try:
+                    return await asyncio.wait_for(_geocode_item(item), timeout=2.5)
+                except Exception as e:
+                    print(f"⚠️ [Safe Geocode] Item '{item.get('place_name')}' timed out or skipped: {e}")
+                    return item
                 
         data["items"] = await asyncio.gather(*[_safe_geocode(item) for item in flat_items])
         

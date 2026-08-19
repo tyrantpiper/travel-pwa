@@ -190,8 +190,7 @@ app.include_router(travel_data_router)
 app.include_router(agents_router)
 print("[Routers] ✅ All systems registered")
 
-# 2. CORS 設定 (嚴格模式)
-# 🚨 生產環境：只允許特定來源
+# 2. CORS 設定與主機白名單
 ALLOWED_ORIGINS = [
     "https://travel-pwa-five.vercel.app",   # Production Frontend
     "http://localhost:3000",                # Local Next.js dev
@@ -201,19 +200,8 @@ ALLOWED_ORIGINS = [
     "https://antigravity-backend-589255638719.us-central1.run.app" # Self
 ]
 
-# 允許 Vercel Preview Deployments (如果有的話)
 if os.getenv("VERCEL_PREVIEW_DOMAINS"):
     ALLOWED_ORIGINS.extend(os.getenv("VERCEL_PREVIEW_DOMAINS").split(","))
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-    allow_headers=["Content-Type", "Authorization", "X-Gemini-Key", "X-Gemini-API-Key", "X-Requested-With", "X-User-ID"],
-    max_age=3600, # Cache preflight requests for 1 hour
-)
-print(f"[CORS] Configured strict origins: {ALLOWED_ORIGINS}")
 
 # 3. 安全 Headers 中介軟體 (Security Headers)
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -243,6 +231,17 @@ async def add_security_headers(request, call_next):
     # 🆕 強化版 CSP (防止非法內容加載)
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:;"
     return response
+
+# 4. CORS 設定 (置於最外層，確保所有回應與異常均注入合法 Access-Control 標頭)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+    allow_headers=["*"],
+    max_age=3600, # Cache preflight requests for 1 hour
+)
+print(f"[CORS] Configured outermost strict origins: {ALLOWED_ORIGINS}")
 
 # 3. 初始化已遷移至 Lifespan Manager
 
