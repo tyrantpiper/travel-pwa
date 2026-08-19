@@ -359,20 +359,22 @@ async def generate_trip(
            - 標題應簡潔有力。排除藥師(💊)人設噪聲。
            - `desc` 應像專業嚮導般提供歷史背景、排隊攻略、點餐建議或最佳拍照角度。
         4. **禁止裝飾**: 嚴禁在輸出內容中使用藥品圖示 (💊) 或非旅遊相關符號。
+        5. **精確經緯度座標**: 每個 activity 必須包含 `lat` (緯度 float) 與 `lng` (經度 float) 欄位，精度至少小數點後 4 位。若不確定精確座標，請給予最接近的已知座標。
 
         ### 輸出格式範例 (Strict JSON - Nested Day Structure):
         {
             "title": "行程名稱",
+            "destination": "東京",
             "days": [
                 {
                     "day_number": 1,
                     "activities": [
-                        { "time": "08:30", "place_name": "築地市場 (早餐)", "category": "food", "desc": "建議 08:00 前抵達避免排隊。", "tags": ["在地美食"], "is_highlight": true },
-                        { "time": "10:30", "place_name": "淺草寺", "category": "sightseeing", "desc": "東京最古老寺廟，歷史悠久。", "tags": ["地標"], "is_highlight": false },
-                        { "time": "12:30", "place_name": "淺草今半 (午餐)", "category": "food", "desc": "百年壽喜燒老店，性價比極高。", "tags": ["必吃"], "is_highlight": false },
-                        { "time": "14:30", "place_name": "上野公園", "category": "sightseeing", "desc": "散步享受寧靜氛圍與藝術館。", "tags": ["風景"], "is_highlight": false },
-                        { "time": "17:00", "place_name": "秋葉原萬世橋", "category": "shopping", "desc": "古老紅磚建築改裝的特色文創區。", "tags": ["逛街"], "is_highlight": false },
-                        { "time": "19:30", "place_name": "六本木之丘", "category": "nightlife", "desc": "俯瞰東京鐵塔的最佳位置。", "tags": ["夜景", "浪漫"], "is_highlight": true }
+                        { "time": "08:30", "place_name": "築地市場 (早餐)", "category": "food", "desc": "建議 08:00 前抵達避免排隊。", "lat": 35.6654, "lng": 139.7707, "tags": ["在地美食"], "is_highlight": true },
+                        { "time": "10:30", "place_name": "淺草寺", "category": "sightseeing", "desc": "東京最古老寺廟，歷史悠久。", "lat": 35.7148, "lng": 139.7967, "tags": ["地標"], "is_highlight": false },
+                        { "time": "12:30", "place_name": "淺草今半 (午餐)", "category": "food", "desc": "百年壽喜燒老店，性價比極高。", "lat": 35.7135, "lng": 139.7925, "tags": ["必吃"], "is_highlight": false },
+                        { "time": "14:30", "place_name": "上野公園", "category": "sightseeing", "desc": "散步享受寧靜氛圍與藝術館。", "lat": 35.7153, "lng": 139.7739, "tags": ["風景"], "is_highlight": false },
+                        { "time": "17:00", "place_name": "秋葉原萬世橋", "category": "shopping", "desc": "古老紅磚建築改裝的特色文創區。", "lat": 35.6975, "lng": 139.7712, "tags": ["逛街"], "is_highlight": false },
+                        { "time": "19:30", "place_name": "六本木之丘", "category": "nightlife", "desc": "俯瞰東京鐵塔的最佳位置。", "lat": 35.6605, "lng": 139.7292, "tags": ["夜景", "浪漫"], "is_highlight": true }
                     ]
                 }
             ],
@@ -408,8 +410,6 @@ async def generate_trip(
                 a["day_number"] = d_num
                 if "time" in a:
                     a["time_slot"] = a["time"] # Front-end compatibility
-                if "desc" in a and len(a["desc"]) > 60:
-                    a["desc"] = a["desc"][:57] + "..."
                 flat_items.append(a)
         
         # 🌍 [批次地理編碼] 自動為沒有座標的景點補齊經緯度 (支援全域動態目的地空間錨點)

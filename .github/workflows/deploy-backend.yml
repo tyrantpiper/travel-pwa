@@ -37,7 +37,7 @@ jobs:
             --allow-unauthenticated \
             --memory 512Mi \
             --cpu 1 \
-            --timeout 300s \
+            --timeout 600s \
             --max-instances 10 \
             --min-instances 0 \
             --set-env-vars "^||^SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co||API_VERSION=v1||NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu||CLOUDINARY_API_KEY=996197457174111||GAS_GEOCODE_URLS=${{ secrets.GAS_GEOCODE_URLS }}||GAS_RESOLVE_LINK_URLS=${{ secrets.GAS_RESOLVE_LINK_URLS }}" \
