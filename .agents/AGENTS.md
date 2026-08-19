@@ -66,10 +66,15 @@
 ### 2. 效能與國際化 (i18n)
 - **國際化**: 支援 `zh-TW` 與 `en`。UI 所有字串必須使用 i18n 翻譯檔。
 
-## 🚨 關鍵工作流
-- **測試**: `/test` (提交前必做)
-- **推送**: `/push`
-- **回歸**: `/regression-check` (後端變更後)
+## 🚨 8 大核心工作流與技能路由 (Core Workflows)
+- **代碼審核**: `/audit` (架構分析、React Compiler 深度審查與代碼品質)
+- **測試守門**: `/test` (標準測試、`--regression` 回歸檢查、`--bisect` 二分除錯)
+- **E2E 與效能**: `/verify-e2e` (Playwright 全端邏輯整合 ✕ Lighthouse 效能剖析)
+- **測試驅動**: `/tdd` (TDD 紅綠重構循環)
+- **契約守護**: `/contract-check` (Supabase ⇄ FastAPI ⇄ Next.js 型別同步)
+- **UI 與重構**: `/ui-optimize` (Tailwind v4、Radix a11y、Framer Motion 與 Dry-Run 重構)
+- **資安與升級**: `/security-audit` (漏洞掃描、密鑰檢測與安全依賴升級)
+- **發布與記憶**: `/push` (品質關卡與神經發布), `/daily-report` (每日報告與記憶融合)
 
 ## 🛡️ Token 最佳化 (延遲載入)
 - SKILL 僅在需要時讀取參考文件 (references)，而非預先載入。

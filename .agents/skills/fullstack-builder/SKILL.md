@@ -3,11 +3,11 @@ name: "Full-Stack Feature Builder"
 description: "Build complete features using Adaptive System 2 Architecture"
 version: "2.0.0"
 depends_on:
-  - component-generator
+  - ui-component-architect
   - api-generator (inline)
   - test-generator (inline)
 composition:
-  - skill: component-generator
+  - skill: ui-component-architect
     output: component_path
   - skill: api-generator
     input: component_path
@@ -46,7 +46,7 @@ Analyze the user request to determine the execution path.
 ### Step 3: Phase 1 - Frontend Component
 *Objective: Create the UI layer.*
 
-1. **Execute Skill**: `component-generator`
+1. **Execute Skill**: `ui-component-architect`
    - Params: `componentName`, `toggled_features`
 2. **Verify**: Ensure component exports match the Design Doc.
 
