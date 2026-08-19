@@ -14,7 +14,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ Error: Supabase credentials not found in env.")
+    print("[ERROR] Supabase credentials not found in env.")
     sys.exit(1)
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -25,7 +25,7 @@ def cleanup_test_data(target_code=None):
     If target_code is provided, deletes that specific trip.
     Otherwise, deletes all trips with 'TEST-' prefix in share_code.
     """
-    print("🧹 Starting Test Data Cleanup...")
+    print("[CLEANUP] Starting Test Data Cleanup...")
     
     try:
         query = supabase.table("itineraries").delete()
@@ -42,12 +42,12 @@ def cleanup_test_data(target_code=None):
         # Supabase-py v2 return structure check
         if hasattr(res, 'data'):
             count = len(res.data)
-            print(f"✅ Cleanup successful. Deleted {count} test records.")
+            print(f"[OK] Cleanup successful. Deleted {count} test records.")
         else:
-             print("✅ Cleanup executed (No count available).")
+             print("[OK] Cleanup executed (No count available).")
              
     except Exception as e:
-        print(f"❌ Cleanup failed: {e}")
+        print(f"[ERROR] Cleanup failed: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

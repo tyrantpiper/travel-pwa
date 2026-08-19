@@ -1,49 +1,62 @@
 ---
-description: Complete UI optimization workflow with skill chaining
+name: "ui-optimize"
+description: "Comprehensive UI optimization, accessibility audit, and safe structural refactoring"
 triggers:
+  - "/ui-optimize"
   - "UI 優化"
   - "樣式優化"
-  - "styling"
+  - "重構"
+  - "refactor"
   - "dark mode"
-  - "效能優化"
 ---
 
-# UI Optimization Workflow
+# UI Optimization & Refactoring Workflow (/ui-optimize)
 
-This workflow chains multiple skills for comprehensive UI work.
+> **Principle**: Dry-Run First, Apply Later. Zero CSS & Accessibility Regression.
 
-## Phase 1: Audit
-1. Read and execute `.agents/skills/pwa-auditor/SKILL.md`
-2. Generate audit report
+---
 
-## Phase 2: Plan
-3. Based on audit, create implementation plan
-4. Request user approval if major changes
+## Phase 1: Audit & Scope Identification
 
-## Phase 3: Execute
-5. For dark mode work → Read `.agents/skills/dark-mode-migrator/SKILL.md`
-6. Apply changes following skill instructions
+1. **Audit Accessibility & PWA**:
+   - Read and apply `.agents/skills/pwa-auditor/SKILL.md`.
+2. **Identify Refactoring Target**:
+   - Determine mode: `Component Extraction`, `Dark Mode Migration`, `Tailwind v4 Tokenization`, `Dead Code Removal`.
 
-## Phase 4: Verify
-// turbo
-7. Run `npx tsc --noEmit --skipLibCheck` for TypeScript check
+---
 
-// turbo  
-8. Run `npx eslint . --ext .ts,.tsx --quiet 2>&1 | Select-Object -First 20` for lint check
+## Phase 2: Dry-Run & Simulation (Absorbed Refactor Protection)
 
-## Phase 5: Report
-9. Update walkthrough with changes made
-10. Notify user of completion
+3. **Generate Virtual Diff**:
+   - Create refactor plan showing proposed before/after diff.
+   - Calculate Complexity & Breaking Risk.
+4. **Obtain User Approval**:
+   - If refactor touches > 3 files or changes public props, request explicit user confirmation.
 
-## Chained Skills
-- `pwa-auditor` (Phase 1)
-- `dark-mode-migrator` (Phase 3, if applicable)
+---
 
-## Exit Criteria
-- [ ] All TypeScript errors resolved
-- [ ] Audit findings addressed
-- [ ] User notified
+## Phase 3: Execution via UI Component Architect
+
+5. **Apply Changes**:
+   - Read `.agents/skills/ui-component-architect/SKILL.md`.
+   - Enforce Tailwind CSS v4 `@theme` tokens, Radix UI accessibility, Framer Motion, and i18n dictionaries.
+
+---
+
+## Phase 4: Quality & Verification Gate
+
+6. **Static Checks**:
+   ```bash
+   cd frontend
+   npx tsc --noEmit --skipLibCheck
+   npx eslint . --ext .ts,.tsx --quiet
+   cd ..
+   ```
+
+---
 
 ## [NEURAL] Neural Linkage
-11. **Signal Sentinel**:
-    - Execute: `python backend/scripts/telemetry.py --source "UI Optimize" --message "UI Optimize completed" --level "INFO"`
+Execute telemetry signal:
+```bash
+python backend/scripts/telemetry.py --source "UI Optimize" --message "UI optimization and refactor completed" --level "INFO"
+```
