@@ -47,3 +47,10 @@ next-env.d.ts
 public/workbox-*.js
 public/worker-*.js
 
+# Quality gate & diagnostic reports
+eslint-*.json
+eslint-report.txt
+lint-*.json
+lint_*.txt
+tsc-*.txt
+tsc_*.txt

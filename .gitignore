@@ -34,9 +34,19 @@ backend/migrations/20260308_security_hardening.sql
 *.json
 gcp-sa-key.json
 
-# Scratch & Diff files
+# Scratch, Diff & Backup files
 *.diff
+*.bak
 tmp/
+failing_page.html
+route_error_debug.log
+
+# Diagnostic & Audit Logs
+*-report.txt
+*-output.json
+*-errors.txt
+*-results.json
+
 # Diagnostic Scripts
 backend/scripts/maps_diagnostic/
 backend/v17_*.py
@@ -45,3 +55,4 @@ db_probe_*.py
 e2e_evidence.py
 reproduce_links.py
 tmp_*.py
+

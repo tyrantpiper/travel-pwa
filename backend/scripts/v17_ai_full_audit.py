@@ -11,7 +11,7 @@ load_dotenv()
 
 # 手動模擬後端路徑
 import sys
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.ai_config import DAILY_ROUTING, HEAVY_ROUTING
 from services.model_manager import get_generation_config, sanitize_config_for_model, _build_chat_history
