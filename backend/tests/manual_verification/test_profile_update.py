@@ -1,7 +1,9 @@
 import asyncio
 import httpx
 import uuid
+import pytest
 
+@pytest.mark.skip(reason="Manual integration probe requiring live backend server")
 async def test_update():
     url = "http://localhost:8000/api/users/me"
     

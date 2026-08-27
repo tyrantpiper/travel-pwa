@@ -14,7 +14,7 @@ if sys.stdout and hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # 確保能 import backend modules
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from services.geocode_service import smart_geocode_logic, expand_cjk_variants
 

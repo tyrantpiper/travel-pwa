@@ -1,7 +1,9 @@
 import httpx
 import asyncio
 import json
+import pytest
 
+@pytest.mark.skip(reason="Manual integration probe requiring live backend server")
 async def test_enrich():
     url = "http://127.0.0.1:8008/api/poi/ai-enrich"
     payload = {
