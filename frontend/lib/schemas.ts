@@ -32,25 +32,25 @@ export const ItineraryItemSchema = z.object({
     id: z.string(),
     itinerary_id: z.string(),
     day_number: z.number(),
-    time_slot: z.string().default("00:00"),
+    time_slot: z.string().nullable().default("00:00").transform(v => v ?? "00:00"),
     place_name: z.string(),
-    category: z.string().default("activity"),
+    category: z.string().nullable().default("activity").transform(v => v ?? "activity"),
     notes: z.string().optional().nullable(),
     memo: z.string().optional().nullable(),
     lat: z.number().optional().nullable(),
     lng: z.number().optional().nullable(),
-    tags: z.array(z.string()).default([]),
-    image_urls: z.array(z.string()).default([]),
-    sub_items: z.array(SubItemSchema).default([]),
+    tags: z.array(z.string()).nullable().default([]).transform(v => v ?? []),
+    image_urls: z.array(z.string()).nullable().default([]).transform(v => v ?? []),
+    sub_items: z.array(SubItemSchema).nullable().default([]).transform(v => v ?? []),
     link_url: z.string().optional().nullable(),
     website_link: z.string().optional().nullable(),   // 🆕 官網連結
-    preview_metadata: z.any().optional(),             // 🆕 預覽元數據
+    preview_metadata: z.any().optional().nullable(),   // 🆕 預覽元數據
     reservation_code: z.string().optional().nullable(),
     cost_amount: z.number().nullable().default(0).transform(v => v ?? 0),
-    sort_order: z.number().default(0),
-    hide_navigation: z.boolean().default(false),
-    is_private: z.boolean().default(false),
-    is_highlight: z.boolean().default(false),
+    sort_order: z.number().nullable().default(0).transform(v => v ?? 0),
+    hide_navigation: z.boolean().nullable().default(false).transform(v => v ?? false),
+    is_private: z.boolean().nullable().default(false).transform(v => v ?? false),
+    is_highlight: z.boolean().nullable().default(false).transform(v => v ?? false),
 });
 
 export const TripDaySchema = z.object({

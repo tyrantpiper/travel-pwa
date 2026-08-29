@@ -73,6 +73,33 @@ describe('ItineraryItemSchema', () => {
         expect(result.cost_amount).toBe(0)
     })
 
+    it('should handle null values from PostgreSQL for sub_items, is_highlight, and boolean/array fields', () => {
+        const result = ItineraryItemSchema.parse({
+            id: 'item-1',
+            itinerary_id: 'trip-1',
+            day_number: 1,
+            place_name: 'Test Spot',
+            sub_items: null,
+            is_highlight: null,
+            is_private: null,
+            hide_navigation: null,
+            tags: null,
+            image_urls: null,
+            sort_order: null,
+            time_slot: null,
+            category: null,
+        })
+        expect(result.sub_items).toEqual([])
+        expect(result.is_highlight).toBe(false)
+        expect(result.is_private).toBe(false)
+        expect(result.hide_navigation).toBe(false)
+        expect(result.tags).toEqual([])
+        expect(result.image_urls).toEqual([])
+        expect(result.sort_order).toBe(0)
+        expect(result.time_slot).toBe("00:00")
+        expect(result.category).toBe("activity")
+    })
+
     it('should fail without required fields', () => {
         expect(() => ItineraryItemSchema.parse({ id: 'item-1' })).toThrow()
     })

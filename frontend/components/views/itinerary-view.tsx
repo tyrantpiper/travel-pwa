@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { useTripDetail, useOnlineStatus, useHaptic } from "@/lib/hooks"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -40,8 +40,8 @@ import { LocationEditDialog } from "@/components/itinerary/LocationEditDialog"
 import { TripList } from "@/components/itinerary/TripList"
 import { ItineraryHeader } from "@/components/itinerary/ItineraryHeader"
 import { ItineraryTimeline } from "@/components/itinerary/ItineraryTimeline"
-
-const DEFAULT_START_DATE = new Date()
+import { TripMasterOverview } from "@/components/itinerary/TripMasterOverview"
+import { CalendarRangeSheet } from "@/components/itinerary/CalendarRangeSheet"
 
 /**
  * 🔧 Helper to access day data with number/string key fallback
@@ -94,12 +94,12 @@ export function ItineraryView() {
     // 🔧 v2.5: Use State callback to ensure ref propagation to Virtuoso
     const [scrollerEl, setScrollerEl] = useState<HTMLElement | null>(null)
 
-    // 🆕 Smart Clone States
-    const [isClonePromptOpen, setIsClonePromptOpen] = useState(false)
-    const [cloneSourceDay, setCloneSourceDay] = useState<number | null>(null)
-    const [pendingAddDayPosition, setPendingAddDayPosition] = useState<'before' | 'end' | null>(null)
-    const [isAddingDay, setIsAddingDay] = useState(false)
     const originalUrlRef = useRef<string>("")
+
+    // 🆕 Calendar Range Picker States
+    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+    const [pendingShortenDates, setPendingShortenDates] = useState<{ start_date: string; end_date: string } | null>(null)
+    const [isUpdatingDates, setIsUpdatingDates] = useState(false)
 
 
     // 🆕 DND Sensors (同多圖拖曳)
@@ -317,7 +317,8 @@ export function ItineraryView() {
         }
 
         // 🛑 Fix FOIC (Flash of Incorrect Content): Wait for trip to load
-        if (!currentTrip) return
+        // 🛡️ Overview Guard: Skip single-day weather calculation when in Master Overview (day === 0)
+        if (!currentTrip || day === 0) return
 
 
         // 🛡️ AbortController 防止競爭條件
@@ -1134,90 +1135,59 @@ export function ItineraryView() {
     // 🧠 Add Day Loading State
 
 
-    // 🧠 Smart Clone Logic: 檢查是否有可克隆的資料 (Checklist/Notes/Location)
-    const checkHasCloneableData = (sourceDay: number) => {
-        if (!currentTrip) return false
-        const hasNotes = (getDayData(currentTrip.day_notes, sourceDay)?.length || 0) > 0
-        const hasLoc = !!dailyLocs[sourceDay]?.name
-        const hasChecklist = (getDayData(currentTrip.day_checklists, sourceDay)?.length || 0) > 0
-        return hasNotes || hasLoc || hasChecklist
-    }
-
-    // ⚡ 實際執行新增 API
-    const executeAddDay = async (position: "before" | "end", cloneContent: boolean = false): Promise<void> => {
+    // 📅 實際執行日期更新 API
+    const executeDateRangeUpdate = async (startDate: string, endDate: string, onShorten: "merge" | "delete" = "merge") => {
         if (!currentTrip) return
-        setIsAddingDay(true)
+        setIsUpdatingDates(true)
         haptic.tap()
 
-        const isOptimistic = position === "end" && !cloneContent
-
-        if (isOptimistic) {
-            const currentDays = currentTrip.days || []
-            const maxDay = currentDays.length > 0 ? Math.max(...currentDays.map(d => d.day)) : 0
-            const newDay = maxDay + 1
-            const optimisticTrip = structuredClone(currentTrip)
-
-            if (!optimisticTrip.days) optimisticTrip.days = []
-            optimisticTrip.days.push({ day: newDay, activities: [] })
-
-            if (!optimisticTrip.daily_locations) optimisticTrip.daily_locations = {}
-            delete optimisticTrip.daily_locations[newDay]
-
-            if (!optimisticTrip.day_notes) optimisticTrip.day_notes = {}
-            optimisticTrip.day_notes[newDay] = []
-            if (!optimisticTrip.day_costs) optimisticTrip.day_costs = {}
-            optimisticTrip.day_costs[newDay] = []
-            if (!optimisticTrip.day_tickets) optimisticTrip.day_tickets = {}
-            optimisticTrip.day_tickets[newDay] = []
-            if (!optimisticTrip.day_checklists) optimisticTrip.day_checklists = {}
-            optimisticTrip.day_checklists[newDay] = []
-
-            setDailyLocs(prev => {
-                const updated = { ...prev }
-                delete updated[newDay]
-                return updated
-            })
-
-            reloadTripDetail(() => optimisticTrip, false)
-            toast.success(t('iv_day_added', { day: String(newDay) }))
-        }
-
         try {
-            // 🔒 Standardized: Use tripsApi.addDay with userId
-            const data = await tripsApi.addDay(currentTrip.id, position === "before" ? "before:1" : "end", userId || "", cloneContent)
+            await tripsApi.updateDates(currentTrip.id, {
+                start_date: startDate,
+                end_date: endDate,
+                on_shorten: onShorten
+            }, userId || "")
 
-            if (!isOptimistic) {
-                toast.success(cloneContent ? t('iv_day_added_clone', { day: String(data.new_day) }) : t('iv_day_added', { day: String(data.new_day) }))
-            }
-
+            // Invalidate weather cache
+            setWeatherData([])
             await reloadTripDetail()
-            if (position === "before") setDay(1)
-            else if (position === "end") setDay(data.new_day)
-
+            toast.success(t('cal_updated_success') || "行程日期已成功更新！")
         } catch (e) {
-            console.error(e)
-            toast.error(t('iv_add_failed'))
-            reloadTripDetail()
+            console.error("🔥 Failed to update trip dates:", e)
+            toast.error(t('iv_update_failed_short') || "更新日期失敗")
         } finally {
-            setIsAddingDay(false)
-            setIsClonePromptOpen(false)
-            setPendingAddDayPosition(null)
+            setIsUpdatingDates(false)
+            setIsDatePickerOpen(false)
+            setPendingShortenDates(null)
         }
     }
 
-    const handleAddDay = async (position: "before" | "end"): Promise<void> => {
+    const handleDateRangeChange = async (newStartDate: string, newEndDate: string) => {
         if (!currentTrip) return
 
-        // 判斷來源天數 (如果是 Before 1 則源自本來的 Day 1，如果是 End 則源自本來的最後一天)
-        const sourceDay = position === "before" ? 1 : Math.max(...(currentTrip.days?.map(d => d.day) || [1]))
+        const oldStartStr = (currentTrip.start_date || "").split('T')[0]
+        const oldEndStr = (currentTrip.end_date || oldStartStr).split('T')[0]
 
-        if (checkHasCloneableData(sourceDay)) {
-            setCloneSourceDay(sourceDay)
-            setPendingAddDayPosition(position)
-            setIsClonePromptOpen(true)
-        } else {
-            await executeAddDay(position, false)
+        if (oldStartStr && oldEndStr) {
+            const [oy1, om1, od1] = oldStartStr.split('-').map(Number)
+            const [oy2, om2, od2] = oldEndStr.split('-').map(Number)
+            const [ny1, nm1, nd1] = newStartDate.split('-').map(Number)
+            const [ny2, nm2, nd2] = newEndDate.split('-').map(Number)
+
+            const oldDays = Math.max(1, Math.round((new Date(oy2, om2 - 1, od2).getTime() - new Date(oy1, om1 - 1, od1).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+            const newDays = Math.max(1, Math.round((new Date(ny2, nm2 - 1, nd2).getTime() - new Date(ny1, nm1 - 1, nd1).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+
+            // If shortening and truncated days have items, show safety confirmation dialog
+            if (newDays < oldDays) {
+                const hasItemsInTruncatedDays = (currentTrip.days || []).some(d => d.day > newDays && (d.activities || []).length > 0)
+                if (hasItemsInTruncatedDays) {
+                    setPendingShortenDates({ start_date: newStartDate, end_date: newEndDate })
+                    return
+                }
+            }
         }
+
+        await executeDateRangeUpdate(newStartDate, newEndDate, "merge")
     }
 
     // Calculate total days from start_date and end_date, with fallback
@@ -1226,10 +1196,12 @@ export function ItineraryView() {
         let daysFromDates = 1
         // First try to calculate from dates
         if (currentTrip.start_date && currentTrip.end_date) {
-            const start = new Date(currentTrip.start_date)
-            const end = new Date(currentTrip.end_date)
+            const [sy, sm, sd] = currentTrip.start_date.split('T')[0].split('-').map(Number)
+            const [ey, em, ed] = currentTrip.end_date.split('T')[0].split('-').map(Number)
+            const start = new Date(sy, sm - 1, sd)
+            const end = new Date(ey, em - 1, ed)
             if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                daysFromDates = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+                daysFromDates = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
             }
         }
         // 🛡️ 雙重防禦守衛：以「日期計算天數」與「景點實際最大天數」取最大值，絕不隱藏任何一天！
@@ -1248,10 +1220,21 @@ export function ItineraryView() {
         (isValidating && !currentTrip?.start_date)   // Validating with no valid date
 
     const getDateInfo = (dayNum: number) => {
-        const start = currentTrip ? new Date(currentTrip.start_date || DEFAULT_START_DATE) : DEFAULT_START_DATE
-        const d = new Date(start)
-        d.setDate(d.getDate() + (dayNum - 1))
-        return { date: `${d.getMonth() + 1}/${d.getDate()}`, week: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][d.getDay()] }
+        const rawStart = currentTrip?.start_date
+        if (rawStart) {
+            const [y, m, d] = rawStart.split('T')[0].split('-').map(Number)
+            const dt = new Date(y, m - 1, d + (dayNum - 1))
+            return { 
+                date: `${dt.getMonth() + 1}/${dt.getDate()}`, 
+                week: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][dt.getDay()] 
+            }
+        }
+        const now = new Date()
+        const dt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (dayNum - 1))
+        return { 
+            date: `${dt.getMonth() + 1}/${dt.getDate()}`, 
+            week: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][dt.getDay()] 
+        }
     }
 
     if (viewMode === 'list') {
@@ -1369,7 +1352,7 @@ export function ItineraryView() {
                         setActiveTripId(null)
                         setViewMode('list')
                     }}
-                    onAddDay={handleAddDay}
+                    onOpenDatePicker={() => setIsDatePickerOpen(true)}
                     onDeleteDay={handleDeleteDay}
                     getDateInfo={getDateInfo}
                     userId={userId}
@@ -1377,121 +1360,144 @@ export function ItineraryView() {
                     shouldShowDateSkeleton={shouldShowDateSkeleton}
                 />
 
-                {/* 🕵️ Phase 3: Modular Weather Panel */}
-                <WeatherPanel
-                    day={day}
-                    weatherData={weatherData}
-                    weatherMode={weatherMode}
-                    weatherConfidence={weatherConfidence}
-                    elevation={elevation}
-                    resolvedLocation={resolvedLocation}
-                    currentTimezone={currentTimezone}
-                    onEditLocation={() => setIsLocEditOpen(true)}
-                />
+                {day === 0 ? (
+                    /* 🌟 Master Overview View */
+                    <TripMasterOverview
+                        currentTrip={currentTrip}
+                        dayNumbers={dayNumbers}
+                        getDateInfo={getDateInfo}
+                        dailyLocs={dailyLocs}
+                        onSelectDay={(targetDay) => {
+                            setDay(targetDay)
+                            scrollerEl?.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                        onAddActivityToDay={(targetDay) => {
+                            setDay(targetDay)
+                            scrollerEl?.scrollTo({ top: 0, behavior: 'smooth' })
+                            setIsAddMode(true)
+                            setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] })
+                            setIsEditOpen(true)
+                        }}
+                    />
+                ) : (
+                    <>
+                        {/* 🕵️ Phase 3: Modular Weather Panel */}
+                        <WeatherPanel
+                            day={day}
+                            weatherData={weatherData}
+                            weatherMode={weatherMode}
+                            weatherConfidence={weatherConfidence}
+                            elevation={elevation}
+                            resolvedLocation={resolvedLocation}
+                            currentTimezone={currentTimezone}
+                            onEditLocation={() => setIsLocEditOpen(true)}
+                        />
 
-                {/* AI Reviews & Tips */}
-                <EditableDailyAIReview
-                    key={`ai-review-${day}`}
-                    tripId={activeTripId || ""}
-                    day={day}
-                    review={getDayData(currentTrip?.day_ai_reviews, day) || (day === 1 ? currentTrip?.ai_review : undefined)}
-                    userId={userId || ""}
-                    onUpdate={async () => {
-                        await reloadTripDetail()
-                    }}
-                />
+                        {/* AI Reviews & Tips */}
+                        <EditableDailyAIReview
+                            key={`ai-review-${day}`}
+                            tripId={activeTripId || ""}
+                            day={day}
+                            review={getDayData(currentTrip?.day_ai_reviews, day) || (day === 1 ? currentTrip?.ai_review : undefined)}
+                            userId={userId || ""}
+                            onUpdate={async () => {
+                                await reloadTripDetail()
+                            }}
+                        />
 
-                <EditableDailyTips
-                    key={`tips-${day}`}
-                    tripId={activeTripId || ""}
-                    day={day}
-                    notes={getDayData(currentTrip?.day_notes, day) || []}
-                    costs={getDayData(currentTrip?.day_costs, day) || []}
-                    tickets={getDayData(currentTrip?.day_tickets, day) || []}
-                    userId={userId || undefined}
-                    onUpdate={async (type, data) => {
-                        if (!activeTripId) return false
-                        try {
-                            const updatePayload: Record<string, unknown> = {}
-                            if (type === "notes") updatePayload.day_notes = { [day]: data }
-                            if (type === "costs") updatePayload.day_costs = { [day]: data }
-                            if (type === "tickets") updatePayload.day_tickets = { [day]: data }
+                        <EditableDailyTips
+                            key={`tips-${day}`}
+                            tripId={activeTripId || ""}
+                            day={day}
+                            notes={getDayData(currentTrip?.day_notes, day) || []}
+                            costs={getDayData(currentTrip?.day_costs, day) || []}
+                            tickets={getDayData(currentTrip?.day_tickets, day) || []}
+                            userId={userId || undefined}
+                            onUpdate={async (type, data) => {
+                                if (!activeTripId) return false
+                                try {
+                                    const updatePayload: Record<string, unknown> = {}
+                                    if (type === "notes") updatePayload.day_notes = { [day]: data }
+                                    if (type === "costs") updatePayload.day_costs = { [day]: data }
+                                    if (type === "tickets") updatePayload.day_tickets = { [day]: data }
 
-                            await tripsApi.updateDayData(activeTripId, day, updatePayload, userId || "")
-                            await reloadTripDetail()
-                            return true
-                        } catch (e) {
-                            console.error("Failed to update day data:", e)
-                            toast.error(t('iv_update_failed_short'))
-                            return false
-                        }
-                    }}
-                />
+                                    await tripsApi.updateDayData(activeTripId, day, updatePayload, userId || "")
+                                    await reloadTripDetail()
+                                    return true
+                                } catch (e) {
+                                    console.error("Failed to update day data:", e)
+                                    toast.error(t('iv_update_failed_short'))
+                                    return false
+                                }
+                            }}
+                        />
 
-                <EditableDailyChecklist
-                    key={`checklist-${day}`}
-                    tripId={activeTripId || ""}
-                    day={day}
-                    items={day === 1 ? (() => {
-                        const d0 = getDayData(currentTrip?.day_checklists, 0) || [];
-                        const d1 = getDayData(currentTrip?.day_checklists, 1) || [];
-                        // 🛡️ L4 深度防禦：使用 Map 依據 ID 去重，防止 React Key 衝突導致崩潰
-                        const uniqueMap = new Map();
-                        [...d0, ...d1].forEach(item => { if (item.id) uniqueMap.set(item.id, item); });
-                        return Array.from(uniqueMap.values()) as ChecklistItem[];
-                    })() : (getDayData(currentTrip?.day_checklists, day) || [])}
-                    userId={userId || undefined}
-                    onUpdate={async (items) => {
-                        if (!activeTripId) return false
-                        try {
-                            // 1. Update current day items
-                            await tripsApi.updateDayData(activeTripId, day, {
-                                day_checklists: { [day]: items }
-                            }, userId || "")
+                        <EditableDailyChecklist
+                            key={`checklist-${day}`}
+                            tripId={activeTripId || ""}
+                            day={day}
+                            items={day === 1 ? (() => {
+                                const d0 = getDayData(currentTrip?.day_checklists, 0) || [];
+                                const d1 = getDayData(currentTrip?.day_checklists, 1) || [];
+                                // 🛡️ L4 深度防禦：使用 Map 依據 ID 去重，防止 React Key 衝突導致崩潰
+                                const uniqueMap = new Map();
+                                [...d0, ...d1].forEach(item => { if (item.id) uniqueMap.set(item.id, item); });
+                                return Array.from(uniqueMap.values()) as ChecklistItem[];
+                            })() : (getDayData(currentTrip?.day_checklists, day) || [])}
+                            userId={userId || undefined}
+                            onUpdate={async (items) => {
+                                if (!activeTripId) return false
+                                try {
+                                    // 1. Update current day items
+                                    await tripsApi.updateDayData(activeTripId, day, {
+                                        day_checklists: { [day]: items }
+                                    }, userId || "")
 
-                            // 2. Clear Day 0 items if they were merged into Day 1 (bcfeb32 parity)
-                            // If user is editing Day 1 and there are items in Day 0 (pre-trip), we assume they are now merged and should be cleared from Day 0
-                            const hasDay0Items = (getDayData(currentTrip?.day_checklists, 0)?.length || 0) > 0
-                            if (day === 1 && hasDay0Items) {
-                                debugLog("🕵️ Detecting Day 0 items after merge, clearing Day 0...")
-                                await tripsApi.updateDayData(activeTripId, 0, {
-                                    day_checklists: { "0": [] }
-                                }, userId || "")
-                            }
+                                    // 2. Clear Day 0 items if they were merged into Day 1 (bcfeb32 parity)
+                                    // If user is editing Day 1 and there are items in Day 0 (pre-trip), we assume they are now merged and should be cleared from Day 0
+                                    const hasDay0Items = (getDayData(currentTrip?.day_checklists, 0)?.length || 0) > 0
+                                    if (day === 1 && hasDay0Items) {
+                                        debugLog("🕵️ Detecting Day 0 items after merge, clearing Day 0...")
+                                        await tripsApi.updateDayData(activeTripId, 0, {
+                                            day_checklists: { "0": [] }
+                                        }, userId || "")
+                                    }
 
-                            await reloadTripDetail()
-                            return true
-                        } catch (e) {
-                            console.error("Failed to update checklist:", e)
-                            toast.error(t('iv_update_failed_short'))
-                            return false
-                        }
-                    }}
-                />
+                                    await reloadTripDetail()
+                                    return true
+                                } catch (e) {
+                                    console.error("Failed to update checklist:", e)
+                                    toast.error(t('iv_update_failed_short'))
+                                    return false
+                                }
+                            }}
+                        />
 
-                {/* 🕵️ Phase 3: Modular Timeline */}
-                <ItineraryTimeline
-                    currentDayData={currentDayData}
-                    dndSensors={dndSensors}
-                    handleDragStart={handleDragStart}
-                    handleDragEnd={handleDragEnd}
-                    handleDragCancel={handleDragCancel}
-                    itnVirtuosoRef={itnVirtuosoRef}
-                    scrollerEl={scrollerEl}
-                    onEditActivity={handleEditActivity}
-                    onDeleteActivity={handleDeleteActivity}
-                    onUpdateActivity={handleUpdateActivity}
-                    activeId={activeId}
-                    isOnline={isOnline}
-                    mounted={mounted}
-                    onAddActivity={() => {
-                        setIsAddMode(true);
-                        setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] });
-                        setIsEditOpen(true);
-                    }}
-                    onAddPOI={handleAddPOI}
-                    currentTrip={currentTrip}
-                />
+                        {/* 🕵️ Phase 3: Modular Timeline */}
+                        <ItineraryTimeline
+                            currentDayData={currentDayData}
+                            dndSensors={dndSensors}
+                            handleDragStart={handleDragStart}
+                            handleDragEnd={handleDragEnd}
+                            handleDragCancel={handleDragCancel}
+                            itnVirtuosoRef={itnVirtuosoRef}
+                            scrollerEl={scrollerEl}
+                            onEditActivity={handleEditActivity}
+                            onDeleteActivity={handleDeleteActivity}
+                            onUpdateActivity={handleUpdateActivity}
+                            activeId={activeId}
+                            isOnline={isOnline}
+                            mounted={mounted}
+                            onAddActivity={() => {
+                                setIsAddMode(true);
+                                setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] });
+                                setIsEditOpen(true);
+                            }}
+                            onAddPOI={handleAddPOI}
+                            currentTrip={currentTrip}
+                        />
+                    </>
+                )}
             </div>
 
             <ActivityEditModal
@@ -1537,33 +1543,48 @@ export function ItineraryView() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* 🆕 Smart Clone Confirmation Dialog */}
-            <AlertDialog open={isClonePromptOpen} onOpenChange={setIsClonePromptOpen}>
+            {/* 📅 iOS Calendar Range Picker Sheet */}
+            <CalendarRangeSheet
+                key={`${currentTrip?.id}-${currentTrip?.start_date}-${isDatePickerOpen}`}
+                isOpen={isDatePickerOpen}
+                onOpenChange={setIsDatePickerOpen}
+                currentStartDate={currentTrip?.start_date}
+                currentEndDate={currentTrip?.end_date}
+                onConfirm={handleDateRangeChange}
+                isUpdating={isUpdatingDates}
+            />
+
+            {/* ⚠️ Shorten Trip Duration Safety Alert Dialog */}
+            <AlertDialog open={!!pendingShortenDates} onOpenChange={(open) => !open && setPendingShortenDates(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{t('iv_clone_title')}</AlertDialogTitle>
+                        <AlertDialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                            <AlertCircle className="w-5 h-5" />
+                            {t('cal_shorten_title') || '縮短行程天數提醒'}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            {t('iv_clone_desc_prefix', { day: String(cloneSourceDay) })}<b>{t('iv_clone_desc_bold')}</b>{t('iv_clone_desc_suffix')}
-                            <br /><br />
-                            {t('iv_clone_question')}
-                            <br />
-                            <span className="text-xs text-slate-500">{t('iv_clone_note')}</span>
+                            {t('cal_shorten_desc') || '縮短天數將影響被截斷天數中的景點與活動，請選擇處理方式：'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel
-                            disabled={isAddingDay}
-                            onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, false)}
+                    <AlertDialogFooter className="flex-col sm:flex-col gap-2">
+                        <Button
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
+                            onClick={() => pendingShortenDates && executeDateRangeUpdate(pendingShortenDates.start_date, pendingShortenDates.end_date, "merge")}
+                            disabled={isUpdatingDates}
                         >
-                            {isAddingDay ? t('iv_processing') : t('iv_add_blank')}
+                            {isUpdatingDates ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "📦"} {t('cal_merge_to_last') || '合併景點至最後一天 (推薦)'}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => pendingShortenDates && executeDateRangeUpdate(pendingShortenDates.start_date, pendingShortenDates.end_date, "delete")}
+                            disabled={isUpdatingDates}
+                        >
+                            {isUpdatingDates ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : "🗑️"} {t('cal_delete_truncated') || '直接刪除被截斷天數'}
+                        </Button>
+                        <AlertDialogCancel className="w-full" disabled={isUpdatingDates}>
+                            {t('cal_cancel') || '取消'}
                         </AlertDialogCancel>
-                        <AlertDialogAction
-                            disabled={isAddingDay}
-                            onClick={() => pendingAddDayPosition && executeAddDay(pendingAddDayPosition, true)}
-                            className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400"
-                        >
-                            {isAddingDay ? <><Loader2 className="w-4 h-4 mr-1" />{t('iv_processing')}</> : t('iv_clone_and_add')}
-                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
