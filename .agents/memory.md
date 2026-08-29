@@ -3,6 +3,10 @@
 - **表現層截斷與資料層無損分離 (Presentation Layer Truncation Separation)**: 資料傳輸與儲存層保持 100% 原始語義完整性，移除後端硬性 57 字截斷，溢出隱藏完全由前端 CSS (`line-clamp-2`, `truncate`) 控制。
 - **基礎設施宣告權威性原則 (Infra-as-Code Authority)**: 雲端資源參數（如 Cloud Run `--timeout 600s`）必須在 `.github/workflows/deploy-backend.yml` 宣告，杜絕手動 Console 調整後被 CI/CD 管線無預警洗回。
 - **全景行程總覽模式 (Full-Trip Master Overview)**: 確立「全部 (ALL) / 行程總覽」為核心演進目標，支援多天點燈全景地圖軌跡、每日摘要卡片與總預算/體力智慧分析，讓旅人一秒俯瞰多天全局。
+- **iOS Swift 風格日曆區間選擇器與行程總覽 (Continuous Multi-Month Calendar & Master Overview)**: 採用連續縱向雙向滾動的 iOS Swift 日曆區間選擇器 (`CalendarRangeSheet`)，搭配 Sticky 月份標題、動態快速跳轉「跳至今日/回到行程月份」，取代零散前後加減天數按鈕；在 Day 0 建立 `TripMasterOverview` 全景脈絡儀表板。
+- **原子日期平移與雙向位移引擎 (Atomic Date Range Shift & Protection)**: 後端實作 `PATCH /api/trips/{trip_id}/dates` 原子平移端點。出發日提前（Shift > 0）時採用逆序迭代（Reverse-order shift）位移 Content 字典；延後（Shift < 0）時採用正序迭代；行程縮短時提供 `merge` 與 `delete` 雙重保護策略。
+- **HTML5 標籤語意合法性與按鈕解耦 (Decoupled Button DOM Architecture)**: 卡片容器內部點擊進入與操作列按鈕（PDF、退出、刪除）必須在 DOM 層級完全解耦為同級 Sibling，徹底根除 `<button>` 嵌套 `<button>` 的 HTML5 規範違規。
+- **Playwright 獨立 E2E 守門套件 (Isolated E2E Playwright Suite)**: 透過 `playwright.config.ts` 將 E2E 測試目錄嚴格隔離至 `./tests`，避免與 Vitest 的 `__tests__` 目錄衝突，並在無頭模式下自動監聽瀏覽器 Console 0 錯誤。
 - **母體區域繼承原則 (Mother Region Inheritance)**: 行程景點地理編碼以母體目的地中心點為 Proximity Bias，國碼解析以確定性關鍵字直接獨立解析注入，解決 Photon 回傳結果不含 `country` 欄位導致 `dest_country` 永遠為 `None` 的 P0 隱患。
 - **天數物理可見性雙向防衛 (Physical Visibility Defense)**: 前端天數分頁以 `Math.max(日期天數, 資料庫景點天數)` 渲染，後端 `save_itinerary` 與 `ai.py` 強制以 `max_day` 動態展延 `end_date`，徹底解決多天行程被截斷為 1 天且需手動按加號的幽靈行程問題。
 - **System 2 深度研究 Agent 上線**: 整合 Travelpayouts 即時票價數據與 Gemini 3.7 Flash 思考推論模式，前端支援非同步輪詢進度卡片與一鍵轉入行程匯入器。
@@ -11,6 +15,8 @@
 - **神經注入與跨平台極限防呆**: 實作 `argparse` 支援高層級工作流實體報告注入；使用 `safe_print` 包裹 `sys.stdout` 避免 Windows 背景服務崩潰；修復 Python 3.11 f-string 語法相容性與 `TrustedHostMiddleware` 白名單 (加入 `testserver`)。
 
 ## [Failed Paths]
+- **Language Server 記憶體緩存落後引發的假性紅字 (In-Flight Document Buffer De-sync)**: AI 工具在毫秒級寫入檔案時，IDE Language Server 若恰好在中間狀態捕獲 AST，會產生整排假性紅字。若使用者編輯器此時存檔，會觸發「The content of the file is newer」警告。核心教訓：遇到此狀況絕對不要點 Overwrite，應關閉分頁或執行 Revert File 重新載入磁碟最新版。
+- **Playwright 預設掃描目錄與 Vitest 單元測試衝突**: Playwright 預設會遞迴掃描專案內所有 `*.test.ts`，進而誤載 Vitest 的 CommonJS 測試檔導致報錯。核心教訓：多測試框架共存時，必須使用配置檔明確劃分測試範圍。
 - **GFE 逾時引發的偽性 CORS 誤診**: 連線若在到達 FastAPI Middleware Stack 前即被 Google Front End (GFE) 依據 60s 逾時強制斷開，瀏覽器只會收到不帶 CORS Headers 的 504 頁面並拋出 CORS 錯誤。修改代碼層 CORS Middleware 毫無作用，根因在於基礎設施層逾時配置。
 - **CI/CD 覆寫雲端手動設定**: 在 GCP Console Web UI 調整參數（如 Request Timeout）會在下一次包含 `backend/**` 的 Git Push 觸發 GitHub Actions 時被 `gcloud run deploy` 覆寫回 YAML 預設值。所有基礎設施調優必須於 Workflow 檔案中同步落地。
 - **Photon 回傳結構盲區**: 錯誤假設 Photon/Nominatim 的回傳結果物件中包含 `country` 欄位，導致取值永遠為 `None`。核心教訓：取用欄位前必須直接檢驗 API 回傳原始結構，不可依賴直覺假設。
@@ -26,6 +32,9 @@
 - **Dependabot 漏洞修補**: Default branch 存在 1 個 Low severity 安全漏洞，需排程升級相依性。
 
 ## [Vocabulary]
+- **Continuous Multi-Month Calendar**: iOS Swift 風格連續縱向多月份滾動日曆區間選擇器。
+- **Atomic Date Range Shift**: 原子日期平移，出發日與結束日平移時同步將所有子項目天數逆序/正序移動並保障截斷資料。
+- **Decoupled Button DOM Architecture**: 解耦按鈕 DOM 架構，避免按鈕巢狀包覆造成 HTML5 規格衝突。
 - **Inline Coordinates with Dynamic Fallback**: AI 直出座標伴隨動態補漏，兼顧極速生成與邊緣景點高可用性的坐標解析架構。
 - **Presentation Layer Truncation Separation**: 表現層截斷分離，保持資料層語義完整性，字數截斷完全由 CSS 控制。
 - **Infra-as-Code Authority**: 基礎設施程式碼權威，雲端執行時配置以 CI/CD Workflow 定義為唯一真實來源。
