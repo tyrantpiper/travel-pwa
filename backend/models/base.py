@@ -399,6 +399,13 @@ class UpdateInfoRequest(BaseModel):
     credit_cards: Optional[List[dict]] = None
 
 
+class UpdateDatesRequest(BaseModel):
+    """更新行程日期區間請求"""
+    start_date: str
+    end_date: str
+    on_shorten: Optional[str] = "merge"  # "merge" | "delete"
+
+
 class RouteStop(BaseModel):
     """路線停靠點"""
     lat: float

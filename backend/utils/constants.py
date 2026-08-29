@@ -11,7 +11,8 @@ DAY_MAP_FIELDS = [
     "day_notes", 
     "day_costs", 
     "day_tickets", 
-    "day_checklists"
+    "day_checklists",
+    "day_ai_reviews"
 ]
 
 # Smart Clone 允許複製的欄位

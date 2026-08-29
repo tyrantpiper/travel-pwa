@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Calendar, ChevronDown } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { TripSwitcher } from "@/components/trip-switcher"
@@ -16,7 +16,7 @@ interface ItineraryHeaderProps {
     day: number
     setDay: (d: number) => void
     onBack: () => void
-    onAddDay: (position: "before" | "end") => void
+    onOpenDatePicker?: () => void
     onDeleteDay: (dayNum: number) => void
     getDateInfo: (dayNum: number) => { date: string; week: string }
     userId: string | null
@@ -30,7 +30,7 @@ export function ItineraryHeader({
     day,
     setDay,
     onBack,
-    onAddDay,
+    onOpenDatePicker,
     onDeleteDay,
     getDateInfo,
     userId,
@@ -40,15 +40,45 @@ export function ItineraryHeader({
     const totalDays = dayNumbers.length
     const { t } = useLanguage()
 
+    // Format date capsule text
+    const dateCapsuleText = (() => {
+        if (!currentTrip?.start_date) {
+            return `${totalDays} ${t('ov_total_days') || '天'}`
+        }
+        const startStr = currentTrip.start_date.split('T')[0]
+        const endStr = currentTrip.end_date ? currentTrip.end_date.split('T')[0] : startStr
+        const nights = Math.max(0, totalDays - 1)
+        const durationStr = nights === 0 
+            ? (t('cal_single_day') || '1 天當日來回') 
+            : `${totalDays} 天 ${nights} 晚`
+        return `${startStr} - ${endStr} · ${durationStr}`
+    })()
+
     return (
         <div className="bg-white dark:bg-slate-800 pt-12 pb-2 border-b border-slate-200 dark:border-slate-700">
-            <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-4 sm:gap-2">
+            <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-3 gap-4 sm:gap-2">
                 <div className="w-full sm:w-auto min-w-0">
                     <button onClick={onBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
                         <ArrowLeft className="w-3 h-3" /> {t('back')}
                     </button>
-                    <TripSwitcher className="w-full sm:w-[240px] justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
+                    <TripSwitcher className="w-full sm:w-60 justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
+                    
+                    {/* 📅 iOS Date Range Capsule Button */}
+                    {onOpenDatePicker && (
+                        <div className="mt-1">
+                            <button
+                                onClick={onOpenDatePicker}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100/80 dark:bg-slate-700/60 hover:bg-slate-200/80 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-full border border-slate-200/80 dark:border-slate-600/60 shadow-xs transition-all active:scale-95 group"
+                                title={t('cal_title') || '調整旅行日期'}
+                            >
+                                <Calendar className="w-3.5 h-3.5 text-emerald-500 group-hover:scale-110 transition-transform" />
+                                <span>{dateCapsuleText}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                            </button>
+                        </div>
+                    )}
                 </div>
+
                 <div className="flex items-center justify-between w-full sm:w-auto sm:gap-4 min-w-0">
                     <div className="flex items-center gap-2">
                         {currentTrip?.public_id && (
@@ -71,69 +101,77 @@ export function ItineraryHeader({
                 </div>
             </div>
 
+            {/* 🗓️ Days Horizontal Scroll Stream */}
             <div className="flex gap-3 overflow-x-auto px-6 pt-2 no-scrollbar items-center">
-                <button
-                    onClick={() => onAddDay("before")}
-                    className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                    title={t('iv_add_day_before')}
-                    aria-label={t('iv_add_day_before')}
-                >
-                    +
-                </button>
-
                 {shouldShowDateSkeleton ? (
                     [1, 2, 3].map(i => (
-                        <div key={i} className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse flex-shrink-0" />
+                        <div key={i} className="w-14 h-14 bg-slate-200 dark:bg-slate-700 rounded-lg animate-pulse shrink-0" />
                     ))
                 ) : (
-                    dayNumbers.map((d) => {
-                        const { date, week } = getDateInfo(d)
-                        return (
-                            <div key={d} className="relative flex flex-col items-center">
-                                <button
-                                    onClick={() => setDay(d)}
-                                    className={cn(
-                                        "day-btn relative flex flex-col items-center min-w-[3.5rem] py-2 rounded-lg border",
-                                        day === d
-                                            ? "text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-md"
-                                            : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
-                                    )}
-                                >
-                                    {day === d && (
-                                        <motion.div
-                                            layoutId="day-indicator"
-                                            className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
-                                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                        />
-                                    )}
-                                    <span className="text-[10px] opacity-70">{week}</span>
-                                    <span className="font-bold">{date}</span>
-                                </button>
-                                {totalDays > 1 && day === d && (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onDeleteDay(d) }}
-                                        className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
-                                                text-red-400 bg-red-50/80 backdrop-blur-sm
-                                                border border-red-200/60 rounded-full shadow-sm 
-                                                active:scale-95 active:bg-red-100
-                                                transition-transform duration-100"
-                                    >
-                                        {t('iv_delete_this_day')}
-                                    </button>
+                    <>
+                        {/* 🆕 總覽 (Overview) Tab */}
+                        <div className="relative flex flex-col items-center">
+                            <button
+                                onClick={() => setDay(0)}
+                                className={cn(
+                                    "day-btn relative flex flex-col items-center min-w-14 py-2 px-2.5 rounded-lg border transition-colors",
+                                    day === 0
+                                        ? "text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-md"
+                                        : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                                 )}
-                            </div>
-                        )
-                    })
-                )}
+                            >
+                                {day === 0 && (
+                                    <motion.div
+                                        layoutId="day-indicator"
+                                        className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    />
+                                )}
+                                <span className="text-[10px] opacity-70">ALL</span>
+                                <span className="font-bold text-xs">{t('ov_overview_tab') || '總覽'}</span>
+                            </button>
+                        </div>
 
-                <button
-                    onClick={() => onAddDay("end")}
-                    className="flex-shrink-0 w-8 h-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full text-lg font-bold flex items-center justify-center shadow-sm transition-all hover:scale-110"
-                    title={t('iv_add_day_end')}
-                    aria-label={t('iv_add_day_end')}
-                >
-                    +
-                </button>
+                        {dayNumbers.map((d) => {
+                            const { date, week } = getDateInfo(d)
+                            return (
+                                <div key={d} className="relative flex flex-col items-center">
+                                    <button
+                                        onClick={() => setDay(d)}
+                                        className={cn(
+                                            "day-btn relative flex flex-col items-center min-w-14 py-2 rounded-lg border",
+                                            day === d
+                                                ? "text-white bg-slate-900 dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-md"
+                                                : "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
+                                        )}
+                                    >
+                                        {day === d && (
+                                            <motion.div
+                                                layoutId="day-indicator"
+                                                className="absolute inset-0 bg-slate-900 dark:bg-slate-100 rounded-lg -z-10"
+                                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                            />
+                                        )}
+                                        <span className="text-[10px] opacity-70">{week}</span>
+                                        <span className="font-bold">{date}</span>
+                                    </button>
+                                    {totalDays > 1 && day === d && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onDeleteDay(d) }}
+                                            className="mt-1.5 px-2.5 py-1 text-[10px] font-medium 
+                                                    text-red-400 bg-red-50/80 backdrop-blur-sm
+                                                    border border-red-200/60 rounded-full shadow-sm 
+                                                    active:scale-95 active:bg-red-100
+                                                    transition-transform duration-100"
+                                        >
+                                            {t('iv_delete_this_day')}
+                                        </button>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </>
+                )}
             </div>
         </div>
     )

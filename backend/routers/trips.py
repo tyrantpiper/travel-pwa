@@ -29,6 +29,7 @@ from models.base import (
     UpdateDayDataRequest,
     UpdateLocationRequest,
     UpdateInfoRequest,
+    UpdateDatesRequest,
     CreateItemRequest,
     UpdateItemRequest,
     AddDayRequest,
@@ -1280,6 +1281,184 @@ async def update_trip_info(
         raise
     except Exception as e:
         print(f"Update Info Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{trip_id}/dates")
+async def update_trip_dates(
+    trip_id: str,
+    request: UpdateDatesRequest,
+    user_id: str = Depends(get_verified_user),
+    supabase=Depends(get_supabase)
+):
+    """📅 原子化更新行程日期區間 (With Zero-Regression Shifting Engine)"""
+    print(f"📅 更新行程 {trip_id} 日期: {request.start_date} ~ {request.end_date}, on_shorten={request.on_shorten}, user={user_id}")
+    try:
+        # 1. 權限檢查
+        if user_id:
+            member_check = supabase.table("trip_members")\
+                .select("user_id")\
+                .eq("itinerary_id", trip_id)\
+                .eq("user_id", user_id)\
+                .execute()
+            if not member_check.data:
+                raise HTTPException(status_code=403, detail="您沒有權限修改此行程日期")
+
+        # 2. 取得目前行程
+        trip_res = supabase.table("itineraries").select("start_date, end_date, content").eq("id", trip_id).single().execute()
+        if not trip_res.data:
+            raise HTTPException(status_code=404, detail="行程不存在")
+
+        trip = trip_res.data
+        content = trip.get("content") or {}
+
+        # 3. 日期計算
+        old_start_str = trip.get("start_date") or request.start_date
+        old_end_str = trip.get("end_date") or old_start_str
+        
+        old_start = datetime.strptime(old_start_str.split('T')[0], "%Y-%m-%d")
+        old_end = datetime.strptime(old_end_str.split('T')[0], "%Y-%m-%d")
+        new_start = datetime.strptime(request.start_date.split('T')[0], "%Y-%m-%d")
+        new_end = datetime.strptime(request.end_date.split('T')[0], "%Y-%m-%d")
+
+        if new_end < new_start:
+            raise HTTPException(status_code=400, detail="結束日期不能早於開始日期")
+
+        old_days = max(1, (old_end - old_start).days + 1)
+        new_days = max(1, (new_end - new_start).days + 1)
+        start_shift = (old_start - new_start).days  # 正數 = 提前出發 (如原本 3/10 改 3/08 -> shift=+2)
+
+        # 4. 取得最大 content key 與 items 中的最大天數
+        all_content_keys = []
+        for field in DAY_MAP_FIELDS:
+            if field in content and isinstance(content[field], dict):
+                all_content_keys.extend(content[field].keys())
+        valid_day_nums = [int(k) for k in all_content_keys if k.isdigit()]
+        content_max_day = max(valid_day_nums) if valid_day_nums else 0
+        shift_limit_day = max(old_days, content_max_day)
+
+        # 5. 處理出發日平移
+        if start_shift != 0:
+            if start_shift > 0:
+                # A. 提前出發：舊活動與 content 往後移 +start_shift
+                items_res = supabase.table("itinerary_items")\
+                    .select("id, day_number")\
+                    .eq("itinerary_id", trip_id)\
+                    .order("day_number", desc=True)\
+                    .execute()
+                for item in (items_res.data or []):
+                    supabase.table("itinerary_items")\
+                        .update({"day_number": item["day_number"] + start_shift})\
+                        .eq("id", item["id"])\
+                        .execute()
+
+                # Content 欄位 (逆序迭代):
+                for field in DAY_MAP_FIELDS:
+                    if field in content and isinstance(content[field], dict):
+                        for i in range(shift_limit_day, 0, -1):
+                            old_k = str(i)
+                            new_k = str(i + start_shift)
+                            if old_k in content[field]:
+                                content[field][new_k] = content[field][old_k]
+                                del content[field][old_k]
+
+            else:
+                # B. 延後出發 (start_shift < 0)
+                shift_abs = abs(start_shift)
+                if request.on_shorten == "merge":
+                    early_items = supabase.table("itinerary_items")\
+                        .select("id, day_number")\
+                        .eq("itinerary_id", trip_id)\
+                        .lte("day_number", shift_abs)\
+                        .execute()
+                    for item in (early_items.data or []):
+                        supabase.table("itinerary_items")\
+                            .update({"day_number": shift_abs + 1})\
+                            .eq("id", item["id"])\
+                            .execute()
+                else:
+                    supabase.table("itinerary_items")\
+                        .delete()\
+                        .eq("itinerary_id", trip_id)\
+                        .lte("day_number", shift_abs)\
+                        .execute()
+
+                rem_items = supabase.table("itinerary_items")\
+                    .select("id, day_number")\
+                    .eq("itinerary_id", trip_id)\
+                    .gt("day_number", shift_abs)\
+                    .order("day_number", desc=False)\
+                    .execute()
+                for item in (rem_items.data or []):
+                    supabase.table("itinerary_items")\
+                        .update({"day_number": item["day_number"] - shift_abs})\
+                        .eq("id", item["id"])\
+                        .execute()
+
+                # Content 欄位 (正序迭代):
+                for field in DAY_MAP_FIELDS:
+                    if field in content and isinstance(content[field], dict):
+                        for i in range(shift_abs + 1, shift_limit_day + 1):
+                            old_k = str(i)
+                            new_k = str(i - shift_abs)
+                            if old_k in content[field]:
+                                content[field][new_k] = content[field][old_k]
+                                del content[field][old_k]
+                        for i in range(1, shift_abs + 1):
+                            if str(i) in content[field]:
+                                del content[field][str(i)]
+
+        # 6. 處理結束日截斷 (如果有效總天數比新天數大)
+        excess_items = supabase.table("itinerary_items")\
+            .select("id, day_number")\
+            .eq("itinerary_id", trip_id)\
+            .gt("day_number", new_days)\
+            .execute()
+        
+        if excess_items.data:
+            if request.on_shorten == "merge":
+                for item in excess_items.data:
+                    supabase.table("itinerary_items")\
+                        .update({"day_number": new_days})\
+                        .eq("id", item["id"])\
+                        .execute()
+                for field in DAY_MAP_FIELDS:
+                    if field in content and isinstance(content[field], dict):
+                        for k in list(content[field].keys()):
+                            if k.isdigit() and int(k) > new_days:
+                                if isinstance(content[field].get(str(new_days)), list) and isinstance(content[field][k], list):
+                                    content[field][str(new_days)].extend(content[field][k])
+                                del content[field][k]
+            else:
+                for item in excess_items.data:
+                    supabase.table("itinerary_items").delete().eq("id", item["id"]).execute()
+                for field in DAY_MAP_FIELDS:
+                    if field in content and isinstance(content[field], dict):
+                        for k in list(content[field].keys()):
+                            if k.isdigit() and int(k) > new_days:
+                                del content[field][k]
+
+        # 7. 更新 itineraries 表 (原子寫入)
+        updates = {
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "content": content
+        }
+        supabase.table("itineraries").update(updates).eq("id", trip_id).execute()
+        print(f"✅ 成功原子化更新 Trip {trip_id} 日期為 {request.start_date} ~ {request.end_date} (共 {new_days} 天)")
+
+        return {
+            "status": "success",
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "total_days": new_days
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"🔥 Update Dates Error: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -9,8 +9,7 @@ import { Trip, Activity } from "@/lib/itinerary-types"
 import { generateTripPDF, downloadPDF, TripPDFData } from "@/lib/pdf-generator"
 import { tripsApi } from "@/lib/api"
 import { useLanguage } from "@/lib/LanguageContext"
-
-
+import { useHaptic } from "@/lib/hooks"
 
 interface TripListProps {
     trips: Trip[]
@@ -23,16 +22,16 @@ interface TripListProps {
 }
 
 export function TripList({
-    // i18n
     trips,
     userId,
     isTripsLoading,
     onSelectTrip,
     onDeleteTrip,
     onLeaveTrip,
-    leavingTripId
+    leavingTripId,
 }: TripListProps) {
     const { t } = useLanguage()
+    const haptic = useHaptic()
 
     // PDF Generation Handler
     const handleDownloadPDF = async (trip: Trip) => {
@@ -86,8 +85,8 @@ export function TripList({
     if (isTripsLoading) {
         return (
             <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="h-32 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-36 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
                 ))}
             </div>
         )
@@ -95,8 +94,7 @@ export function TripList({
 
     if (trips.length === 0) {
         return (
-            <div className="text-center py-20 bg-white/50 dark:bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700">
-                <div className="text-slate-400 mb-2 text-lg">📭</div>
+            <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
                 <p className="text-slate-500">{t('trip_no_trips')}</p>
                 <p className="text-xs text-slate-400 mt-1">{t('trip_create_hint')}</p>
             </div>
@@ -119,7 +117,15 @@ export function TripList({
                             </Button>
                         )}
                     </div>
-                    <div className="cursor-pointer active:opacity-90" onClick={() => onSelectTrip(trip.id)}>
+                    {/* Top Clickable Banner Button */}
+                    <button 
+                        type="button" 
+                        className="w-full text-left cursor-pointer transition-all duration-200 active:scale-[0.985] block p-0 border-none bg-transparent outline-hidden" 
+                        onClick={() => {
+                            haptic.selection()
+                            onSelectTrip(trip.id)
+                        }}
+                    >
                         <div className="h-24 bg-slate-800 relative rounded-t-lg overflow-hidden">
                             {trip.cover_image ? (
                                 <div className="relative w-full h-full">
@@ -133,9 +139,9 @@ export function TripList({
                                     />
                                 </div>
                             ) : (
-                                <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900" />
+                                <div className="absolute inset-0 bg-linear-to-br from-slate-700 to-slate-900" />
                             )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                            <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                             <div className="absolute bottom-4 left-4 right-4 text-white">
                                 <h3 className="font-bold text-lg truncate">{trip.title}</h3>
                                 <p className="text-xs opacity-80 flex items-center gap-1">
@@ -144,7 +150,7 @@ export function TripList({
                                 </p>
                             </div>
                             {trip.is_sample ? (
-                                <div className="absolute top-3 right-12 bg-gradient-to-r from-indigo-500/80 to-purple-500/80 dark:from-indigo-400/70 dark:to-purple-400/70 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs text-white font-semibold flex items-center gap-1 shadow-md">
+                                <div className="absolute top-3 right-12 bg-linear-to-r from-indigo-500/80 to-purple-500/80 dark:from-indigo-400/70 dark:to-purple-400/70 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs text-white font-semibold flex items-center gap-1 shadow-md">
                                     {t('sample_trip_badge')}
                                 </div>
                             ) : (
@@ -153,37 +159,46 @@ export function TripList({
                                 </div>
                             )}
                         </div>
-                        <div className="p-4 bg-white dark:bg-slate-800 flex justify-between items-center rounded-b-lg">
-                            <span className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400 px-2 py-1 rounded-full">
-                                By {trip.creator_name || 'Guest'}
-                            </span>
-                            <div className="flex items-center gap-2">
-                                {trip.is_sample ? (
-                                    <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium px-2 h-7 flex items-center">
-                                        {t('sample_trip_explore')}
-                                    </span>
-                                ) : (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 gap-1 px-2 h-7"
-                                        onClick={(e) => { e.stopPropagation(); handleDownloadPDF(trip) }}
-                                    >
-                                        <Download className="w-3 h-3" /> PDF
-                                    </Button>
-                                )}
-                                {userId && trip.created_by !== userId && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 gap-1 px-2 h-7"
-                                        disabled={leavingTripId === trip.id}
-                                        onClick={(e) => { e.stopPropagation(); onLeaveTrip(trip.id) }}
-                                    >
-                                        {leavingTripId === trip.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />} {t('trip_leave')}
-                                    </Button>
-                                )}
-                            </div>
+                    </button>
+
+                    {/* Bottom Action Footer (Sibling, not inside <button>) */}
+                    <div className="p-4 bg-white dark:bg-slate-800 flex justify-between items-center rounded-b-lg">
+                        <button
+                            type="button"
+                            className="text-xs text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400 px-2 py-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors cursor-pointer border-none outline-hidden"
+                            onClick={() => {
+                                haptic.selection()
+                                onSelectTrip(trip.id)
+                            }}
+                        >
+                            By {trip.creator_name || 'Guest'}
+                        </button>
+                        <div className="flex items-center gap-2">
+                            {trip.is_sample ? (
+                                <span className="text-xs text-indigo-500 dark:text-indigo-400 font-medium px-2 h-7 flex items-center">
+                                    {t('sample_trip_explore')}
+                                </span>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-slate-700 gap-1 px-2 h-7"
+                                    onClick={(e) => { e.stopPropagation(); handleDownloadPDF(trip) }}
+                                >
+                                    <Download className="w-3 h-3" /> PDF
+                                </Button>
+                            )}
+                            {userId && trip.created_by !== userId && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-slate-700 gap-1 px-2 h-7"
+                                    disabled={leavingTripId === trip.id}
+                                    onClick={(e) => { e.stopPropagation(); onLeaveTrip(trip.id) }}
+                                >
+                                    {leavingTripId === trip.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />} {t('trip_leave')}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </Card>

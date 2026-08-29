@@ -353,6 +353,23 @@ export const tripsApi = {
         return res.json()
     },
 
+    /** 📅 Update trip date range (atomic shifting) */
+    updateDates: async (tripId: string, payload: { start_date: string; end_date: string; on_shorten?: "merge" | "delete" }, userId?: string) => {
+        const headers: Record<string, string> = { "Content-Type": "application/json" }
+        if (userId) headers["X-User-ID"] = userId
+
+        const res = await fetch(`${API.TRIPS}/${tripId}/dates`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify(payload)
+        })
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: "更新行程日期失敗" }))
+            throw new Error(error.detail || "更新行程日期失敗")
+        }
+        return res.json()
+    },
+
     /** Update daily location */
     updateLocation: async (tripId: string, location: { day: number; name: string; lat: number; lng: number }, userId?: string) => {
         const headers: Record<string, string> = { "Content-Type": "application/json" }

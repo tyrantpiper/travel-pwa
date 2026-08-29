@@ -136,6 +136,8 @@ export function useHaptic() {
     }, [])
 
     return useMemo(() => ({
+        /** Ultra-light tick - for tabs, lists, and segmented pickers */
+        selection: () => vibrate(6),
         /** Light tap - for button clicks */
         tap: () => vibrate(10),
         /** Medium feedback - for successful actions */
