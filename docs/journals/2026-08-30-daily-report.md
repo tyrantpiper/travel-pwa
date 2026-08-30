@@ -1,66 +1,69 @@
 # 📅 Daily Report - 2026-08-30
 
-> **系統狀態**：🟢 Production Ready (All 114 Unit Tests, 25 Backend Tests, 2 Playwright E2E Tests Passed)  
-> **發布提交**：[`cff9adf`](https://github.com/tyrantpiper/travel-pwa/commit/cff9adf) `feat(itinerary): add iOS Swift calendar range picker, master overview, and atomic date engine`
+> **系統狀態**：🟢 Production Ready (All 114 Unit Tests, 25 Backend Tests, 6/6 Playwright E2E Suites Passed)  
+> **今日關鍵提交**：
+> - [`cff9adf`](https://github.com/tyrantpiper/travel-pwa/commit/cff9adf) `feat(itinerary): add iOS Swift calendar range picker, master overview, and atomic date engine`
+> - [`167f565`](https://github.com/tyrantpiper/travel-pwa/commit/167f565) `feat(ui): add iOS Swift native navigation transitions, sub-views, and minimalist back buttons`
+> - [`53eabaf`](https://github.com/tyrantpiper/travel-pwa/commit/53eabaf) `feat(ui): elevate ai itinerary wizards, ios swift motion transitions, and touch guards`
 
 ---
 
 ## 🟢 1. Features & Fixes (今日交付價值)
 
-1. **iOS Swift 連續縱向日曆區間選擇器 (`CalendarRangeSheet.tsx`)**：
-   - 實作連續 12 個月多月份縱向平滑滾動日曆，支援 Sticky 月份頂部懸浮吸頂。
-   - 支援兩次點擊選取「出發日」與「結束日」，即時計算「X 天 Y 晚 / 1 天當日來回」日期膠囊。
-   - 具備「🔄 跳至今日 (`cal_jump_to_today`)」與「回到行程月份」快捷操作，並適配 `z-120` 遮罩分層與 Tailwind v4 語法。
-2. **行程全景脈絡儀表板 (`TripMasterOverview.tsx`)**：
-   - 在行程左側頂部新增「全部 (ALL) / 總覽 (Day 0)」Tab，一秒俯瞰多天總天數、景點數、總預算與城市軌跡。
-   - 支援點擊任一天數無縫跳轉，並自動適配國際多幣別格式化。
-3. **後端原子日期平移引擎 (`PATCH /api/trips/{trip_id}/dates`)**：
-   - 實現行程出發日、結束日原子化批次平移。
-   - 支援 `itinerary_items.day_number` 自動偏移，以及 `DAY_MAP_FIELDS`（含筆記、花費、票券、AI 評論）雙向安全位移。
-   - 具備縮短行程安全對話框：提供「合併至最後一天 (Merge)」與「直接刪除 (Delete)」雙重防禦。
-4. **HTML5 按鈕巢狀衝突修復 (`TripList.tsx`)**：
-   - 徹底解耦卡片主按鈕與底部動作按鈕列（PDF 下載、退出行程、刪除），消除瀏覽器 `cannot contain a nested <button>` 控制台報錯。
-5. **Zod 資料契約深度容錯 (`schemas.ts`)**：
-   - 全面為 Supabase 歷史 null 欄位加入 `.nullable().transform(...)` 轉換防禦，杜絕舊行程載入崩潰。
-6. **Playwright 現代化 E2E 測試工程化**：
-   - 新增 `playwright.config.ts` 隔離測試範圍至 `./tests`，成功建立登入與日曆總覽 2 組端對端自動化測試。
+1. **多模態行程匯入精靈 (`AiImportTripWizard.tsx`)**：
+   - 支援純文字、旅遊筆記、拖曳/點擊圖片上傳、以及剪貼簿 `Ctrl+V` 截圖直貼。
+   - 整合即時靈感範本膠囊（東京 5 日遊、關西美食、北海道自駕等），點擊自動帶入測試範本。
+   - 後端 Gemini 3.x Multimodal 解析圖片並自動結構化為標準 `TripPlan`。
+2. **5 步 Grill-Me 智慧問答嚮導 (`AiGrillMeWizard.tsx`)**：
+   - 實作「目的地 ➔ 旅伴 ➔ 節奏 ➔ 預算 ➔ 喜好」5 步分段互動嚮導。
+   - 動態計算進度條，並自動生成嚴格 XML 提示詞發送給 AI 生成行程。
+3. **雙向儲存目標選擇器 (`TripDialogs.tsx` & `tools-view.tsx`)**：
+   - AI 解析/生成完成後，提供雙向選擇：🌟 **建立為全新行程** vs 📥 **合併至現有行程**（依天數智慧追加）。
+4. **工具頁 3-Way 原地現代化分段器 (`tools-view.tsx`)**：
+   - 淘汰舊版彈窗與死代碼，原地內嵌 `🧙‍♂️ 智能引導` ✕ `📝 多模態匯入` ✕ `✍️ 自由輸入`。
+   - 完整保留信用卡管理（`cards`）與記帳分帳總覽（`expense`）所有資料流與圖表。
+5. **iOS Swift 全域雙向滑動轉場 (`app-shell.tsx`)**：
+   - 導入方向感知索引計算 (`TAB_INDICES: 0 ➔ 1 ➔ 2 ➔ 3`)，往右往左切換自動匹配 iOS 原生彈簧滑入（`x: ±28px`）。
+   - **消除動態 Key**：四個主畫面實例永不銷毀，達成 **0 重複 API 請求** 與 **滾動位置 100% 記憶**。
+6. **全域長按防文字選取保護 (`globals.css` & `bottom-nav.tsx`)**：
+   - 注入 iOS Native 觸控規範，所有按鈕、導航列與標籤強制 `select-none`，徹底消除手機長按文字反藍問題。
+   - 底部導航加入 `haptic.selection()` 原生震動與 `active:scale-95` 彈性點擊反饋。
+7. **記帳彈窗 Tailwind v4 標準化 (`expense-dialog.tsx`)**：
+   - 遵循「避免過度工程」決策，零破壞保留 20+ 項核心記帳業務邏輯，僅修復樣式語法達到 0 警告。
+8. **全套自動化端到端測試套件 (Playwright 6 大套件全數通過)**：
+   - 新增 `create_trip_flow.spec.ts` 與 `tools_view_flow.spec.ts`，全自動守護行程建立、工具箱與帳號設定。
 
 ---
 
 ## 🏛️ 2. Architecture Decisions (架構級決策)
 
-- **iOS Swift 風格日曆區間選擇器與行程總覽 (Continuous Multi-Month Calendar & Master Overview)**：
-  捨棄繁瑣且容易造成幽靈天數的單日增減按鈕，改以連續縱向滾動的雙向日曆區間選擇器為唯一日期變更入口；Day 0 專屬承載全行程指標脈絡。
-- **原子日期平移與雙向位移演算法 (Atomic Date Range Shift & Key Directional Movement)**：
-  出發日提前（Shift > 0）時，Content 字典必須採用**逆序迭代（Reverse-order shift）**防止鍵值覆蓋；延後（Shift < 0）時採用**正序迭代**前移過期資料。
-- **解耦按鈕 DOM 架構 (Decoupled Button DOM Architecture)**：
-  在複合卡片中，進入主要頁面的觸發器與內部獨立操作按鈕必須是平級 Sibling，不得互相包裹，確保 100% 符合 HTML5 與 WAI-ARIA 規範。
-- **E2E 獨立測試目錄隔離 (Isolated Playwright testDir)**：
-  透過 `playwright.config.ts` 明確宣告 `testDir: './tests'`，嚴格與 Vitest 單元測試 `__tests__` 隔離，保障測試管線獨立互不干擾。
+- **避免高風險重寫，採取精準微拋光 (Pragmatic Stabilization over Over-Execution)**：
+  對於承載 20+ 項高密度邏輯的 `ExpenseDialog`（AI 收據 OCR、多幣別匯率、明細拆帳、診斷狀態機），果斷停止推倒式重構，專注於樣式標準化與全域動效，取得最高的穩定度與安全 ROI。
+- **無狀態銷毀的視圖動畫架構 (Zero-Remount View Animation Architecture)**：
+  在 `<motion.div>` 實作切換動畫時，絕對不可在常駐視圖上使用動態 `key`。必須使用靜態標識並透過 `animate` 屬性驅動視覺位移，保證 React 元件生命週期穩定與 0 重複網路請求。
+- **雙向儲存目標分流引擎 (Dual Save Destination Engine)**：
+  AI 解析結果不再預設僅能建立新行程，而是透過 `tripsApi.importToTrip` 支援合併至現有行程，形成完整的旅遊資訊收集閉環。
 
 ---
 
 ## 🔴 3. Technical Debt (技術債務追蹤)
 
-- **AI 預估座標精準度觀測**: 需持續觀察 AI 在冷門景點給出經緯度之偏差值，評估是否需要在 DB 標註 `is_ai_inferred` 供使用者校對。
-- **Nominatim 呼叫前置守衛**: 當 Photon 或 LANDMARKS 已取得高置信度結果時，完全略過 Nominatim 網路請求以減少控制台 Warning 與網路延遲。
-- **Radix DialogContent 無障礙警告**: 修復瀏覽器控制台對 `DialogContent` 缺少 `Description` 或 `aria-describedby` 的 Accessibility Warning。
-- **Metrics/Timeout 測試跳過**: `test_poi_lifespan.py` 使用 `@pytest.mark.skip` 暫時略過了未實作的 Metrics 與 Timeout 測試案例，待後續 Sprint 補齊。
-- **Dependabot 漏洞修補**: Default branch 存在 1 個 Low severity 安全漏洞，需排程升級相依性。
+- **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby`，後續可補齊 `<DialogDescription>`。
+- **AI 座標精準度觀測**: 需持續觀察 AI 在冷門景點給出經緯度之偏差值，評估是否需要在 DB 標註 `is_ai_inferred`。
+- **Nominatim 呼叫前置守衛**: 當 Photon 或 LANDMARKS 已取得高置信度結果時，完全略過 Nominatim 網路請求以減少控制台 Warning。
 
 ---
 
 ## 🛡️ 4. Failed Paths (踩坑與失敗教訓)
 
-- **Language Server 記憶體緩存落後引發的假性紅字 (In-Flight Document Buffer De-sync)**：
-  AI 工具在毫秒級寫入檔案時，IDE Language Server 若恰好在中間狀態捕獲 AST，會產生整排假性紅字。若使用者編輯器此時存檔，會觸發「The content of the file is newer」警告。**教訓**：遇到此狀況絕對不要點 Overwrite，應關閉分頁或執行 Revert File 重新載入磁碟最新版。
-- **Playwright 預設掃描目錄與 Vitest 單元測試衝突**：
-  Playwright 預設會遞迴掃描專案內所有 `*.test.ts`，進而誤載 Vitest 的 CommonJS 測試檔導致報錯。**教訓**：多測試框架共存時，必須使用配置檔明確劃分測試範圍。
+- **Framer Motion 動態 Key 引發元件重新掛載與重複請求**：
+  在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 判定為新元件而銷毀重新掛載，引發 `fetchProfileData` 重複發送。**教訓**：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
+- **測試選擇器依賴特定 Tailwind 類別字串 (`z-[100]` vs `z-100`)**：
+  在升級 Tailwind v4 utility token 時，若 Playwright 測試選擇器以 `.z-\\[100\\]` 尋找元素會導致測試失敗。**教訓**：測試選擇器應優先使用角色 (`role`)、`aria-label` 或組合選擇器（如 `.fixed.z-100, .fixed.z-\\[100\\]`）以保持彈性。
 
 ---
 
 ## 🚀 5. Next Steps (後續規劃)
 
-1. 針對 `DialogContent` 補齊 `aria-describedby` 與 a11y 標籤，達成 100% 無障礙標準。
+1. 持續監控生產環境在 PWA 離線模式下的快取命中率與 Core Web Vitals (INP / LCP / CLS) 表現。
 2. 規劃行程總覽 (Day 0) 中的「多天軌跡地圖疊加渲染」，讓旅人在地圖上一鍵看清全趟旅行的地理移動軌跡。
-3. 持續監控生產環境 Core Web Vitals (INP / LCP / CLS) 表現。
