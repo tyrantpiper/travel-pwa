@@ -71,7 +71,8 @@ test.describe('Account Settings iOS Swift Flow', () => {
         const tripTrigger = page.getByRole('button', { name: /行程管理|Trip Management/i }).first();
         await expect(tripTrigger).toBeVisible();
         await tripTrigger.click();
-        await expect(page.locator('text=建立新行程').or(page.locator('text=Create New Trip')).first()).toBeVisible({ timeout: 5000 });
+        await page.waitForTimeout(400);
+        await expect(page.locator('[data-state="open"]').getByText(/建立新行程|Create New Trip/i).first()).toBeVisible({ timeout: 5000 });
 
         // 11. Tap Back Button from Usage Guide
         const guideBackBtn = page.locator('button[aria-label="Back"]').first();

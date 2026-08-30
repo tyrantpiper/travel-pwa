@@ -514,7 +514,7 @@ export function ExpenseDialog({
                         )}
 
                         {/* Hero Amount Section */}
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3 shadow-inner">
+                        <div className="p-4 rounded-xl bg-linear-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 space-y-3 shadow-inner">
                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                 💰 {t('exp_amount')}
                             </Label>
@@ -530,7 +530,7 @@ export function ExpenseDialog({
                                             {(() => {
                                                 const curr = CURRENCIES.find(c => c.code === inputCurrency) || allCurrencies.find(c => c.code === inputCurrency);
                                                 return curr?.countryCode ? (
-                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm flex-shrink-0">
+                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm shrink-0">
                                                         <Image 
                                                             src={`https://flagcdn.com/w40/${curr.countryCode}.png`} 
                                                             alt={curr.code}
@@ -548,7 +548,7 @@ export function ExpenseDialog({
                                         <ChevronsUpDown className="h-4 w-4 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0 rounded-xl shadow-2xl overflow-hidden" align="start">
+                                <PopoverContent className="w-75 p-0 rounded-xl shadow-2xl overflow-hidden" align="start">
                                     <div className="flex flex-col h-[min(400px,70vh)] overscroll-contain">
                                         <div className="p-2 border-b bg-slate-50 dark:bg-slate-900">
                                             <div className="relative">
@@ -582,7 +582,7 @@ export function ExpenseDialog({
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
-                                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm flex-shrink-0 mr-3">
+                                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm shrink-0 mr-3">
                                                                         <Image 
                                                                             src={`https://flagcdn.com/w40/${c.countryCode}.png`} 
                                                                             alt={c.code}
@@ -615,7 +615,7 @@ export function ExpenseDialog({
                                                                 onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
                                                             >
                                                                 {c.countryCode ? (
-                                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm flex-shrink-0 mr-3">
+                                                                    <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm shrink-0 mr-3">
                                                                         <Image 
                                                                             src={`https://flagcdn.com/w40/${c.countryCode}.png`} 
                                                                             alt={c.code}
@@ -629,8 +629,8 @@ export function ExpenseDialog({
                                                                 )}
                                                                 <span className="font-mono font-bold mr-2 w-10 text-left">{c.code}</span>
                                                                 <div className="flex flex-col items-start leading-none overflow-hidden">
-                                                                    <span className="text-xs truncate max-w-[150px]">{c.zhName || c.name}</span>
-                                                                    {c.zhName && <span className="text-[9px] text-slate-400 truncate max-w-[150px]">{c.name}</span>}
+                                                                    <span className="text-xs truncate max-w-37.5">{c.zhName || c.name}</span>
+                                                                    {c.zhName && <span className="text-[9px] text-slate-400 truncate max-w-37.5">{c.name}</span>}
                                                                 </div>
                                                             </Button>
                                                         ))}
@@ -663,7 +663,7 @@ export function ExpenseDialog({
                                         }}
                                     />
                                 </div>
-                                <div className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-white whitespace-nowrap min-w-[8rem] justify-center font-bold shadow-lg">
+                                <div className="flex items-center px-4 py-2 bg-linear-to-r from-emerald-500 to-teal-500 rounded-xl text-white whitespace-nowrap min-w-32 justify-center font-bold shadow-lg">
                                     <span className="text-emerald-200 text-xs mr-1">≈</span>
                                     NT$ {Math.round(cleanAmount(amountJPY) * inputRate).toLocaleString()}
                                 </div>
@@ -821,8 +821,8 @@ export function ExpenseDialog({
                                             <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 rounded-xl overflow-hidden shadow-2xl" align="start">
-                                        <div className="flex flex-col max-h-[300px]">
+                                    <PopoverContent className="w-(--radix-popover-trigger-width) p-0 rounded-xl overflow-hidden shadow-2xl" align="start">
+                                        <div className="flex flex-col max-h-75">
                                             <div className="p-2 border-b bg-slate-50">
                                                 <Input
                                                     placeholder={t('search')}
@@ -895,7 +895,7 @@ export function ExpenseDialog({
                                 placeholder={t('exp_notes_placeholder') || "備註說明..."}
                                 value={notes}
                                 onChange={e => setNotes(e.target.value)}
-                                className="min-h-[80px] text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 rounded-xl focus:ring-slate-300"
+                                className="min-h-20 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 rounded-xl focus:ring-slate-300"
                             />
                         </div>
 
@@ -1052,7 +1052,7 @@ export function ExpenseDialog({
 
             {/* AI Confirmation Dialog */}
             <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                <DialogContent className="sm:max-w-[500px] h-[85vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-950 rounded-3xl shadow-2xl z-[110]">
+                <DialogContent className="sm:max-w-125 h-[85vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-950 rounded-3xl shadow-2xl z-110">
                     <DialogHeader className="p-5 border-b bg-slate-50 dark:bg-slate-900 shrink-0">
                         <DialogTitle className="flex items-center gap-2.5 text-base font-black">
                             <div className="h-8 w-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center shrink-0">
@@ -1129,7 +1129,7 @@ export function ExpenseDialog({
                             {t('exp_ai_confirm_cancel')}
                         </Button>
                         <Button
-                            className="flex-[2] h-12 rounded-xl bg-slate-950 text-white font-black shadow-lg active:scale-95 transition-all"
+                            className="flex-2 h-12 rounded-xl bg-slate-950 text-white font-black shadow-lg active:scale-95 transition-all"
                             onClick={applyParseResult}
                         >
                             <CheckCircle2 className="w-5 h-5 mr-2" />

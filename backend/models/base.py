@@ -18,9 +18,10 @@ class UserPreferences(BaseModel):
 
 
 class MarkdownImportRequest(BaseModel):
-    """Markdown 匯入請求"""
-    markdown_text: str
+    """Markdown/多模態 匯入請求"""
+    markdown_text: Optional[str] = ""
     itinerary_id: Optional[str] = None
+    image_base64: Optional[str] = None
 
 
 class GenerateTripRequest(BaseModel):

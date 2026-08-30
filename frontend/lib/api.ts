@@ -128,6 +128,7 @@ export interface GeocodeSearchParams {
 export interface AiParseParams {
     markdown_text: string
     user_id?: string
+    image_base64?: string
 }
 
 export interface AiGenerateParams {
@@ -535,7 +536,10 @@ export const aiApi = {
         const res = await fetch(API.PARSE_MD, {
             method: "POST",
             headers,
-            body: JSON.stringify({ markdown_text: params.markdown_text })
+            body: JSON.stringify({
+                markdown_text: params.markdown_text,
+                image_base64: params.image_base64
+            })
         })
         if (!res.ok) {
             const errMsg = await extractError(res, "AI 解析失敗")
