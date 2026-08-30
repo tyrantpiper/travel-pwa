@@ -56,9 +56,19 @@ test('Itinerary Date Range & Overview E2E Flow', async ({ page }) => {
                 }
             }
         }
+
+        // 7. Test Circular Back Button in ItineraryHeader
+        const headerBackBtn = page.locator('button[aria-label="Back"]').first();
+        if (await headerBackBtn.isVisible()) {
+            await headerBackBtn.click();
+            await page.waitForTimeout(500);
+            // Verify returned to trip list view
+            await expect(page.locator('h1').filter({ hasText: /(我的行程|My Journeys|My Trips)/i }).first()).toBeVisible({ timeout: 5000 });
+            console.log('✅ Itinerary Header circular back button pop transition passed');
+        }
     }
 
-    // 7. Verify zero button nesting console errors
+    // 8. Verify zero button nesting console errors
     const buttonNestingErrors = consoleErrors.filter(err => err.includes('cannot contain a nested <button>'));
     expect(buttonNestingErrors.length).toBe(0);
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -1237,77 +1238,89 @@ export function ItineraryView() {
         }
     }
 
-    if (viewMode === 'list') {
-        return (
-            <div className="h-full overflow-y-auto overscroll-contain">
-                <div className="flex flex-col bg-stone-50 dark:bg-slate-900 pb-32">
-                    <div className="flex-1 px-6 py-12 pb-32">
-                        <header className="mb-8 flex justify-between items-start">
-                            <div>
-                                <h1 className="text-3xl font-serif text-slate-900 dark:text-slate-100 mb-2">{t('my_trips')}</h1>
-                                <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
-                            </div>
-                            <ZenRenew onRefresh={async () => { await reloadTrips() }} successMessage={t('update_success')} errorMessage={t('update_failed')} />
-                        </header>
-
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <CreateTripModal
-                                isOpen={isCreateOpen}
-                                onOpenChange={setIsCreateOpen}
-                                userId={userId || ""}
-                                onSuccess={() => {
-                                    reloadTrips()
-                                    setTimeout(() => reloadTrips(), 500)
-                                }}
-                            />
-                            <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
-                        </div>
-
-                        <TripList
-                            trips={trips}
-                            userId={userId}
-                            isTripsLoading={isTripsLoading}
-                            onSelectTrip={(id) => {
-                                setActiveTripId(id)
-                                setViewMode('detail')
-                            }}
-                            onDeleteTrip={handleDeleteTrip}
-                            onLeaveTrip={handleLeaveTrip}
-                            leavingTripId={leavingTripId}
-                        />
-
-                        {/* Delete Confirmation Dialog */}
-                        <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle className="text-red-600 flex items-center gap-2">
-                                        <AlertCircle className="w-5 h-5" />
-                                        {t('confirm_delete')}
-                                    </DialogTitle>
-                                    <DialogDescription>{t('iv_delete_desc')}</DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4">
-                                    <p className="text-slate-600">
-                                        {t('iv_delete_trip_prefix')}<span className="font-bold text-slate-900">{trips.find((tr: Trip) => tr.id === deletingTripId)?.title}</span>{t('iv_delete_trip_suffix')}
-                                    </p>
-                                </div>
-                                <div className="flex justify-end gap-3">
-                                    <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
-                                    <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
-                                        {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('iv_deleting')}</> : t('delete')}
-                                    </Button>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-
     return (
         <div className="flex-1 flex flex-col h-full bg-stone-50 dark:bg-slate-900 overflow-hidden relative">
+            <AnimatePresence mode="wait" initial={false}>
+                {viewMode === 'list' ? (
+                    <motion.div
+                        key="trip-list"
+                        initial={{ opacity: 0, x: "-20%" }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: "-20%" }}
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        className="w-full h-full overflow-y-auto overscroll-contain bg-stone-50 dark:bg-slate-900"
+                    >
+                        <div className="flex flex-col bg-stone-50 dark:bg-slate-900 pb-32">
+                            <div className="flex-1 px-6 py-12 pb-32">
+                                <header className="mb-8 flex justify-between items-start">
+                                    <div>
+                                        <h1 className="text-3xl font-serif text-slate-900 dark:text-slate-100 mb-2">{t('my_trips')}</h1>
+                                        <p className="text-slate-500 text-sm">{t('manage_journeys')}</p>
+                                    </div>
+                                    <ZenRenew onRefresh={async () => { await reloadTrips() }} successMessage={t('update_success')} errorMessage={t('update_failed')} />
+                                </header>
+
+                                <div className="grid grid-cols-2 gap-3 mb-6">
+                                    <CreateTripModal
+                                        isOpen={isCreateOpen}
+                                        onOpenChange={setIsCreateOpen}
+                                        userId={userId || ""}
+                                        onSuccess={() => {
+                                            reloadTrips()
+                                            setTimeout(() => reloadTrips(), 500)
+                                        }}
+                                    />
+                                    <JoinTripDialog userId={userId || ""} onSuccess={reloadTrips} />
+                                </div>
+
+                                <TripList
+                                    trips={trips}
+                                    userId={userId}
+                                    isTripsLoading={isTripsLoading}
+                                    onSelectTrip={(id) => {
+                                        setActiveTripId(id)
+                                        setViewMode('detail')
+                                    }}
+                                    onDeleteTrip={handleDeleteTrip}
+                                    onLeaveTrip={handleLeaveTrip}
+                                    leavingTripId={leavingTripId}
+                                />
+
+                                {/* Delete Confirmation Dialog */}
+                                <Dialog open={!!deletingTripId} onOpenChange={(open) => !open && setDeletingTripId(null)}>
+                                    <DialogContent className="sm:max-w-md">
+                                        <DialogHeader>
+                                            <DialogTitle className="text-red-600 flex items-center gap-2">
+                                                <AlertCircle className="w-5 h-5" />
+                                                {t('confirm_delete')}
+                                            </DialogTitle>
+                                            <DialogDescription>{t('iv_delete_desc')}</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="py-4">
+                                            <p className="text-slate-600">
+                                                {t('iv_delete_trip_prefix')}<span className="font-bold text-slate-900">{trips.find((tr: Trip) => tr.id === deletingTripId)?.title}</span>{t('iv_delete_trip_suffix')}
+                                            </p>
+                                        </div>
+                                        <div className="flex justify-end gap-3">
+                                            <Button variant="outline" onClick={() => setDeletingTripId(null)}>{t('cancel')}</Button>
+                                            <Button variant="destructive" onClick={confirmDeleteTrip} disabled={isDeleting}>
+                                                {isDeleting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('iv_deleting')}</> : t('delete')}
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="trip-detail"
+                        initial={{ opacity: 0, x: "100%" }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: "100%" }}
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        className="w-full flex-1 flex flex-col h-full overflow-hidden relative bg-stone-50 dark:bg-slate-900"
+                    >
             {/* 🆕 Phase 3: Modular Header */}
 
             <LocationEditDialog
@@ -1588,6 +1601,9 @@ export function ItineraryView() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }
