@@ -194,6 +194,33 @@ body,
    Framer Motion handles will-change and GPU compositing internally.
    The global rule was causing downward scroll jitter on mobile. */
 
+/* 📱 iOS Swift PWA Touch & Selection Guard */
+body {
+  -webkit-touch-callout: none;
+}
+
+/* 禁止導航列、按鈕、圖標、標籤被長按意外選取文字 */
+button,
+nav,
+[role="button"],
+[role="tab"],
+.select-none,
+.bottom-nav-container,
+.tab-pill,
+.inspiration-pill {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* 確保輸入框與文字編輯區依然能正常選取與輸入文字 */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 /* ✨ 微動畫：按鈕按壓回饋 */
 button:not(:disabled),
 [role="button"]:not(:disabled) {

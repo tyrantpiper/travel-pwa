@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useMemo, memo, ComponentType, useRef } from "react"
 import { motion } from "framer-motion"
-import { useSWRConfig } from "swr"
 import {
     Plus, Trash2, Edit2, ChevronRight, FileText, Loader2,
     Wallet, CreditCard, Train, Utensils, ShoppingBag, Bed, Ticket, Receipt,
-    Sparkles, Upload, Image as ImageIcon, ChevronLeft, PieChart, List, Users, User,
-    Key, CheckCircle2, Share2, Inbox
+    Sparkles, Image as ImageIcon, ChevronLeft, PieChart, List, Users, User,
+    Key, Share2, FolderInput, Check, Inbox
 } from "lucide-react"
+import { AiGrillMeWizard } from "@/components/itinerary/AiGrillMeWizard"
+import { AiImportTripWizard } from "@/components/itinerary/AiImportTripWizard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -17,10 +18,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
@@ -79,33 +79,6 @@ interface Expense {
     payer_name?: string    // 🆕 Guest payer name
     items?: { original_name: string, translated_name?: string, amount: number }[] // 🆕 Replacing 'details'
     details?: { name: string, price: number }[] // ⚠️ Legacy fallback
-}
-
-interface ParseResult {
-    items?: Record<string, unknown>[]
-    title?: string
-    start_date?: string
-    end_date?: string
-    daily_locations?: Record<string, Record<string, unknown>>
-    day_notes?: Record<string, Record<string, unknown>>
-    day_costs?: Record<string, Record<string, unknown>>
-    day_tickets?: Record<string, Record<string, unknown>>
-    day_checklists?: Record<string, Record<string, unknown>>
-    ai_review?: string
-}
-
-interface GenerateResult {
-    items?: Record<string, unknown>[]
-    data?: { items?: Record<string, unknown>[] }
-    title?: string
-    start_date?: string
-    end_date?: string
-    daily_locations?: Record<string, Record<string, unknown>>
-    day_notes?: Record<string, Record<string, unknown>>
-    day_costs?: Record<string, Record<string, unknown>>
-    day_tickets?: Record<string, Record<string, unknown>>
-    day_checklists?: Record<string, Record<string, unknown>>
-    ai_review?: string
 }
 
 // 🆕 v3.8: 信用卡回饋功能
@@ -184,7 +157,6 @@ export function ToolsView() {
     // 🔧 v7 FIX: 載入完整行程資料（含 members），解決成員列表為空的問題
     const { trip: tripDetail } = useTripDetail(activeTripId, userId)
     const tripMembers = tripDetail?.members || activeTrip?.members || []
-    const { mutate } = useSWRConfig()
     const { mutate: offlineMutate } = useOfflineMutation() // 🆕 Resilience Hook
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection
     const [expenses, setExpenses] = useState<Expense[]>([])  // 🔧 FIX: Add missing expenses state
@@ -222,9 +194,7 @@ export function ToolsView() {
             if (content) {
                 const itinerary = tryParseItinerary(content)
                 if (itinerary) {
-                    setAiResult(itinerary)
-                } else {
-                    setMarkdown(content)
+                    setToolsAiResult(itinerary)
                 }
                 setActiveSection('ai')
                 toast.info(t('ai_ready_to_import' as TranslationKey))
@@ -266,21 +236,23 @@ export function ToolsView() {
     const [editItem, setEditItem] = useState<Expense | null>(null)
     const haptic = useHaptic()
 
-    // AI Tools state
-    const [markdown, setMarkdown] = useState("")
-    const [mdLoading, setMdLoading] = useState(false)
-    const [mdResult, setMdResult] = useState<ParseResult | null>(null)
+    // 🤖 Modern AI Tools state
+    const [toolsAiMode, setToolsAiMode] = useState<'wizard' | 'import' | 'freeform'>('wizard')
     const [aiPrompt, setAiPrompt] = useState("")
     const [aiLoading, setAiLoading] = useState(false)
-    const [aiResult, setAiResult] = useState<GenerateResult | null>(null)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [toolsAiResult, setToolsAiResult] = useState<any | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const [hasApiKey, setHasApiKey] = useState(false)
-    // 🆕 v3.5: 進度指示器
-    const [parseProgress, setParseProgress] = useState<string | null>(null)
     const [generateProgress, setGenerateProgress] = useState<string | null>(null)
+    const [saveTarget, setSaveTarget] = useState<'new' | 'existing'>('new')
+    const [selectedTripId, setSelectedTripId] = useState<string>(() => trips?.[0]?.id || "")
 
-    // 🆕 v3.9: 匯入行程選擇
-    const [selectedImportTripId, setSelectedImportTripId] = useState<string>("new")
+    useEffect(() => {
+        if (trips && trips.length > 0 && !selectedTripId) {
+            setSelectedTripId(trips[0].id)
+        }
+    }, [trips, selectedTripId])
 
     // 🆕 v3.8: 信用卡回饋彙整
     const [localCards, setLocalCards] = useState<CreditCard[]>([])
@@ -611,60 +583,35 @@ export function ToolsView() {
     // But verify on mount if needed
     // ...
 
-    const handleParse = async () => {
-        if (!markdown.trim()) return
-        setMdLoading(true)
-        setParseProgress(t('tv_ai_parsing'))
-        const userId = localStorage.getItem("user_uuid") || ""
-
-        try {
-            // 🛡️ Use standardized aiApi wrapper
-            const data = await aiApi.parseMarkdown({
-                markdown_text: markdown,
-                user_id: userId
-            })
-            setParseProgress(t('tv_ai_geocoding'))
-            setMdResult(data)
-            toast.success(t('tv_ai_parsed', { count: String(data.items?.length || 0) }))
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Parse failed")
-        } finally {
-            setMdLoading(false)
-            setParseProgress(null)
-        }
-    }
-
-    const handleGenerate = async () => {
-        if (!aiPrompt.trim()) return
+    const handleAiGenerate = async (customPrompt?: string) => {
+        const p = customPrompt || aiPrompt
+        if (!p?.trim()) return
+        haptic.tap()
         setAiLoading(true)
         setGenerateProgress(t('tv_ai_generating'))
-        const userId = localStorage.getItem("user_uuid") || ""
+        const activeUserId = localStorage.getItem("user_uuid") || userId || ""
 
         try {
-            // 🛡️ Use standardized aiApi wrapper
             const response = await aiApi.generateTrip({
-                prompt: aiPrompt,
-                user_id: userId
+                prompt: p,
+                user_id: activeUserId
             })
             setGenerateProgress(t('tv_ai_geocoding'))
-            
-            // 🆕 v22.1: Align nested structure. API returns { status, data: { items, ... } }
-            const itineraryData = response.data || response
-            
-            // 🛑 [防呆阻斷] 如果沒有生成任何景點，視為失敗，不要彈出綠色通知
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const itineraryData = (response as any).data || response
             if (!itineraryData.items || itineraryData.items.length === 0) {
-                setAiResult(null)
+                setToolsAiResult(null)
                 toast.error("AI 未能生成有效的景點列表，請再試一次")
                 return
             }
-
-            setAiResult(itineraryData)
+            haptic.success()
+            setToolsAiResult(itineraryData)
             toast.success(t('tv_ai_generated', { count: String(itineraryData.items?.length || 0) }))
         } catch (error) {
-            // 讓後端拋出的 422 錯誤能顯示出來
+            haptic.error()
             const msg = error instanceof Error ? error.message : "Generate failed"
             toast.error(`生成失敗: ${msg}`)
-            setAiResult(null)
+            setToolsAiResult(null)
         } finally {
             setAiLoading(false)
             setGenerateProgress(null)
@@ -672,43 +619,60 @@ export function ToolsView() {
     }
 
     const handleSaveTrip = async () => {
-        // Prevent double-click
         if (isSaving) return
-
-        const result = mdResult || aiResult
+        const result = toolsAiResult
         if (!result?.items) {
             toast.error("No items to save")
             return
         }
 
+        haptic.tap()
         setIsSaving(true)
-        const userId = localStorage.getItem("user_uuid")
+        const activeUserId = localStorage.getItem("user_uuid") || userId
         const userName = localStorage.getItem("user_nickname")
 
-        if (!userId || !userName) {
+        if (!activeUserId || !userName) {
             toast.error("Please login first")
-            setIsSaving(false)  // 🛡️ 防止按鈕永久禁用
+            setIsSaving(false)
             return
         }
 
         try {
-            if (selectedImportTripId === "new") {
-                // 1. 建立新行程 - 計算實際最大天數避免 end_date 截斷
-                const maxDay = result.items?.length > 0 ? Math.max(...result.items.map((it: { day_number?: number; day?: number }) => it.day_number || it.day || 1)) : 1
+            if (saveTarget === 'existing' && (selectedTripId || trips?.[0]?.id)) {
+                const targetId = selectedTripId || trips[0].id
+                const data = await tripsApi.importToTrip(targetId, {
+                    items: result.items,
+                    daily_locations: result.daily_locations || {},
+                    day_notes: result.day_notes || {},
+                    day_costs: result.day_costs || {},
+                    day_tickets: result.day_tickets || {},
+                    day_checklists: result.day_checklists || {},
+                    ai_review: result.ai_review,
+                    user_id: activeUserId
+                })
+
+                haptic.success()
+                toast.success(data.message || t('trip_merged_success'))
+                setToolsAiResult(null)
+                setAiPrompt("")
+                setSaveTarget('new')
+                await Promise.all([tripMutate(), reloadExpenses()])
+            } else {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const maxDay = result.items?.length > 0 ? Math.max(...result.items.map((it: any) => it.day_number || it.day || 1)) : 1
                 const startDateStr = result.start_date || new Date().toISOString().split('T')[0]
                 const startDateObj = new Date(startDateStr)
                 const calculatedEndDateObj = new Date(startDateObj)
                 calculatedEndDateObj.setDate(calculatedEndDateObj.getDate() + (maxDay - 1))
                 const endDateStr = result.end_date || calculatedEndDateObj.toISOString().split('T')[0]
 
-                // 使用 standardized tripsApi
                 const data = await tripsApi.saveItinerary({
-                    title: result.title || "New Trip",
+                    title: result.title || "New AI Trip",
                     start_date: startDateStr,
                     end_date: endDateStr,
                     items: result.items,
-                    user_id: userId,
-                    creator_name: userName,
+                    user_id: activeUserId,
+                    creator_name: userName || "Traveler",
                     daily_locations: result.daily_locations || {},
                     day_notes: result.day_notes || {},
                     day_costs: result.day_costs || {},
@@ -717,48 +681,18 @@ export function ToolsView() {
                     ai_review: result.ai_review
                 })
 
+                haptic.success()
                 toast.success(t('tv_trip_created', { code: data.share_code }))
-                setMarkdown("")
-                setMdResult(null)
-                setAiResult(null)
-                setSelectedImportTripId("new") // Reset
-                mutate((key) => typeof key === 'string' ? key.includes('/api/trips') : Array.isArray(key) && key[0]?.includes('/api/trips'), undefined, { revalidate: true })
-            } else {
-                // 2. 匯入至現有行程 - 使用 standardized tripsApi
-                const data = await tripsApi.importToTrip(selectedImportTripId, {
-                    items: result.items,
-                    daily_locations: result.daily_locations || {},
-                    day_notes: result.day_notes || {},
-                    day_costs: result.day_costs || {},
-                    day_tickets: result.day_tickets || {},
-                    day_checklists: result.day_checklists || {},
-                    ai_review: result.ai_review,
-                    user_id: userId
-                })
-
-                toast.success(data.message || t('tv_joined'))
-                setMarkdown("")
-                setMdResult(null)
-                setAiResult(null)
-                setSelectedImportTripId("new") // Reset
-                // Refresh trip data if active
-                if (activeTripId === selectedImportTripId) {
-                    mutate((key) => typeof key === 'string' && key.includes(`/api/trips/${activeTripId}`), undefined, { revalidate: true })
-                }
+                setToolsAiResult(null)
+                setAiPrompt("")
+                setSaveTarget('new')
+                await Promise.all([tripMutate(), reloadExpenses()])
             }
         } catch (error) {
+            haptic.error()
             toast.error(error instanceof Error ? error.message : "Save failed")
         } finally {
             setIsSaving(false)
-        }
-    }
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (file) {
-            const reader = new FileReader()
-            reader.onload = (event) => { setMarkdown(event.target?.result as string) }
-            reader.readAsText(file)
         }
     }
 
@@ -1189,24 +1123,22 @@ export function ToolsView() {
                                 )}
                             </TabsContent>
 
+                            {/* 🤖 現代化 AI 工具箱 (Grill-Me ✕ 多模態匯入 ✕ 自由輸入) */}
                             <TabsContent value="ai" className="mt-4 space-y-4">
-                                {/* API Key Prompt */}
                                 {!hasApiKey && (
-                                    <div className="bg-linear-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 space-y-3">
+                                    <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <div className="bg-amber-100 p-2 rounded-full">
-                                                <Key className="w-4 h-4 text-amber-600" />
-                                            </div>
-                                            <h3 className="font-semibold text-amber-800">{t('tv_setup_ai')}</h3>
+                                            <Key className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                            <h3 className="font-semibold text-amber-800 dark:text-amber-200">{t('tv_setup_ai')}</h3>
                                         </div>
-                                        <p className="text-sm text-amber-700">
+                                        <p className="text-xs text-amber-700 dark:text-amber-300">
                                             {t('tv_setup_ai_desc')}
                                         </p>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-amber-600">{t('tv_setup_ai_hint')}</span>
+                                        <div className="flex items-center justify-between pt-1">
+                                            <span className="text-xs text-amber-600 dark:text-amber-400">{t('tv_setup_ai_hint')}</span>
                                             <Button
                                                 size="sm"
-                                                className="bg-amber-500 hover:bg-amber-600 text-white"
+                                                className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl cursor-pointer"
                                                 onClick={() => {
                                                     const event = new CustomEvent('navigate-to-profile')
                                                     window.dispatchEvent(event)
@@ -1219,111 +1151,206 @@ export function ToolsView() {
                                     </div>
                                 )}
 
-                                {hasApiKey && (
-                                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/30 px-3 py-2 rounded-lg border border-green-100 dark:border-green-800/50">
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        <span>{t('tv_ai_ready')}</span>
+                                {/* 生成/解析結果預覽與儲存卡片 */}
+                                {toolsAiResult && !aiLoading && (
+                                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-md border border-stone-200 dark:border-slate-700 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-indigo-500" />
+                                                <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{toolsAiResult.title || "AI 規劃結果"}</span>
+                                            </div>
+                                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 font-semibold">
+                                                {toolsAiResult.items?.length || 0} {t('trip_preview_spots')}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            📅 {toolsAiResult.start_date || "2026-10-01"} ~ {toolsAiResult.end_date || "2026-10-05"}
+                                        </p>
+
+                                        {/* 📥 儲存目標選擇 (新建 vs 合併) */}
+                                        <div className="space-y-2 pt-2 border-t border-stone-200/80 dark:border-slate-700/80">
+                                            <div className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-between">
+                                                <span>{t('save_target_label')}</span>
+                                                <span className="text-[11px] font-normal text-slate-400">{t('save_target_desc')}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        haptic.selection()
+                                                        setSaveTarget('new')
+                                                    }}
+                                                    className={cn(
+                                                        "p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer select-none active:scale-98",
+                                                        saveTarget === 'new'
+                                                            ? "bg-indigo-500/10 dark:bg-indigo-400/15 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs"
+                                                            : "bg-stone-50 dark:bg-slate-900 border-stone-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                                                    )}
+                                                >
+                                                    <Plus className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                                                    <span className="text-xs">{t('save_as_new_trip')}</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={!trips || trips.length === 0}
+                                                    onClick={() => {
+                                                        haptic.selection()
+                                                        setSaveTarget('existing')
+                                                        if (!selectedTripId && trips && trips.length > 0) {
+                                                            setSelectedTripId(trips[0].id)
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer select-none active:scale-98 disabled:opacity-40",
+                                                        saveTarget === 'existing'
+                                                            ? "bg-indigo-500/10 dark:bg-indigo-400/15 border-indigo-500 dark:border-indigo-400 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs"
+                                                            : "bg-stone-50 dark:bg-slate-900 border-stone-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                                                    )}
+                                                >
+                                                    <FolderInput className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+                                                    <span className="text-xs">{t('merge_into_existing_trip')}</span>
+                                                </button>
+                                            </div>
+
+                                            {saveTarget === 'existing' && trips && trips.length > 0 && (
+                                                <div className="pt-1">
+                                                    <select
+                                                        value={selectedTripId || trips[0]?.id}
+                                                        onChange={e => setSelectedTripId(e.target.value)}
+                                                        className="w-full h-10 px-3 rounded-xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-700 text-xs font-medium text-slate-800 dark:text-slate-200 cursor-pointer outline-hidden focus:border-indigo-500"
+                                                    >
+                                                        {trips.map(tr => (
+                                                            <option key={tr.id} value={tr.id}>
+                                                                {tr.title} ({tr.start_date || ""} ~ {tr.end_date || ""})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 pt-1">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    haptic.tap()
+                                                    setToolsAiResult(null)
+                                                }}
+                                                className="h-10 px-3 text-xs rounded-xl cursor-pointer"
+                                            >
+                                                {t('replan_btn')}
+                                            </Button>
+                                            <Button
+                                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl h-10 shadow-sm cursor-pointer"
+                                                onClick={handleSaveTrip}
+                                                disabled={isSaving}
+                                            >
+                                                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-1.5" />}
+                                                {saveTarget === 'existing' ? t('save_and_merge') : t('save_as_trip')}
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
 
-                                <Sheet>
-                                    <SheetTrigger asChild>
-                                        <Button variant="outline" className="h-14 w-full bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white justify-between">
-                                            <span className="flex items-center gap-3">
-                                                <div className="bg-amber-100 dark:bg-amber-500/20 p-1.5 rounded-full"><Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" /></div>
-                                                {t('ai_generator')}
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 opacity-30" />
-                                        </Button>
-                                    </SheetTrigger>
-                                    <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                                        <SheetHeader><SheetTitle>{t('ai_generator')}</SheetTitle></SheetHeader>
-                                        <div className="flex-1 space-y-4 py-4">
-                                            <Textarea placeholder={t('describe_trip')} className="min-h-25" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} />
-                                            <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleGenerate} disabled={aiLoading}>{aiLoading ? <><Loader2 className="animate-spin mr-2" />{generateProgress || t('generating')}</> : <>{t('generate')}</>}</Button>
-                                            {aiResult?.items && (
-                                                <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
-                                                    <p className="text-sm text-green-600 font-medium">✅ 已生成 {aiResult.items.length} 個地點</p>
-
-                                                    <div className="space-y-1">
-                                                        <Label className="text-xs text-slate-500">{t('tools_storage')}</Label>
-                                                        <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                            <SelectTrigger className="w-full bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white">
-                                                                <SelectValue placeholder={t('tools_storage_ph')} />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="new">{t('tv_create_new_trip')}</SelectItem>
-                                                                {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                                {trips.map((trip: Trip) => (
-                                                                    <SelectItem key={trip.id} value={trip.id}>
-                                                                        📂 {trip.title} (Day {trip.days?.length || 1})
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-
-                                                    <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleSaveTrip} disabled={isSaving}>
-                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('confirm_import'))}
-                                                    </Button>
-                                                </div>
-                                            )}
+                                {/* AI 子功能切換 (三合一分段選擇器) */}
+                                {!toolsAiResult && (
+                                    <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-stone-200/80 dark:border-slate-700 space-y-4">
+                                        <div className="flex bg-stone-100 dark:bg-slate-900 p-0.5 rounded-xl border border-stone-200/80 dark:border-slate-800 text-xs font-semibold select-none">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    haptic.selection()
+                                                    setToolsAiMode('wizard')
+                                                }}
+                                                className={cn(
+                                                    "flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1",
+                                                    toolsAiMode === 'wizard'
+                                                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                )}
+                                            >
+                                                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                                                <span>{t('mode_grill_me')}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    haptic.selection()
+                                                    setToolsAiMode('import')
+                                                }}
+                                                className={cn(
+                                                    "flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1",
+                                                    toolsAiMode === 'import'
+                                                        ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-300 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                )}
+                                            >
+                                                <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                                                <span>多模態匯入</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    haptic.selection()
+                                                    setToolsAiMode('freeform')
+                                                }}
+                                                className={cn(
+                                                    "flex-1 py-1.5 px-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1",
+                                                    toolsAiMode === 'freeform'
+                                                        ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-2xs font-bold"
+                                                        : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                )}
+                                            >
+                                                <span>{t('mode_freeform')}</span>
+                                            </button>
                                         </div>
-                                    </SheetContent>
-                                </Sheet>
 
-                                <Sheet>
-                                    <SheetTrigger asChild>
-                                        <Button variant="outline" className="h-14 w-full bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white justify-between">
-                                            <span className="flex items-center gap-3">
-                                                <div className="bg-blue-100 dark:bg-blue-500/20 p-1.5 rounded-full"><FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" /></div>
-                                                {t('markdown_import')}
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 opacity-30" />
-                                        </Button>
-                                    </SheetTrigger>
-                                    <SheetContent className="w-full sm:max-w-md overflow-y-auto flex flex-col h-full">
-                                        <SheetHeader><SheetTitle>{t('markdown_import')}</SheetTitle></SheetHeader>
-                                        <div className="flex-1 space-y-4 py-4">
-                                            <div className="flex justify-between items-center">
-                                                <Label className="text-xs">{t('input_or_upload')}</Label>
-                                                <div>
-                                                    <input type="file" id="file-upload" className="hidden" accept=".txt,.md" onChange={handleFileUpload} />
-                                                    <label htmlFor="file-upload"><span className="text-xs text-blue-600 cursor-pointer hover:underline bg-blue-50 px-2 py-1 rounded"><Upload className="w-3 h-3 inline mr-1" />{t('upload')}</span></label>
+                                        {/* 1. 🧙‍♂️ Grill-Me 5 步智能引導 */}
+                                        {toolsAiMode === 'wizard' && (
+                                            <AiGrillMeWizard
+                                                onComplete={(xmlPrompt) => handleAiGenerate(xmlPrompt)}
+                                            />
+                                        )}
+
+                                        {/* 2. 📝 多模態筆記/圖片解析 */}
+                                        {toolsAiMode === 'import' && (
+                                            <AiImportTripWizard
+                                                userId={userId || ""}
+                                                onComplete={(data) => setToolsAiResult(data)}
+                                            />
+                                        )}
+
+                                        {/* 3. ✍️ 自由提示詞輸入 */}
+                                        {toolsAiMode === 'freeform' && (
+                                            <div className="space-y-4 pt-1">
+                                                <div className="space-y-2">
+                                                    <Label>{t('ai_prompt_label')}</Label>
+                                                    <Textarea
+                                                        value={aiPrompt}
+                                                        onChange={e => setAiPrompt(e.target.value)}
+                                                        placeholder={t('ai_prompt_placeholder')}
+                                                        rows={4}
+                                                        className="resize-none font-sans rounded-xl bg-stone-50 dark:bg-slate-900"
+                                                    />
+                                                    <p className="text-xs text-slate-400">{t('ai_prompt_hint')}</p>
                                                 </div>
+
+                                                <Button
+                                                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.99]"
+                                                    onClick={() => handleAiGenerate()}
+                                                    disabled={aiLoading || !aiPrompt.trim()}
+                                                >
+                                                    {aiLoading ? (
+                                                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{generateProgress || t('generating')}</>
+                                                    ) : (
+                                                        <><Sparkles className="w-4 h-4 mr-2" />{t('ai_generate_btn')}</>
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <Textarea placeholder={t('paste_markdown')} className="min-h-50 font-mono text-xs" value={markdown} onChange={e => setMarkdown(e.target.value)} />
-                                            <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleParse} disabled={mdLoading}>{mdLoading ? <><Loader2 className="animate-spin mr-2" />{parseProgress || t('parsing')}</> : <>{t('parse')}</>}</Button>
-                                            {mdResult?.items && (
-                                                <div className="p-4 bg-stone-100 dark:bg-slate-800 rounded-xl space-y-3">
-                                                    <p className="text-sm text-green-600 font-medium">✅ {t('tv_ai_parsed', { count: String(mdResult.items.length) })}</p>
-
-                                                    <div className="space-y-1">
-                                                        <Label className="text-xs text-slate-500">{t('tv_save_to')}</Label>
-                                                        <Select value={selectedImportTripId} onValueChange={setSelectedImportTripId}>
-                                                            <SelectTrigger className="w-full bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-white">
-                                                                <SelectValue placeholder={t('tv_save_to')} />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="new">{t('tv_create_new_trip')}</SelectItem>
-                                                                {trips.length > 0 && <div className="h-px bg-slate-100 my-1" />}
-                                                                {trips.map((trip: Trip) => (
-                                                                    <SelectItem key={trip.id} value={trip.id}>
-                                                                        📂 {trip.title} ({trip.share_code})
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-
-                                                    <Button className="w-full dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200" onClick={handleSaveTrip} disabled={isSaving}>
-                                                        {isSaving ? <><Loader2 className="animate-spin mr-2" />{t('tv_processing')}</> : (selectedImportTripId === "new" ? t('save_trip') : t('tv_joined'))}
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </SheetContent>
-                                </Sheet>
+                                        )}
+                                    </div>
+                                )}
                             </TabsContent>
                         </Tabs>
                     </div>

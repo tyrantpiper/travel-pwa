@@ -4,6 +4,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import { useTheme } from "@/lib/ThemeContext"
+import { useHaptic } from "@/lib/hooks"
 
 interface BottomNavProps {
     activeTab: string
@@ -15,6 +16,7 @@ interface BottomNavProps {
 export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible = true }: BottomNavProps) {
     const { t } = useLanguage()
     const { currentTheme, accentColor } = useTheme()
+    const haptic = useHaptic()
 
     const tabs = [
         { id: "itinerary", label: t('nav_itinerary'), icon: Map },
@@ -31,15 +33,16 @@ export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible 
                 opacity: isVisible ? 1 : 0
             }}
             transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="fixed z-[100] bottom-[max(env(safe-area-inset-bottom,16px),16px)] left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-sm"
+            className="fixed z-100 bottom-[max(env(safe-area-inset-bottom,16px),16px)] left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-sm"
         >
-            <div className="bg-white/90 dark:bg-slate-950/90 backdrop-blur-2xl shadow-2xl dark:shadow-2xl border border-slate-200/50 dark:border-white/10 rounded-full px-2 flex justify-around items-center h-[68px]">
+            <div className="bg-white/90 dark:bg-slate-950/90 backdrop-blur-2xl shadow-2xl dark:shadow-2xl border border-slate-200/50 dark:border-white/10 rounded-full px-2 flex justify-around items-center h-17 select-none">
                 {tabs.map((tab) => {
                     const isActive = activeTab === tab.id;
                     return (
                         <button
                             key={tab.id}
                             onClick={() => {
+                                haptic.selection()
                                 if (isActive) {
                                     onActiveTabClick?.(tab.id)
                                 } else {
@@ -47,7 +50,7 @@ export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible 
                                 }
                             }}
                             className={cn(
-                                "relative flex flex-col items-center justify-center w-full h-[85%] gap-1 rounded-full transition-colors duration-200 z-10",
+                                "relative flex flex-col items-center justify-center w-full h-[85%] gap-1 rounded-full transition-all duration-200 z-10 cursor-pointer active:scale-95 select-none",
                                 isActive 
                                     ? (accentColor === 'default' ? "text-slate-900 dark:text-white" : "") 
                                     : "text-slate-500 hover:text-slate-800 dark:text-white/50 dark:hover:text-white/80"
@@ -65,7 +68,7 @@ export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible 
                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                 />
                             )}
-                            <tab.icon className="w-[22px] h-[22px]" strokeWidth={isActive ? 2.5 : 1.5} />
+                            <tab.icon className="w-5.5 h-5.5" strokeWidth={isActive ? 2.5 : 1.5} />
                             <span className="text-[10px] font-semibold tracking-tight">{tab.label}</span>
                         </button>
                     );

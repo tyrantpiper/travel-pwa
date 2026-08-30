@@ -1265,6 +1265,7 @@ export function ItineraryView() {
                                         isOpen={isCreateOpen}
                                         onOpenChange={setIsCreateOpen}
                                         userId={userId || ""}
+                                        trips={trips}
                                         onSuccess={() => {
                                             reloadTrips()
                                             setTimeout(() => reloadTrips(), 500)

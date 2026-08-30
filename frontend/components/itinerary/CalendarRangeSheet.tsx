@@ -183,6 +183,7 @@ export function CalendarRangeSheet({
         haptic.success()
         const end = selectedEnd || selectedStart
         await onConfirm(selectedStart, end)
+        onOpenChange(false)
     }
 
     const weekHeaders = zh 

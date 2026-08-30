@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { PushPermissionPrompt } from "@/components/notifications/push-permission-prompt"
 import dynamic from "next/dynamic"
 import { BottomNav } from "@/components/bottom-nav"
@@ -10,6 +10,15 @@ import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
 import { debugLog } from "@/lib/debug"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { AIStatusButton } from "@/components/ai/ai-status-button"
+
+import { motion } from "framer-motion"
+
+const TAB_INDICES: Record<string, number> = {
+    itinerary: 0,
+    info: 1,
+    tools: 2,
+    profile: 3,
+}
 
 // 🚀 [Perf Audit 2026] 將最強大的核心視圖 (ItineraryView) 也改為動態載入
 // 配合 Stealth Preheat 機制，達成「啟動極速」與「切換即時」
@@ -47,11 +56,11 @@ const InfoView = dynamic(() => import("@/components/views/info-view").then(mod =
 const ToolsView = dynamic(() => import("@/components/views/tools-view").then(mod => mod.ToolsView), {
     ssr: false,
     loading: () => (
-        <div className="flex-1 p-6 bg-stone-50 animate-pulse">
+        <div className="flex-1 flex flex-col bg-stone-50 animate-pulse p-6 space-y-6">
+            <div className="h-14 bg-stone-200/40 rounded-2xl w-full" />
             <div className="grid grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="h-32 bg-stone-200/40 rounded-3xl" />
-                ))}
+                <div className="h-32 bg-stone-200/30 rounded-2xl" />
+                <div className="h-32 bg-stone-200/30 rounded-2xl" />
             </div>
         </div>
     )
@@ -74,6 +83,17 @@ const ProfileView = dynamic(() => import("@/components/views/profile-view").then
 
 export function AppShell() {
     const [activeView, setActiveView] = useState("itinerary")
+    const [direction, setDirection] = useState<1 | -1>(1)
+    const prevViewRef = useRef(activeView)
+
+    const handleTabChange = useCallback((nextTab: string) => {
+        const prevIdx = TAB_INDICES[prevViewRef.current] ?? 0
+        const nextIdx = TAB_INDICES[nextTab] ?? 0
+        setDirection(nextIdx >= prevIdx ? 1 : -1)
+        prevViewRef.current = nextTab
+        setActiveView(nextTab)
+    }, [])
+
     // 💡 Preheat 旗標：決定是否在背景偷偷加載並渲染隱藏視圖
     const [shouldPreheat, setShouldPreheat] = useState(false)
 
@@ -103,15 +123,15 @@ export function AppShell() {
 
     // Listen for navigation events from other components
     useEffect(() => {
-        const handleNavigateToProfile = () => setActiveView("profile")
-        const handleNavigateToTools = () => setActiveView("tools")
+        const handleNavigateToProfile = () => handleTabChange("profile")
+        const handleNavigateToTools = () => handleTabChange("tools")
         window.addEventListener('navigate-to-profile', handleNavigateToProfile)
         window.addEventListener('navigate-to-tools', handleNavigateToTools)
         return () => {
             window.removeEventListener('navigate-to-profile', handleNavigateToProfile)
             window.removeEventListener('navigate-to-tools', handleNavigateToTools)
         }
-    }, [])
+    }, [handleTabChange])
 
     // 🕵️‍♂️ [Stealth Preheat] 隱形預熱機制 (Idle-Until-Urgent)
     useEffect(() => {
@@ -152,7 +172,7 @@ export function AppShell() {
                 }}
             />
             <div className="h-screen bg-background flex flex-col overflow-hidden">
-                <main className="flex-1 flex flex-col min-h-0" data-scroll="true">
+                <main className="flex-1 flex flex-col min-h-0 relative" data-scroll="true">
                     {/* ✨ 全域 AI 狀態按鈕 — 左上角固定定位 (與右上角通知對稱) */}
                     <div className="absolute top-2 left-3 z-100">
                         <AIStatusButton />
@@ -165,20 +185,52 @@ export function AppShell() {
 
                     {/* ItineraryView (Critical Path - Now Dynamic & Preheated) */}
                     <div className={activeView === "itinerary" ? "flex-1 h-full min-h-0 overflow-hidden" : "hidden"}>
-                        {(activeView === "itinerary" || shouldPreheat) && <ItineraryView />}
+                        {(activeView === "itinerary" || shouldPreheat) && (
+                            <motion.div
+                                animate={activeView === "itinerary" ? { opacity: 1, x: 0 } : { opacity: 0.7, x: direction * 28 }}
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="w-full h-full flex flex-col"
+                            >
+                                <ItineraryView />
+                            </motion.div>
+                        )}
                     </div>
 
                     {/* Lazy components with Preheat guard */}
                     <div className={activeView === "info" ? "flex-1 h-full overflow-hidden" : "hidden"}>
-                        {(activeView === "info" || shouldPreheat) && <InfoView />}
+                        {(activeView === "info" || shouldPreheat) && (
+                            <motion.div
+                                animate={activeView === "info" ? { opacity: 1, x: 0 } : { opacity: 0.7, x: direction * 28 }}
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="w-full h-full flex flex-col"
+                            >
+                                <InfoView />
+                            </motion.div>
+                        )}
                     </div>
 
                     <div className={activeView === "tools" ? "flex-1 h-full overflow-hidden" : "hidden"}>
-                        {(activeView === "tools" || shouldPreheat) && <ToolsView />}
+                        {(activeView === "tools" || shouldPreheat) && (
+                            <motion.div
+                                animate={activeView === "tools" ? { opacity: 1, x: 0 } : { opacity: 0.7, x: direction * 28 }}
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="w-full h-full flex flex-col"
+                            >
+                                <ToolsView />
+                            </motion.div>
+                        )}
                     </div>
 
                     <div className={activeView === "profile" ? "flex-1 h-full overflow-hidden" : "hidden"}>
-                        {(activeView === "profile" || shouldPreheat) && <ProfileView />}
+                        {(activeView === "profile" || shouldPreheat) && (
+                            <motion.div
+                                animate={activeView === "profile" ? { opacity: 1, x: 0 } : { opacity: 0.7, x: direction * 28 }}
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="w-full h-full flex flex-col"
+                            >
+                                <ProfileView />
+                            </motion.div>
+                        )}
                     </div>
 
                 </main>
