@@ -13,8 +13,13 @@
 - **Tiered Memory 架構與原生 CLI 轉移**: 放棄外部 MCP CLI 依賴，全面改用原生 Antigravity CLI (`agy`) 作為神經壓縮引擎。在非同步 Daemon 中採用非阻塞 `asyncio.create_subprocess_exec` 呼叫 `agy` (包含 `%LOCALAPPDATA%\agy\bin\agy.exe` 動態尋址)，防止 Event Loop 阻塞。
 - **AI Recombination 神經融合機制**: 記憶壓縮採用 AI 重組融合模式取代傳統覆寫 (Overwrite)，無縫整合新舊日誌並確保 `[Technical Debt]` 區塊持續累積追蹤。
 - **神經注入與跨平台極限防呆**: 實作 `argparse` 支援高層級工作流實體報告注入；使用 `safe_print` 包裹 `sys.stdout` 避免 Windows 背景服務崩潰；修復 Python 3.11 f-string 語法相容性與 `TrustedHostMiddleware` 白名單 (加入 `testserver`)。
+- **無狀態銷毀的視圖動畫架構 (Zero-Remount View Animation Architecture)**: 在 `<motion.div>` 實作切換動畫時，絕對不可在常駐視圖上使用動態 `key`。必須使用靜態標識並透過 `animate` 屬性驅動視覺位移，保證 React 元件生命週期穩定與 0 重複網路請求。
+- **避免高風險重寫，採取精準微拋光 (Pragmatic Stabilization over Over-Execution)**: 對於承載 20+ 項高密度邏輯的 `ExpenseDialog`，停止推倒式重構，專注於樣式標準化與全域動效，取得最高的穩定度與安全 ROI。
+- **雙向儲存目標分流引擎 (Dual Save Destination Engine)**: AI 解析結果透過 `tripsApi.importToTrip` 支援合併至現有行程或建立為新行程，形成完整閉環。
 
 ## [Failed Paths]
+- **Framer Motion 動態 Key 引發元件重新掛載與重複請求**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 判定為新元件而銷毀重新掛載，引發 `fetchProfileData` 重複發送。核心教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
+- **測試選擇器依賴特定 Tailwind 類別字串 (`z-[100]` vs `z-100`)**: 在升級 Tailwind v4 utility token 時，若 Playwright 測試選擇器以 `.z-\\[100\\]` 尋找元素會導致測試失敗。核心教訓：測試選擇器應優先使用角色 (`role`)、`aria-label` 或組合選擇器（如 `.fixed.z-100, .fixed.z-\\[100\\]`）以保持彈性。
 - **Language Server 記憶體緩存落後引發的假性紅字 (In-Flight Document Buffer De-sync)**: AI 工具在毫秒級寫入檔案時，IDE Language Server 若恰好在中間狀態捕獲 AST，會產生整排假性紅字。若使用者編輯器此時存檔，會觸發「The content of the file is newer」警告。核心教訓：遇到此狀況絕對不要點 Overwrite，應關閉分頁或執行 Revert File 重新載入磁碟最新版。
 - **Playwright 預設掃描目錄與 Vitest 單元測試衝突**: Playwright 預設會遞迴掃描專案內所有 `*.test.ts`，進而誤載 Vitest 的 CommonJS 測試檔導致報錯。核心教訓：多測試框架共存時，必須使用配置檔明確劃分測試範圍。
 - **GFE 逾時引發的偽性 CORS 誤診**: 連線若在到達 FastAPI Middleware Stack 前即被 Google Front End (GFE) 依據 60s 逾時強制斷開，瀏覽器只會收到不帶 CORS Headers 的 504 頁面並拋出 CORS 錯誤。修改代碼層 CORS Middleware 毫無作用，根因在於基礎設施層逾時配置。
