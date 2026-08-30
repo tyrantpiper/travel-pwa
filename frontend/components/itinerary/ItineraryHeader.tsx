@@ -1,6 +1,6 @@
 "use client"
 
-import { ArrowLeft, Calendar, ChevronDown } from "lucide-react"
+import { ChevronLeft, Calendar, ChevronDown } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { TripSwitcher } from "@/components/trip-switcher"
@@ -9,6 +9,7 @@ import { TripMembersSheet } from "@/components/itinerary/TripMembersSheet"
 import { ZenRenew } from "@/components/ui/zen-renew"
 import { Trip } from "@/lib/itinerary-types"
 import { useLanguage } from "@/lib/LanguageContext"
+import { useHaptic } from "@/lib/hooks"
 
 interface ItineraryHeaderProps {
     currentTrip?: Trip
@@ -39,6 +40,7 @@ export function ItineraryHeader({
 }: ItineraryHeaderProps) {
     const totalDays = dayNumbers.length
     const { t } = useLanguage()
+    const haptic = useHaptic()
 
     // Format date capsule text
     const dateCapsuleText = (() => {
@@ -58,8 +60,15 @@ export function ItineraryHeader({
         <div className="bg-white dark:bg-slate-800 pt-12 pb-2 border-b border-slate-200 dark:border-slate-700">
             <div className="px-6 flex flex-col sm:flex-row justify-between items-start sm:items-end mb-3 gap-4 sm:gap-2">
                 <div className="w-full sm:w-auto min-w-0">
-                    <button onClick={onBack} className="flex items-center gap-1 text-xs font-bold text-slate-400 mb-2">
-                        <ArrowLeft className="w-3 h-3" /> {t('back')}
+                    <button
+                        onClick={() => {
+                            haptic.selection()
+                            onBack()
+                        }}
+                        className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center bg-stone-100/80 dark:bg-slate-700/80 hover:bg-stone-200/80 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 active:scale-90 transition-all cursor-pointer shadow-2xs mb-2 select-none"
+                        aria-label="Back"
+                    >
+                        <ChevronLeft className="w-5 h-5 -ml-0.5" />
                     </button>
                     <TripSwitcher className="w-full sm:w-60 justify-start px-0 font-serif font-bold text-2xl border-none shadow-none bg-transparent hover:bg-slate-100/50 h-auto py-1" />
                     

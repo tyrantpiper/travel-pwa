@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Sparkles, Moon, Sun, Palette, AlertTriangle,
-    ChevronDown, ChevronUp, Brain, // 🆕 AI 記憶圖示
+    ChevronDown, ChevronUp, Brain, ChevronRight, ChevronLeft, // 🆕 AI 記憶與導航圖示
     BookOpen, Mail, Check, BellRing  // 🆕 使用說明、聯絡、推播圖示
 } from "lucide-react"
 import Image from "next/image"
@@ -17,13 +18,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { TranslationKey } from "@/lib/i18n"
 import { cn, openExternalLink } from "@/lib/utils"
 import { ZoomableImage } from "@/components/ui/zoomable-image"
+import { useHaptic } from "@/lib/hooks"
 
 import { useLanguage } from "@/lib/LanguageContext"
 import { useTheme, ACCENT_COLORS, AccentColor } from "@/lib/ThemeContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { toast } from "sonner"
 import {
-    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+    Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Label } from "@/components/ui/label"
@@ -34,6 +36,7 @@ import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
 import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
+import { UsageGuideContent } from "@/components/UsageGuideContent"
 import { getSecureApiKey } from "@/lib/security"
 import { usePushNotifications } from "@/lib/hooks/usePushNotifications"
 import { AIKeyDialog } from "@/components/ai/ai-key-dialog"
@@ -44,6 +47,9 @@ export function ProfileView() {
     const { lang, setLang, t } = useLanguage()
     const zh = lang === 'zh'
     const { isDark, toggleDark, accentColor, setAccentColor, currentTheme } = useTheme()
+    const haptic = useHaptic()
+    const [subView, setSubView] = useState<'main' | 'account' | 'guide'>('main')
+    const [copiedUuid, setCopiedUuid] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
     const [memoryToDelete, setMemoryToDelete] = useState<UserPreference | null>(null)
@@ -358,15 +364,23 @@ export function ProfileView() {
     }
 
     return (
-        <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
-            <div className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900">
+        <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none relative">
+            <AnimatePresence mode="wait" initial={false}>
+                {subView === 'main' ? (
+                    <motion.div
+                        key="profile-main"
+                        initial={{ opacity: 0, x: -16 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -16 }}
+                        transition={{ duration: 0.2 }}
+                        className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900"
+                    >
+                        <div className={cn("h-48 relative overflow-hidden bg-linear-to-br", currentTheme.gradient)}>
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
+                            <div className="absolute inset-0 bg-linear-to-b from-transparent to-stone-50/90 dark:to-slate-900/90"></div>
+                        </div>
 
-                <div className={cn("h-48 relative overflow-hidden bg-linear-to-br", currentTheme.gradient)}>
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1480796927426-f609979314bd?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-30"></div>
-                    <div className="absolute inset-0 bg-linear-to-b from-transparent to-stone-50/90 dark:to-slate-900/90"></div>
-                </div>
-
-                <div className="px-6 relative -mt-20">
+                        <div className="px-6 relative -mt-20">
                     <div className="flex flex-col items-center gap-5">
                         {/* Avatar Wrapper */}
                         <div className="relative group">
@@ -1065,7 +1079,15 @@ export function ProfileView() {
                         </div>
 
                         <Separator />
-                        <MenuItem icon={User} label={t('account_settings')} />
+                        <MenuItem 
+                            icon={User} 
+                            label={t('account_settings')} 
+                            showChevron 
+                            onClick={() => {
+                                haptic.selection()
+                                setSubView('account')
+                            }} 
+                        />
                         <Separator />
                         {/* 🔔 推播通知開關 */}
                         {isSupported && (
@@ -1101,130 +1123,275 @@ export function ProfileView() {
                                 <Separator />
                             </>
                         )}
-                        <MenuItem icon={BookOpen} label={t('usage_guide')} onClick={() => setUsageGuideOpen(true)} />
+                        <MenuItem 
+                            icon={BookOpen} 
+                            label={t('usage_guide')} 
+                            showChevron 
+                            onClick={() => {
+                                haptic.selection()
+                                setSubView('guide')
+                            }} 
+                        />
                         <Separator />
-                        <MenuItem icon={Smartphone} label={t('app_version')} value="v1.0.0" />
-                        <Separator />
+                        {/* 📱 App 版本 (已依需求隱藏) */}
+                        {/* <MenuItem icon={Smartphone} label={t('app_version')} value="v1.0.0" /> */}
+                        {/* <Separator /> */}
                         <MenuItem icon={CreditCard} label={t('default_currency')} value="TWD (NT$)" />
                         <Separator />
                         <MenuItem 
                             icon={Mail} 
                             label={zh ? "聯絡開發者" : "Contact Developer"} 
+                            showChevron 
                             onClick={() => setContactDialogOpen(true)} 
                         />
-                        <Separator />
-                        <MenuItem icon={Trash2} label={t('clear_cache')} isDestructive onClick={handleClearCache} />
-                        <Separator />
-                        {/* 🔴 刪除所有資料 (GDPR) */}
-                        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                            <DialogTrigger asChild>
-                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-red-50 transition-colors text-red-600">
-                                    <div className="flex items-center gap-3">
-                                        <AlertTriangle className="w-5 h-5 text-red-500" />
-                                        <span className="text-sm font-medium">{t('profile_delete_all_data')}</span>
-                                    </div>
-                                    <span className="text-xs text-red-400">GDPR</span>
-                                </div>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-100">
-                                <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2 text-red-600">
-                                        <AlertTriangle className="w-5 h-5" />
-                                        {t('profile_delete_all_data')}
-                                    </DialogTitle>
-                                    <DialogDescription asChild>
-                                        <div className="text-left text-sm text-muted-foreground">
-                                            {t('profile_delete_warning')}
-                                            <ul className="list-disc pl-5 mt-2 space-y-1 text-slate-500">
-                                                <li>{t('profile_all_trips')}</li>
-                                                <li>{t('profile_all_expenses')}</li>
-                                                <li>{t('profile_all_photos')}</li>
-                                            </ul>
-                                            <p className="mt-3 text-red-600 font-bold">{t('profile_delete_irreversible')}</p>
-                                        </div>
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="py-4">
-                                    <Label htmlFor="deleteConfirm" className="text-sm text-slate-600">
-                                        {t('profile_type_delete')}
-                                    </Label>
-                                    <Input
-                                        id="deleteConfirm"
-                                        value={deleteConfirmText}
-                                        onChange={(e) => setDeleteConfirmText(e.target.value)}
-                                        placeholder="DELETE"
-                                        className="mt-2 font-mono"
-                                    />
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>{t('cancel')}</Button>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={handleDeleteAllData}
-                                        disabled={deleteConfirmText !== "DELETE" || isDeleting}
-                                    >
-                                        {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                                        {t('profile_confirm_delete')}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        {/* ✉️ 聯絡開發者 Dialog */}
-                        <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-                            <DialogContent className="sm:max-w-100 border-blue-100/50 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90 dark:border-slate-800">
-                                <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2 text-blue-600">
-                                        <Mail className="w-5 h-5" />
-                                        {zh ? "聯絡開發者" : "Contact Developer"}
-                                    </DialogTitle>
-                                    <DialogDescription className="text-left pt-2">
-                                        {zh ? "如果您有任何建議、功能回報或合作意向，歡迎隨時聯繫我。" : "Feel free to reach out for suggestions, bug reports, or collaboration."}
-                                    </DialogDescription>
-                                </DialogHeader>
-                                
-                                <div className="py-6 flex flex-col items-center gap-4">
-                                    <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/50 w-full flex flex-col items-center gap-1 group">
-                                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">{zh ? '官方信箱' : 'OFFICIAL EMAIL'}</span>
-                                        <span className="text-lg font-mono font-medium text-slate-700 dark:text-slate-200">ryanpig228@gmail.com</span>
-                                    </div>
-
-                                    <div className="flex gap-3 w-full">
-                                        <Button 
-                                            variant="outline" 
-                                            className={cn(
-                                                "flex-1 h-11 transition-all duration-300",
-                                                copied ? "border-green-500 text-green-500 bg-green-50 dark:bg-green-900/10" : "border-slate-200 dark:border-slate-700"
-                                            )}
-                                            onClick={handleCopyEmail}
-                                        >
-                                            {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                                            {zh ? (copied ? "已複製" : "複製信箱") : (copied ? "Copied" : "Copy")}
-                                        </Button>
-                                    <Button 
-                                        className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white"
-                                        onClick={handleWriteEmail}
-                                    >
-                                        <Mail className="w-4 h-4 mr-2" />
-                                        {zh ? "撰寫郵件" : "Write Email"}
-                                    </Button>
-                                    </div>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
                     </div>
 
-                    {/* 📖 使用說明 Dialog */}
-                    <UsageGuideDialog open={usageGuideOpen} onOpenChange={setUsageGuideOpen} />
-
-                    <Button variant="outline" className="w-full h-12 text-red-500 border-red-100 hover:bg-red-50 hover:text-red-600 mt-4" onClick={handleLogout}>
+                    <Button variant="outline" className="w-full h-12 text-red-500 border-red-100 dark:border-red-900/40 hover:bg-red-50 hover:text-red-600 mt-4 active:scale-98" onClick={handleLogout}>
                         <LogOut className="w-4 h-4 mr-2" /> {t('logout')}
                     </Button>
                     <div className="h-20" />
                 </div>
+            </motion.div>
+        ) : subView === 'account' ? (
+            <motion.div
+                key="profile-account"
+                initial={{ opacity: 0, x: "100%" }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: "100%" }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900 px-4 pt-16 sm:pt-14"
+            >
+                {/* 1. iOS Top Navigation Bar */}
+                <div className="flex items-center justify-between mb-6">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            haptic.selection()
+                            setSubView('main')
+                        }}
+                        className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center bg-white/80 dark:bg-slate-800/80 border border-stone-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 hover:bg-stone-100 dark:hover:bg-slate-700 active:scale-90 transition-all shadow-2xs cursor-pointer select-none"
+                        aria-label="Back"
+                    >
+                        <ChevronLeft className="w-5 h-5 -ml-0.5" />
+                    </button>
+                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                        {t('account_settings')}
+                    </h2>
+                    <div className="w-10" />
+                </div>
 
+                {/* 2. iOS Group 1: 帳號身分與復原碼 */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 mb-4 shadow-xs border border-stone-200/60 dark:border-slate-700/60">
+                    <div className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                        {t('account_uuid') || '帳號識別碼 (UUID)'}
+                    </div>
+                    <div className="p-3 bg-stone-50 dark:bg-slate-900 rounded-xl font-mono text-xs text-slate-700 dark:text-slate-300 break-all border border-stone-200 dark:border-slate-700 mb-2 select-all">
+                        {typeof window !== 'undefined' ? localStorage.getItem("user_uuid") || "guest-session" : "guest-session"}
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mb-3 leading-relaxed">
+                        {t('account_uuid_hint') || '用於在不同裝置復原帳號或備份資料'}
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-10 rounded-xl text-xs font-medium dark:border-slate-700 active:scale-98"
+                        onClick={async () => {
+                            const uuid = localStorage.getItem("user_uuid")
+                            if (uuid) {
+                                await navigator.clipboard.writeText(uuid)
+                                haptic.tap()
+                                setCopiedUuid(true)
+                                toast.success(t('account_copied') || '已複製識別碼！')
+                                setTimeout(() => setCopiedUuid(false), 2000)
+                            }
+                        }}
+                    >
+                        {copiedUuid ? <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
+                        {copiedUuid ? (t('account_copied') || '已複製') : (t('account_copy_uuid') || '複製識別碼')}
+                    </Button>
+                </div>
+
+                {/* 3. iOS Group 2: 資料與快取維護 */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden mb-4 shadow-xs border border-stone-200/60 dark:border-slate-700/60">
+                    <div className="px-4 pt-3 pb-1 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        {t('cache_and_data') || '資料維護'}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            haptic.error()
+                            handleClearCache()
+                        }}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-stone-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer border-none bg-transparent outline-hidden active:bg-stone-100 dark:active:bg-slate-700"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Trash2 className="w-4 h-4 text-amber-500" />
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                {t('clear_cache')}
+                            </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400/60" />
+                    </button>
+                </div>
+
+                {/* 4. iOS Group 3: 危險操作區 */}
+                <div className="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs border border-red-100 dark:border-red-950/50 mb-6">
+                    <div className="px-4 pt-3 pb-1 text-xs font-bold text-rose-400 uppercase tracking-wider">
+                        {t('danger_zone') || '危險操作'}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            haptic.error()
+                            setDeleteDialogOpen(true)
+                        }}
+                        className="w-full flex items-center justify-between p-4 text-left hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors text-red-600 cursor-pointer border-none bg-transparent outline-hidden active:bg-red-50 dark:active:bg-red-950/40"
+                    >
+                        <div className="flex items-center gap-3">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-sm font-medium">
+                                {t('profile_delete_all_data')}
+                            </span>
+                        </div>
+                        <span className="text-xs text-red-400 font-mono">GDPR</span>
+                    </button>
+                </div>
+
+                {/* 5. 帳號登出 */}
+                <Button 
+                    variant="outline" 
+                    className="w-full h-12 text-red-500 border-red-100 dark:border-red-900/40 hover:bg-red-50 hover:text-red-600 rounded-2xl active:scale-98" 
+                    onClick={handleLogout}
+                >
+                    <LogOut className="w-4 h-4 mr-2" /> {t('logout')}
+                </Button>
+            </motion.div>
+        ) : (
+            <motion.div
+                key="profile-guide"
+                initial={{ opacity: 0, x: "100%" }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: "100%" }}
+                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                className="min-h-screen pb-32 bg-stone-50 dark:bg-slate-900 px-4 pt-16 sm:pt-14"
+            >
+                {/* 1. iOS Top Navigation Bar */}
+                <div className="flex items-center justify-between mb-6">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            haptic.selection()
+                            setSubView('main')
+                        }}
+                        className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center bg-white/80 dark:bg-slate-800/80 border border-stone-200/60 dark:border-slate-700/60 text-slate-700 dark:text-slate-200 hover:bg-stone-100 dark:hover:bg-slate-700 active:scale-90 transition-all shadow-2xs cursor-pointer select-none"
+                        aria-label="Back"
+                    >
+                        <ChevronLeft className="w-5 h-5 -ml-0.5" />
+                    </button>
+                    <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                        {t('usage_guide')}
+                    </h2>
+                    <div className="w-10" />
+                </div>
+
+                {/* 2. Usage Guide Content */}
+                <UsageGuideContent />
+            </motion.div>
+        )}
+    </AnimatePresence>
+
+    {/* 🔴 刪除所有資料 (GDPR) Dialog */}
+    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-100">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="w-5 h-5" />
+                    {t('profile_delete_all_data')}
+                </DialogTitle>
+                <DialogDescription asChild>
+                    <div className="text-left text-sm text-muted-foreground">
+                        {t('profile_delete_warning')}
+                        <ul className="list-disc pl-5 mt-2 space-y-1 text-slate-500">
+                            <li>{t('profile_all_trips')}</li>
+                            <li>{t('profile_all_expenses')}</li>
+                            <li>{t('profile_all_photos')}</li>
+                        </ul>
+                        <p className="mt-3 text-red-600 font-bold">{t('profile_delete_irreversible')}</p>
+                    </div>
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Label htmlFor="deleteConfirm" className="text-sm text-slate-600">
+                    {t('profile_type_delete')}
+                </Label>
+                <Input
+                    id="deleteConfirm"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    className="mt-2 font-mono"
+                />
             </div>
-        </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>{t('cancel')}</Button>
+                <Button
+                    variant="destructive"
+                    onClick={handleDeleteAllData}
+                    disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                >
+                    {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                    {t('profile_confirm_delete')}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    {/* ✉️ 聯絡開發者 Dialog */}
+    <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+        <DialogContent className="sm:max-w-100 border-blue-100/50 bg-white/90 backdrop-blur-xl dark:bg-slate-900/90 dark:border-slate-800">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-blue-600">
+                    <Mail className="w-5 h-5" />
+                    {zh ? "聯絡開發者" : "Contact Developer"}
+                </DialogTitle>
+                <DialogDescription className="text-left pt-2">
+                    {zh ? "如果您有任何建議、功能回報或合作意向，歡迎隨時聯繫我。" : "Feel free to reach out for suggestions, bug reports, or collaboration."}
+                </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-6 flex flex-col items-center gap-4">
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-900/50 w-full flex flex-col items-center gap-1 group">
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">{zh ? '官方信箱' : 'OFFICIAL EMAIL'}</span>
+                    <span className="text-lg font-mono font-medium text-slate-700 dark:text-slate-200">ryanpig228@gmail.com</span>
+                </div>
+
+                <div className="flex gap-3 w-full">
+                    <Button 
+                        variant="outline" 
+                        className={cn(
+                            "flex-1 h-11 transition-all duration-300",
+                            copied ? "border-green-500 text-green-500 bg-green-50 dark:bg-green-900/10" : "border-slate-200 dark:border-slate-700"
+                        )}
+                        onClick={handleCopyEmail}
+                    >
+                        {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                        {zh ? (copied ? "已複製" : "複製信箱") : (copied ? "Copied" : "Copy")}
+                    </Button>
+                <Button 
+                    className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleWriteEmail}
+                >
+                    <Mail className="w-4 h-4 mr-2" />
+                    {zh ? "撰寫郵件" : "Write Email"}
+                </Button>
+                </div>
+            </div>
+        </DialogContent>
+    </Dialog>
+
+    {/* 📖 使用說明 Dialog */}
+    <UsageGuideDialog open={usageGuideOpen} onOpenChange={setUsageGuideOpen} />
+</div>
     )
 }
 
@@ -1233,14 +1400,18 @@ interface MenuItemProps {
     label: string
     value?: string
     isDestructive?: boolean
+    showChevron?: boolean
     onClick?: () => void
 }
 
-function MenuItem({ icon: Icon, label, value, isDestructive, onClick }: MenuItemProps) {
+function MenuItem({ icon: Icon, label, value, isDestructive, showChevron, onClick }: MenuItemProps) {
     return (
-        <div className={cn("flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 transition-colors", isDestructive ? "text-red-500 hover:bg-red-50" : "text-slate-700")} onClick={onClick}>
-            <div className="flex items-center gap-3"><Icon className={cn("w-5 h-5", isDestructive ? "text-red-400" : "text-slate-400")} /><span className="text-sm font-medium">{label}</span></div>
-            {value && <span className="text-xs text-slate-400 bg-stone-100 px-2 py-1 rounded">{value}</span>}
+        <div className={cn("flex items-center justify-between p-4 cursor-pointer hover:bg-stone-50 dark:hover:bg-slate-700/50 transition-colors select-none", isDestructive ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20" : "text-slate-700 dark:text-slate-200")} onClick={onClick}>
+            <div className="flex items-center gap-3"><Icon className={cn("w-5 h-5", isDestructive ? "text-red-400" : "text-slate-400 dark:text-slate-500")} /><span className="text-sm font-medium">{label}</span></div>
+            <div className="flex items-center gap-2">
+                {value && <span className="text-xs text-slate-400 dark:text-slate-400 bg-stone-100 dark:bg-slate-700 px-2 py-1 rounded">{value}</span>}
+                {showChevron && <ChevronRight className="w-4 h-4 text-slate-400/70" />}
+            </div>
         </div>
     )
 }
