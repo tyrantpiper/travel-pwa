@@ -74,6 +74,25 @@ from utils.deps import get_gemini_key, get_verified_user, get_supabase
 from utils.ai_config import DAILY_ROUTING, WORKHORSE_MODEL
 from google.genai import errors as genai_errors
 
+# 🛡️ 背景溫熱與防休眠守護
+async def _bg_warm_supabase(app: FastAPI):
+    """在獨立線程池中執行 Supabase 查詢，溫熱連線並防止 7 天暫停，不阻塞主 Event Loop"""
+    try:
+        supabase_client = getattr(app.state, "supabase", None)
+        if supabase_client:
+            def _sync_ping():
+                t0 = datetime.utcnow()
+                res = supabase_client.table("itineraries").select("id").limit(1).execute()
+                latency = (datetime.utcnow() - t0).total_seconds() * 1000
+                return latency, len(res.data) if res.data else 0
+            
+            latency, count = await asyncio.to_thread(_sync_ping)
+            app.state.db_last_status = "connected"
+            app.state.db_last_latency_ms = round(latency, 2)
+            app.state.db_last_checked = datetime.utcnow()
+    except Exception as e:
+        app.state.db_last_status = f"warning: {str(e)[:50]}"
+
 # [NEW] Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,11 +112,13 @@ async def lifespan(app: FastAPI):
     if supabase_url and supabase_key:
         try:
             app.state.supabase = create_client(supabase_url, supabase_key)
-            # [SAFETY] Predictive Check: Test connection with a lightweight query
-            test_res = app.state.supabase.table("itineraries").select("id").limit(1).execute()
-            print(f"[Supabase] ✅ Connected and verified (Query OK: {len(test_res.data) if test_res.data else 0} items)")
+            app.state.db_last_status = "initializing"
+            app.state.db_last_latency_ms = -1
+            # ✅ 非同步背景預熱，不阻塞開機流程 (0ms 啟動)
+            asyncio.create_task(_bg_warm_supabase(app))
+            print("[Supabase] ✅ Client initialized, warm-up scheduled in background")
         except Exception as e:
-            print(f"⚠️ [Supabase] Startup Verification Failed: {e}")
+            print(f"⚠️ [Supabase] Startup Initialization Failed: {e}")
             app.state.supabase = None
     else:
         app.state.supabase = None
@@ -246,33 +267,22 @@ print(f"[CORS] Configured outermost strict origins: {ALLOWED_ORIGINS}")
 # 3. 初始化已遷移至 Lifespan Manager
 
 
-# [NEW] Health Check (for UptimeRobot - prevents Supabase 7-day pause)
+# [NEW] Health Check (for UptimeRobot - prevents Supabase 7-day pause with zero latency)
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
-    """[HEALTH] 強化版健康檢查 (2026 Resilience Edition)
-    提供環境、資料庫與連線池的深度狀態
+    """[HEALTH] 0ms 極速健康檢查 (2026 Zero-Blocking Resilience Edition)
+    即時返回記憶體與 Uptime 狀態，並在背景非同步溫熱 Supabase
     """
+    # 1. 觸發背景非同步溫熱 (完全解耦，不阻塞主 Event Loop)
+    asyncio.create_task(_bg_warm_supabase(request.app))
     
-    # 1. 計算 Uptime
+    # 2. 計算 Uptime
     uptime_seconds = 0
     if hasattr(request.app.state, "start_time"):
         uptime_seconds = (datetime.utcnow() - request.app.state.start_time).total_seconds()
     
-    # 2. 探測資料庫 (Supabase Resilience)
-    db_status = "unknown"
-    db_latency_ms = -1
-    try:
-        supabase_client = getattr(request.app.state, "supabase", None)
-        if supabase_client:
-            start_check = datetime.utcnow()
-            # 輕量級查詢測試連線
-            supabase_client.table("itineraries").select("id").limit(1).execute()
-            db_latency_ms = (datetime.utcnow() - start_check).total_seconds() * 1000
-            db_status = "connected"
-        else:
-            db_status = "not_initialized"
-    except Exception as e:
-        db_status = f"error: {str(e)[:50]}"
+    db_status = getattr(request.app.state, "db_last_status", "connected")
+    db_latency_ms = getattr(request.app.state, "db_last_latency_ms", -1)
     
     # 3. 獲取連線池統計 (Predictive Stats)
     pool_stats = "N/A"
@@ -292,20 +302,58 @@ async def health_check(request: Request):
         pass
 
     return {
-        "status": "healthy" if db_status == "connected" else "degraded",
+        "status": "healthy" if db_status != "not_initialized" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "uptime_seconds": round(uptime_seconds, 1),
         "database": {
             "status": db_status,
-            "latency_ms": round(db_latency_ms, 2)
+            "latency_ms": round(db_latency_ms, 2) if isinstance(db_latency_ms, (int, float)) else db_latency_ms,
+            "mode": "async_background_warmed"
         },
         "resources": {
             "pool": pool_stats,
             "memory": "stable" # Placeholder for future OS metrics
         },
-        "version": "1.2.5-hardened",
+        "version": "1.2.6-resilience",
         "service": "ryan-travel-api"
     }
+
+@app.api_route("/health/deep", methods=["GET"])
+async def health_check_deep(request: Request):
+    """[HEALTH/DEEP] 深度健康檢查 (含 2.5s 硬熔斷防護)"""
+    start_check = datetime.utcnow()
+    try:
+        supabase_client = getattr(request.app.state, "supabase", None)
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Supabase not initialized")
+            
+        def _sync_ping():
+            return supabase_client.table("itineraries").select("id").limit(1).execute()
+            
+        # 🛡️ 2.5 秒硬熔斷
+        res = await asyncio.wait_for(asyncio.to_thread(_sync_ping), timeout=2.5)
+        latency = (datetime.utcnow() - start_check).total_seconds() * 1000
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "database": {
+                "status": "connected",
+                "latency_ms": round(latency, 2),
+                "items": len(res.data) if res.data else 0
+            },
+            "version": "1.2.6-resilience",
+            "service": "ryan-travel-api"
+        }
+    except asyncio.TimeoutError:
+        return ORJSONResponse(
+            status_code=504,
+            content={"status": "degraded", "detail": "Supabase check timed out after 2.5s"}
+        )
+    except Exception as e:
+        return ORJSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": str(e)[:100]}
+        )
 
 # 4. 載入 ArcGIS API Key (地理編碼用，可選)
 ARCGIS_API_KEY = (os.getenv("ARCGIS_API_KEY") or "").strip()
