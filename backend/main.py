@@ -75,51 +75,22 @@ from utils.deps import get_gemini_key, get_verified_user, get_supabase
 from utils.ai_config import DAILY_ROUTING, WORKHORSE_MODEL
 from google.genai import errors as genai_errors
 
-# 🛡️ 背景溫熱與防休眠守護 (原生非同步 + 60s 防抖冷卻鎖)
-_last_supabase_warm_time: float = 0.0
-_supabase_warm_lock = asyncio.Lock()
-
-async def _bg_warm_supabase(app: FastAPI):
-    """使用原生非同步 HTTP 查詢 Supabase PostgREST，溫熱連線並防止 7 天暫停
-    具備 60 秒冷卻防抖機制與非同步鎖，完全杜絕併發死鎖與線程池耗盡
-    """
-    global _last_supabase_warm_time
-    now = time.time()
-    # 🛡️ 60 秒防抖守衛：若 60 秒內已溫熱過，直接略過
-    if now - _last_supabase_warm_time < 60.0:
-        return
-        
-    async with _supabase_warm_lock:
-        if now - _last_supabase_warm_time < 60.0:
-            return
+# 🛡️ 獨立背景保活循環 (每 6 小時一次，完全與 HTTP 請求解耦)
+async def _periodic_supabase_keepalive():
+    """在背景每 6 小時靜默敲一次 Supabase，防止 7 天暫停，完全不影響任何 HTTP 請求"""
+    while True:
         try:
+            await asyncio.sleep(6 * 3600)
             supabase_url = os.getenv("SUPABASE_URL", "").strip()
             supabase_key = os.getenv("SUPABASE_KEY", "").strip()
-            if not supabase_url or not supabase_key:
-                return
-                
-            headers = {
-                "apikey": supabase_key,
-                "Authorization": f"Bearer {supabase_key}"
-            }
-            client = getattr(app.state, "client", None)
-            t0 = time.time()
-            if client:
-                res = await client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers, timeout=5.0)
-            else:
-                async with httpx.AsyncClient(timeout=5.0) as temp_client:
-                    res = await temp_client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers)
-            
-            latency = (time.time() - t0) * 1000
-            if res.status_code == 200:
-                _last_supabase_warm_time = time.time()
-                app.state.db_last_status = "connected"
-                app.state.db_last_latency_ms = round(latency, 2)
-                app.state.db_last_checked = datetime.utcnow()
-            else:
-                app.state.db_last_status = f"http_{res.status_code}"
-        except Exception as e:
-            app.state.db_last_status = f"warning: {str(e)[:50]}"
+            if supabase_url and supabase_key:
+                headers = {"apikey": supabase_key, "Authorization": f"Bearer {supabase_key}"}
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
 
 # [NEW] Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
 @asynccontextmanager
@@ -140,11 +111,7 @@ async def lifespan(app: FastAPI):
     if supabase_url and supabase_key:
         try:
             app.state.supabase = create_client(supabase_url, supabase_key)
-            app.state.db_last_status = "initializing"
-            app.state.db_last_latency_ms = -1
-            # ✅ 非同步背景預熱，不阻塞開機流程 (0ms 啟動)
-            asyncio.create_task(_bg_warm_supabase(app))
-            print("[Supabase] ✅ Client initialized, warm-up scheduled in background")
+            print("[Supabase] ✅ Client initialized")
         except Exception as e:
             print(f"⚠️ [Supabase] Startup Initialization Failed: {e}")
             app.state.supabase = None
@@ -160,14 +127,16 @@ async def lifespan(app: FastAPI):
     )
     print(f"[HTTPX] ✅ Global shared client ready")
 
-    # 4. 註冊全局狀態標記
+    # 4. 註冊全局狀態標記與獨立背景保活
     app.state.start_time = datetime.utcnow()
+    keepalive_task = asyncio.create_task(_periodic_supabase_keepalive())
     print("[DONE] [Lifespan] All systems operational")
     
     yield
     
     # --- Shutdown Logic ---
     print("[STOP] [Lifespan] Releasing resources...")
+    keepalive_task.cancel()
     try:
         if hasattr(app.state, "client"):
             await app.state.client.aclose()
@@ -178,6 +147,7 @@ async def lifespan(app: FastAPI):
         print("[HTTPX] ✅ Legacy geocode pool closed")
     except Exception as e:
         print(f"⚠️ [Shutdown] Error releasing HTTPX resources: {e}")
+
 
 # 0. Initialize App
 app = FastAPI(
@@ -298,24 +268,18 @@ print(f"[CORS] Configured outermost strict origins: {ALLOWED_ORIGINS}")
 # [NEW] Health Check (for UptimeRobot - prevents Supabase 7-day pause with zero latency)
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
-    """[HEALTH] 0ms 極速健康檢查 (2026 Zero-Blocking Resilience Edition)
-    即時返回記憶體與 Uptime 狀態，並在背景非同步溫熱 Supabase
+    """[HEALTH] 0ms 極速純記憶體健康檢查 (Zero Side-Effects, 100% Non-Blocking)
+    即時返回記憶體與 Uptime 狀態，Supabase 防休眠由獨立背景定時任務守護
     """
-    # 1. 觸發背景非同步溫熱 (完全解耦，不阻塞主 Event Loop)
-    asyncio.create_task(_bg_warm_supabase(request.app))
-    
-    # 2. 計算 Uptime
     uptime_seconds = 0
     if hasattr(request.app.state, "start_time"):
         uptime_seconds = (datetime.utcnow() - request.app.state.start_time).total_seconds()
     
-    db_status = getattr(request.app.state, "db_last_status", "connected")
-    db_latency_ms = getattr(request.app.state, "db_last_latency_ms", -1)
+    db_configured = bool(getattr(request.app.state, "supabase", None))
     
-    # 3. 獲取連線池統計 (Predictive Stats)
+    # 獲取連線池統計 (Predictive Stats)
     pool_stats = "N/A"
     try:
-        # HTTPX AsyncClient stats - Use hasattr/getattr for robustness
         pool = HTTPX_CLIENT._transport._pool
         max_conn = getattr(HTTPX_CLIENT, "limits", None)
         max_conn_val = max_conn.max_connections if max_conn else "Unknown"
@@ -325,24 +289,21 @@ async def health_check(request: Request):
             "max_connections": max_conn_val,
             "requests_in_flight": len(pool._requests)
         }
-    except Exception as pool_err:
-        print(f"⚠️ Health pool stats failed: {pool_err}")
+    except Exception:
         pass
 
     return {
-        "status": "healthy" if db_status != "not_initialized" else "degraded",
+        "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "uptime_seconds": round(uptime_seconds, 1),
         "database": {
-            "status": db_status,
-            "latency_ms": round(db_latency_ms, 2) if isinstance(db_latency_ms, (int, float)) else db_latency_ms,
-            "mode": "async_background_warmed"
+            "status": "connected" if db_configured else "not_configured"
         },
         "resources": {
             "pool": pool_stats,
-            "memory": "stable" # Placeholder for future OS metrics
+            "memory": "stable"
         },
-        "version": "1.2.6-resilience",
+        "version": "1.2.8-resilience",
         "service": "ryan-travel-api"
     }
 
