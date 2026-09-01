@@ -17,9 +17,12 @@
 - **System 2 深度研究 Agent 上線**: 整合 Travelpayouts 即時票價數據與 Gemini 3.7 Flash 思考推論模式，前端支援非同步輪詢進度卡片與一鍵轉入行程匯入器。
 - **Tiered Memory 架構與原生 CLI 轉移**: 改用原生 Antigravity CLI (`agy`) 作為神經壓縮引擎，非同步 Daemon 採用非阻塞 `asyncio.create_subprocess_exec` 呼叫 `agy`（含 `%LOCALAPPDATA%\agy\bin\agy.exe` 動態尋址），防止 Event Loop 阻塞。
 - **AI Recombination 神經融合機制**: 記憶壓縮採用 AI 重組融合模式取代傳統覆寫 (Overwrite)，無縫整合新舊日誌並確保 `[Technical Debt]` 區塊持續累積追蹤。
-- **神經注入與跨平台極限防呆**: 實作 `argparse` 支援高層級工作流實體報告注入；使用 `safe_print` 包裹 `sys.stdout` 避免 Windows 背景服務崩潰；修復 Python 3.11 f-string 語法相容性與 `TrustedHostMiddleware` 白名單 (加入 `testserver`)。
+- **純記憶體存活探針與獨立保活解耦架構 (Zero-Blocking Health & Keep-Alive Decoupling)**: `/health` 端點堅持 0ms 純記憶體計算（單一職責原則），完全不觸發任何外部網路 I/O 或資料庫查詢；Supabase 7 天防休眠保活由 Lifespan 獨立非同步背景定時循環（每 6 小時一次）靜默守護，達成極限並發安全與 100% 外部監控免疫。
+- **三層健康檢查分流機制 (Tri-Tier Health Probe Hierarchy)**: `/health` 作為 Liveness Probe 提供 0ms 純記憶體快速探針；`/health/deep` 作為 Readiness/Diagnostics Probe 提供帶 2.5s 硬熔斷的非同步 Supabase 深度檢查。
 
 ## [Failed Paths]
+- **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
+- **健康檢查端點攜帶副作用 (Side-Effects in Health Endpoint)**: 將資料庫保活或連線預熱強行掛在健康檢查端點上，一旦外部網路波動或連線鎖爭搶，健康檢查連帶失敗導致整台伺服器被誤判死亡。教訓：健康檢查必須保持 Idempotent 與無副作用。
 - **Framer Motion 動態 Key 引發元件重新掛載與重複請求**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 銷毀重新掛載引發 API 重複發送。教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
 - **測試選擇器依賴特定 Tailwind 類別字串 (`z-[100]` vs `z-100`)**: Tailwind v4 utility token 升級時， Playwright 測試選擇器若以 `.z-\\[100\\]` 尋找元素會導致測試失敗。教訓：測試選擇器應優先使用角色 (`role`)、`aria-label` 或組合選擇器（如 `.fixed.z-100, .fixed.z-\\[100\\]`）。
 - **Language Server 記憶體緩存落後引發的假性紅字 (In-Flight Document Buffer De-sync)**: AI 工具在毫秒級寫檔時，IDE Language Server 捕獲中間狀態會產生假性紅字。遇到此狀況絕對不要點 Overwrite，應關閉分頁或執行 Revert File。
@@ -54,3 +57,5 @@
 - **Pragmatic Stabilization over Over-Execution**: 精準微拋光穩定策略，對於高密度複雜邏輯元件停止推倒重構，專注於樣式標準化與穩定 ROI。
 - **Dual Save Destination Engine**: 雙向儲存目標分流引擎，支援 AI 解析結果建立為全新行程或合併至現有行程。
 - **Direction-Aware Spring Transition**: 方向感知彈簧滑入轉場，依據 Tab 索引動態計算方向並驅動 iOS 原生彈簧滑入動畫。
+- **Zero-Blocking Health Probe**: 零阻塞健康探針，僅依據伺服器內存狀態秒回 200 OK，杜絕外部依賴污染。
+- **Isolated Keep-Alive Task**: 隔離保活任務，在 Lifespan 背景獨立循環運行的資料庫保活定時器。
