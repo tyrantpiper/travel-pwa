@@ -12,6 +12,7 @@ if sys.stdout and hasattr(sys.stdout, 'buffer') and 'pytest' not in sys.modules:
         pass  # Ignore if stdout is not a standard stream
 
 import os
+import time
 import base64
 import json
 import asyncio
@@ -74,24 +75,51 @@ from utils.deps import get_gemini_key, get_verified_user, get_supabase
 from utils.ai_config import DAILY_ROUTING, WORKHORSE_MODEL
 from google.genai import errors as genai_errors
 
-# 🛡️ 背景溫熱與防休眠守護
+# 🛡️ 背景溫熱與防休眠守護 (原生非同步 + 60s 防抖冷卻鎖)
+_last_supabase_warm_time: float = 0.0
+_supabase_warm_lock = asyncio.Lock()
+
 async def _bg_warm_supabase(app: FastAPI):
-    """在獨立線程池中執行 Supabase 查詢，溫熱連線並防止 7 天暫停，不阻塞主 Event Loop"""
-    try:
-        supabase_client = getattr(app.state, "supabase", None)
-        if supabase_client:
-            def _sync_ping():
-                t0 = datetime.utcnow()
-                res = supabase_client.table("itineraries").select("id").limit(1).execute()
-                latency = (datetime.utcnow() - t0).total_seconds() * 1000
-                return latency, len(res.data) if res.data else 0
+    """使用原生非同步 HTTP 查詢 Supabase PostgREST，溫熱連線並防止 7 天暫停
+    具備 60 秒冷卻防抖機制與非同步鎖，完全杜絕併發死鎖與線程池耗盡
+    """
+    global _last_supabase_warm_time
+    now = time.time()
+    # 🛡️ 60 秒防抖守衛：若 60 秒內已溫熱過，直接略過
+    if now - _last_supabase_warm_time < 60.0:
+        return
+        
+    async with _supabase_warm_lock:
+        if now - _last_supabase_warm_time < 60.0:
+            return
+        try:
+            supabase_url = os.getenv("SUPABASE_URL", "").strip()
+            supabase_key = os.getenv("SUPABASE_KEY", "").strip()
+            if not supabase_url or not supabase_key:
+                return
+                
+            headers = {
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}"
+            }
+            client = getattr(app.state, "client", None)
+            t0 = time.time()
+            if client:
+                res = await client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers, timeout=5.0)
+            else:
+                async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                    res = await temp_client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers)
             
-            latency, count = await asyncio.to_thread(_sync_ping)
-            app.state.db_last_status = "connected"
-            app.state.db_last_latency_ms = round(latency, 2)
-            app.state.db_last_checked = datetime.utcnow()
-    except Exception as e:
-        app.state.db_last_status = f"warning: {str(e)[:50]}"
+            latency = (time.time() - t0) * 1000
+            if res.status_code == 200:
+                _last_supabase_warm_time = time.time()
+                app.state.db_last_status = "connected"
+                app.state.db_last_latency_ms = round(latency, 2)
+                app.state.db_last_checked = datetime.utcnow()
+            else:
+                app.state.db_last_status = f"http_{res.status_code}"
+        except Exception as e:
+            app.state.db_last_status = f"warning: {str(e)[:50]}"
 
 # [NEW] Phase 2026: Lifespan Manager (取代舊的 startup/shutdown 裝飾器)
 @asynccontextmanager
@@ -320,31 +348,45 @@ async def health_check(request: Request):
 
 @app.api_route("/health/deep", methods=["GET"])
 async def health_check_deep(request: Request):
-    """[HEALTH/DEEP] 深度健康檢查 (含 2.5s 硬熔斷防護)"""
-    start_check = datetime.utcnow()
+    """[HEALTH/DEEP] 深度健康檢查 (原生非同步 + 2.5s 硬熔斷防護)"""
+    start_check = time.time()
     try:
-        supabase_client = getattr(request.app.state, "supabase", None)
-        if not supabase_client:
-            raise HTTPException(status_code=503, detail="Supabase not initialized")
+        supabase_url = os.getenv("SUPABASE_URL", "").strip()
+        supabase_key = os.getenv("SUPABASE_KEY", "").strip()
+        if not supabase_url or not supabase_key:
+            raise HTTPException(status_code=503, detail="Supabase not configured")
             
-        def _sync_ping():
-            return supabase_client.table("itineraries").select("id").limit(1).execute()
-            
-        # 🛡️ 2.5 秒硬熔斷
-        res = await asyncio.wait_for(asyncio.to_thread(_sync_ping), timeout=2.5)
-        latency = (datetime.utcnow() - start_check).total_seconds() * 1000
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "database": {
-                "status": "connected",
-                "latency_ms": round(latency, 2),
-                "items": len(res.data) if res.data else 0
-            },
-            "version": "1.2.6-resilience",
-            "service": "ryan-travel-api"
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}"
         }
-    except asyncio.TimeoutError:
+        client = getattr(request.app.state, "client", None)
+        if client:
+            res = await client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers, timeout=2.5)
+        else:
+            async with httpx.AsyncClient(timeout=2.5) as temp_client:
+                res = await temp_client.get(f"{supabase_url}/rest/v1/itineraries?select=id&limit=1", headers=headers)
+                
+        latency = (time.time() - start_check) * 1000
+        if res.status_code == 200:
+            data = res.json()
+            return {
+                "status": "healthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "database": {
+                    "status": "connected",
+                    "latency_ms": round(latency, 2),
+                    "items": len(data) if isinstance(data, list) else 0
+                },
+                "version": "1.2.7-hardened",
+                "service": "ryan-travel-api"
+            }
+        else:
+            return ORJSONResponse(
+                status_code=502,
+                content={"status": "degraded", "http_status": res.status_code}
+            )
+    except httpx.TimeoutException:
         return ORJSONResponse(
             status_code=504,
             content={"status": "degraded", "detail": "Supabase check timed out after 2.5s"}
