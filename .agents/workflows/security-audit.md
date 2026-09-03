@@ -17,16 +17,23 @@ triggers:
 
 ---
 
-## Phase 1: Vulnerability & Secret Scanning
+## Phase 1: Vulnerability & Secret Scanning (tools-hub Powered)
 
 1. **Dependency Audit**:
    ```bash
    cd frontend; npm audit --production; cd ..
    ```
-2. **Secret Leak Detection**:
-   - Check `.env*` files are excluded in `.gitignore`.
-   - Scan codebase for hardcoded API keys, JWT tokens (`eyJ...`), or Supabase service keys.
-3. **API & CORS Hardening**:
+2. **Verified Secret Leak Detection (`trufflehog_scan`)**:
+   - 執行活體憑證掃描，排除 `node_modules` 與暫存區，精準捕捉已驗證之高危洩漏：
+     `trufflehog_scan(path="frontend/app", only_verified=true)`
+     `trufflehog_scan(path="backend", only_verified=true)`
+     `trufflehog_scan(path="docs", only_verified=true)`
+   - 檢查 `.env*` 檔案皆已包含於 `.gitignore`。
+3. **AST Sensitive Call Audit (`ast_grep_search`)**:
+   - 掃描是否有硬編碼密鑰或非法的危險代碼執行：
+     `ast_grep_search(lang="typescript", path="frontend", pattern="process.env.SUPABASE_SERVICE_ROLE_KEY")`
+     `ast_grep_search(lang="python", path="backend", pattern="eval($$$ARGS)")`
+4. **API & CORS Hardening**:
    - Verify `backend/main.py` CORS does not allow `["*"]` in production.
    - Verify rate-limiting (`@limiter`) covers sensitive endpoints.
 
