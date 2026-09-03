@@ -64,7 +64,9 @@
     "zustand": "^5.0.9"
   },
   "overrides": {
-    "serialize-javascript": "^6.0.2"
+    "serialize-javascript": "^6.0.2",
+    "browserslist": "^4.28.8",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

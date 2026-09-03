@@ -45,7 +45,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ryan-travel-api")
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Models
 from models.base import (
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
     print(f"[HTTPX] ✅ Global shared client ready")
 
     # 4. 註冊全局狀態標記與獨立背景保活
-    app.state.start_time = datetime.utcnow()
+    app.state.start_time = datetime.now(timezone.utc)
     keepalive_task = asyncio.create_task(_periodic_supabase_keepalive())
     print("[DONE] [Lifespan] All systems operational")
     
@@ -273,7 +273,7 @@ async def health_check(request: Request):
     """
     uptime_seconds = 0
     if hasattr(request.app.state, "start_time"):
-        uptime_seconds = (datetime.utcnow() - request.app.state.start_time).total_seconds()
+        uptime_seconds = (datetime.now(timezone.utc) - request.app.state.start_time).total_seconds()
     
     db_configured = bool(getattr(request.app.state, "supabase", None))
     
@@ -294,7 +294,7 @@ async def health_check(request: Request):
 
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "uptime_seconds": round(uptime_seconds, 1),
         "database": {
             "status": "connected" if db_configured else "not_configured"
@@ -333,7 +333,7 @@ async def health_check_deep(request: Request):
             data = res.json()
             return {
                 "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "database": {
                     "status": "connected",
                     "latency_ms": round(latency, 2),
