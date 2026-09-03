@@ -19,6 +19,10 @@
 - **AI Recombination 神經融合機制**: 記憶壓縮採用 AI 重組融合模式取代傳統覆寫 (Overwrite)，無縫整合新舊日誌並確保 `[Technical Debt]` 區塊持續累積追蹤。
 - **純記憶體存活探針與獨立保活解耦架構 (Zero-Blocking Health & Keep-Alive Decoupling)**: `/health` 端點堅持 0ms 純記憶體計算（單一職責原則），完全不觸發任何外部網路 I/O 或資料庫查詢；Supabase 7 天防休眠保活由 Lifespan 獨立非同步背景定時循環（每 6 小時一次）靜默守護，達成極限並發安全與 100% 外部監控免疫。
 - **三層健康檢查分流機制 (Tri-Tier Health Probe Hierarchy)**: `/health` 作為 Liveness Probe 提供 0ms 純記憶體快速探針；`/health/deep` 作為 Readiness/Diagnostics Probe 提供帶 2.5s 硬熔斷的非同步 Supabase 深度檢查。
+- **overrides 原地安全合併原則 (In-Place Override Merging)**: 在既有 package.json 配置依賴覆蓋時，嚴禁盲目新增重複鍵，必須採增量原地合併（In-Place Merge）以保留既有修復（如 serialize-javascript），杜絕 JSON 語法解析錯誤。
+- **後端時間處理時區原子一致性 (Timezone-Aware Atomicity)**: 伺服器啟動時間（start_time）與每次請求計算（uptime_seconds）必須同步採用 timezone.utc，杜絕因 naive/aware 混用導致的 TypeError: can't subtract offset-naive and offset-aware datetimes 致命崩潰。
+- **三重活體驗收防線 (Tri-Layer Verification Protocol)**: 底層依賴與編譯鏈更新時，驗收絕不能僅停留在靜態型別層（tsc），必須串聯 npm audit、vitest 與 next build 進行真實驗收。
+- **tools-hub 智能審查矩陣架構**: 融合 ast_grep_search、trufflehog_scan、xh_http_request 與 hyperfine_benchmark 為專案建立跨維度靜態與活體審查防線。
 
 ## [Failed Paths]
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
@@ -33,12 +37,16 @@
 - **前端預設值覆蓋後端推算**: 前端在儲存行程時盲目將 `end_date` 兜底為 `today`，導致後端跳過多天數自動推算邏輯。
 - **OSM Nominatim 併發限速衝突**: OpenStreetMap Nominatim 官方限速 1 req/s，AI 批次 5 並發查詢觸發 429 或 ReadTimeout。第三方免費用量受限服務必須有前置命中跳過條件。
 - **「看見黑影就開槍」的過度工程陷阱**: 未經驗證誤判 SDK 回傳 `FunctionCall` 警告為 `thought_signature` 遺失，進而撰寫龐大無效的序列化補丁導致 CI 崩潰。架構修改前必須執行活體實驗 (Live Probing)。
+- **盲目 npm audit fix --force 引發的 Serwist 破壞性降級陷阱**: npm audit fix 試圖將 @serwist/turbopack 降級至骨董版本 9.5.2 破壞 Next.js 16 打包。教訓：間接依賴漏洞治理應優先採用 npm 原生 overrides 原地鎖定，杜絕向後降級。
+- **JSON 重複鍵盲區 (Duplicate Key Trap)**: 在已有 overrides 的 package.json 粗暴追加新區塊產生重複鍵語法錯誤。教訓：工程修改前必須嚴格確認既有代碼結構，堅持原地增量合併。
+- **型別檢查取代真實建置的推論跳躍**: 誤以為 tsc --noEmit 通過即代表打包正常，忽略了 browserslist 僅在打包轉譯期被調用。教訓：編譯鏈工具升級必須以 npm run build 作為最終真實驗收依據。
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
 - **AI 座標精準度觀測**: 需持續觀察 AI 在冷門景點給出經緯度之偏差值，評估是否需要在 DB 標註 `is_ai_inferred` 供使用者校對。
 - **Nominatim 呼叫前置守衛**: 當 Photon 或 LANDMARKS 已取得高置信度結果時，完全略過 Nominatim 網路請求以減少控制台 Warning 與網路延遲。
 - **Metrics/Timeout 測試跳過**: `test_poi_lifespan.py` 使用 `@pytest.mark.skip` 暫時略過了未實作的 Metrics 與 Timeout 測試案例，待後續 Sprint 補齊。
+- **FastAPI ORJSONResponse 遷移評估**: FastAPI 新版本提出 FastAPIDeprecationWarning: ORJSONResponse is deprecated，建議後續可評估直接交由 Pydantic response_model 序列化。
 - **Dependabot 漏洞修補**: Default branch 存在 1 個 Low severity 安全漏洞，需排程升級相依性。
 - **PWA 快取與 Core Web Vitals 監控**: 監控生產環境在 PWA 離線模式下的快取命中率與 Core Web Vitals (INP / LCP / CLS) 表現。
 
@@ -59,3 +67,6 @@
 - **Direction-Aware Spring Transition**: 方向感知彈簧滑入轉場，依據 Tab 索引動態計算方向並驅動 iOS 原生彈簧滑入動畫。
 - **Zero-Blocking Health Probe**: 零阻塞健康探針，僅依據伺服器內存狀態秒回 200 OK，杜絕外部依賴污染。
 - **Isolated Keep-Alive Task**: 隔離保活任務，在 Lifespan 背景獨立循環運行的資料庫保活定時器。
+- **In-Place Override Merging**: 原地覆蓋合併，在既有 package.json overrides 區塊增量注入而不破壞既有補丁。
+- **Timezone-Aware Atomicity**: 時區原子一致性，全域時間運算統一強制帶有時區標籤以防 TypeError。
+- **Tri-Layer Verification Protocol**: 三重活體驗收協議，結合靜態安全、單元邏輯與真實生產打包的三重驗收標準。
