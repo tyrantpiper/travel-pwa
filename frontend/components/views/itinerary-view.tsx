@@ -35,7 +35,6 @@ import {
 import { arrayMove } from "@dnd-kit/sortable"
 import { POIBasicData } from "@/components/POIDetailDrawer"
 
-// 🆕 Phase 3 Components
 import { WeatherPanel } from "@/components/itinerary/WeatherPanel"
 import { LocationEditDialog } from "@/components/itinerary/LocationEditDialog"
 import { TripList } from "@/components/itinerary/TripList"
@@ -1248,7 +1247,7 @@ export function ItineraryView() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: "-20%" }}
                         transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                        className="w-full h-full overflow-y-auto overscroll-contain bg-stone-50 dark:bg-slate-900"
+                        className="w-full h-full overflow-y-auto overscroll-contain bg-stone-50 dark:bg-slate-900 gpu-layer-accelerated"
                     >
                         <div className="flex flex-col bg-stone-50 dark:bg-slate-900 pb-32">
                             <div className="flex-1 px-6 py-12 pb-32">
@@ -1320,7 +1319,7 @@ export function ItineraryView() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: "100%" }}
                         transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                        className="w-full flex-1 flex flex-col h-full overflow-hidden relative bg-stone-50 dark:bg-slate-900"
+                        className="w-full flex-1 flex flex-col h-full overflow-hidden relative bg-stone-50 dark:bg-slate-900 gpu-layer-accelerated"
                     >
             {/* 🆕 Phase 3: Modular Header */}
 
@@ -1354,7 +1353,7 @@ export function ItineraryView() {
                 biasLoc={calculateBiasLocation(day)}
             />
 
-            <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth" ref={setScrollerEl}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth gpu-layer-accelerated" ref={setScrollerEl}>
                 {/* 🆕 Phase 3: Modular Header - Restored to Scroll Flow (bcfeb32 parity) */}
                 <ItineraryHeader
                     currentTrip={currentTrip}

@@ -34,28 +34,6 @@ export function LandingPage() {
     const [showRecover, setShowRecover] = useState(false)
     const [recoverCode, setRecoverCode] = useState("")
     const [showWizard, setShowWizard] = useState(false)
-    const [hasAttemptedPrerender, setHasAttemptedPrerender] = useState(false)
-
-    // 🕵️‍♂️ [2026 Hacker Pattern] Speculative Prerendering
-    // 當使用者準備輸入暱稱時，背後偷偷開始預算渲染整個 App 路徑
-    const handlePrerenderTrigger = () => {
-        if (hasAttemptedPrerender) return
-        setHasAttemptedPrerender(true)
-
-        if (typeof document !== 'undefined' && 'HTMLScriptElement' in window) {
-            const specScript = document.createElement('script')
-            specScript.type = 'speculationrules'
-            specScript.textContent = JSON.stringify({
-                "prerender": [{
-                    "source": "list",
-                    "urls": ["/"], // 基於目前的架構，將預熱根路徑的 AppShell 部分
-                    "eagerness": "moderate"
-                }]
-            })
-            document.head.appendChild(specScript)
-            debugLog("🚀 [Speculation] Prerender process initiated via user focus.")
-        }
-    }
 
     // 🆕 Onboarding state
     const { isCompleted: isOnboardingComplete } = useOnboardingStore()
@@ -228,7 +206,6 @@ export function LandingPage() {
                                     value={nickname}
                                     onChange={(e) => setNickname(e.target.value)}
                                     autoComplete="off"
-                                    onFocus={handlePrerenderTrigger}
                                 />
                             </div>
 
