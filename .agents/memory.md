@@ -23,6 +23,10 @@
 - **後端時間處理時區原子一致性 (Timezone-Aware Atomicity)**: 伺服器啟動時間（start_time）與每次請求計算（uptime_seconds）必須同步採用 timezone.utc，杜絕因 naive/aware 混用導致的 TypeError: can't subtract offset-naive and offset-aware datetimes 致命崩潰。
 - **三重活體驗收防線 (Tri-Layer Verification Protocol)**: 底層依賴與編譯鏈更新時，驗收絕不能僅停留在靜態型別層（tsc），必須串聯 npm audit、vitest 與 next build 進行真實驗收。
 - **tools-hub 智能審查矩陣架構**: 融合 ast_grep_search、trufflehog_scan、xh_http_request 與 hyperfine_benchmark 為專案建立跨維度靜態與活體審查防線。
+- **雙重核驗零誤判自癒架構 (Double-Checked Silent Self-Healing)**: 分散式客戶端快取自癒時，嚴禁僅憑單次 HTTP 404 就草率清除快取（避免網路抖動或 CDN 延遲導致正常行程被誤判跳轉）。必須透過「行程總清單存活二次核驗（List Double-Check）」雙重證實死透後，才在 300ms 內完全靜默導正至最新有效行程。
+- **SWR 404 立即熔斷機制 (Zero-Retry 404 Guard)**: HTTP 404 屬於明確的客戶端資源不存在，在 SWR 的 `onErrorRetry` 中強制判定 `error.status === 404` 立即終止重試，將無效請求次數由 19 次嚴格降為 0，消除 Cloud Run 冷啟動擴展負擔與頻寬浪費。
+- **本地快取雙清原則 (Dual-Storage Coherence)**: 同時使用狀態庫持久化（Zustand `persist` 寫入 `trip-storage`）與舊版 Storage（`active_trip_id`）時，自癒清理必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵，杜絕重新整理後狀態中介軟體再次反序列化還原。
+- **Fetcher 錯誤語義化傳遞 (Typed HttpError Propagation)**: 原生 fetch 遇 4xx/5xx 不會 reject Promise，底層 Fetcher 必須主動檢查 `!r.ok` 並拋出帶有狀態碼的 `HttpError`，防止上層快取引擎誤將 404 當作合法成功資料吸收而使重試熔斷全數啞火。
 
 ## [Failed Paths]
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
@@ -40,6 +44,9 @@
 - **盲目 npm audit fix --force 引發的 Serwist 破壞性降級陷阱**: npm audit fix 試圖將 @serwist/turbopack 降級至骨董版本 9.5.2 破壞 Next.js 16 打包。教訓：間接依賴漏洞治理應優先採用 npm 原生 overrides 原地鎖定，杜絕向後降級。
 - **JSON 重複鍵盲區 (Duplicate Key Trap)**: 在已有 overrides 的 package.json 粗暴追加新區塊產生重複鍵語法錯誤。教訓：工程修改前必須嚴格確認既有代碼結構，堅持原地增量合併。
 - **型別檢查取代真實建置的推論跳躍**: 誤以為 tsc --noEmit 通過即代表打包正常，忽略了 browserslist 僅在打包轉譯期被調用。教訓：編譯鏈工具升級必須以 npm run build 作為最終真實驗收依據。
+- **原生 fetch 吞沒 404 引發 SWR 假成功的盲點陷阱 (Raw Fetch 404 Swallowing Trap)**: 在 fetcher 中直接使用 fetch().then(r => r.json())，未檢查 r.ok。當後端回傳 404 時，Promise 依然正常 resolve，SWR 將 { detail: "Trip not found" } 判定為成功資料寫入快取，導致 error 永遠為 undefined，SWR 的 onErrorRetry 與自癒完全啞火。教訓：所有底層 Fetcher 必須嚴格檢驗 !r.ok 並主動拋出標準 HttpError。
+- **未經二次核驗就清除快取引發的誤判跳轉風險 (Unverified 404 Eviction Trap)**: 若僅憑一次 GET /api/trips/{id} 收到 404 就直接清除本地快取並切換行程，在行動網路偶發抖動或 CDN 節點異常時，使用者正在看的合法行程會被誤切換。教訓：自癒機制必須搭配「清單總表二次核驗（List Double-Check）」，確認清單中也查無此人時才允許執行破壞性清除。
+- **Zustand 與 legacy localStorage 雙重持久化漂移 (Dual Persistence Drift Trap)**: 僅透過 localStorage.removeItem('active_trip_id') 清理快取，忽略了 Zustand 的 persist 中介軟體仍將舊 ID 儲存在 trip-storage，重新整理後死 ID 再次復發。教訓：具備多重持久化機制時，必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵。
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
@@ -70,3 +77,7 @@
 - **In-Place Override Merging**: 原地覆蓋合併，在既有 package.json overrides 區塊增量注入而不破壞既有補丁。
 - **Timezone-Aware Atomicity**: 時區原子一致性，全域時間運算統一強制帶有時區標籤以防 TypeError。
 - **Tri-Layer Verification Protocol**: 三重活體驗收協議，結合靜態安全、單元邏輯與真實生產打包的三重驗收標準。
+- **Double-Checked Silent Self-Healing**: 雙重核驗完全靜默自癒，結合 SWR 404 立即熔斷與清單二度核驗，達成 <300ms 無感導正與零誤判防禦。
+- **Zero-Retry 404 Guard**: SWR 404 立即熔斷守衛，遇到客戶端資源不存在時重試次數強制歸零，杜絕伺服器冷啟動風暴。
+- **Dual-Storage Coherence**: 雙重持久化存儲一致性，跨 Zustand 與 localStorage 雙清以防幽靈 ID 還原。
+- **Typed HttpError Propagation**: 型別化 HTTP 錯誤傳遞，強制底層 Fetcher 檢驗 !r.ok 並向外拋出狀態碼。
