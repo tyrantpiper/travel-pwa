@@ -56,7 +56,7 @@ function getDayData<T>(data: Record<number | string, T> | undefined, day: number
 
 export function ItineraryView() {
     const { t } = useLanguage()
-    const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading } = useTripContext()
+    const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading, handleTripNotFound } = useTripContext()
     const setFocusedDay = useTripStore((s) => s.setFocusedDay)
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
@@ -64,7 +64,7 @@ export function ItineraryView() {
     const refreshInterval = useDynamicPolling()
 
     // Use activeTripId from context, pass userId for privacy filtering
-    const { trip: currentTrip, mutate: reloadTripDetail, isValidating } = useTripDetail(activeTripId, userId, refreshInterval) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void>, isValidating: boolean }
+    const { trip: currentTrip, mutate: reloadTripDetail, isValidating } = useTripDetail(activeTripId, userId, refreshInterval, handleTripNotFound) as { trip: Trip, mutate: (data?: unknown, shouldRevalidate?: boolean) => Promise<void>, isValidating: boolean }
     const [deletingTripId, setDeletingTripId] = useState<string | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
 
