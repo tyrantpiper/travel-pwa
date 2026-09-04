@@ -90,19 +90,20 @@ async def trigger_llm_compaction(history_content):
     """
     
     try:
-        # 使用 Antigravity CLI 進行壓縮 (非同步執行)
+        # 使用 Antigravity CLI 進行壓縮 (非同步執行，帶 --print 與 30 秒安全停損)
         process = await asyncio.create_subprocess_exec(
             AGY_CMD,
-            stdin=asyncio.subprocess.PIPE,
+            "--print",
+            prompt[:8000],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await process.communicate(input=prompt.encode('utf-8'))
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=30)
         
         stdout = stdout_bytes.decode('utf-8') if stdout_bytes else ""
         stderr = stderr_bytes.decode('utf-8') if stderr_bytes else ""
         
-        if process.returncode == 0 and stdout.strip():
+        if process.returncode == 0 and stdout.strip() and ("[Decisions]" in stdout or "##" in stdout):
             final_result = stdout.strip()
             # 寫入融合後的新記憶 (完全覆寫，因為是 AI Recombination)
             with open(DREAM_MEMORY_PATH, "w", encoding="utf-8") as f:
@@ -110,17 +111,14 @@ async def trigger_llm_compaction(history_content):
             safe_print(f"[{datetime.now()}] 💾 Auto Dream 完成！神經重組已寫入 {DREAM_MEMORY_PATH}")
             return True
         else:
-            safe_print(f"[{datetime.now()}] ⚠️ 壓縮失敗，觸發安全防護機制 (Zero-Regression)。錯誤: {stderr}")
-            fallback_msg = f"\n\n> [!WARNING]\n> [System] {datetime.now().date()} 壓縮失敗，保留原始日誌等待下次處理。\n"
-            with open(DREAM_MEMORY_PATH, "a", encoding="utf-8") as f:
-                f.write(fallback_msg)
+            safe_print(f"[{datetime.now()}] ⚠️ 壓縮未達標或返回異常 ({stderr})，維持既有記憶結構。")
             return False
             
+    except asyncio.TimeoutError:
+        safe_print(f"[{datetime.now()}] ⚠️ Auto Dream 呼叫逾時 (30s)，觸發安全防護機制，維持既有記憶結構。")
+        return False
     except Exception as e:
         safe_print(f"[{datetime.now()}] ❌ 核心引擎發生例外錯誤: {e}")
-        fallback_msg = f"\n\n> [!WARNING]\n> [System] {datetime.now().date()} 壓縮遭遇系統錯誤 ({e})，保留原始日誌等待下次處理。\n"
-        with open(DREAM_MEMORY_PATH, "a", encoding="utf-8") as f:
-            f.write(fallback_msg)
         return False
 
 async def daemon_loop():
