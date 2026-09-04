@@ -1,6 +1,7 @@
 import useSWR from "swr"
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { travelDataApi } from './api'
+import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot } from './idb-storage'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -56,6 +57,9 @@ export function useTripDetail(
     // 🧠 2026 Normalization: userId is critical for privacy-aware caching
     const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
 
+    // ⚡ 0ms L1 記憶體微秒級快顯 (首幀 0 骨架屏)
+    const initialSnapshot = useMemo(() => getTripSnapshotSync(tripId), [tripId])
+
     const { data, error, mutate, isValidating } = useSWR(
         swrKey,
         ([url, uid]: [string, string]) =>
@@ -76,10 +80,17 @@ export function useTripDetail(
                 throw err
             }),
         {
+            fallbackData: initialSnapshot || undefined,
             revalidateOnFocus: false,
             revalidateOnMount: true,
             refreshInterval, // 🆕 Hyper-Heuristics Injection
             dedupingInterval: 2000, // Prevent spam
+            onSuccess: (freshData) => {
+                // ⚡ 雲端獲取最新資料後，同步更新 L1 記憶體與 L2 IndexedDB
+                if (tripId && freshData) {
+                    saveTripSnapshot(tripId, freshData)
+                }
+            },
             onErrorRetry: (err) => {
                 // 🛡️ 404 資源不存在，徹底禁止無效重試，保護 Cloud Run 冷啟動與頻寬
                 if (err instanceof HttpError && err.status === 404) return
@@ -92,11 +103,27 @@ export function useTripDetail(
         }
     )
 
-    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，強制刷新
-    // 這解決了首次載入時資料不顯示的問題
+    // 🚀 非同步自 L2 (IndexedDB) 預熱快取至 L1 記憶體
+    useEffect(() => {
+        if (tripId) {
+            preloadTripSnapshot(tripId).then(cached => {
+                // 若當前無資料且 L2 預熱出資料，立即觸發一次局部 revalidate 注入
+                if (cached && !data && mutate) {
+                    mutate(cached, false)
+                }
+            })
+        }
+    }, [tripId, data, mutate])
+
+    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，保底刷新 (帶 2 秒去重時間閘門)
+    const lastMutateTimeRef = useRef(0)
     useEffect(() => {
         if (userId && tripId && mutate) {
-            mutate()
+            const now = Date.now()
+            if (now - lastMutateTimeRef.current > 2000) {
+                lastMutateTimeRef.current = now
+                mutate()
+            }
         }
     }, [userId, tripId, mutate])
 

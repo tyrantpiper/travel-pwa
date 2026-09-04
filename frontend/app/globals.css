@@ -284,4 +284,13 @@ button:not(:disabled):active,
     from { opacity: 0; }
     to { opacity: 1; }
   }
-}
+}
+
+/* 🚀 GPU 紋理硬體加速常駐 (Full-Throttle Hardware Compositing)
+   不節省顯卡，將行程卡片與滑動軸常駐於 GPU 顯存，鎖定 120 FPS 原生絲滑體驗 */
+.gpu-layer-accelerated {
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { SerwistGlobalConfig } from "serwist";
-import { Serwist, CacheFirst, NetworkFirst, NetworkOnly, ExpirationPlugin } from "serwist";
+import { Serwist, CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate, ExpirationPlugin } from "serwist";
 
 declare const self: ServiceWorkerGlobalScope & SerwistGlobalConfig;
 
@@ -57,6 +57,19 @@ const serwist = new Serwist({
         return isSupabaseAuth || isSensitiveApi;
       },
       handler: new NetworkOnly(),
+    },
+    {
+      // ⚡ 行程詳情 API 極速快顯 (SWR 策略：本地磁碟秒回 + 背景靜默更新)
+      matcher: ({ url }) => url.pathname.startsWith("/api/trips/") && !url.pathname.includes("/dates"),
+      handler: new StaleWhileRevalidate({
+        cacheName: "trips-api-cache",
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 30,
+            maxAgeSeconds: 60 * 60 * 24 * 7, // 快取 7 天
+          }),
+        ],
+      }),
     },
     ...defaultCache,
   ],
