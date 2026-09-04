@@ -12,6 +12,7 @@ import { SyncManager } from "@/components/sync-manager"
 import { HtmlLangSync } from "@/components/ui/html-lang-sync"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { AppClientLayer } from "@/components/app-client-layer"
+import { SpeculationRules } from "@/components/core/speculation-rules"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -87,6 +88,7 @@ export default function RootLayout({
                 {children}
               </Suspense>
               <AppClientLayer />
+              <SpeculationRules />
               <PWAInstallPrompt />
             </TripProvider>
           </LanguageProvider>

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, ReactNode, useTransition,
 import { useTrips } from "./hooks"
 import { useTripStore } from "./stores/tripStore"
 import { sampleTripApi } from "./api"
+import { deleteTripSnapshot } from "./idb-storage"
 
 interface TripContextType {
     activeTripId: string | null
@@ -89,11 +90,15 @@ export function TripProvider({ children }: { children: ReactNode }) {
 
     const { trips, isLoading, mutate } = useTrips(userId)
 
-    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，強制刷新 trips
-    // 這解決了首次載入時資料不顯示的問題
+    // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，保底刷新 trips (帶 2 秒去重時間閘門)
+    const lastTripsMutateTimeRef = useRef(0)
     useEffect(() => {
         if (userId && mutate) {
-            mutate()
+            const now = Date.now()
+            if (now - lastTripsMutateTimeRef.current > 2000) {
+                lastTripsMutateTimeRef.current = now
+                mutate()
+            }
         }
     }, [userId, mutate])
 
@@ -148,6 +153,9 @@ export function TripProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem("active_trip_id")
                 localStorage.removeItem("active_trip_title")
             }
+
+            // 3. ⚡ 三清閉環：同步抹除 IndexedDB 與 L1 記憶體中的幽靈快照
+            deleteTripSnapshot(invalidId)
         })
     }, [trips, setActiveTripId, setActiveTripTitle])
 
@@ -160,6 +168,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
                     const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
                     if (!tripExists) {
                         console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
+                        deleteTripSnapshot(activeTripId)
                         const latestTrip = trips[0]
                         setActiveTripId(latestTrip.id)
                         setActiveTripTitle(latestTrip.title || null)
@@ -237,5 +246,13 @@ export function useTripContext() {
         throw new Error("useTripContext must be used within a TripProvider")
     }
     return context
+}
+
+/**
+ * 🛡️ 安全版 TripContext 讀取 Hook
+ * 即使脫離 TripProvider 也不會拋出未捕獲錯誤，符合 React Rules of Hooks 頂層調用規範
+ */
+export function useTripContextSafe() {
+    return useContext(TripContext) ?? null
 }
 
