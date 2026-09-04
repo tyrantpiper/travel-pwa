@@ -7,13 +7,28 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 import { toast } from "sonner"
 
+export class HttpError extends Error {
+    constructor(public status: number, message: string, public data?: unknown) {
+        super(message)
+        this.name = "HttpError"
+    }
+}
+
 export const fetcherWithUserId = ([url, uid]: [string, string]) =>
     fetch(API_BASE + url, { headers: { "X-User-ID": uid } })
-        .then(r => r.json())
+        .then(async r => {
+            if (!r.ok) {
+                const errorBody = await r.json().catch(() => ({}))
+                if (r.status !== 404) {
+                    toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)")
+                }
+                throw new HttpError(r.status, errorBody?.detail || `HTTP ${r.status}`, errorBody)
+            }
+            return r.json()
+        })
         .catch(err => {
-            console.error("fetcher error:", err);
-            toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)");
-            throw err;
+            console.error("fetcher error:", err)
+            throw err
         })
 
 export function useTrips(userId: string | null) {
@@ -30,7 +45,12 @@ export function useTrips(userId: string | null) {
     }
 }
 
-export function useTripDetail(tripId: string | null, userId?: string | null, refreshInterval: number = 0) {
+export function useTripDetail(
+    tripId: string | null, 
+    userId?: string | null, 
+    refreshInterval: number = 0,
+    onTripNotFound?: (invalidId: string) => void
+) {
     // 🔧 FIX: Include userId in cache key to ensure refetch when userId changes
     // And only make the request when we have a valid userId to prevent unauthenticated fetches
     // 🧠 2026 Normalization: userId is critical for privacy-aware caching
@@ -41,17 +61,34 @@ export function useTripDetail(tripId: string | null, userId?: string | null, ref
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
                 headers: { "X-User-ID": uid }
-            }).then(r => r.json())
-                .catch(err => {
-                    console.error("fetcher error:", err);
-                    toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)");
-                    throw err;
-                }),
+            }).then(async r => {
+                if (!r.ok) {
+                    const errorBody = await r.json().catch(() => ({}))
+                    // 🛡️ 404 代表行程已被刪除或不存在，不跳出連線失敗 toast，由自癒機制靜默接管
+                    if (r.status !== 404) {
+                        toast.error("伺服器連線失敗，請稍後再試 (Server connection failed)")
+                    }
+                    throw new HttpError(r.status, errorBody?.detail || `HTTP ${r.status}`, errorBody)
+                }
+                return r.json()
+            }).catch(err => {
+                console.error("fetcher error:", err)
+                throw err
+            }),
         {
             revalidateOnFocus: false,
             revalidateOnMount: true,
             refreshInterval, // 🆕 Hyper-Heuristics Injection
-            dedupingInterval: 2000 // Prevent spam
+            dedupingInterval: 2000, // Prevent spam
+            onErrorRetry: (err) => {
+                // 🛡️ 404 資源不存在，徹底禁止無效重試，保護 Cloud Run 冷啟動與頻寬
+                if (err instanceof HttpError && err.status === 404) return
+            },
+            onError: (err) => {
+                if (err instanceof HttpError && err.status === 404 && tripId && onTripNotFound) {
+                    onTripNotFound(tripId)
+                }
+            }
         }
     )
 

@@ -244,6 +244,7 @@ async def get_trip_by_id(
         trip_res = supabase.table("itineraries").select("*").eq("id", trip_id).execute()
         
         if not trip_res.data or len(trip_res.data) == 0:
+            print(f"ℹ️ [Trips] Trip {trip_id} not found for user {user_id}. Returning 404 for client self-healing.")
             raise HTTPException(status_code=404, detail="Trip not found")
             
         trip = trip_res.data[0]

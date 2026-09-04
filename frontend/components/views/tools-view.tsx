@@ -153,9 +153,9 @@ function tryParseItinerary(text: string): ParsedItinerary | null {
 
 export function ToolsView() {
     const { t } = useLanguage()
-    const { activeTrip, activeTripId, trips, mutate: tripMutate, userId } = useTripContext()
+    const { activeTrip, activeTripId, trips, mutate: tripMutate, userId, handleTripNotFound } = useTripContext()
     // 🔧 v7 FIX: 載入完整行程資料（含 members），解決成員列表為空的問題
-    const { trip: tripDetail } = useTripDetail(activeTripId, userId)
+    const { trip: tripDetail } = useTripDetail(activeTripId, userId, 0, handleTripNotFound)
     const tripMembers = tripDetail?.members || activeTrip?.members || []
     const { mutate: offlineMutate } = useOfflineMutation() // 🆕 Resilience Hook
     const [activeSection, setActiveSection] = useState("expense")  // 🔧 FIX: Rename to activeSection

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useRef, ReactNode, useTransition } from "react"
+import { createContext, useContext, useEffect, useRef, ReactNode, useTransition, useCallback } from "react"
 import { useTrips } from "./hooks"
 import { useTripStore } from "./stores/tripStore"
 import { sampleTripApi } from "./api"
@@ -8,6 +8,7 @@ import { sampleTripApi } from "./api"
 interface TripContextType {
     activeTripId: string | null
     setActiveTripId: (id: string | null) => void
+    handleTripNotFound: (invalidId: string) => void
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     trips: any[]
     isLoading: boolean
@@ -118,23 +119,67 @@ export function TripProvider({ children }: { children: ReactNode }) {
         })
     }, [userId, isLoading, mutate])
 
+    // 🛡️ 雙向秒級自癒：當子視圖或 SWR 捕獲 404 時秒級調用
+    const handleTripNotFound = useCallback((invalidId: string) => {
+        // 🔒 零誤判防線：檢查該行程是否仍存在於使用者的有效清單中
+        const tripStillExistsInList = trips.some((t: { id: string }) => t.id === invalidId)
+        if (tripStillExistsInList) {
+            // 該行程在使用者清單中依然合法（可能是暫時性網路抖動或唯讀副本延遲），絕對不誤判清除！
+            console.warn("🛡️ [TripContext] 404 received, but trip still exists in user's trip list. Aborting destructive clear to prevent regression.")
+            return
+        }
+
+        console.warn("🛡️ [TripContext] Confirmed ghost trip (not in list + 404):", invalidId, "- Initiating silent healing...")
+        startTransition(() => {
+            // 挑選備用行程：直接取清單第 1 個有效行程，或設為 null
+            const fallbackTrip = trips.length > 0 ? trips[0] : null
+            const nextId = fallbackTrip ? fallbackTrip.id : null
+            const nextTitle = fallbackTrip ? (fallbackTrip.title || null) : null
+
+            // 1. 同步更新 Zustand store 與持久化
+            setActiveTripId(nextId)
+            setActiveTripTitle(nextTitle)
+
+            // 2. 同步清理 legacy localStorage 鍵，杜絕雙重恢復
+            if (nextId) {
+                localStorage.setItem("active_trip_id", nextId)
+                if (nextTitle) localStorage.setItem("active_trip_title", nextTitle)
+            } else {
+                localStorage.removeItem("active_trip_id")
+                localStorage.removeItem("active_trip_title")
+            }
+        })
+    }, [trips, setActiveTripId, setActiveTripTitle])
+
     // 當 trips 載入完成，驗證 activeTripId 是否有效
     useEffect(() => {
-        if (!isLoading && trips.length > 0) {
-            if (activeTripId) {
-                // 檢查快取的 ID 是否存在於 trips 中
-                const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
-                if (!tripExists) {
-                    console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
+        if (!isLoading) {
+            if (trips.length > 0) {
+                if (activeTripId) {
+                    // 檢查快取的 ID 是否存在於 trips 中
+                    const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
+                    if (!tripExists) {
+                        console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
+                        const latestTrip = trips[0]
+                        setActiveTripId(latestTrip.id)
+                        setActiveTripTitle(latestTrip.title || null)
+                        localStorage.setItem("active_trip_id", latestTrip.id)
+                        if (latestTrip.title) localStorage.setItem("active_trip_title", latestTrip.title)
+                    }
+                } else {
+                    // 沒有選中行程時，預設選中最新的行程
                     const latestTrip = trips[0]
                     setActiveTripId(latestTrip.id)
                     setActiveTripTitle(latestTrip.title || null)
+                    localStorage.setItem("active_trip_id", latestTrip.id)
+                    if (latestTrip.title) localStorage.setItem("active_trip_title", latestTrip.title)
                 }
-            } else {
-                // 沒有選中行程時，預設選中最新的行程
-                const latestTrip = trips[0]
-                setActiveTripId(latestTrip.id)
-                setActiveTripTitle(latestTrip.title || null)
+            } else if (trips.length === 0 && activeTripId) {
+                // 🛡️ 邊界防禦：使用者名下無任何行程，清理無效的 activeTripId
+                setActiveTripId(null)
+                setActiveTripTitle(null)
+                localStorage.removeItem("active_trip_id")
+                localStorage.removeItem("active_trip_title")
             }
         }
     }, [isLoading, trips, activeTripId, setActiveTripId, setActiveTripTitle])
@@ -173,6 +218,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         <TripContext.Provider value={{
             activeTripId,
             setActiveTripId: handleSetActiveTripId,
+            handleTripNotFound,
             trips,
             isLoading,
             activeTrip,
