@@ -121,4 +121,46 @@ export async function deleteTripSnapshot(tripId: string | null | undefined): Pro
  */
 export function clearAllMemorySnapshots(): void {
     l1SnapshotCache.clear()
+    l1TripsListCache.clear()
+}
+
+// 🧠 Layer 1: 行程清單微秒級記憶體快取 (RAM Cache)
+const TRIPS_LIST_KEY_PREFIX = "tabidachi_trips_list_"
+const l1TripsListCache = new Map<string, SnapshotPayload>()
+
+/**
+ * 0ms 同步讀取行程清單 L1 記憶體快照 (供 useTrips fallbackData 使用)
+ */
+export function getTripsListSnapshotSync<T = unknown>(userId: string | null | undefined): T | null {
+    if (!userId) return null
+    const cached = l1TripsListCache.get(userId)
+    if (!cached || cached.version !== SNAPSHOT_SCHEMA_VERSION) {
+        return null
+    }
+    return cached.data as T
+}
+
+/**
+ * 同步寫入行程清單至 L1 記憶體，並非同步持久化至 L2 IndexedDB
+ */
+export async function saveTripsListSnapshot<T = unknown>(userId: string | null | undefined, data: T): Promise<void> {
+    if (!userId || !data) return
+
+    const payload: SnapshotPayload<T> = {
+        data,
+        timestamp: Date.now(),
+        version: SNAPSHOT_SCHEMA_VERSION,
+    }
+
+    // 1. 0ms 同步更新 L1 記憶體
+    l1TripsListCache.set(userId, payload)
+
+    // 2. 非同步持久化至 L2 IndexedDB
+    if (isBrowserWithStorage()) {
+        try {
+            await set(TRIPS_LIST_KEY_PREFIX + userId, payload)
+        } catch (err) {
+            console.warn("[Storage] L2 IndexedDB trips list write warning (safely ignored):", err)
+        }
+    }
 }
