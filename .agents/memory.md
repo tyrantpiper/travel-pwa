@@ -30,6 +30,11 @@
 - **雙套件依賴強耦合原子升級鐵律 (Coupled Dependency Atomic Lock)**: `react-map-gl` 與 `maplibre-gl` 存在深層私有 API（內部 transform 實例）綁定，嚴禁任由 Dependabot 獨立升級單一套件。未來升級必須將兩者視為「原子包 (Atomic Pair)」同步評估與實機雙重核驗。
 - **務實穩定勝於盲目追新原則 (Pragmatic Stabilization over Chasing SemVer Major)**: 在核心商業邏輯未受阻礙且既有版本（v5.15.0）維持 0 安全漏洞的前提下，不為了追求版本號承擔生態斷層與 WebGL1 淘汰的代價。經深度利弊分析，升級「弊遠大於利」。
 - **本地真機活體驗收守門 (Local Native Probing Gate)**: 嚴禁將 Node.js / JSDOM 單元測試或 Next.js 靜態建置的綠燈直接等同於 WebGL Canvas 與原生瀏覽器渲染安全。凡涉及圖形渲染與事件循環的核心依賴升級，必須等待開發者在本地瀏覽器親自確認無誤後，方可推進 Commit 與 Push。
+- **站在既有巨人肩膀上的輕量化離線原則 (Shoulder-of-Giants Offline Architecture)**: 拒絕盲目引入 PowerSync 或 RxDB 等肥大客戶端複寫引擎（節省 ~200KB bundle 與複雜 schema 遷移風險），完全立足於專案既有的 `serwist`、`idb-keyval` 與 `SWRConfig provider` 官方標準模式，以最小代碼增量完成離線優先秒開閉環。
+- **以體驗為先解鎖圖片快取容量 (Experience-First Media Cache Unlocking)**: 遵循使用者明確指示「不需要在乎國外漫遊流量」，將外部景點圖片上限擴充至 300 張（約 30MB），保障出國離線重度使用體驗，並透過 Cloudflare Worker 反向代理注入 `Access-Control-Allow-Origin: *`，防止 Safari 7~10MB Opaque 填充配額爆炸。
+- **動脈與靜脈讀寫分流架構 (Arterial/Venous Read-Write Decoupling)**: 在 Service Worker 層將 GET 查詢（SWR 快取）與 POST/PUT/PATCH/DELETE 突變（BackgroundSync 離線重試）物理隔離，杜絕突變請求被快取誤吞或 GET 查詢誤進背景佇列。
+- **React 19 RSC 水合防衛鐵律 (Hydration-Safe App Shell Fallback)**: 導航快取 Matcher 嚴格排除 `_rsc` 二進位參數與 `/api/` 路由，防止 Service Worker 將 HTML App Shell 誤回給 RSC 串流導致客戶端發生致命水合撕裂。
+
 
 
 ## [Failed Paths]
@@ -54,6 +59,9 @@
 - **MapLibre v6 移除公開 map.transform 引發 undefined.center 致命白屏 (Unbound Transform Trap)**: MapLibre v6 移除了 `map.transform`，而 `react-map-gl@8.1.0` 在 `transformToViewState` 中強依賴此屬性，造成執行時拋出 `TypeError: Cannot read properties of undefined (reading 'center')`。教訓：涉及包裝層（Wrapper Lib）的底層核心函式庫 Major 升級，不能只看 TypeScript 定義，必須深入檢查包裝層是否已對內部重構提供完整適配。
 - **JSDOM / SSR 建置通過帶來的偽陽性安全感 (WebGL Canvas Testing Blind Spot)**: `tsc --noEmit` 與 `vitest` 在 Node.js / JSDOM 環境下無法模擬真實 WebGL 上下文與 Canvas 交互，誤導做出「升級通過」的斷言。教訓：WebGL 與 Canvas 相關改動必須以瀏覽器真實繪製為唯一驗收標準。
 - **跳過本地驗收的過早推送違規 (Premature Push Anti-pattern)**: 在使用者尚未於本地 `localhost:3000` 進行實機操作核驗前，過早執行了 Commit 與 Push，違反了「人類主權」與「謹慎防衛」核心原則。教訓：重大依賴更新必須由人類開發者於真實環境核可後，才能執行 Git 提交與推送。
+- **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB 的複製陷阱 (DataCloneError Trap)**: SWR 內部的 cacheMap 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
+- **忽略 Next.js /_next/image 轉址路徑引發的圖片快取未命中 (Next.js Image Proxy Bypass Trap)**: 初版圖片快取僅針對外部 CDN host (如 cloudinary.com)，但 Next.js `<Image />` 組件會將圖片重寫為本地 `/_next/image?url=...` 路由。教訓：圖片快取 Matcher 必須將 `/_next/image` 與外部 CDN 列為聯集比對。
+
 
 
 ## [Technical Debt]
@@ -66,6 +74,8 @@
 - **PWA 快取與 Core Web Vitals 監控**: 監控生產環境在 PWA 離線模式下的快取命中率與 Core Web Vitals (INP / LCP / CLS) 表現。
 - **Dependabot 忽略 MapLibre Major 升級配置**: 需在 `.github/dependabot.yml` 中新增 `maplibre-gl` 的 major 版本忽略規則，防止機器人再次產生破壞性相容變更 PR。
 - **未來 MLT (MapLibre Tile) 格式追蹤**: 待 OpenFreeMap 或自託管地圖伺服器正式普及 MLT 格式時，再行重啟評估 v6 升級。
+- **BackgroundSync iOS Safari 降級機制強化**: iOS Safari 原生不支援 W3C Background Sync API，目前依賴 Service Worker 重新啟動與連線 fetch 事件被動觸發。後續可評估在 `SyncManager` 前端組件中監聽 `window.addEventListener('online')` 作為雙重主動觸發保險。
+- **離線突變樂觀 UI 狀態提示 (Optimistic UI Badge)**: 當使用者於離線狀態新增費用或筆記時，可於 UI 卡片旁標註「等待連線同步中...」的徽章，提升使用者心理安全感。
 
 ## [Vocabulary]
 - **Continuous Multi-Month Calendar**: iOS Swift 風格連續縱向多月份滾動日曆區間選擇器。
@@ -94,3 +104,7 @@
 - **Coupled Dependency Atomic Lock**: 雙套件依賴強耦合原子升級鎖，將具有深層內部 API 依賴的跨函式庫綁定為單一原子升級單元。
 - **Local Native Probing Gate**: 本地真機活體驗收守門，要求涉及圖形渲染與原生 Web API 的重大變更必須通過本機瀏覽器實地驗收。
 - **Unbound Transform Trap**: 未綁定相機變換陷阱，底層地圖引擎移除內部 transform 屬性導致上層包裝套件取值崩潰。
+- **Shoulder-of-Giants Offline Architecture**: 站在既有巨人肩膀上的輕量化離線架構，立足既有 Serwist、idb-keyval 與 SWR 快取規範，達成零冗餘體積的離線優先秒開。
+- **Arterial/Venous Read-Write Decoupling**: 動脈與靜脈讀寫分流架構，將 GET 離線讀取與 POST/PUT/PATCH/DELETE 突變寫入在 Service Worker 層物理分離。
+- **Hydration-Safe App Shell Fallback**: 水合安全 App Shell 導航降級，導航快取精確排除 _rsc 與 /api/ 以維護 React 19 RSC 水合安全。
+- **DataCloneError Trap**: 資料複製錯誤陷阱，嘗試將包含 Promise 或閉包的記憶體物件寫入 IndexedDB 時觸發的致命拋錯。
