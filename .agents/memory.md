@@ -27,10 +27,8 @@
 - **SWR 404 立即熔斷機制 (Zero-Retry 404 Guard)**: HTTP 404 屬於明確的客戶端資源不存在，在 SWR 的 `onErrorRetry` 中強制判定 `error.status === 404` 立即終止重試，將無效請求次數由 19 次嚴格降為 0，消除 Cloud Run 冷啟動擴展負擔與頻寬浪費。
 - **本地快取雙清原則 (Dual-Storage Coherence)**: 同時使用狀態庫持久化（Zustand `persist` 寫入 `trip-storage`）與舊版 Storage（`active_trip_id`）時，自癒清理必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵，杜絕重新整理後狀態中介軟體再次反序列化還原。
 - **Fetcher 錯誤語義化傳遞 (Typed HttpError Propagation)**: 原生 fetch 遇 4xx/5xx 不會 reject Promise，底層 Fetcher 必須主動檢查 `!r.ok` 並拋出帶有狀態碼的 `HttpError`，防止上層快取引擎誤將 404 當作合法成功資料吸收而使重試熔斷全數啞火。
-- **MapLibre v6 配套升級原則 (MapLibre v6 & react-map-gl Transform Alignment)**: MapLibre GL JS 6.0+ 將原本公開的 `map.transform` 屬性移除並改為離散 getter，react-map-gl 必須鎖定 >= 8.1.3（導入 `getTransformLike`）方可正常獲取相機視角，否則於執行期觸發 `TypeError: Cannot read properties of undefined (reading 'center')`。
 
 ## [Failed Paths]
-- **react-map-gl 8.1.0 搭配 maplibre-gl 6.x 引發相機狀態讀取崩潰 (Unbound Map Transform Trap)**: 升級 maplibre-gl 至 6.x 時若未同步將 react-map-gl 升級至 8.1.3+，react-map-gl 內部 `transformToViewState(this._map.transform)` 因讀取不存在的 `transform` 屬性而拋出 `Cannot read properties of undefined (reading 'center')`，導致地圖白屏。教訓：maplibre-gl 跨大版本升級時，封裝庫 (react-map-gl) 必須一併進行相容版本聯動更新。
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
 - **健康檢查端點攜帶副作用 (Side-Effects in Health Endpoint)**: 將資料庫保活或連線預熱強行掛在健康檢查端點上，一旦外部網路波動或連線鎖爭搶，健康檢查連帶失敗導致整台伺服器被誤判死亡。教訓：健康檢查必須保持 Idempotent 與無副作用。
 - **Framer Motion 動態 Key 引發元件重新掛載與重複請求**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 銷毀重新掛載引發 API 重複發送。教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
