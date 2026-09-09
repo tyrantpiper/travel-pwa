@@ -66,8 +66,6 @@ export const MAP_STYLES = {
     ROAD_OPACITY_ON_SATELLITE: 0.7,
 }
 
-import type { ExpressionSpecification } from 'maplibre-gl'
-
 /**
  * 地圖中文化配置
  * 將所有標籤優先顯示繁體中文，並提供回退機制
@@ -80,7 +78,7 @@ export const MAP_LOCALIZATION = {
         ['get', 'name:zh'],        // 2. 簡體中文
         ['get', 'name:latin'],     // 3. 拉丁字母
         ['get', 'name']            // 4. 當地語系 (最終回退)
-    ] as ExpressionSpecification,
+    ] as const,
 
     // POI 名稱優先級順序
     CHINESE_NAME_KEYS: ['name:zh-Hant', 'name:zh', 'name', 'name_en'] as const,
