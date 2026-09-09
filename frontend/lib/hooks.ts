@@ -1,7 +1,8 @@
 import useSWR from "swr"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { travelDataApi } from './api'
-import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot } from './idb-storage'
+import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot, getTripsListSnapshotSync, saveTripsListSnapshot } from './idb-storage'
+import type { Trip } from './itinerary-types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -33,14 +34,23 @@ export const fetcherWithUserId = ([url, uid]: [string, string]) =>
         })
 
 export function useTrips(userId: string | null) {
-    const { data, error, mutate } = useSWR(
+    const initialSnapshot = useMemo(() => getTripsListSnapshotSync<Trip[]>(userId), [userId])
+    const { data, error, mutate } = useSWR<Trip[]>(
         userId ? ["/api/trips", userId] : null,
         fetcherWithUserId,
-        { revalidateOnFocus: false }
+        {
+            fallbackData: initialSnapshot || undefined,
+            revalidateOnFocus: false,
+            onSuccess: (freshData) => {
+                if (userId && freshData) {
+                    saveTripsListSnapshot(userId, freshData)
+                }
+            }
+        }
     )
     return {
-        trips: Array.isArray(data) ? data : [],
-        isLoading: !error && !data,
+        trips: Array.isArray(data) ? data : (Array.isArray(initialSnapshot) ? initialSnapshot : []),
+        isLoading: !error && !data && !initialSnapshot,
         isError: error,
         mutate
     }

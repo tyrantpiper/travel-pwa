@@ -14,6 +14,8 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { AppClientLayer } from "@/components/app-client-layer"
 import { SpeculationRules } from "@/components/core/speculation-rules"
 
+import { IdbSwrProvider } from "@/lib/idb-swr-provider"
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
@@ -81,16 +83,18 @@ export default function RootLayout({
         <ThemeProvider>
           <LanguageProvider>
             <HtmlLangSync />
-            <TripProvider>
-              <SplashScreen />
-              <SyncManager />
-              <Suspense fallback={null}>
-                {children}
-              </Suspense>
-              <AppClientLayer />
-              <SpeculationRules />
-              <PWAInstallPrompt />
-            </TripProvider>
+            <IdbSwrProvider>
+              <TripProvider>
+                <SplashScreen />
+                <SyncManager />
+                <Suspense fallback={null}>
+                  {children}
+                </Suspense>
+                <AppClientLayer />
+                <SpeculationRules />
+                <PWAInstallPrompt />
+              </TripProvider>
+            </IdbSwrProvider>
           </LanguageProvider>
         </ThemeProvider>
         <Toaster position="bottom-center" richColors />

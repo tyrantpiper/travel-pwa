@@ -126,4 +126,22 @@ describe('Instant Boot L1/L2 Storage Engine Tests', () => {
         const result = await preloadTripSnapshot('trip-incognito')
         expect(result).toBeNull()
     })
+
+    it('TC-6: saveTripsListSnapshot and getTripsListSnapshotSync work synchronously for 0ms instant list render', async () => {
+        const { saveTripsListSnapshot, getTripsListSnapshotSync } = await import('@/lib/idb-storage')
+        const tripsList = [
+            { id: 'trip-1', title: '東京賞櫻' },
+            { id: 'trip-2', title: '京都紅葉' }
+        ]
+
+        // 寫入快照
+        await saveTripsListSnapshot('user-test-uuid', tripsList)
+
+        // 0ms 同步直出
+        const syncResult = getTripsListSnapshotSync('user-test-uuid')
+        expect(syncResult).toEqual(tripsList)
+
+        // 驗證 L2 IndexedDB 已持久化
+        expect(mockIdbStore.has('tabidachi_trips_list_user-test-uuid')).toBe(true)
+    })
 })
