@@ -27,6 +27,10 @@
 - **SWR 404 立即熔斷機制 (Zero-Retry 404 Guard)**: HTTP 404 屬於明確的客戶端資源不存在，在 SWR 的 `onErrorRetry` 中強制判定 `error.status === 404` 立即終止重試，將無效請求次數由 19 次嚴格降為 0，消除 Cloud Run 冷啟動擴展負擔與頻寬浪費。
 - **本地快取雙清原則 (Dual-Storage Coherence)**: 同時使用狀態庫持久化（Zustand `persist` 寫入 `trip-storage`）與舊版 Storage（`active_trip_id`）時，自癒清理必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵，杜絕重新整理後狀態中介軟體再次反序列化還原。
 - **Fetcher 錯誤語義化傳遞 (Typed HttpError Propagation)**: 原生 fetch 遇 4xx/5xx 不會 reject Promise，底層 Fetcher 必須主動檢查 `!r.ok` 並拋出帶有狀態碼的 `HttpError`，防止上層快取引擎誤將 404 當作合法成功資料吸收而使重試熔斷全數啞火。
+- **雙套件依賴強耦合原子升級鐵律 (Coupled Dependency Atomic Lock)**: `react-map-gl` 與 `maplibre-gl` 存在深層私有 API（內部 transform 實例）綁定，嚴禁任由 Dependabot 獨立升級單一套件。未來升級必須將兩者視為「原子包 (Atomic Pair)」同步評估與實機雙重核驗。
+- **務實穩定勝於盲目追新原則 (Pragmatic Stabilization over Chasing SemVer Major)**: 在核心商業邏輯未受阻礙且既有版本（v5.15.0）維持 0 安全漏洞的前提下，不為了追求版本號承擔生態斷層與 WebGL1 淘汰的代價。經深度利弊分析，升級「弊遠大於利」。
+- **本地真機活體驗收守門 (Local Native Probing Gate)**: 嚴禁將 Node.js / JSDOM 單元測試或 Next.js 靜態建置的綠燈直接等同於 WebGL Canvas 與原生瀏覽器渲染安全。凡涉及圖形渲染與事件循環的核心依賴升級，必須等待開發者在本地瀏覽器親自確認無誤後，方可推進 Commit 與 Push。
+
 
 ## [Failed Paths]
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
@@ -47,6 +51,10 @@
 - **原生 fetch 吞沒 404 引發 SWR 假成功的盲點陷阱 (Raw Fetch 404 Swallowing Trap)**: 在 fetcher 中直接使用 fetch().then(r => r.json())，未檢查 r.ok。當後端回傳 404 時，Promise 依然正常 resolve，SWR 將 { detail: "Trip not found" } 判定為成功資料寫入快取，導致 error 永遠為 undefined，SWR 的 onErrorRetry 與自癒完全啞火。教訓：所有底層 Fetcher 必須嚴格檢驗 !r.ok 並主動拋出標準 HttpError。
 - **未經二次核驗就清除快取引發的誤判跳轉風險 (Unverified 404 Eviction Trap)**: 若僅憑一次 GET /api/trips/{id} 收到 404 就直接清除本地快取並切換行程，在行動網路偶發抖動或 CDN 節點異常時，使用者正在看的合法行程會被誤切換。教訓：自癒機制必須搭配「清單總表二次核驗（List Double-Check）」，確認清單中也查無此人時才允許執行破壞性清除。
 - **Zustand 與 legacy localStorage 雙重持久化漂移 (Dual Persistence Drift Trap)**: 僅透過 localStorage.removeItem('active_trip_id') 清理快取，忽略了 Zustand 的 persist 中介軟體仍將舊 ID 儲存在 trip-storage，重新整理後死 ID 再次復發。教訓：具備多重持久化機制時，必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵。
+- **MapLibre v6 移除公開 map.transform 引發 undefined.center 致命白屏 (Unbound Transform Trap)**: MapLibre v6 移除了 `map.transform`，而 `react-map-gl@8.1.0` 在 `transformToViewState` 中強依賴此屬性，造成執行時拋出 `TypeError: Cannot read properties of undefined (reading 'center')`。教訓：涉及包裝層（Wrapper Lib）的底層核心函式庫 Major 升級，不能只看 TypeScript 定義，必須深入檢查包裝層是否已對內部重構提供完整適配。
+- **JSDOM / SSR 建置通過帶來的偽陽性安全感 (WebGL Canvas Testing Blind Spot)**: `tsc --noEmit` 與 `vitest` 在 Node.js / JSDOM 環境下無法模擬真實 WebGL 上下文與 Canvas 交互，誤導做出「升級通過」的斷言。教訓：WebGL 與 Canvas 相關改動必須以瀏覽器真實繪製為唯一驗收標準。
+- **跳過本地驗收的過早推送違規 (Premature Push Anti-pattern)**: 在使用者尚未於本地 `localhost:3000` 進行實機操作核驗前，過早執行了 Commit 與 Push，違反了「人類主權」與「謹慎防衛」核心原則。教訓：重大依賴更新必須由人類開發者於真實環境核可後，才能執行 Git 提交與推送。
+
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
@@ -56,6 +64,8 @@
 - **FastAPI ORJSONResponse 遷移評估**: FastAPI 新版本提出 FastAPIDeprecationWarning: ORJSONResponse is deprecated，建議後續可評估直接交由 Pydantic response_model 序列化。
 - **Dependabot 漏洞修補**: Default branch 存在 1 個 Low severity 安全漏洞，需排程升級相依性。
 - **PWA 快取與 Core Web Vitals 監控**: 監控生產環境在 PWA 離線模式下的快取命中率與 Core Web Vitals (INP / LCP / CLS) 表現。
+- **Dependabot 忽略 MapLibre Major 升級配置**: 需在 `.github/dependabot.yml` 中新增 `maplibre-gl` 的 major 版本忽略規則，防止機器人再次產生破壞性相容變更 PR。
+- **未來 MLT (MapLibre Tile) 格式追蹤**: 待 OpenFreeMap 或自託管地圖伺服器正式普及 MLT 格式時，再行重啟評估 v6 升級。
 
 ## [Vocabulary]
 - **Continuous Multi-Month Calendar**: iOS Swift 風格連續縱向多月份滾動日曆區間選擇器。
@@ -81,3 +91,6 @@
 - **Zero-Retry 404 Guard**: SWR 404 立即熔斷守衛，遇到客戶端資源不存在時重試次數強制歸零，杜絕伺服器冷啟動風暴。
 - **Dual-Storage Coherence**: 雙重持久化存儲一致性，跨 Zustand 與 localStorage 雙清以防幽靈 ID 還原。
 - **Typed HttpError Propagation**: 型別化 HTTP 錯誤傳遞，強制底層 Fetcher 檢驗 !r.ok 並向外拋出狀態碼。
+- **Coupled Dependency Atomic Lock**: 雙套件依賴強耦合原子升級鎖，將具有深層內部 API 依賴的跨函式庫綁定為單一原子升級單元。
+- **Local Native Probing Gate**: 本地真機活體驗收守門，要求涉及圖形渲染與原生 Web API 的重大變更必須通過本機瀏覽器實地驗收。
+- **Unbound Transform Trap**: 未綁定相機變換陷阱，底層地圖引擎移除內部 transform 屬性導致上層包裝套件取值崩潰。
