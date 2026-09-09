@@ -388,7 +388,7 @@ export default function FullscreenMapModal({
     }, [mapMode, mapLoaded])
 
     // POI 點擊
-    const handleMapClick = useCallback((e: maplibregl.MapLayerMouseEvent) => {
+    const handleMapClick = useCallback((e: MapLayerMouseEvent) => {
         const map = mapRef.current?.getMap()
         if (!map) return
 
@@ -428,7 +428,7 @@ export default function FullscreenMapModal({
     }, [t])
 
     // 🆕 2026 Logic: 處理地圖長按 (任意取點)
-    const handleMapLongPress = useCallback((e: maplibregl.MapLayerMouseEvent) => {
+    const handleMapLongPress = useCallback((e: MapLayerMouseEvent) => {
         const { lng, lat } = e.lngLat
 
         const poiData: POIBasicData = {
