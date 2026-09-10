@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { MessageCircle, X, Send, Image as ImageIcon, Bot, User } from "lucide-react"
+import { X, Send, Image as ImageIcon, User } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTripContext } from "@/lib/trip-context"
 import { useFocusedDay } from "@/lib/stores/tripStore"
@@ -237,6 +236,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
     const [isSummarizing, setIsSummarizing] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
     // 🆕 v3.5: AbortController for stopping generation
     const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -279,11 +279,23 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
         }
     }, [activeTripId, isOpen])
 
-    // Draggable state
+    // Draggable state & 2D Magnetic Snap
     const [position, setPosition] = useState<Position>({ x: 16, y: 100 })
     const [isDragging, setIsDragging] = useState(false)
+    const [isIdle, setIsIdle] = useState(false)
     const dragRef = useRef<HTMLDivElement>(null)
     const dragOffset = useRef<Position>({ x: 0, y: 0 })
+    const hasMovedRef = useRef(false)
+
+    // 4 秒無操作自動半透明 (Idle Dimming)
+    useEffect(() => {
+        if (isOpen || isDragging) {
+            setIsIdle(false)
+            return
+        }
+        const timer = setTimeout(() => setIsIdle(true), 4000)
+        return () => clearTimeout(timer)
+    }, [isOpen, isDragging, position])
 
     // Load saved position + clamp to current viewport
     useEffect(() => {
@@ -313,8 +325,9 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 const minY = 80 + safeBottom
                 const maxY = window.innerHeight - buttonSize - margin
                 const clampedY = Math.max(minY, Math.min(prev.y, maxY))
-                if (clampedY !== prev.y) {
-                    const newPos = { x: prev.x, y: clampedY }
+                const clampedX = Math.max(margin, Math.min(prev.x, window.innerWidth - buttonSize - margin))
+                if (clampedY !== prev.y || clampedX !== prev.x) {
+                    const newPos = { x: clampedX, y: clampedY }
                     localStorage.setItem("chat_widget_position", JSON.stringify(newPos))
                     return newPos
                 }
@@ -343,38 +356,49 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             x: clientX - rect.left,
             y: clientY - rect.top
         }
+        hasMovedRef.current = false
         setIsDragging(true)
     }, [])
 
-    // Handle drag move - constrain to screen edges (bottom-right corner only, slide along edges)
+    // Handle drag move - 2D AssistiveTouch free movement within safe margins
     const handleDragMove = useCallback((clientX: number, clientY: number) => {
         if (!isDragging) return
 
+        hasMovedRef.current = true
         const buttonSize = 56
-        const margin = 16 // margin from edge
+        const margin = 16
         const safeBottom = getSafeAreaBottom()
-        const minY = 80 + safeBottom // 🆕 minimum distance includes safe area
-        const maxY = window.innerHeight - buttonSize - margin // maximum Y (near top of screen)
+        const minY = 80 + safeBottom
+        const maxY = window.innerHeight - buttonSize - margin
 
-        // Calculate position from bottom-right
+        // 2D 雙向自由位移計算
+        const newX = window.innerWidth - clientX - (buttonSize - dragOffset.current.x)
+        const clampedX = Math.max(margin, Math.min(newX, window.innerWidth - buttonSize - margin))
         const newY = window.innerHeight - clientY - (buttonSize - dragOffset.current.y)
-
-        // Clamp Y to valid range (slide vertically along right edge)
         const clampedY = Math.max(minY, Math.min(newY, maxY))
 
-        setPosition({ x: margin, y: clampedY })
+        setPosition({ x: clampedX, y: clampedY })
     }, [isDragging])
 
-    // Handle drag end - snap to edge
+    // Handle drag end - 2D 彈簧磁吸貼齊最近邊緣 (左右) + Haptic 反饋
     const handleDragEnd = useCallback(() => {
         if (isDragging) {
             setIsDragging(false)
-            // Snap to right edge
-            const snappedPosition = { x: 16, y: position.y }
+            const buttonSize = 56
+            // 判斷離左側還是右側邊界更近
+            const snapToRight = position.x < (window.innerWidth - buttonSize) / 2
+            const targetX = snapToRight ? 16 : window.innerWidth - buttonSize - 16
+            const snappedPosition = { x: targetX, y: position.y }
             setPosition(snappedPosition)
             localStorage.setItem("chat_widget_position", JSON.stringify(snappedPosition))
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(10)
+            }
+            setTimeout(() => {
+                hasMovedRef.current = false
+            }, 80)
         }
-    }, [isDragging, position.y])
+    }, [isDragging, position.x, position.y])
 
     // Mouse events
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -440,6 +464,9 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
 
         setInput("")
         setSelectedImage(null)
+        if (textareaRef.current) {
+            textareaRef.current.style.height = "auto"
+        }
 
         // 🆕 建立使用者訊息 (新格式)
         const userMessage: Message = {
@@ -790,19 +817,23 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
 
     return (
         <>
-            {/* Chat Window - Fullscreen Immersive with Desktop Centering */}
+            {/* Chat Window - Fullscreen Immersive with Desktop Centering & Dark Mode */}
             {isOpen && (
                 <div className="fixed inset-0 z-110 flex flex-col bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="w-full max-w-3xl mx-auto h-full flex flex-col bg-white shadow-2xl md:border-x md:border-slate-200 overflow-hidden">
+                    <div className="w-full max-w-3xl mx-auto h-full flex flex-col bg-white dark:bg-slate-900 shadow-2xl md:border-x md:border-slate-200 dark:md:border-slate-800 overflow-hidden">
                         {/* Header - No longer draggable */}
-                        <div className="bg-linear-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white shrink-0">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-white/20 p-1.5 rounded-full">
-                                    <Bot className="w-5 h-5 text-white" />
+                        <div className="bg-linear-to-r from-blue-600 to-indigo-600 dark:from-slate-900 dark:to-indigo-950 p-4 flex justify-between items-center text-white shrink-0 border-b border-white/10">
+                            <div className="flex items-center gap-2.5">
+                                <div className="relative w-9 h-9 rounded-full overflow-hidden bg-white/20 dark:bg-slate-800/80 flex items-center justify-center shrink-0 border border-white/30 dark:border-cyan-500/30 shadow-xs">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/images/ryan-bot-avatar.webp" alt="Ryan AI" className="w-8 h-8 object-contain" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-sm">Ryan AI Assistant</h3>
-                                    <p className="text-[10px] text-blue-100 opacity-80">{t('ai_subtitle')}</p>
+                                    <h3 className="font-bold text-sm flex items-center gap-1.5">
+                                        Ryan AI Assistant
+                                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse inline-block" />
+                                    </h3>
+                                    <p className="text-[10px] text-blue-100 dark:text-cyan-200/70 opacity-90">{t('ai_subtitle')}</p>
                                 </div>
                             </div>
                             <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-full text-white/80 hover:text-white transition-colors">
@@ -811,18 +842,23 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 bg-slate-50 scroll-smooth">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 space-y-4 bg-slate-50 dark:bg-slate-950/90 scroll-smooth">
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={cn("flex gap-3 min-w-0", msg.role === "user" ? "max-w-[85%] ml-auto flex-row-reverse" : "max-w-[95%]")}>
                                     <div className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
-                                        msg.role === "model" ? "bg-indigo-100 text-indigo-600" : "bg-slate-200 text-slate-500"
+                                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 overflow-hidden",
+                                        msg.role === "model" ? "bg-indigo-100 dark:bg-indigo-950/80 border border-indigo-200/50 dark:border-indigo-800/50 shadow-xs" : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
                                     )}>
-                                        {msg.role === "model" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
+                                        {msg.role === "model" ? (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img src="/images/ryan-bot-avatar.webp" alt="Ryan AI" className="w-6 h-6 object-contain" />
+                                        ) : (
+                                            <User className="w-5 h-5" />
+                                        )}
                                     </div>
                                     <div className={cn(
                                         "p-3.5 md:p-4 rounded-2xl text-sm shadow-sm min-w-0 wrap-anywhere",
-                                        msg.role === "model" ? "bg-white text-slate-700 rounded-tl-none border border-slate-200" : "bg-blue-600 text-white rounded-tr-none"
+                                        msg.role === "model" ? "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 rounded-tl-none border border-slate-200 dark:border-slate-800 shadow-xs" : "bg-blue-600 text-white rounded-tr-none"
                                     )}>
                                         {msg.role === "model" ? (
                                             <>
@@ -880,7 +916,27 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                                 (itinerary.items.length > 5 ? `\n... (還有 ${itinerary.items.length - 5} 個地點)` : '')
                                                             return <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary}</ReactMarkdown>
                                                         }
-                                                        return <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent === "__GREETING__" ? t('ai_greet_msg') : msg.displayContent}</ReactMarkdown>
+                                                        if (msg.displayContent === "__GREETING__") {
+                                                            return (
+                                                                <div className="space-y-3">
+                                                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-linear-to-r from-blue-500/10 via-indigo-500/10 to-cyan-500/10 border border-blue-200/60 dark:border-cyan-900/40 shadow-xs">
+                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                        <img
+                                                                            src="/images/ryan-bot-hero.webp"
+                                                                            alt="Ryan AI Companion"
+                                                                            className="w-14 h-14 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(6,182,212,0.3)]"
+                                                                        />
+                                                                        <div className="min-w-0">
+                                                                            <h4 className="font-semibold text-xs text-blue-700 dark:text-cyan-400">Ryan AI 隨行旅伴</h4>
+                                                                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-snug mt-0.5">
+                                                                                {t('ai_greet_msg')}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        }
+                                                        return <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.displayContent}</ReactMarkdown>
                                                     })()}
                                                 </div>
 
@@ -923,8 +979,10 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                             ))}
                             {isLoading && (
                                 <div className="flex gap-3 max-w-[85%]">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-1">
-                                        <Bot className="w-5 h-5" />
+                                    <div className="relative w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950/80 border border-indigo-200/50 dark:border-indigo-800/50 flex items-center justify-center shrink-0 mt-1 overflow-hidden shadow-xs">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src="/images/ryan-bot-avatar.webp" alt="Ryan AI Thinking" className="w-6 h-6 object-contain animate-pulse" />
+                                        <span className="absolute inset-0 rounded-full border border-cyan-400/60 animate-ping pointer-events-none" />
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         {/* 🆕 脈衝手風琴 */}
@@ -962,11 +1020,11 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                        <div className="p-3 md:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                             {selectedImage && (
                                 <div className="mb-2 relative inline-block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={selectedImage} alt="Selected" className="h-16 w-auto rounded-lg border border-slate-200" />
+                                    <img src={selectedImage} alt="Selected" className="h-16 w-auto rounded-lg border border-slate-200 dark:border-slate-700" />
                                     <button
                                         onClick={() => setSelectedImage(null)}
                                         className="absolute -top-2 -right-2 bg-slate-500 text-white rounded-full p-0.5 hover:bg-slate-600"
@@ -986,7 +1044,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="shrink-0 text-slate-400 hover:text-slate-600"
+                                    className="shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <ImageIcon className="w-5 h-5" />
@@ -1007,12 +1065,19 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 >
                                     🔬 {zh ? "深度研究" : "Deep"}
                                 </Button>
-                                <Input
+                                <textarea
+                                    ref={textareaRef}
+                                    rows={1}
                                     placeholder={t('ai_ask_placeholder')}
-                                    className="bg-slate-50 border-slate-200 focus-visible:ring-blue-500"
+                                    className="flex min-h-9 max-h-32 w-full resize-none rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all leading-normal"
                                     value={input}
-                                    onChange={(e) => setInput(e.target.value)}
+                                    onChange={(e) => {
+                                        setInput(e.target.value)
+                                        e.target.style.height = "auto"
+                                        e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`
+                                    }}
                                     onKeyDown={(e) => {
+                                        if (e.nativeEvent.isComposing) return
                                         if (e.key === "Enter" && !e.shiftKey) {
                                             e.preventDefault()
                                             handleSendMessage()
@@ -1021,7 +1086,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                 />
                                 <Button
                                     size="icon"
-                                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
                                     onClick={handleSendMessage}
                                     disabled={isLoading || (!input.trim() && !selectedImage)}
                                 >
@@ -1033,7 +1098,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 </div>
             )}
 
-            {/* Toggle Button - Edge Draggable */}
+            {/* Toggle Button - 2D Edge Draggable Liquid Glass */}
             <div
                 ref={dragRef}
                 className="fixed z-110"
@@ -1046,15 +1111,33 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 <Button
                     size="icon"
                     className={cn(
-                        "h-14 w-14 rounded-full shadow-lg transition-all duration-300 hover:scale-105 touch-manipulation",
-                        isOpen ? "bg-slate-200 text-slate-600 hover:bg-slate-300" : "bg-linear-to-r from-blue-600 to-indigo-600 text-white",
+                        "h-14 w-14 rounded-full transition-all duration-300 hover:scale-105 touch-manipulation relative overflow-hidden",
+                        "backdrop-blur-2xl border border-white/60 dark:border-white/15",
+                        isOpen
+                            ? "bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 shadow-lg"
+                            : "bg-white/85 dark:bg-slate-900/85 text-indigo-600 dark:text-indigo-400 shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.8)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.15)]",
+                        isIdle && !isOpen && !isDragging ? "opacity-40 hover:opacity-100" : "opacity-100",
                         isDragging && "scale-110 shadow-2xl"
                     )}
-                    onClick={() => !isDragging && setIsOpen(!isOpen)}
+                    onClick={() => !hasMovedRef.current && setIsOpen(!isOpen)}
                     onMouseDown={handleMouseDown}
                     onTouchStart={handleTouchStart}
                 >
-                    {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+                    {isOpen ? (
+                        <X className="w-6 h-6 text-slate-700 dark:text-slate-300" />
+                    ) : (
+                        <div className="relative w-full h-full flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src="/images/ryan-bot-avatar.webp"
+                                alt="Ryan AI"
+                                className="w-9 h-9 object-contain drop-shadow-[0_2px_8px_rgba(6,182,212,0.35)] transition-transform hover:scale-110"
+                            />
+                            {isLoading && (
+                                <span className="absolute inset-0 rounded-full border-2 border-cyan-400/80 animate-ping pointer-events-none" />
+                            )}
+                        </div>
+                    )}
                 </Button>
             </div>
         </>
