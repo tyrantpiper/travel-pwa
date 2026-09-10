@@ -33,7 +33,10 @@
 - **站在既有巨人肩膀上的輕量化離線原則 (Shoulder-of-Giants Offline Architecture)**: 拒絕盲目引入 PowerSync 或 RxDB 等肥大客戶端複寫引擎（節省 ~200KB bundle 與複雜 schema 遷移風險），完全立足於專案既有的 `serwist`、`idb-keyval` 與 `SWRConfig provider` 官方標準模式，以最小代碼增量完成離線優先秒開閉環。
 - **以體驗為先解鎖圖片快取容量 (Experience-First Media Cache Unlocking)**: 遵循使用者明確指示「不需要在乎國外漫遊流量」，將外部景點圖片上限擴充至 300 張（約 30MB），保障出國離線重度使用體驗，並透過 Cloudflare Worker 反向代理注入 `Access-Control-Allow-Origin: *`，防止 Safari 7~10MB Opaque 填充配額爆炸。
 - **動脈與靜脈讀寫分流架構 (Arterial/Venous Read-Write Decoupling)**: 在 Service Worker 層將 GET 查詢（SWR 快取）與 POST/PUT/PATCH/DELETE 突變（BackgroundSync 離線重試）物理隔離，杜絕突變請求被快取誤吞或 GET 查詢誤進背景佇列。
-- **React 19 RSC 水合防衛鐵律 (Hydration-Safe App Shell Fallback)**: 導航快取 Matcher 嚴格排除 `_rsc` 二進位參數與 `/api/` 路由，防止 Service Worker 將 HTML App Shell 誤回給 RSC 串流導致客戶端發生致命水合撕裂。
+- **高密度對話組件原地微創升級原則 (In-Place Surgical Modernization over Premature Component Splitting)**: 對於承載 12+ 項複雜閉包、SWR 動態輪詢與 SSE 串流狀態的 `chat-widget.tsx`，堅決抵制盲目拆檔（如拆成 `LiquidGlassOrb`, `ChatBottomSheet`, `ChatInputBar`），改以原地微創升級導入 iOS 26 Liquid Glass、2D AssistiveTouch 自由位移、16px 邊界安全磁吸貼齊與 Haptic 微震動，達成 100% 零業務邏輯流失、零回歸。
+- **合成點擊與拖曳手勢競態防衛 (Drag-Release Synthetic Click Race-Condition Guard)**: 當使用者於觸控或滑鼠拖曳浮動按鈕並釋放時，瀏覽器會合成觸發 `click` 事件導致聊天面板被誤開啟。透過 `hasMovedRef` 追蹤位移並於 `handleDragEnd` 中設置 80ms 延遲釋放閥，徹底杜絕拖曳完放開手指誤開面板的手勢衝突。
+- **輸入法組合態攔截與自適應高度防線 (IME Composition Guard & Auto-Growing Textarea)**: 中文（注音/倉頡/拼音）與日文平假名輸入時，按下 Enter 選字常引發未完成文字提早發送的災難。輸入框全面升級為自適應高度 `<textarea>`（`min-h-9 max-h-32`），並在 `onKeyDown` 嚴格掛載 `if (e.nativeEvent.isComposing) return`，保障多語言選字體驗。
+- **專屬 3D 虛擬導遊 IP 輕量化與 PWA 快取 (Lightweight 3D Companion Avatar & Offline PWA Caching)**: 將抽象向量圖標升級為具象化的「Ryan AI 隨行旅伴」3D 陶瓷光澤透明 WebP 資產（微縮頭像 6.5KB + 迎賓卡 31.9KB），並於 Service Worker 靜態快取池長效保活，兼顧情感連結與 PWA 斷網毫秒級即時渲染。
 
 
 
@@ -60,7 +63,8 @@
 - **JSDOM / SSR 建置通過帶來的偽陽性安全感 (WebGL Canvas Testing Blind Spot)**: `tsc --noEmit` 與 `vitest` 在 Node.js / JSDOM 環境下無法模擬真實 WebGL 上下文與 Canvas 交互，誤導做出「升級通過」的斷言。教訓：WebGL 與 Canvas 相關改動必須以瀏覽器真實繪製為唯一驗收標準。
 - **跳過本地驗收的過早推送違規 (Premature Push Anti-pattern)**: 在使用者尚未於本地 `localhost:3000` 進行實機操作核驗前，過早執行了 Commit 與 Push，違反了「人類主權」與「謹慎防衛」核心原則。教訓：重大依賴更新必須由人類開發者於真實環境核可後，才能執行 Git 提交與推送。
 - **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB 的複製陷阱 (DataCloneError Trap)**: SWR 內部的 cacheMap 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
-- **忽略 Next.js /_next/image 轉址路徑引發的圖片快取未命中 (Next.js Image Proxy Bypass Trap)**: 初版圖片快取僅針對外部 CDN host (如 cloudinary.com)，但 Next.js `<Image />` 組件會將圖片重寫為本地 `/_next/image?url=...` 路由。教訓：圖片快取 Matcher 必須將 `/_next/image` 與外部 CDN 列為聯集比對。
+- **推倒式拆檔引發的閉包斷裂與 SWR 快取丟失陷阱 (Premature Component Decomposition Trap)**: 曾嘗試將 `chat-widget.tsx` 暴力解耦拆分至 3 個獨立組件（`LiquidGlassOrb`, `ChatBottomSheet`, `ChatInputBar`），導致 `useDynamicPolling`、`prevTripIdRef` 雙清閉包、`textareaRef` 焦點控制以及多個自癒狀態遺失，引發大量測試報錯與死循環震盪。教訓：在缺乏完整抽象層保護前，高耦合高密度邏輯組件應優先採原地微創增強，嚴禁過度工程化的推倒重來。
+- **未攔截輸入法組合態引發的 Enter 誤送出語句災難 (CJK IME Premature Send Trap)**: 在 input/textarea 監聽 `onKeyDown` 的 Enter 事件時，若未檢查 `e.nativeEvent.isComposing`，使用者在注音或拼音選字確認按下 Enter 時會誤觸發 `handleSendMessage()`，將半形注音碼或未完成拼音直接送出。教訓：所有富文字或對話輸入框必須強制加入 `if (e.nativeEvent.isComposing) return`。
 
 
 
