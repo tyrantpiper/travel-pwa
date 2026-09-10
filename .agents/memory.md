@@ -36,11 +36,11 @@
 - **高密度對話組件原地微創升級原則 (In-Place Surgical Modernization over Premature Component Splitting)**: 對於承載 12+ 項複雜閉包、SWR 動態輪詢與 SSE 串流狀態的 `chat-widget.tsx`，堅決抵制盲目拆檔（如拆成 `LiquidGlassOrb`, `ChatBottomSheet`, `ChatInputBar`），改以原地微創升級導入 iOS 26 Liquid Glass、2D AssistiveTouch 自由位移、16px 邊界安全磁吸貼齊與 Haptic 微震動，達成 100% 零業務邏輯流失、零回歸。
 - **合成點擊與拖曳手勢競態防衛 (Drag-Release Synthetic Click Race-Condition Guard)**: 當使用者於觸控或滑鼠拖曳浮動按鈕並釋放時，瀏覽器會合成觸發 `click` 事件導致聊天面板被誤開啟。透過 `hasMovedRef` 追蹤位移並於 `handleDragEnd` 中設置 80ms 延遲釋放閥，徹底杜絕拖曳完放開手指誤開面板的手勢衝突。
 - **輸入法組合態攔截與自適應高度防線 (IME Composition Guard & Auto-Growing Textarea)**: 中文（注音/倉頡/拼音）與日文平假名輸入時，按下 Enter 選字常引發未完成文字提早發送的災難。輸入框全面升級為自適應高度 `<textarea>`（`min-h-9 max-h-32`），並在 `onKeyDown` 嚴格掛載 `if (e.nativeEvent.isComposing) return`，保障多語言選字體驗。
-- **專屬 3D 虛擬導遊 IP 輕量化與 PWA 快取 (Lightweight 3D Companion Avatar & Offline PWA Caching)**: 將抽象向量圖標升級為具象化的「Ryan AI 隨行旅伴」3D 陶瓷光澤透明 WebP 資產（微縮頭像 6.5KB + 迎賓卡 31.9KB），並於 Service Worker 靜態快取池長效保活，兼顧情感連結與 PWA 斷網毫秒級即時渲染。
-
-
+- **離線快取真因釐清與過度工程化及時熔斷 (Over-engineering Circuit Breaker)**: 開發模式 (npm run dev) 預設阻斷 Service Worker 註冊以保護 HMR 免受污染，測試 PWA 離線能力應走標準生產預覽流程 (npm run build && npm start)，嚴禁盲目跨層在 RootLayout 注入 raw HTML/CSS inline splash 等破壞 Next.js 架構純潔性的補丁。
+- **微架構微調之零回歸硬核驗證 (Hardcore Zero-Regression Protocol)**: 元件渲染順序與 Tailwind v4 樣式微調後，必須強制執行 tsc、eslint 與 vitest 全量單元測試 (127 passed) 進行純客觀驗證，確保零語法與邏輯退化。
 
 ## [Failed Paths]
+- **試圖在 React RootLayout 內嵌 Raw HTML/CSS 假裝原生 Splash (Inline Splash Over-Engineering Trap)**: 在 Next.js App Router 體系下硬塞 90 行 inline <style>、id="pwa-native-splash" 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 manifest.json 自動渲染原生啟動畫面的基本事實。問題本質在於開發模式根本未啟動快取，而非需要用粗暴補丁解決。
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`asyncio.to_thread`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
 - **健康檢查端點攜帶副作用 (Side-Effects in Health Endpoint)**: 將資料庫保活或連線預熱強行掛在健康檢查端點上，一旦外部網路波動或連線鎖爭搶，健康檢查連帶失敗導致整台伺服器被誤判死亡。教訓：健康檢查必須保持 Idempotent 與無副作用。
 - **Framer Motion 動態 Key 引發元件重新掛載與重複請求**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 銷毀重新掛載引發 API 重複發送。教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
