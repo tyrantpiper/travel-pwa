@@ -1079,16 +1079,6 @@ export function ProfileView() {
                         </div>
 
                         <Separator />
-                        <MenuItem 
-                            icon={User} 
-                            label={t('account_settings')} 
-                            showChevron 
-                            onClick={() => {
-                                haptic.selection()
-                                setSubView('account')
-                            }} 
-                        />
-                        <Separator />
                         {/* 🔔 推播通知開關 */}
                         {isSupported && (
                             <>
@@ -1123,6 +1113,16 @@ export function ProfileView() {
                                 <Separator />
                             </>
                         )}
+                        <MenuItem 
+                            icon={User} 
+                            label={t('account_settings')} 
+                            showChevron 
+                            onClick={() => {
+                                haptic.selection()
+                                setSubView('account')
+                            }} 
+                        />
+                        <Separator />
                         <MenuItem 
                             icon={BookOpen} 
                             label={t('usage_guide')} 

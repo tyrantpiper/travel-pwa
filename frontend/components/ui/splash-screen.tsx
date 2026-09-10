@@ -39,7 +39,7 @@ export function SplashScreen() {
         <AnimatePresence>
             {show && (
                 <motion.div
-                    className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-b from-stone-50 via-white to-stone-100"
+                    className="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-linear-to-b from-stone-50 via-white to-stone-100"
                     initial={{ opacity: 1 }}
                     exit={{ opacity: 0, scale: 1.05, filter: 'blur(10px)' }}
                     transition={{ duration: 0.6, ease: "easeInOut" }}
@@ -118,7 +118,7 @@ export function SplashScreen() {
                         transition={{ delay: 0.5, duration: 0.5 }}
                         className="mt-8 text-center"
                     >
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+                        <h1 className="text-3xl font-bold bg-linear-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
                             Tabidachi
                         </h1>
                         <p className="text-sm text-slate-500 mt-1">AI Travel Planner</p>
