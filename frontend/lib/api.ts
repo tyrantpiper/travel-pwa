@@ -159,6 +159,7 @@ export interface SaveItineraryParams {
     day_tickets?: Record<string, Record<string, unknown>>
     day_checklists?: Record<string, Record<string, unknown>>
     ai_review?: string
+    currency?: string
 }
 
 export interface ImportToTripParams {

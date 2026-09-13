@@ -51,6 +51,7 @@ export interface ItineraryItemState {
     reservation_code?: string
     cost?: number | null
     cost_amount?: number | null // 🆕 For backend parity
+    currency?: string
     hide_navigation?: boolean
     is_private?: boolean
     is_highlight?: boolean
@@ -109,6 +110,7 @@ export interface Activity {
     reservation_code?: string
     cost?: number | null
     cost_amount?: number | null
+    currency?: string
     hide_navigation?: boolean
     is_private?: boolean
     is_highlight?: boolean
@@ -156,6 +158,7 @@ export interface Trip {
     cover_image?: string
     share_code?: string
     public_id?: string // 🆕 隨機公開 ID (URL 使用)
+    currency?: string
     creator_name?: string
     created_by?: string
     members?: { user_id: string; user_name: string }[]  // 🆕 成員列表

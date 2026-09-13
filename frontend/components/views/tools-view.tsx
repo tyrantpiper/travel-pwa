@@ -670,6 +670,7 @@ export function ToolsView() {
                     title: result.title || "New AI Trip",
                     start_date: startDateStr,
                     end_date: endDateStr,
+                    currency: result.currency || "TWD",
                     items: result.items,
                     user_id: activeUserId,
                     creator_name: userName || "Traveler",

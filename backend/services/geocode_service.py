@@ -18,6 +18,7 @@ from google.genai import types
 from pathlib import Path
 import time
 import random
+from typing import Optional, List, Dict, Any
 
 # 🆕 模糊搜尋 (Restore rapidfuzz for Cloud Run optimization)
 from rapidfuzz import fuzz, process
@@ -1010,7 +1011,7 @@ LOCATION_KEYWORDS = {
     ],
 }
 
-def detect_country_from_keywords(query: str) -> str:
+def detect_country_from_keywords(query: Optional[str]) -> Optional[str]:
     """🔑 從搜尋關鍵字確定性判斷國家（無需 AI，零延遲）
     
     這是 Google Maps 風格的語意解析：
@@ -1019,6 +1020,8 @@ def detect_country_from_keywords(query: str) -> str:
     
     Returns: 國家代碼 或 None
     """
+    if not query or not isinstance(query, str):
+        return None
     query_lower = query.lower()
     
     for country_code, keywords in LOCATION_KEYWORDS.items():
@@ -1027,6 +1030,66 @@ def detect_country_from_keywords(query: str) -> str:
                 print(f"🔑 Keyword Match: '{kw}' → {country_code}")
                 return country_code
     return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 幣別映射與確定性推斷引擎 (ISO 4217 Currency Engine)
+# ═══════════════════════════════════════════════════════════════
+COUNTRY_TO_CURRENCY = {
+    "TW": "TWD",
+    "JP": "JPY",
+    "KR": "KRW",
+    "US": "USD",
+    "UK": "GBP",
+    "GB": "GBP",
+    "FR": "EUR",
+    "DE": "EUR",
+    "IT": "EUR",
+    "ES": "EUR",
+    "EU": "EUR",
+    "TH": "THB",
+    "SG": "SGD",
+    "HK": "HKD",
+    "MO": "MOP",
+    "CN": "CNY",
+    "AU": "AUD",
+    "NZ": "NZD",
+    "CA": "CAD",
+    "VN": "VND",
+    "MY": "MYR",
+    "PH": "PHP",
+    "ID": "IDR",
+}
+
+def detect_currency_from_country(country_code: Optional[str], fallback: str = "TWD") -> str:
+    """根據國家代碼 (ISO 3166-1 alpha-2) 返回對應 ISO 4217 法幣代碼"""
+    if not country_code:
+        return fallback
+    return COUNTRY_TO_CURRENCY.get(country_code.upper(), fallback)
+
+def infer_currency_from_destination(dest: str, declared_currency: Optional[str] = None) -> str:
+    """雙層防禦推斷法定幣別 (Destination ➔ Country ➔ Currency)"""
+    # 1. 若外部/LLM 已提供有效三位大寫字母幣別代碼
+    if declared_currency and isinstance(declared_currency, str):
+        cleaned = declared_currency.strip().upper()
+        if len(cleaned) == 3 and cleaned.isalpha():
+            country = detect_country_from_keywords(dest)
+            if country:
+                expected = detect_currency_from_country(country)
+                # 若外部/LLM 隨機輸出 JPY 但目的地明確為台灣(TW)或韓國(KR)，以確定性規則糾偏
+                if cleaned == "JPY" and expected != "JPY":
+                    return expected
+                return cleaned
+            return cleaned
+
+    # 2. 確定性關鍵字對照
+    if dest:
+        country = detect_country_from_keywords(dest)
+        if country:
+            return detect_currency_from_country(country)
+
+    return "TWD"
+
 
 # 🆕 擴展版地標資料庫（支援別名、中文顯示、國家識別、座標直接回傳）
 LANDMARKS_DB = {
