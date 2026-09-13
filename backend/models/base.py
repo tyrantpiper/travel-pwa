@@ -239,6 +239,7 @@ class ItineraryItem(BaseModel):
     memo: Optional[str] = None
     is_private: bool = False
     is_highlight: bool = False
+    currency: Optional[str] = None
 
 
 class SaveItineraryRequest(BaseModel):
@@ -256,6 +257,7 @@ class SaveItineraryRequest(BaseModel):
     day_checklists: Dict[str, Any] = Field(default_factory=dict)
     ai_review: Optional[str] = None
     public_id: Optional[str] = None
+    currency: Optional[str] = "TWD"
 
 
 class JoinTripRequest(BaseModel):

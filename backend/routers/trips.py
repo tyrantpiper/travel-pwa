@@ -45,6 +45,17 @@ from utils.constants import DAY_MAP_FIELDS, CLONEABLE_FIELDS
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
 
+def resolve_trip_currency(trip: Optional[dict], content: Optional[dict]) -> str:
+    """確定性解析行程幣別，含舊行程標題語意回溯"""
+    safe_content = content or {}
+    safe_trip = trip or {}
+    declared = safe_content.get("currency") or safe_trip.get("currency")
+    if declared:
+        return declared
+    from services.geocode_service import infer_currency_from_destination
+    title = safe_trip.get("title") or ""
+    return infer_currency_from_destination(title, declared_currency=None)
+
 # ensure_user_exists moved to utils.helpers
 
 
@@ -124,6 +135,7 @@ async def get_public_trip_by_public_id(
             "cover_image": trip.get("cover_image"),
             "share_code": trip.get("share_code", ""),
             "creator_name": trip.get("creator_name", "Guest"),
+            "currency": resolve_trip_currency(trip, content),
             "daily_locations": content.get("daily_locations", {}),
             # 不回傳: day_costs, day_tickets (私人財務資訊)
             # 不回傳: members (隱私)
@@ -204,6 +216,7 @@ async def get_trips(
             trip['day_checklists'] = trip.get('day_checklists') or content.get('day_checklists', {})
             trip['ai_review'] = trip.get('ai_review') or content.get('ai_review', "")
             trip['credit_cards'] = trip.get('credit_cards') or content.get('credit_cards', [])
+            trip['currency'] = resolve_trip_currency(trip, content)
             trip['is_sample'] = content.get('is_sample', False)  # 🎓 Sample trip flag
             trips.append(trip)
             
@@ -373,6 +386,7 @@ async def get_trip_by_id(
             "share_code": trip.get("share_code", ""),
             "public_id": trip.get("public_id", ""),
             "cover_image": trip.get("cover_image"),
+            "currency": resolve_trip_currency(trip, content),
             
             # 🔧 FIX: Check content first (New Truth), then top-level (Legacy Fallback)
             "daily_locations": content.get("daily_locations") or trip.get("daily_locations") or {},
@@ -698,6 +712,7 @@ async def get_latest_itinerary(
             "start_date": trip["start_date"],  # 👈 關鍵！補上這行
             "end_date": trip.get("end_date"),  # 🐛 FIX: 補上缺失的 end_date
             "share_code": trip.get("share_code", ""),  # 順便補上分享碼
+            "currency": resolve_trip_currency(trip, trip.get("content") or {}),
             # 👇 讀取並回傳
             "daily_locations": (trip.get("content") or {}).get("daily_locations", {}),
             # 🆕 每日提示
@@ -795,7 +810,8 @@ async def save_itinerary(
                 "ai_review": request.ai_review or None,
                 "credit_cards": [], # 🆕 顯式初始化，防止後續讀取異常
                 "flight_info": None,
-                "hotel_info": None
+                "hotel_info": None,
+                "currency": request.currency or "TWD"
             }
         }
         

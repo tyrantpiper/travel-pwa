@@ -374,11 +374,13 @@ async def generate_trip(
            - `desc` 應像專業嚮導般提供歷史背景、排隊攻略、點餐建議或最佳拍照角度。
         4. **禁止裝飾**: 嚴禁在輸出內容中使用藥品圖示 (💊) 或非旅遊相關符號。
         5. **精確經緯度座標**: 每個 activity 必須包含 `lat` (緯度 float) 與 `lng` (經度 float) 欄位，精度至少小數點後 4 位。若不確定精確座標，請給予最接近的已知座標。
+        6. **法定貨幣規範**: 根據行程目的地國家使用的法定貨幣輸出 `currency` 欄位（ISO 4217 代碼，如 TWD, JPY, KRW, USD, EUR, THB, SGD, HKD 等）。
 
         ### 輸出格式範例 (Strict JSON - Nested Day Structure):
         {
             "title": "行程名稱",
             "destination": "東京",
+            "currency": "JPY",
             "days": [
                 {
                     "day_number": 1,
@@ -484,6 +486,17 @@ async def generate_trip(
         data = reconstruct_metadata(data)
         data = normalize_notes(data)
         data = fix_sub_items_structure(data)
+
+        # 💵 [確定性幣別解析與注入] (ISO 4217 Currency Engine)
+        from services.geocode_service import infer_currency_from_destination
+        inferred_currency = infer_currency_from_destination(
+            dest=raw_dest or dest_query or body.prompt,
+            declared_currency=data.get("currency")
+        )
+        data["currency"] = inferred_currency
+        for item in data.get("items", []):
+            if not item.get("currency"):
+                item["currency"] = inferred_currency
         
         # 🆕 自動根據 items 天數精準推算 start_date 與 end_date
         from datetime import datetime, timedelta

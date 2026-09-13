@@ -13,7 +13,7 @@ import { AiGrillMeWizard } from "@/components/itinerary/AiGrillMeWizard"
 import { AiImportTripWizard } from "@/components/itinerary/AiImportTripWizard"
 import { useLanguage } from "@/lib/LanguageContext"
 import { useHaptic } from "@/lib/hooks"
-import { Plus, Hash, Loader2, Calendar, Sparkles, FileText, Compass, Check, ClipboardPaste, FolderInput } from "lucide-react"
+import { Plus, Hash, Loader2, Calendar, Sparkles, FileText, Compass, Check, FolderInput } from "lucide-react"
 import { tripsApi, aiApi } from "@/lib/api"
 import { type Trip } from "@/lib/itinerary-types"
 import { PushPermissionPrompt } from "@/components/notifications/push-permission-prompt"
@@ -228,6 +228,7 @@ export function CreateTripModal({
                     title: result.title || "New AI Trip",
                     start_date: startDateStr,
                     end_date: endDateStr,
+                    currency: result.currency || "TWD",
                     items: result.items,
                     user_id: activeUserId,
                     creator_name: userName || "Traveler",
@@ -770,34 +771,7 @@ export function JoinTripDialog({
     const [joinCode, setJoinCode] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [showPushPrompt, setShowPushPrompt] = useState(false)
-    const [clipboardCode, setClipboardCode] = useState<string | null>(null)
 
-    // 📋 自動偵測剪貼簿是否含有 4~6 位英數旅程代碼
-    useEffect(() => {
-        if (!isOpen) {
-            setClipboardCode(null)
-            return
-        }
-
-        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
-            navigator.clipboard.readText().then(text => {
-                const clean = (text || "").trim().toUpperCase()
-                if (/^[A-Z0-9]{4,6}$/.test(clean) && clean !== joinCode) {
-                    setClipboardCode(clean)
-                }
-            }).catch(() => {
-                // 剪貼簿讀取未授權或無焦點時靜默忽略
-            })
-        }
-    }, [isOpen, joinCode])
-
-    // 一鍵貼上剪貼簿代碼
-    const handlePasteClipboard = () => {
-        if (!clipboardCode) return
-        haptic.selection()
-        setJoinCode(clipboardCode)
-        toast.info(`${t('code_copied_from_clipboard')}: ${clipboardCode}`)
-    }
 
     const handleJoin = async (codeToSubmit?: string) => {
         const targetCode = (codeToSubmit || joinCode).trim().toUpperCase()
@@ -870,33 +844,17 @@ export function JoinTripDialog({
                     }}
                     className="space-y-4 pt-2"
                 >
-                    {/* 📋 剪貼簿快速填入膠囊 */}
-                    {clipboardCode && (
-                        <motion.button
-                            type="button"
-                            initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            onClick={handlePasteClipboard}
-                            className="w-full py-2 px-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/80 flex items-center justify-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-900/50 transition-all cursor-pointer active:scale-98"
-                        >
-                            <ClipboardPaste className="w-3.5 h-3.5 shrink-0" />
-                            <span>{t('paste_clipboard_code')}: <strong className="font-mono tracking-wider">{clipboardCode}</strong></span>
-                        </motion.button>
-                    )}
-
                     {/* 🔠 iOS Swift 驗證碼大字號輸入框 */}
                     <div className="relative">
                         <Input
                             id="trip-join-code-input"
                             placeholder={t('join_trip_placeholder') || "輸入代碼"}
                             className="text-center text-2xl tracking-[0.35em] font-mono uppercase h-14 bg-stone-100/80 dark:bg-slate-800/90 rounded-2xl border-2 border-stone-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 focus:ring-0 transition-colors shadow-inner"
-                            maxLength={6}
                             value={joinCode}
-                            autoFocus
                             autoComplete="off"
                             autoCapitalize="characters"
                             onChange={(e) => {
-                                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                                const val = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6)
                                 setJoinCode(val)
                                 if (val.length > 0) {
                                     haptic.selection()
