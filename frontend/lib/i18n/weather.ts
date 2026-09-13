@@ -108,6 +108,15 @@ export const weatherTranslations = {
         w_season_summer: "Summer Mode",
         w_season_winter: "Winter Mode",
         w_season_spring: "Spring/Autumn Mode",
+
+        // 5-Day Microclimate Strip
+        w_five_day_forecast: "5-Day Live Forecast",
+        w_today: "Today",
+        w_tomorrow: "Tomorrow",
+        w_rain_risk: "Rain Risk",
+        w_clothing_tip: "Clothing Tip",
+        w_weather_unavailable: "Weather unavailable",
+        w_popover_hint: "Tap for details",
     },
     zh: {
         // Mode labels
@@ -209,5 +218,14 @@ export const weatherTranslations = {
         w_season_summer: "夏季模式",
         w_season_winter: "冬季模式",
         w_season_spring: "春秋模式",
+
+        // 5-Day Microclimate Strip
+        w_five_day_forecast: "即時連續 5 天天氣",
+        w_today: "今日",
+        w_tomorrow: "明日",
+        w_rain_risk: "降雨風險",
+        w_clothing_tip: "穿著建議",
+        w_weather_unavailable: "暫無氣象資料",
+        w_popover_hint: "點擊查看微氣象詳情",
     },
 } as const

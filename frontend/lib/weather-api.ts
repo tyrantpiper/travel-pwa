@@ -407,3 +407,92 @@ export const fetchWeatherWithSDK = async (
         return null
     }
 }
+
+import { DailyForecastItem } from './stores/weatherStore'
+export type { DailyForecastItem }
+
+/**
+ * 🆕 2026: 取得該地點自真實今天起算的連續 5 天每日即時天氣 (FlatBuffers 優化)
+ */
+export const fetchFiveDayForecast = async (
+    lat: number,
+    lng: number
+): Promise<DailyForecastItem[] | null> => {
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        return null
+    }
+
+    try {
+        const params = {
+            latitude: lat,
+            longitude: lng,
+            daily: [
+                'weather_code',
+                'temperature_2m_max',
+                'temperature_2m_min',
+                'apparent_temperature_max',
+                'apparent_temperature_min',
+                'precipitation_probability_max',
+                'uv_index_max',
+                'wind_speed_10m_max'
+            ],
+            timezone: 'auto',
+            forecast_days: 5
+        }
+
+        const responses = await fetchWeatherApi('https://api.open-meteo.com/v1/forecast', params)
+        const response = responses[0]
+        if (!response) return null
+
+        const utcOffsetSeconds = response.utcOffsetSeconds()
+        const daily = response.daily()
+        if (!daily) return null
+
+        const range = (start: number, stop: number, step: number) =>
+            Array.from({ length: (stop - start) / step }, (_, i) => start + i * step)
+
+        const timeRange = range(Number(daily.time()), Number(daily.timeEnd()), daily.interval())
+        const weatherCodes = daily.variables(0)?.valuesArray()
+        const tempMaxs = daily.variables(1)?.valuesArray()
+        const tempMins = daily.variables(2)?.valuesArray()
+        const apparentMaxs = daily.variables(3)?.valuesArray()
+        const apparentMins = daily.variables(4)?.valuesArray()
+        const precipProbs = daily.variables(5)?.valuesArray()
+        const uvIndexes = daily.variables(6)?.valuesArray()
+        const windSpeeds = daily.variables(7)?.valuesArray()
+
+        const weekdayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六']
+
+        const items: DailyForecastItem[] = []
+        for (let i = 0; i < timeRange.length && i < 5; i++) {
+            const dateObj = new Date((timeRange[i] + utcOffsetSeconds) * 1000)
+            const dateStr = dateObj.toISOString().split('T')[0]
+
+            let dayLabel: string
+            if (i === 0) dayLabel = '今日'
+            else if (i === 1) dayLabel = '明日'
+            else {
+                dayLabel = weekdayNames[dateObj.getUTCDay()] || `D+${i}`
+            }
+
+            items.push({
+                date: dateStr,
+                dayLabel,
+                weatherCode: weatherCodes ? Math.round(weatherCodes[i]) : 0,
+                tempMax: tempMaxs ? Math.round(tempMaxs[i]) : 0,
+                tempMin: tempMins ? Math.round(tempMins[i]) : 0,
+                apparentMax: apparentMaxs ? Math.round(apparentMaxs[i]) : undefined,
+                apparentMin: apparentMins ? Math.round(apparentMins[i]) : undefined,
+                precipProb: precipProbs ? Math.round(precipProbs[i]) : 0,
+                uvIndex: uvIndexes ? Number(uvIndexes[i].toFixed(1)) : undefined,
+                windSpeed: windSpeeds ? Math.round(windSpeeds[i]) : undefined
+            })
+        }
+
+        return items
+    } catch (error) {
+        console.error('[Weather SDK] 5-Day Fetch Failed:', error)
+        return null
+    }
+}
+

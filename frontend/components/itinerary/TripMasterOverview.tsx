@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { 
     Calendar, 
@@ -18,6 +18,10 @@ import {
 } from "lucide-react"
 import { Trip, Activity, DailyLocation } from "@/lib/itinerary-types"
 import { useLanguage } from "@/lib/LanguageContext"
+import { resolveDayLocation, type ResolvedLocation } from "@/lib/location-resolver"
+import { DailyWeatherStrip } from "@/components/itinerary/DailyWeatherStrip"
+import { useWeatherStore, type DailyForecastItem } from "@/lib/stores/weatherStore"
+import { fetchFiveDayForecast } from "@/lib/weather-api"
 
 interface TripMasterOverviewProps {
     currentTrip?: Trip
@@ -69,7 +73,7 @@ export function TripMasterOverview({
                 totalSpots: 0,
                 totalCost: 0,
                 cities: [] as string[],
-                currency: "JPY",
+                currency: currentTrip?.currency || "TWD",
                 highlightSpotsCount: 0
             }
         }
@@ -99,10 +103,15 @@ export function TripMasterOverview({
             }
         })
 
+        const inferredCurrency = currentTrip?.currency || 
+            currentTrip.days.flatMap(d => d.activities || []).find(a => a.currency)?.currency || 
+            "TWD"
+
         return {
             totalSpots: spotCount,
             totalCost,
             cities: Array.from(citySet),
+            currency: inferredCurrency,
             highlightSpotsCount: highlightCount
         }
     }, [currentTrip, dailyLocs])
@@ -117,6 +126,66 @@ export function TripMasterOverview({
         }
         return map
     }, [currentTrip])
+
+    // 📍 1. Resolve locations for all days using 4-tier fallback engine
+    const dayLocations = useMemo(() => {
+        const map: Record<number, ResolvedLocation> = {}
+        dayNumbers.forEach((d) => {
+            map[d] = resolveDayLocation(d, dailyLocs, activitiesByDay[d] || [], currentTrip?.title || "")
+        })
+        return map
+    }, [dayNumbers, dailyLocs, activitiesByDay, currentTrip?.title])
+
+    // 🌤️ 2. Unique location clusters for deduplicated weather queries (~1.1km)
+    const uniqueClusters = useMemo(() => {
+        const clusters = new Map<string, { lat: number; lng: number }>()
+        Object.values(dayLocations).forEach((loc) => {
+            const key = `${loc.lat.toFixed(2)}_${loc.lng.toFixed(2)}`
+            if (!clusters.has(key)) {
+                clusters.set(key, { lat: loc.lat, lng: loc.lng })
+            }
+        })
+        return clusters
+    }, [dayLocations])
+
+    // 📦 3. Weather Store integration
+    const getFiveDayData = useWeatherStore((s) => s.getFiveDayData)
+    const setFiveDayData = useWeatherStore((s) => s.setFiveDayData)
+
+    const [fiveDayMap, setFiveDayMap] = useState<Record<string, DailyForecastItem[]>>({})
+    const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+
+    useEffect(() => {
+        const todayStr = new Date().toISOString().split("T")[0]
+        let isMounted = true
+
+        uniqueClusters.forEach(({ lat, lng }, clusterKey) => {
+            // Check cache first
+            const cached = getFiveDayData(lat, lng, todayStr)
+            if (cached) {
+                setFiveDayMap((prev) => ({ ...prev, [clusterKey]: cached }))
+                return
+            }
+
+            // Fetch in parallel
+            setLoadingMap((prev) => ({ ...prev, [clusterKey]: true }))
+            fetchFiveDayForecast(lat, lng)
+                .then((items) => {
+                    if (!isMounted || !items) return
+                    setFiveDayData(lat, lng, todayStr, items)
+                    setFiveDayMap((prev) => ({ ...prev, [clusterKey]: items }))
+                })
+                .finally(() => {
+                    if (isMounted) {
+                        setLoadingMap((prev) => ({ ...prev, [clusterKey]: false }))
+                    }
+                })
+        })
+
+        return () => {
+            isMounted = false
+        }
+    }, [uniqueClusters, getFiveDayData, setFiveDayData])
 
     return (
         <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -176,7 +245,12 @@ export function TripMasterOverview({
                         <div className="bg-white/5 rounded-xl p-3 border border-white/5">
                             <p className="text-[11px] text-slate-400 font-medium">{t('ov_total_budget')}</p>
                             <p className="text-lg sm:text-xl font-bold text-amber-300 mt-0.5">
-                                {metrics.totalCost > 0 ? metrics.totalCost.toLocaleString() : "—"}
+                                {metrics.totalCost > 0 ? (
+                                    <>
+                                        {metrics.totalCost.toLocaleString()}{" "}
+                                        <span className="text-xs font-normal text-slate-300">{metrics.currency}</span>
+                                    </>
+                                ) : "—"}
                             </p>
                         </div>
                         <div className="bg-white/5 rounded-xl p-3 border border-white/5">
@@ -194,7 +268,11 @@ export function TripMasterOverview({
                 {dayNumbers.map((d, index) => {
                     const { date, week } = getDateInfo(d)
                     const activities = activitiesByDay[d] || []
-                    const dailyLocation = dailyLocs[d]?.name
+                    const resolvedLoc = dayLocations[d]
+                    const dailyLocation = dailyLocs[d]?.name || resolvedLoc?.name
+                    const clusterKey = resolvedLoc ? `${resolvedLoc.lat.toFixed(2)}_${resolvedLoc.lng.toFixed(2)}` : ""
+                    const forecastItems = fiveDayMap[clusterKey]
+                    const isWeatherLoading = loadingMap[clusterKey]
                     const hasActivities = activities.length > 0
                     const dayTotalCost = activities.reduce((sum, item) => sum + Number(item.cost ?? item.cost_amount ?? 0), 0)
 
@@ -227,7 +305,7 @@ export function TripMasterOverview({
                                         </div>
                                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                                             {activities.length} {t('ov_total_spots')}
-                                            {dayTotalCost > 0 && ` · ${t('ov_daily_estimated_cost')}: ${dayTotalCost.toLocaleString()} ${metrics.currency}`}
+                                            {dayTotalCost > 0 && ` · ${t('ov_daily_estimated_cost')}: ${dayTotalCost.toLocaleString()} ${metrics.currency || "TWD"}`}
                                         </p>
                                     </div>
                                 </div>
@@ -241,6 +319,17 @@ export function TripMasterOverview({
                                     <span>{t('ov_view_day')}</span>
                                     <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                                 </button>
+                            </div>
+
+                            {/* 🌤️ 5-Day Live Microclimate Strip */}
+                            <div className="my-2.5 -mx-0.5" onClick={(e) => e.stopPropagation()}>
+                                <DailyWeatherStrip
+                                    dayNumber={d}
+                                    locationName={dailyLocation?.split(",")[0]?.trim()}
+                                    forecastItems={forecastItems}
+                                    isLoading={isWeatherLoading}
+                                    targetDate={date}
+                                />
                             </div>
 
                             {/* Activities Timeline Stream */}

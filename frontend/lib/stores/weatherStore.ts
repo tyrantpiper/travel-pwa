@@ -13,14 +13,47 @@ import { WeatherResult } from '../weather-api'
 // Custom storage adapter for IndexedDB using idb-keyval
 const idbStorage: StateStorage = {
     getItem: async (name: string): Promise<string | null> => {
-        return (await get(name)) || null
+        if (typeof indexedDB === 'undefined') return null
+        try {
+            return (await get(name)) || null
+        } catch {
+            return null
+        }
     },
     setItem: async (name: string, value: string): Promise<void> => {
-        await set(name, value)
+        if (typeof indexedDB === 'undefined') return
+        try {
+            await set(name, value)
+        } catch {
+            // safely ignore in unsupported environments
+        }
     },
     removeItem: async (name: string): Promise<void> => {
-        await del(name)
+        if (typeof indexedDB === 'undefined') return
+        try {
+            await del(name)
+        } catch {
+            // safely ignore in unsupported environments
+        }
     },
+}
+
+export interface DailyForecastItem {
+    date: string               // YYYY-MM-DD
+    dayLabel: string           // "今日" | "明日" | "週X"
+    weatherCode: number
+    tempMax: number
+    tempMin: number
+    apparentMax?: number
+    apparentMin?: number
+    precipProb: number         // 0 - 100
+    uvIndex?: number
+    windSpeed?: number
+}
+
+export interface Daily5DayCacheEntry {
+    data: DailyForecastItem[]
+    timestamp: number
 }
 
 interface WeatherCacheEntry extends WeatherResult {
@@ -30,10 +63,14 @@ interface WeatherCacheEntry extends WeatherResult {
 interface WeatherState {
     // Key: "lat_lng_date" (coords to 3 decimal places for privacy obfuscation)
     cache: Record<string, WeatherCacheEntry>
+    // Key: "lat_lng_5d_todayStr" (coords to 2 decimal places ~1.1km clustering)
+    fiveDayCache: Record<string, Daily5DayCacheEntry>
 
     // Actions
     setWeatherData: (lat: number, lng: number, date: string, data: WeatherResult) => void
     getWeatherData: (lat: number, lng: number, date: string) => WeatherCacheEntry | null
+    setFiveDayData: (lat: number, lng: number, todayStr: string, data: DailyForecastItem[]) => void
+    getFiveDayData: (lat: number, lng: number, todayStr: string) => DailyForecastItem[] | null
     clearOldData: () => void
 }
 
@@ -41,6 +78,7 @@ export const useWeatherStore = create<WeatherState>()(
     persist(
         (set, get) => ({
             cache: {},
+            fiveDayCache: {},
 
             setWeatherData: (lat, lng, date, data) => {
                 // 🛡️ Privacy Optimization: Round to 3 decimals (~110m accuracy)
@@ -59,20 +97,45 @@ export const useWeatherStore = create<WeatherState>()(
                 return get().cache[key] || null
             },
 
+            setFiveDayData: (lat, lng, todayStr, data) => {
+                const key = `${lat.toFixed(2)}_${lng.toFixed(2)}_5d_${todayStr}`
+                set((state) => ({
+                    fiveDayCache: {
+                        ...(state.fiveDayCache || {}),
+                        [key]: { data, timestamp: Date.now() }
+                    }
+                }))
+            },
+
+            getFiveDayData: (lat, lng, todayStr) => {
+                const key = `${lat.toFixed(2)}_${lng.toFixed(2)}_5d_${todayStr}`
+                return get().fiveDayCache?.[key]?.data || null
+            },
+
             clearOldData: () => {
                 // ♻️ GC: Auto-cleanup of data older than 7 days
                 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
                 const now = Date.now()
                 set((state) => {
                     const newCache = { ...state.cache }
+                    const newFiveDayCache = { ...(state.fiveDayCache || {}) }
                     let cleaned = false
+
                     Object.keys(newCache).forEach(key => {
                         if (now - newCache[key].timestamp > SEVEN_DAYS_MS) {
                             delete newCache[key]
                             cleaned = true
                         }
                     })
-                    return cleaned ? { cache: newCache } : state
+
+                    Object.keys(newFiveDayCache).forEach(key => {
+                        if (now - newFiveDayCache[key].timestamp > SEVEN_DAYS_MS) {
+                            delete newFiveDayCache[key]
+                            cleaned = true
+                        }
+                    })
+
+                    return cleaned ? { cache: newCache, fiveDayCache: newFiveDayCache } : state
                 })
             }
         }),
