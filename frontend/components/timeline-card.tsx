@@ -191,7 +191,7 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                                 <MoreHorizontal className="w-5 h-5" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-[140px]">
+                        <DropdownMenuContent align="end" className="min-w-35">
                             <DropdownMenuItem onClick={() => onEdit(activity)} className="py-3">
                                 <Edit className="w-4 h-4 mr-2" /> {t('tc_edit_all')}
                             </DropdownMenuItem>
@@ -226,13 +226,13 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 {/* 附屬表格 */}
                 {activity.sub_items && activity.sub_items.length > 0 && (
                     <div className="mt-3 mb-2 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-600 shadow-sm bg-slate-50/50 dark:bg-slate-800/50">
-                        <Table className="w-full table-fixed min-w-[280px]">
+                        <Table className="w-full table-fixed min-w-70">
                             <TableBody>
                                 {activity.sub_items.map((item: SubItem, i: number) => (
                                     <TableRow key={i} className="border-b border-slate-100 dark:border-slate-700 last:border-0 hover:bg-white dark:hover:bg-slate-700 transition-colors">
                                         <TableCell className="py-2.5 px-3 align-top w-[calc(100%-44px)]">
                                             <div className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-0.5 truncate">{item.name}</div>
-                                            {item.desc && <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight break-words whitespace-normal">{item.desc}</div>}
+                                            {item.desc && <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight wrap-break-word whitespace-normal">{item.desc}</div>}
                                         </TableCell>
                                         {item.link ? (
                                             <TableCell className="py-2 px-2 text-right align-middle w-11 shrink-0">
@@ -254,13 +254,13 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 {/* 按鈕區 */}
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     {!hideMapBtn && (
-                        <Button variant="outline" size="sm" className="h-11 min-w-[44px] text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300" onClick={openGoogleMap}>
+                        <Button variant="outline" size="sm" className="h-11 min-w-11 text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300" onClick={openGoogleMap}>
                             <MapPin className="w-3 h-3 mr-1" /> {t('tc_navigate')}
                         </Button>
                     )}
 
                     {/* 👇 改成此地備忘錄 */}
-                    <Button variant="ghost" size="sm" className="h-11 min-w-[44px] text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
+                    <Button variant="ghost" size="sm" className="h-11 min-w-11 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={(e) => { e.stopPropagation(); setShowDetail(true) }}>
                         <StickyNote className="w-3 h-3 mr-1" /> {t('tc_local_memo')}
                     </Button>
                 </div>
@@ -526,7 +526,7 @@ function DetailDialog({ open, onOpenChange, activity, onMap, hideMapBtn, onUpdat
                                     {/* Row 1: [Copy] [Coordinates] */}
                                     <div className="flex gap-1.5 items-center">
                                         <button
-                                            className="h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                                            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
                                             onClick={() => {
                                                 const lat = typeof activity.lat === 'string' ? parseFloat(activity.lat) : activity.lat
                                                 const lng = typeof activity.lng === 'string' ? parseFloat(activity.lng) : activity.lng
