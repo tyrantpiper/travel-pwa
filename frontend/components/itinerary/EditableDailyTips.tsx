@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { AlertCircle, Wallet, Ticket, Plus, X, Check, Calculator, Eye, EyeOff, Loader2, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,6 +44,7 @@ interface EditableDailyTipsProps {
     onUpdate: (type: "notes" | "costs" | "tickets", data: NoteItem[] | CostItem[] | TicketItem[]) => Promise<boolean>
     readOnly?: boolean
     userId?: string  // 🆕 For tracking who set privacy
+    defaultCurrency?: string
 }
 
 // Constants
@@ -144,7 +145,7 @@ function normalizeNote(raw: any): NoteItem {
 }
 
 const CURRENCIES = ["JPY", "TWD", "USD", "EUR", "KRW", "HKD"]
-const DEFAULT_CURRENCY = "JPY"
+const DEFAULT_CURRENCY = "TWD"
 
 export default function EditableDailyTips({
     tripId: _tripId,  // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -154,11 +155,13 @@ export default function EditableDailyTips({
     tickets,
     onUpdate,
     readOnly = false,
-    userId
+    userId,
+    defaultCurrency
 }: EditableDailyTipsProps) {
     const { lang } = useLanguage()
     const zh = lang === 'zh'
     const haptic = useHaptic()
+    const effectiveCurrency = defaultCurrency || DEFAULT_CURRENCY
 
     // Local state (initialized from props, synced via key prop from parent)
     // Note: Parent component should use `key={day}` to force re-mount on day change
@@ -187,8 +190,8 @@ export default function EditableDailyTips({
 
     // Forms
     const [newNote, setNewNote] = useState<NoteItem>({ icon: "⚠️", title: "", content: "" })
-    const [newCost, setNewCost] = useState<CostItem>({ item: "", amount: "", currency: DEFAULT_CURRENCY, note: "" })
-    const [newTicket, setNewTicket] = useState<TicketItem>({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
+    const [newCost, setNewCost] = useState<CostItem>({ item: "", amount: "", currency: effectiveCurrency, note: "" })
+    const [newTicket, setNewTicket] = useState<TicketItem>({ name: "", price: "", currency: effectiveCurrency, note: "" })
 
     const [saving, setSaving] = useState(false)
 
@@ -234,7 +237,7 @@ export default function EditableDailyTips({
     }, [])
 
     // === Helpers ===
-    const formatCurrency = (amount: string | number, currency: string = DEFAULT_CURRENCY) => {
+    const formatCurrency = (amount: string | number, currency: string = effectiveCurrency) => {
         // Try to parse number
         const num = typeof amount === 'number' ? amount : parseFloat(String(amount).replace(/,/g, ''))
         if (isNaN(num)) return String(amount) // invalid number
@@ -251,21 +254,21 @@ export default function EditableDailyTips({
         return baseDisplay
     }
 
-    const calculateTotal = (items: { amount?: string, price?: string, currency?: string }[]) => {
+    const calculateTotal = useCallback((items: { amount?: string, price?: string, currency?: string }[]) => {
         const totals: Record<string, number> = {}
         items.forEach(item => {
             const valRaw = item.amount || item.price || "0"
-            const cur = item.currency || DEFAULT_CURRENCY
+            const cur = item.currency || effectiveCurrency
             const val = typeof valRaw === 'number' ? valRaw : parseFloat(String(valRaw).replace(/,/g, ''))
             if (!isNaN(val)) {
                 totals[cur] = (totals[cur] || 0) + val
             }
         })
         return totals
-    }
+    }, [effectiveCurrency])
 
-    const costsTotal = useMemo(() => calculateTotal(localCosts), [localCosts])
-    const ticketsTotal = useMemo(() => calculateTotal(localTickets), [localTickets])
+    const costsTotal = useMemo(() => calculateTotal(localCosts), [localCosts, calculateTotal])
+    const ticketsTotal = useMemo(() => calculateTotal(localTickets), [localTickets, calculateTotal])
 
     // === Handlers ===
 
@@ -355,7 +358,7 @@ export default function EditableDailyTips({
             const updated = [...localCosts, newCost]
             if (await onUpdate("costs", updated)) {
                 setLocalCosts(updated)
-                setNewCost({ item: "", amount: "", currency: DEFAULT_CURRENCY, note: "" })
+                setNewCost({ item: "", amount: "", currency: effectiveCurrency, note: "" })
                 setAddingCost(false)
                 toast.success(zh ? "已新增花費" : "Cost added")
             }
@@ -463,7 +466,7 @@ export default function EditableDailyTips({
             const updated = [...localTickets, newTicket]
             if (await onUpdate("tickets", updated)) {
                 setLocalTickets(updated)
-                setNewTicket({ name: "", price: "", currency: DEFAULT_CURRENCY, note: "" })
+                setNewTicket({ name: "", price: "", currency: effectiveCurrency, note: "" })
                 setAddingTicket(false)
                 toast.success(zh ? "已新增票券" : "Ticket added")
             }
@@ -633,7 +636,7 @@ export default function EditableDailyTips({
                                     onClick={() => handleRemoveNote(idx)}
                                     disabled={processingNotes.has(idx)}
                                     className={cn(
-                                        "p-1.5 transition-all touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center",
+                                        "p-1.5 transition-all touch-manipulation min-w-8 min-h-8 flex items-center justify-center",
                                         processingNotes.has(idx) ? "opacity-50 cursor-not-allowed" : "text-slate-300 hover:text-red-500 active:text-red-600"
                                     )}
                                 >
@@ -717,8 +720,8 @@ export default function EditableDailyTips({
                                     />
                                     <div className="flex gap-1 w-32">
                                         <select
-                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-[4.5rem]"
-                                            value={cost.currency || DEFAULT_CURRENCY}
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-18"
+                                            value={cost.currency || effectiveCurrency}
                                             onChange={(e) => handleUpdateEditCost(idx, 'currency', e.target.value)}
                                         >
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -765,7 +768,7 @@ export default function EditableDailyTips({
                                                 onClick={() => handleTogglePrivacyCost(idx)}
                                                 disabled={processingCosts.has(idx)}
                                                 className={cn(
-                                                    "p-1 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                    "p-1 transition-all touch-manipulation min-w-7 min-h-7 flex items-center justify-center",
                                                     processingCosts.has(idx) && "opacity-50 cursor-not-allowed",
                                                     cost.is_private
                                                         ? "text-amber-500 hover:text-amber-600"
@@ -785,7 +788,7 @@ export default function EditableDailyTips({
                                                 onClick={() => handleRemoveCost(idx)}
                                                 disabled={processingCosts.has(idx)}
                                                 className={cn(
-                                                    "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                    "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-7 min-h-7 flex items-center justify-center",
                                                     processingCosts.has(idx) && "opacity-50 cursor-not-allowed"
                                                 )}
                                             >
@@ -822,7 +825,7 @@ export default function EditableDailyTips({
                                 <div className="flex gap-2">
                                     <Input placeholder={zh ? "項目" : "Item"} className="flex-1 h-8 text-xs" value={newCost.item} onChange={(e) => setNewCost({ ...newCost, item: e.target.value })} />
                                     <div className="flex gap-1 w-32">
-                                        <select className="h-8 text-xs bg-slate-50 border rounded w-[4.5rem]" value={newCost.currency} onChange={e => setNewCost({ ...newCost, currency: e.target.value })}>
+                                        <select className="h-8 text-xs bg-slate-50 border rounded w-18" value={newCost.currency} onChange={e => setNewCost({ ...newCost, currency: e.target.value })}>
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <Input placeholder={zh ? "金額" : "Amount"} className="flex-1 h-8 text-xs" type="number" value={newCost.amount} onChange={(e) => setNewCost({ ...newCost, amount: e.target.value })} />
@@ -882,8 +885,8 @@ export default function EditableDailyTips({
                                     />
                                     <div className="flex gap-1 w-32">
                                         <select
-                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-[4.5rem]"
-                                            value={ticket.currency || DEFAULT_CURRENCY}
+                                            className="h-8 text-xs bg-slate-50 dark:bg-slate-600 border rounded w-18"
+                                            value={ticket.currency || effectiveCurrency}
                                             onChange={(e) => handleUpdateEditTicket(idx, 'currency', e.target.value)}
                                         >
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -928,7 +931,7 @@ export default function EditableDailyTips({
                                                     onClick={() => handleTogglePrivacyTicket(idx)}
                                                     disabled={processingTickets.has(idx)}
                                                     className={cn(
-                                                        "p-1 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                        "p-1 transition-all touch-manipulation min-w-7 min-h-7 flex items-center justify-center",
                                                         processingTickets.has(idx) && "opacity-50 cursor-not-allowed",
                                                         ticket.is_private
                                                             ? "text-amber-500 hover:text-amber-600"
@@ -948,7 +951,7 @@ export default function EditableDailyTips({
                                                     onClick={() => handleRemoveTicket(idx)}
                                                     disabled={processingTickets.has(idx)}
                                                     className={cn(
-                                                        "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-[28px] min-h-[28px] flex items-center justify-center",
+                                                        "p-1 text-slate-300 hover:text-red-500 active:text-red-600 transition-all touch-manipulation min-w-7 min-h-7 flex items-center justify-center",
                                                         processingTickets.has(idx) && "opacity-50 cursor-not-allowed"
                                                     )}
                                                 >
@@ -987,7 +990,7 @@ export default function EditableDailyTips({
                                 <div className="flex gap-2">
                                     <Input placeholder={zh ? "票券名稱" : "Ticket name"} className="flex-1 h-8 text-xs" value={newTicket.name} onChange={(e) => setNewTicket({ ...newTicket, name: e.target.value })} />
                                     <div className="flex gap-1 w-32">
-                                        <select className="h-8 text-xs bg-slate-50 border rounded w-[4.5rem]" value={newTicket.currency} onChange={e => setNewTicket({ ...newTicket, currency: e.target.value })}>
+                                        <select className="h-8 text-xs bg-slate-50 border rounded w-18" value={newTicket.currency} onChange={e => setNewTicket({ ...newTicket, currency: e.target.value })}>
                                             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                         <Input placeholder={zh ? "金額" : "Amount"} className="flex-1 h-8 text-xs" type="number" value={newTicket.price} onChange={(e) => setNewTicket({ ...newTicket, price: e.target.value })} />

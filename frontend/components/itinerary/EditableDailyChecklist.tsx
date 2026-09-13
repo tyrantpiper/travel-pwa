@@ -281,7 +281,7 @@ export default function EditableDailyChecklist({
 
     return (
         <div className={cn(
-            "bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-4 border border-indigo-100 dark:border-indigo-900/50 transition-all",
+            "bg-linear-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-4 border border-indigo-100 dark:border-indigo-900/50 transition-all",
             isUpdating && "opacity-80 pointer-events-none cursor-wait"
         )}>
             {/* 標題列 */}
@@ -335,7 +335,7 @@ export default function EditableDailyChecklist({
             {totalCount > 0 && (
                 <div className="h-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-full mb-3 overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                        className="h-full bg-linear-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>
@@ -385,7 +385,7 @@ export default function EditableDailyChecklist({
                             >
                                 {/* Checkbox */}
                                 <motion.div
-                                    className="flex-shrink-0"
+                                    className="shrink-0"
                                     animate={{ scale: item.checked ? 1.1 : 1 }}
                                     transition={{ type: "spring", stiffness: 400, damping: 20 }}
                                 >
@@ -413,7 +413,7 @@ export default function EditableDailyChecklist({
                                                 e.stopPropagation()
                                                 handleTogglePrivacy(item.id)
                                             }}
-                                            className={`flex-shrink-0 p-1 rounded transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
+                                            className={`shrink-0 p-1 rounded transition-colors min-w-7 min-h-7 flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' :
                                                 item.is_private ? 'text-amber-500 hover:text-amber-600' : 'text-indigo-300 hover:text-indigo-500'
                                                 }`}
                                             disabled={processingItems.has(item.id) || isUpdating}
@@ -432,7 +432,7 @@ export default function EditableDailyChecklist({
                                                 e.stopPropagation()
                                                 removeItem(item.id)
                                             }}
-                                            className={`flex-shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-[28px] min-h-[28px] flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
+                                            className={`shrink-0 p-1 rounded text-indigo-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors min-w-7 min-h-7 flex items-center justify-center touch-manipulation ${processingItems.has(item.id) ? 'opacity-50 cursor-not-allowed' : ''
                                                 }`}
                                             disabled={processingItems.has(item.id) || isUpdating}
                                         >

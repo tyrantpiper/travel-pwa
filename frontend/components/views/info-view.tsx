@@ -363,7 +363,7 @@ export function InfoView() {
         <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none">
             <div className="min-h-screen pb-32">
                 {/* 🆕 v4.8: Dark Premium Header (Matching ToolsView) */}
-                <div className="bg-gradient-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
+                <div className="bg-linear-to-b from-slate-900 to-slate-800 pt-12 pb-6 px-6 text-white">
                     <div className="space-y-4">
                         <div className="flex justify-between items-start">
                             <div>
@@ -836,7 +836,7 @@ export function InfoView() {
                         {currentHotelIdx !== null && hotels[currentHotelIdx] && (
                             <div className="relative h-full flex flex-col overflow-hidden">
                                 {/* Premium Dialog Header */}
-                                <div className="p-8 pb-4 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-b border-slate-100 dark:border-slate-800 relative">
+                                <div className="p-8 pb-4 bg-linear-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-b border-slate-100 dark:border-slate-800 relative">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
                                     <DialogHeader>
                                         <div className="flex justify-between items-start">
@@ -918,7 +918,7 @@ export function InfoView() {
 
                                                 <div className="space-y-1.5">
                                                     <Label className="text-[10px] text-slate-400 uppercase font-bold ml-1">Memo</Label>
-                                                    <Textarea className="min-h-[120px] text-sm leading-relaxed" value={tempHotel.memo} onChange={e => setTempHotel({ ...tempHotel, memo: e.target.value })} />
+                                                    <Textarea className="min-h-30 text-sm leading-relaxed" value={tempHotel.memo} onChange={e => setTempHotel({ ...tempHotel, memo: e.target.value })} />
                                                 </div>
 
                                                 <div className="space-y-3">
@@ -983,7 +983,7 @@ export function InfoView() {
                                                     <span className="text-[10px] text-slate-400 uppercase font-black flex items-center gap-1.5 ml-1">
                                                         <Wifi className="w-3 h-3" /> Memo & Instructions
                                                     </span>
-                                                    <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 shadow-sm min-h-[100px] text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                                                    <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 shadow-sm min-h-25 text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                                                         {hotels[currentHotelIdx].memo || "No special instructions..."}
                                                     </div>
                                                 </div>

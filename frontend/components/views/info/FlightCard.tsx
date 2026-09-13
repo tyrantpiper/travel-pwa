@@ -121,7 +121,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
             )}
 
             {/* Top Section: Flight Path & Airports */}
-            <div className="p-8 pt-10 bg-gradient-to-br from-blue-50/30 via-transparent to-indigo-50/20 dark:from-blue-900/10 dark:to-transparent">
+            <div className="p-8 pt-10 bg-linear-to-br from-blue-50/30 via-transparent to-indigo-50/20 dark:from-blue-900/10 dark:to-transparent">
 
                 {/* 📅 Date Header (Premium Symmetry & Typography) */}
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center mb-10 px-1">
@@ -144,7 +144,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                     </div>
 
                     <div className="flex flex-col items-center px-4">
-                        <div className="h-px w-12 sm:w-20 bg-gradient-to-r from-blue-400/50 via-slate-300/30 to-indigo-400/50 relative">
+                        <div className="h-px w-12 sm:w-20 bg-linear-to-r from-blue-400/50 via-slate-300/30 to-indigo-400/50 relative">
                             <div className="absolute left-0 -top-0.5 w-1 h-1 rounded-full bg-blue-500" />
                             <div className="absolute right-0 -top-0.5 w-1 h-1 rounded-full bg-indigo-500" />
                         </div>
@@ -215,7 +215,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                     <div className="flex flex-col items-center justify-center px-2">
                         <div className="relative flex items-center justify-center w-16 sm:w-24">
                             <div className="absolute inset-0 flex items-center">
-                                <div className="w-full h-[2px] bg-gradient-to-r from-blue-300/30 via-slate-200/50 to-indigo-300/30 dark:via-slate-700/50 rounded-full" />
+                                <div className="w-full h-0.5 bg-linear-to-r from-blue-300/30 via-slate-200/50 to-indigo-300/30 dark:via-slate-700/50 rounded-full" />
                             </div>
                             <motion.div
                                 animate={{
@@ -242,7 +242,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                     <Input
                                         value={data.arr_airport}
                                         onChange={e => onChange('arr_airport', e.target.value.toUpperCase())}
-                                        className="border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1 text-center"
+                                        className="border-0 p-0 shadow-none focus-visible:ring-0 font-black tracking-tighter leading-none bg-transparent text-right text-4xl h-12 border-b-2 border-slate-100 dark:border-slate-700/50 rounded-none mb-1"
                                         maxLength={3}
                                         placeholder="NRT"
                                     />
@@ -350,14 +350,14 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                     ) : (
                                         <button
                                             onClick={() => handleCopy(item)}
-                                            className="w-full flex items-center justify-between p-4 rounded-[1.25rem] bg-gradient-to-br from-orange-50/80 to-amber-50/50 dark:from-orange-950/20 dark:to-orange-900/10 border border-orange-200/60 dark:border-orange-900/40 hover:shadow-lg hover:shadow-orange-500/5 transition-all text-left group/btn overflow-hidden"
+                                            className="w-full flex items-center justify-between p-4 rounded-4xl bg-linear-to-br from-orange-50/80 to-amber-50/50 dark:from-orange-950/20 dark:to-orange-900/10 border border-orange-200/60 dark:border-orange-900/40 hover:shadow-lg hover:shadow-orange-500/5 transition-all text-left group/btn overflow-hidden"
                                         >
                                             <div className="absolute top-0 right-0 p-1 opacity-10 group-hover/btn:opacity-20 transition-opacity">
                                                 <div className="w-12 h-12 border-4 border-orange-500 rounded-full flex items-center justify-center -rotate-12 translate-x-4 -translate-y-4">
                                                     <span className="text-[8px] font-black">OK</span>
                                                 </div>
                                             </div>
-                                            <span className="text-2xl font-black font-mono text-orange-600 dark:text-orange-400 tracking-[0.1em]">
+                                            <span className="text-2xl font-black font-mono text-orange-600 dark:text-orange-400 tracking-widest">
                                                 {item || "-"}
                                             </span>
                                             <Copy className="w-4 h-4 text-orange-300 group-hover/btn:text-orange-500 transition-colors shrink-0" />
@@ -393,7 +393,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                             <button onClick={() => onChange('terminals', terminals.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     ) : (
-                                        <div className="w-full p-4 rounded-[1.25rem] bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-800/30 text-center shadow-sm relative overflow-hidden group/term">
+                                        <div className="w-full p-4 rounded-4xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-800/30 text-center shadow-sm relative overflow-hidden group/term">
                                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/40" />
                                             <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">{item || "-"}</span>
                                         </div>
@@ -428,7 +428,7 @@ export function FlightCard({ data, isEditing, onChange, onClear }: FlightCardPro
                                             <button onClick={() => onChange('seats', seats.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                         </div>
                                     ) : (
-                                        <div className="w-full p-4 rounded-[1.25rem] bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 text-center shadow-sm relative group/seat">
+                                        <div className="w-full p-4 rounded-4xl bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 text-center shadow-sm relative group/seat">
                                             <div className="absolute top-2 right-2 flex gap-0.5 opacity-20">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-300" />
