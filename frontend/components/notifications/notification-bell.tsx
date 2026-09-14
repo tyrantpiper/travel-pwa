@@ -8,6 +8,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { useTheme } from "@/lib/ThemeContext"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
+import { dispatchDeepLink } from "@/lib/hooks/useDeepLinkRouter"
 
 interface Notification {
     id: string
@@ -195,6 +196,7 @@ export function NotificationBell() {
         setIsOpen(false)
         // Deep link navigation handled by the app's routing
         if (notif.link) {
+            dispatchDeepLink(notif.link)
             router.push(notif.link)
         }
     }
@@ -212,7 +214,7 @@ export function NotificationBell() {
                     <motion.span
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1"
+                        className="absolute -top-0.5 -right-0.5 min-w-4.5 h-4.5 flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1"
                         style={{ backgroundColor: accentColor !== "default" ? currentTheme.primary : "#ef4444" }}
                     >
                         {unreadCount > 99 ? "99+" : unreadCount}
@@ -229,7 +231,7 @@ export function NotificationBell() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[200]"
+                            className="fixed inset-0 z-200"
                             onClick={() => setIsOpen(false)}
                         />
                         {/* Panel */}
@@ -238,7 +240,7 @@ export function NotificationBell() {
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                            className="absolute right-0 top-12 z-[201] w-[340px] max-h-[70vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-slate-700 overflow-hidden"
+                            className="absolute right-0 top-12 z-201 w-85 max-h-[70vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-slate-700 overflow-hidden"
                         >
                             {/* Header */}
                             <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-slate-800">

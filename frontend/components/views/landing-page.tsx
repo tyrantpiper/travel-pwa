@@ -42,6 +42,11 @@ export function LandingPage() {
         /* eslint-disable -- SSR hydration pattern: must set mounted after client render */
         setMounted(true)
 
+        // 🧭 暫存深層連結，確保登入後導航不丟失
+        if (typeof window !== "undefined" && window.location.search && window.location.search.includes("trip=")) {
+            sessionStorage.setItem("pending_deep_link", window.location.search)
+        }
+
         const storedName = localStorage.getItem("user_nickname")
         const storedId = localStorage.getItem("user_uuid")
         if (storedName && storedId) {

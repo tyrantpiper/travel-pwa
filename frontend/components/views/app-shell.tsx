@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
 import { useServiceWorker, useHaptic } from "@/lib/hooks"
 import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
+import { useDeepLinkRouter } from "@/lib/hooks/useDeepLinkRouter" // 🧭
 import { debugLog } from "@/lib/debug"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { AIStatusButton } from "@/components/ai/ai-status-button"
@@ -93,6 +94,9 @@ export function AppShell() {
         prevViewRef.current = nextTab
         setActiveView(nextTab)
     }, [])
+
+    // 🧭 全域深度連結監聽與路由調度器
+    useDeepLinkRouter({ onTabChange: handleTabChange })
 
     // 💡 Preheat 旗標：決定是否在背景偷偷加載並渲染隱藏視圖
     const [shouldPreheat, setShouldPreheat] = useState(false)
