@@ -289,3 +289,97 @@ def test_google_maps_grounding_sanitization():
             assert getattr(t, 'google_maps', None) is None
 
 
+# ═══════════════════════════════════════════════════════════════
+# 🧪 Geocode Routing & Circuit Breaker Immunity Tests
+# ═══════════════════════════════════════════════════════════════
+
+def test_geocode_routing_prefers_gemma_4():
+    """GEOCODE 意圖應優先採用 Gemma 4 31B Dense 高抗幻覺工作馬，絕不墜入 HEAVY_ROUTING"""
+    routing = build_effective_routing("GEOCODE")
+    assert routing[0] == "gemma-4-31b-it"
+    assert routing[1] == "gemma-4-26b-a4b-it"
+    assert routing[2] == "gemma-3-27b-it"
+    assert routing[3] == "gemini-3.1-flash-lite"
+    assert "gemini-3.8-flash" not in routing
+    assert "gemini-3.7-flash" not in routing
+    assert "gemini-3.6-flash" not in routing
+
+
+def test_summarize_routing_uses_workhorse_routing():
+    """SUMMARIZE 意圖應直接導向 WORKHORSE_ROUTING，首選 31B Dense 徹底杜絕旗艦模型配額洩漏"""
+    routing = build_effective_routing("SUMMARIZE")
+    assert routing[0] == "gemma-4-31b-it"
+    assert "gemini-3.8-flash" not in routing
+    assert "gemini-3.7-flash" not in routing
+
+
+def test_heavy_routing_primary_is_gemini_38_with_moe_rescue():
+    """PLANNING 重型意圖首位應為 gemini-3.8-flash，且尾端具備完整的 Gemma MoE 救援鏈"""
+    routing = build_effective_routing("PLANNING")
+    assert routing[0] == "gemini-3.8-flash"
+    assert routing[1] == "gemini-3.7-flash"
+    assert "gemma-4-26b-a4b-it" in routing
+    assert "gemma-4-31b-it" in routing
+    assert "gemma-3-27b-it" in routing
+
+
+def test_gemma_sanitizer_isolates_grounding():
+    """Gemma 模型即便在 CHAT 模式下，也嚴禁被注入 Gemini 專屬 Grounding 工具以防 400"""
+    config = types.GenerateContentConfig(temperature=1.0)
+    safe = sanitize_config_for_model(config, "gemma-4-26b-a4b-it", "CHAT")
+    if safe.tools:
+        for tool in safe.tools:
+            assert not hasattr(tool, "google_search") or tool.google_search is None
+            assert not hasattr(tool, "google_maps") or tool.google_maps is None
+
+
+@pytest.mark.asyncio
+@patch('services.model_manager.get_cached_client')
+async def test_auth_fail_does_not_trip_circuit_breaker(mock_get_client):
+    """認證失敗 (auth_fail) 屬於用戶端金鑰無效，嚴禁懲罰健康模型觸發熔斷"""
+    from services.model_manager import _CIRCUIT_STATE, is_model_circuit_broken, NonRetryableAuthError
+    from google.genai.errors import APIError
+
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+
+    # 模擬 Google API 回傳 400 Bad Request: API key not valid
+    mock_client.aio.models.generate_content = AsyncMock(
+        side_effect=APIError(400, "API key not valid. Please pass a valid API key.")
+    )
+
+    test_model = "gemma-4-31b-it"
+    _CIRCUIT_STATE.pop(test_model, None)
+
+    with pytest.raises(NonRetryableAuthError):
+        await call_extraction(
+            api_key="invalid_cipher_key",
+            prompt="Translate place",
+            intent_type="GEOCODE",
+            routing_strategy=[test_model]
+        )
+
+    # 驗證模型未被熔斷器記過
+    assert is_model_circuit_broken(test_model) is False
+    state = _CIRCUIT_STATE.get(test_model, {"errors": 0})
+    assert state.get("errors", 0) == 0
+
+
+def test_poi_enrich_routing_prefers_daily_routing():
+    """POI_ENRICH 探索地點意圖應優先採用 DAILY_ROUTING (500 RPD)，尾端自動掛載 Gemma 終極救援"""
+    routing = build_effective_routing("POI_ENRICH")
+    assert routing[0] == "gemini-3.1-flash-lite"
+    assert routing[1] == "gemini-3.5-flash-lite"
+    assert "gemma-4-26b-a4b-it" in routing
+    assert "gemma-4-31b-it" in routing
+    assert "gemma-3-27b-it" in routing
+
+
+def test_poi_enrich_generation_config():
+    """POI_ENRICH 配置應具備 temperature=1.0 與適當 output tokens"""
+    config = get_generation_config("POI_ENRICH")
+    assert config.temperature == 1.0
+    assert config.max_output_tokens == 1024
+
+
+

@@ -7,9 +7,14 @@
 // See: https://maplibre.org/news/2026-01-23-mlt-release/
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
+import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl, GlobeControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
+import { setWorkerUrl } from "maplibre-gl"
+
+if (typeof window !== "undefined") {
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs")
+}
 import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
 import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
 import MapillaryViewer from "@/components/MapillaryViewer"
@@ -26,7 +31,7 @@ import { cn } from "@/lib/utils"
 import { debugLog, debugWarn } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
 import { SearchResult } from "@/lib/itinerary-types"
-import { getDistanceKm } from "@/lib/location-utils"
+import { getDistanceKm, getSmartZoomConfig } from "@/lib/location-utils"
 
 // Activity 類型定義
 interface Activity {
@@ -377,7 +382,14 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             _distKm: getDistanceKm(targetLat, targetLng, r.lat, r.lng)
                         }))
 
-                        return withDistance.sort((a, b) => (a._distKm ?? 999) - (b._distKm ?? 999))
+                        // 宏觀層級（國家/省州）豁免純距離排序，維持語意精確置頂
+                        return withDistance.sort((a, b) => {
+                            const aIsMacro = (a.admin_level && a.admin_level <= 4) || a.type === "country"
+                            const bIsMacro = (b.admin_level && b.admin_level <= 4) || b.type === "country"
+                            if (aIsMacro && !bIsMacro) return -1
+                            if (!aIsMacro && bIsMacro) return 1
+                            return (a._distKm ?? 999) - (b._distKm ?? 999)
+                        })
                     })
                 }
             } catch {
@@ -420,10 +432,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             return
         }
 
+        const zoomConfig = getSmartZoomConfig(result)
         mapRef.current.flyTo({
             center: [lng, lat],
-            zoom: 16,
-            duration: 1500
+            zoom: zoomConfig.zoom,
+            duration: zoomConfig.duration
         })
 
         // 🆕 設置搜尋結果標記（紅色大頭針）
@@ -1172,14 +1185,15 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         }
                     }}
                     attributionControl={false}
-                    minZoom={3}
+                    minZoom={1}
                     maxZoom={20}
+                    projection="globe"
                 >
                     {/* 📍 自定義定位按鈕 (取代有 bug 的 GeolocateControl) */}
                     <button
                         onClick={handleLocateMe}
                         disabled={isLocating}
-                        className="absolute top-28 right-2 z-10 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 disabled:opacity-50 transition-all"
+                        className="absolute top-36 right-2 z-10 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 disabled:opacity-50 transition-all"
                         title={t('map_my_location')}
                     >
                         {isLocating ? (
@@ -1189,6 +1203,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                         )}
                     </button>
                     <NavigationControl position="top-right" showCompass={true} />
+                    <GlobeControl position="top-right" />
                     <AttributionControl
                         customAttribution="© OpenStreetMap · © OpenFreeMap · © Esri"
                         position="bottom-right"

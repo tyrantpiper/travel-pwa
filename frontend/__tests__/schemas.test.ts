@@ -167,4 +167,34 @@ describe('GeocodeResultSchema', () => {
         const result = GeocodeResultSchema.parse({ lat: 0, lng: 0 })
         expect(result.name).toBe('Unknown Place')
     })
+
+    it('should safely parse and retain Photon 1.3.0 metadata (admin_level, osm_key, extent)', () => {
+        const result = GeocodeResultSchema.parse({
+            lat: 36.5748441,
+            lng: 139.2394179,
+            name: 'Japan',
+            address: 'Japan',
+            type: 'country',
+            osm_key: 'place',
+            admin_level: 2,
+            extent: [122.7141754, 45.7112046, 154.205541, 20.2145811],
+        })
+        expect(result.admin_level).toBe(2)
+        expect(result.osm_key).toBe('place')
+        expect(result.extent).toEqual([122.7141754, 45.7112046, 154.205541, 20.2145811])
+    })
+
+    it('should allow null or undefined for Photon 1.3.0 metadata (no regression on old POIs)', () => {
+        const result = GeocodeResultSchema.parse({
+            lat: 35.6585,
+            lng: 139.7454,
+            name: 'Tokyo Tower',
+            admin_level: null,
+            osm_key: null,
+            extent: null,
+        })
+        expect(result.admin_level).toBeNull()
+        expect(result.osm_key).toBeNull()
+        expect(result.extent).toBeNull()
+    })
 })

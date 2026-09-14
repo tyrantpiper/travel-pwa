@@ -1,11 +1,16 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl, MapLayerMouseEvent } from "react-map-gl/maplibre"
+import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl, MapLayerMouseEvent, GlobeControl } from "react-map-gl/maplibre"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair } from "lucide-react"
 import { toast } from "sonner"
 import "maplibre-gl/dist/maplibre-gl.css"
+import { setWorkerUrl } from "maplibre-gl"
+
+if (typeof window !== "undefined") {
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs")
+}
 import { Input } from "@/components/ui/input"
 import { MAP_STYLES, MAP_LOCALIZATION } from "@/lib/constants"
 import { geocodeApi } from "@/lib/api"
@@ -15,7 +20,7 @@ import { useCityBias } from "@/hooks/useCityBias"
 import { debugLog } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
 import { SearchResult } from "@/lib/itinerary-types"
-import { getDistanceKm } from "@/lib/location-utils"
+import { getDistanceKm, getSmartZoomConfig } from "@/lib/location-utils"
 
 // ViewState 類型
 interface ViewState {
@@ -39,8 +44,10 @@ function rerankResults(
             const dist = getDistanceKm(centerLat, centerLng, r.lat, r.lng)
             const nameMatch = r.name.toLowerCase().includes(queryLower) ? 50 : 0
             const exactMatch = r.name.toLowerCase() === queryLower ? 100 : 0
-            // 分數 = 完全匹配 + 部分匹配 + 距離分 (越近分越高)
-            const reScore = exactMatch + nameMatch + Math.max(0, 100 - dist)
+            const isMacro = (r.admin_level && r.admin_level <= 4) || r.type === "country" || r.type === "state"
+            const macroBonus = isMacro && exactMatch ? 300 : (isMacro && nameMatch ? 150 : 0)
+            // 分數 = 宏觀加成 + 完全匹配 + 部分匹配 + 距離分 (越近分越高)
+            const reScore = macroBonus + exactMatch + nameMatch + Math.max(0, 100 - dist)
             return { ...r, reScore }
         })
         .sort((a, b) => (b.reScore ?? 0) - (a.reScore ?? 0))
@@ -288,10 +295,11 @@ export default function FullscreenMapModal({
         addToHistory(result)
         setQuery(result.name)
         setShowSearch(false)
+        const zoomConfig = getSmartZoomConfig(result)
         mapRef.current?.flyTo({
             center: [result.lng, result.lat],
-            zoom: 16,
-            duration: 1500
+            zoom: zoomConfig.zoom,
+            duration: zoomConfig.duration
         })
 
         // 🆕 設置標記點（紅色大頭針）
@@ -388,7 +396,7 @@ export default function FullscreenMapModal({
     }, [mapMode, mapLoaded])
 
     // POI 點擊
-    const handleMapClick = useCallback((e: maplibregl.MapLayerMouseEvent) => {
+    const handleMapClick = useCallback((e: MapLayerMouseEvent) => {
         const map = mapRef.current?.getMap()
         if (!map) return
 
@@ -428,7 +436,7 @@ export default function FullscreenMapModal({
     }, [t])
 
     // 🆕 2026 Logic: 處理地圖長按 (任意取點)
-    const handleMapLongPress = useCallback((e: maplibregl.MapLayerMouseEvent) => {
+    const handleMapLongPress = useCallback((e: MapLayerMouseEvent) => {
         const { lng, lat } = e.lngLat
 
         const poiData: POIBasicData = {
@@ -542,10 +550,12 @@ export default function FullscreenMapModal({
                         }
                     }}
                     attributionControl={false}
-                    minZoom={3}
+                    minZoom={1}
                     maxZoom={20}
+                    projection="globe"
                 >
                     <NavigationControl position="top-right" showCompass={false} />
+                    <GlobeControl position="top-right" />
                     <AttributionControl position="bottom-right" compact />
 
                     {/* 路線 */}
