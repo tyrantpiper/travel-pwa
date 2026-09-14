@@ -11,9 +11,10 @@ import { debugLog } from "@/lib/debug"
 import { useLanguage } from "@/lib/LanguageContext"
 import { getSecureApiKey } from "@/lib/security"
 import { useSWRConfig } from "swr"
+import { SingleDateCalendarPopover, ClockTimePickerPopover } from "./DateTimePickers"
 
 // 三源整合資料結構
-interface EnrichedPOI {
+export interface EnrichedPOI {
     display_name?: {
         primary: string
         secondary: string
@@ -30,7 +31,7 @@ interface EnrichedPOI {
 }
 
 // Function call args 結構
-interface POIData {
+export interface POIData {
     place_name: string
     category?: string
     desc?: string
@@ -44,7 +45,7 @@ interface POIData {
     sub_items?: { name: string; desc?: string; link?: string }[]  // 子項目（推薦菜品、必看展品等）
 }
 
-interface POIPreviewCardProps {
+export interface POIPreviewCardProps {
     poiData: POIData
     onAdded?: () => void
     onDismiss?: () => void
@@ -54,14 +55,14 @@ interface POIPreviewCardProps {
  * 🏗️ POI 預覽卡片 (機票樣式)
  * 
  * 當 AI 回應包含 function_call: add_itinerary_item 時渲染
- * 提供「加入行程」和「在地圖上預覽」功能
+ * 提供「加入行程」、「精美日曆與時鐘互動選擇」以及「在地圖上預覽」功能
  */
 export default function POIPreviewCard({
     poiData,
     onAdded,
     onDismiss
 }: POIPreviewCardProps) {
-    const { activeTripId, mutate, userId } = useTripContext()
+    const { activeTripId, activeTrip, mutate, userId } = useTripContext()
     const { mutate: globalMutate } = useSWRConfig()
     const { lang } = useLanguage()
     const zh = lang === 'zh'
@@ -69,6 +70,10 @@ export default function POIPreviewCard({
     const [isAdded, setIsAdded] = useState(false)
     const [enriched, setEnriched] = useState<EnrichedPOI | null>(null)
     const [isLoadingEnrich, setIsLoadingEnrich] = useState(false)
+
+    // 互動式天數與時間狀態 (預設為 AI 給定的值)
+    const [selectedDay, setSelectedDay] = useState(poiData.day_number || 1)
+    const [selectedTime, setSelectedTime] = useState(poiData.time_slot || "12:00")
 
     // 🆕 v3.7: 自動獲取三源整合資料
     useEffect(() => {
@@ -145,8 +150,8 @@ export default function POIPreviewCard({
             // 🛡️ v5: Standardized Item Creation with Auth
             await itemsApi.create({
                 trip_id: activeTripId,
-                day: poiData.day_number || 1,
-                time: poiData.time_slot || "12:00",
+                day: selectedDay,
+                time: selectedTime,
                 place: poiData.place_name,
                 category: poiData.category || "sightseeing",
                 desc: poiData.desc || "",
@@ -198,7 +203,7 @@ export default function POIPreviewCard({
             isAdded ? "border-green-300 bg-green-50" : "border-slate-200 bg-white"
         )}>
             {/* 🎫 票券頂部裝飾 */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+            <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-blue-500 via-indigo-500 to-purple-500" />
 
             {/* Header */}
             <div className="p-3 pb-2">
@@ -322,18 +327,28 @@ export default function POIPreviewCard({
                 )}
             </div>
 
-            {/* Meta */}
-            <div className="px-3 pb-2 flex items-center gap-3 text-[10px] text-slate-500">
+            {/* Meta & 互動式日曆與時鐘選擇器 */}
+            <div className="px-3 pb-2 flex flex-wrap items-center gap-1.5">
+                <SingleDateCalendarPopover
+                    dayNumber={selectedDay}
+                    totalDays={activeTrip?.total_days || 7}
+                    tripStartDate={activeTrip?.start_date}
+                    onChangeDay={(newDay) => setSelectedDay(newDay)}
+                />
+                <ClockTimePickerPopover
+                    time={selectedTime}
+                    onChangeTime={(newTime) => setSelectedTime(newTime)}
+                />
                 {poiData.duration && (
-                    <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
+                    <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                        <Clock className="w-2.5 h-2.5" />
                         {poiData.duration}
                     </span>
                 )}
                 {poiData.lat && poiData.lng && (
-                    <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {zh ? '座標已取得' : 'Coords ready'}
+                    <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                        <MapPin className="w-2.5 h-2.5" />
+                        {zh ? '座標就緒' : 'Coords'}
                     </span>
                 )}
             </div>
@@ -390,48 +405,71 @@ export default function POIPreviewCard({
 }
 
 /**
- * 從 rawParts 中偵測 function_call 並提取 POI 資料
+ * 輔助解析單一 POI 參數字典
  */
-export function extractFunctionCall(rawParts: unknown[]): POIData | null {
-    if (!rawParts || !Array.isArray(rawParts)) return null
+export function parseRawPoiArgs(args: Record<string, unknown>): POIData {
+    const dayVal = args.day_number ?? args.dayNumber ?? args.day ?? 1
+    return {
+        place_name: String(args.place_name || args.name || ""),
+        category: String(args.category || "sightseeing"),
+        desc: String(args.desc || args.description || ""),
+        lat: typeof args.lat === "number" ? args.lat : undefined,
+        lng: typeof args.lng === "number" ? args.lng : undefined,
+        rating: typeof args.rating === "number" ? args.rating : undefined,
+        duration: String(args.duration || ""),
+        day_number: typeof dayVal === "number" ? dayVal : parseInt(String(dayVal)) || 1,
+        time_slot: String(args.time_slot || args.timeSlot || "12:00"),
+        link_url: args.link_url ? String(args.link_url) : undefined,
+        sub_items: Array.isArray(args.sub_items) ? (args.sub_items as unknown[]).map((item) => {
+            const sub = item as { name?: unknown; desc?: unknown; link?: unknown } | null | undefined
+            return {
+                name: sub?.name ? String(sub.name) : "",
+                desc: sub?.desc ? String(sub.desc) : undefined,
+                link: sub?.link ? String(sub.link) : undefined,
+            }
+        }).filter(item => item.name) : undefined
+    }
+}
+
+/**
+ * 🛡️ 三態歸一化解析器 (相容單物件、items 陣列、Parallel Tool Calls 多 Parts)
+ */
+export function extractItineraryFunctionCalls(rawParts: unknown[]): POIData[] {
+    if (!rawParts || !Array.isArray(rawParts)) return []
+    const results: POIData[] = []
 
     for (const part of rawParts) {
-        if (part && typeof part === 'object') {
-            // 🟢 雙格式相容：相容 camelCase 與 snake_case 命名
-            const partObj = part as {
-                functionCall?: { name: string; args?: Record<string, unknown> }
-                function_call?: { name: string; args?: Record<string, unknown> }
-            }
-            const fc = partObj.functionCall || partObj.function_call
-            if (fc && fc.name === "add_itinerary_item") {
-                const args = fc.args || {}
-                
-                // 🟢 參數降級鏈：支援 day_number, dayNumber, day 等各種 AI 產出的欄位變體
-                const dayVal = args.day_number ?? args.dayNumber ?? args.day ?? 1
-                
-                return {
-                    place_name: String(args.place_name || args.name || ""),
-                    category: String(args.category || "sightseeing"),
-                    desc: String(args.desc || args.description || ""),
-                    lat: typeof args.lat === "number" ? args.lat : undefined,
-                    lng: typeof args.lng === "number" ? args.lng : undefined,
-                    rating: typeof args.rating === "number" ? args.rating : undefined,
-                    duration: String(args.duration || ""),
-                    day_number: typeof dayVal === "number" ? dayVal : parseInt(String(dayVal)) || 1,
-                    time_slot: String(args.time_slot || args.timeSlot || "12:00"),
-                    link_url: args.link_url ? String(args.link_url) : undefined,
-                    sub_items: Array.isArray(args.sub_items) ? (args.sub_items as unknown[]).map((item) => {
-                        const sub = item as { name?: unknown; desc?: unknown; link?: unknown } | null | undefined
-                        return {
-                            name: sub?.name ? String(sub.name) : "",
-                            desc: sub?.desc ? String(sub.desc) : undefined,
-                            link: sub?.link ? String(sub.link) : undefined,
-                        }
-                    }).filter(item => item.name) : undefined
+        if (!part || typeof part !== 'object') continue
+        const partObj = part as {
+            functionCall?: { name: string; args?: Record<string, unknown> }
+            function_call?: { name: string; args?: Record<string, unknown> }
+        }
+        const fc = partObj.functionCall || partObj.function_call
+        if (fc && fc.name === "add_itinerary_item") {
+            const args = fc.args || {}
+            // 情況 A：模型輸出 items 陣列 (Batch)
+            if (Array.isArray(args.items) && args.items.length > 0) {
+                for (const item of args.items) {
+                    if (item && typeof item === 'object') {
+                        const parsed = parseRawPoiArgs(item as Record<string, unknown>)
+                        if (parsed.place_name) results.push(parsed)
+                    }
                 }
+            }
+            // 情況 B & C：模型輸出單筆或 Parallel Tool Call
+            else if (args.place_name || args.name) {
+                const parsed = parseRawPoiArgs(args)
+                if (parsed.place_name) results.push(parsed)
             }
         }
     }
+    return results
+}
 
-    return null
+/**
+ * 向後相容單一提取函式
+ */
+export function extractFunctionCall(rawParts: unknown[]): POIData | null {
+    const calls = extractItineraryFunctionCalls(rawParts)
+    return calls.length > 0 ? calls[0] : null
 }

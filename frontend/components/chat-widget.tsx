@@ -14,7 +14,9 @@ import { getSecureApiKey } from "@/lib/security"
 import { getLeanItinerary, LeanItinerary } from "@/lib/getLeanItinerary"
 import SourceCitation from "@/components/chat/SourceCitation"
 import ThinkingIndicator from "@/components/chat/ThinkingIndicator"
-import POIPreviewCard, { extractFunctionCall } from "@/components/chat/POIPreviewCard"
+import POIPreviewCard, { extractItineraryFunctionCalls } from "@/components/chat/POIPreviewCard"
+import BatchPOIPreviewCard from "@/components/chat/BatchPOIPreviewCard"
+import RemoveItemPreviewCard, { extractRemoveFunctionCall } from "@/components/chat/RemoveItemPreviewCard"
 import ExpensePreviewCard, { extractExpenseFunctionCall } from "@/components/chat/ExpensePreviewCard"
 import DeepResearchCard, { type DeepResearchData } from "@/components/chat/DeepResearchCard"
 import { streamChat } from "@/lib/sse-parser"
@@ -862,11 +864,21 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                     )}>
                                         {msg.role === "model" ? (
                                             <>
-                                                {/* 🆕 POI 預覽卡片 (如果有 function_call) */}
+                                                {/* 🆕 移除行程預覽卡片 (如果有 remove_itinerary_item function_call) */}
                                                 {(() => {
-                                                    const poiData = extractFunctionCall(msg.rawParts)
-                                                    if (poiData) {
-                                                        return <POIPreviewCard poiData={poiData} />
+                                                    const removeData = extractRemoveFunctionCall(msg.rawParts)
+                                                    if (removeData) {
+                                                        return <RemoveItemPreviewCard removeData={removeData} currentTrip={tripDetail} />
+                                                    }
+                                                    return null
+                                                })()}
+                                                {/* 🆕 POI 預覽卡片 (支援單筆或多筆批次) */}
+                                                {(() => {
+                                                    const poiItems = extractItineraryFunctionCalls(msg.rawParts)
+                                                    if (poiItems.length === 1) {
+                                                        return <POIPreviewCard poiData={poiItems[0]} />
+                                                    } else if (poiItems.length > 1) {
+                                                        return <BatchPOIPreviewCard items={poiItems} />
                                                     }
                                                     return null
                                                 })()}

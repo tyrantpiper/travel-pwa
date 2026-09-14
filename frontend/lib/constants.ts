@@ -2,6 +2,7 @@
  * 共用常量定義
  * 從 itinerary-view.tsx 和 info-view.tsx 抽取的共用數據
  */
+import type { DataDrivenPropertyValueSpecification } from "@maplibre/maplibre-gl-style-spec"
 
 /**
  * 國家與地區對照表
@@ -78,7 +79,7 @@ export const MAP_LOCALIZATION = {
         ['get', 'name:zh'],        // 2. 簡體中文
         ['get', 'name:latin'],     // 3. 拉丁字母
         ['get', 'name']            // 4. 當地語系 (最終回退)
-    ] as const,
+    ] as DataDrivenPropertyValueSpecification<string>,
 
     // POI 名稱優先級順序
     CHINESE_NAME_KEYS: ['name:zh-Hant', 'name:zh', 'name', 'name_en'] as const,
