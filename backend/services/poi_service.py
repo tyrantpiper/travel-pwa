@@ -371,18 +371,31 @@ def format_pois_for_ai(pois: List[Dict], max_items: int = 5) -> str:
     這是 Token 優化的關鍵！
     原始 JSON 可能 5KB，格式化後只有 ~500 bytes
     """
-    if not pois:
+    if not pois or not isinstance(pois, list):
         return "附近沒有找到相關地點。"
     
     lines = []
     for i, poi in enumerate(pois[:max_items], 1):
-        rating_str = f"⭐{poi.get('rating', '-')}" if poi.get('rating') else ""
-        hours_str = f" | {poi.get('opening_hours', '')}" if poi.get('opening_hours') else ""
+        if not isinstance(poi, dict):
+            continue
+        name = poi.get("name") or poi.get("place_name") or "未知地點"
         
-        line = f"{i}. {poi['name']} ({poi['distance']}m) {rating_str}{hours_str}"
+        # 🛡️ 距離安全防禦：整數化輸出，無距離則優雅省略，杜絕 KeyError
+        dist = poi.get("distance")
+        dist_str = ""
+        if dist is not None:
+            try:
+                dist_str = f" ({int(round(float(dist)))}m)"
+            except (ValueError, TypeError):
+                dist_str = f" ({dist}m)"
+                
+        rating_str = f"⭐{poi.get('rating')}" if poi.get('rating') else ""
+        hours_str = f" | {poi.get('opening_hours')}" if poi.get('opening_hours') else ""
+        
+        line = f"{i}. {name}{dist_str} {rating_str}{hours_str}".strip()
         lines.append(line)
     
-    return "\n".join(lines)
+    return "\n".join(lines) if lines else "附近沒有找到相關地點。"
 
 
 def get_ai_prompt_for_recommendation(

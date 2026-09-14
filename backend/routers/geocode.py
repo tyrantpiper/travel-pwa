@@ -106,7 +106,8 @@ async def geocode_search(
                 "source": "smart_fusion"
             })
         # 決定混合策略：POI 置頂，地理定位置後（這讓「搜拉麵」能直接看到店）
-        return fusion_pois + geocode_results
+        base_list = geocode_results.get("results", []) if isinstance(geocode_results, dict) else (geocode_results if isinstance(geocode_results, list) else [])
+        return {"results": fusion_pois + base_list, "source": "smart_fusion"}
         
     return geocode_results
 

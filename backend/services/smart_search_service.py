@@ -80,11 +80,10 @@ async def parse_intent(
     )
     
     try:
-        # 🆕 v5.0: 使用 call_extraction 獲得 3 層降級保護
+        # 🆕 升級至專屬 INTENT_PARSE (31B 工作馬直通，零 Gemini 500 RPD 額度消耗)
         raw_text = await call_extraction(
             api_key, prompt,
-            intent_type="SUMMARIZE",  # 低 token、快速
-            routing_strategy=DAILY_ROUTING,
+            intent_type="INTENT_PARSE",
         )
         
         json_match = re.search(r'\{[\s\S]*\}', raw_text)

@@ -21,7 +21,7 @@ from google.genai import types
 
 from models.base import POIAIEnrichRequest, POIEnrichRequest, POIRecommendRequest, SmartSearchRequest
 from utils.deps import get_gemini_key
-from utils.ai_config import LITE_MODEL
+from utils.ai_config import LITE_MODEL, DAILY_ROUTING
 from services.poi_service import (
     enrich_poi_complete,
     format_enriched_poi_for_ai,
@@ -69,6 +69,8 @@ async def ai_enrich_poi(fastapi_req: Request, request: POIAIEnrichRequest):
         if not api_key:
             raise HTTPException(status_code=400, detail="需要 API Key")
         
+        print(f"🔍 [POI Enrich] 開始抓取與摘要: {request.name} (Wiki + AI)...")
+        
         prompt = f"""
 You are a travel guide assistant. Search the web for reviews and vibes for:
 - Name: {request.name}
@@ -83,8 +85,13 @@ Output in this EXACT JSON format (Traditional Chinese summary):
     "business_status": "OPERATIONAL"
 }}
 """
-        # 🚀 並行執行 AI 摘要與 Wiki 豐富
-        ai_task = call_extraction(api_key, prompt, "POI_ENRICH")
+        # 🚀 並行執行 AI 摘要與 Wiki 豐富 (使用 DAILY_ROUTING 進行極速低延遲解析)
+        ai_task = call_extraction(
+            api_key,
+            prompt,
+            intent_type="POI_ENRICH",
+            routing_strategy=DAILY_ROUTING
+        )
         wiki_task = enrich_poi_complete({
             "name": request.name,
             "wikidata_id": request.wikidata_id or "",
@@ -165,8 +172,11 @@ Output in this EXACT JSON format (Traditional Chinese summary):
         if final_status == "SUCCESS":
             POI_ENRICH_CACHE[cache_key] = result_payload
             
+        print(f"✅ [POI Enrich] 完成: {request.name} (Status: {final_status})")
         return result_payload
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"🔥 AI POI 整合失敗：{e}")
         raise HTTPException(status_code=500, detail=f"AI 增強失敗: {str(e)}")
@@ -269,6 +279,7 @@ async def ai_recommend_poi(request: POIRecommendRequest):
     try:
         # Step 1: 格式化 POI 為精簡文字
         pois_text = format_pois_for_ai(request.pois, max_items=5)
+        print(f"🤖 [POI Recommend] 正在為 {len(request.pois)} 個地點進行 AI 推薦評估...")
         
         # Step 2: 生成精簡 prompt
         prompt = get_ai_prompt_for_recommendation(
@@ -287,12 +298,15 @@ async def ai_recommend_poi(request: POIRecommendRequest):
             routing_strategy=DAILY_ROUTING,
         )
         
+        print(f"✅ [POI Recommend] AI 推薦完成")
         return {
             "recommendation": recommendation_text,
             "pois_count": len(request.pois),
             "token_optimized": True
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"🔥 POI Recommend Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

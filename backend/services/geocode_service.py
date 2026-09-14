@@ -726,12 +726,22 @@ async def geocode_with_photon(place_name: str, limit: int = 5, lat: float = None
                         if props.get(key):
                             address_parts.append(props[key])
                     
+                    extra = props.get("extra") or {}
+                    admin_lvl = extra.get("admin_level") if isinstance(extra, dict) else None
+                    if not admin_lvl and "admin_level" in props:
+                        admin_lvl = props.get("admin_level")
+
+                    extent = props.get("extent") or feature.get("bbox")
+
                     results.append({
                         "lat": coords[1],
                         "lng": coords[0],
                         "name": props.get("name", place_name),
                         "address": ", ".join(address_parts) if address_parts else props.get("name", ""),
-                        "type": props.get("osm_value", "place")
+                        "type": props.get("osm_value", "place"),
+                        "osm_key": props.get("osm_key"),
+                        "admin_level": int(admin_lvl) if str(admin_lvl).isdigit() else None,
+                        "extent": extent if isinstance(extent, list) and len(extent) == 4 else None
                     })
                 
                 if results:
@@ -1445,7 +1455,7 @@ async def detect_country_from_trip_title(trip_title: str, api_key: str = None) -
             return result
         return None
     except Exception as e:
-        print(f"🧠 Country detection error: {e}")
+        print(f"ℹ️ [SmartGeo] TripTitle 國家推斷跳過 ({e})，轉入關鍵字檢索")
         return None
 
 
@@ -1611,7 +1621,8 @@ async def detect_country_from_query(query: str, api_key: str = None) -> str:
             print(f"🧠 Query '{query}' → Country: {result}")
             return result
         return None
-    except Exception:
+    except Exception as e:
+        print(f"ℹ️ [SmartGeo] Query 國家推斷跳過 ({e})，轉入 Photon / Nominatim 檢索")
         return None
 
 # 🆕 國家名稱 → 代碼映射 (全小寫，大小寫不敏感)
@@ -1685,6 +1696,7 @@ async def smart_geocode_logic(
     zoom: float = None      # 🆕 P1: 地圖縮放層級 (用於動態 bias)
 ) -> dict:
     """共用的智能地理編碼邏輯"""
+    print(f"🌍 [SmartGeo] 啟動多層檢索: '{query}' (Trip: {trip_title or '無'}, 偏置: {lat},{lng})")
     log_debug(f"🔍 [SmartGeo] Start search: '{query}' (Trip: {trip_title}, Country: {country}, Region: {region}, Zoom: {zoom}, Bias: {lat},{lng})")
     
     # 🧠 Step 0: 智能國家判斷和翻譯

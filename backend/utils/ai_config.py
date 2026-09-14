@@ -32,7 +32,8 @@ DAILY_ROUTING: List[str] = [
 ]
 
 HEAVY_ROUTING: List[str] = [
-    "gemini-3.7-flash",               # 🚀 3.7 首選：超長多天複雜行程規劃 (64K 輸出)
+    "gemini-3.8-flash",               # 🚀 3.8 首選：1,048,576 (1M) Tokens 超長上下文、50% 促銷折扣
+    "gemini-3.7-flash",               # 🚀 3.7 第一備援 (64K 輸出)
     "gemini-3.6-flash",               # 3.6 穩定次選
     "gemini-3.5-flash-lite",          # 🆕 3.5 Lite: 快速低延遲備援
     "gemini-3.1-flash-lite",           # 500 RPD, 高額度優先
@@ -46,10 +47,19 @@ HEAVY_ROUTING: List[str] = [
 # ═══════════════════════════════════════════════════════════════
 
 WORKHORSE_ULTIMATE: str = "gemma-3-27b-it"        # 終極救援 (L3)
-WORKHORSE_PENULTIMATE: str = "gemma-4-31b-it"     # 倒數第二救援 (L2)
-WORKHORSE_MOE: str = "gemma-4-26b-a4b-it"         # 高效多模態專家
+WORKHORSE_MOE: str = "gemma-4-26b-a4b-it"         # 高效混合專家 (L2: 4B Active, 1100+ tps)
+WORKHORSE_PENULTIMATE: str = "gemma-4-31b-it"     # 31B 稠密模型 (L1 首選工作馬: 1452 分最高抗幻覺)
 
-WORKHORSE_MODEL: str = WORKHORSE_ULTIMATE
+WORKHORSE_MODEL: str = WORKHORSE_PENULTIMATE      # 🚀 正式切換為 31B Dense 作為首選
+
+WORKHORSE_ROUTING: List[str] = [
+    WORKHORSE_PENULTIMATE,            # gemma-4-31b-it (首選，31B Dense 最高品質與抗幻覺)
+    WORKHORSE_MOE,                    # gemma-4-26b-a4b-it (26B MoE 極速第一備援)
+    WORKHORSE_ULTIMATE,               # gemma-3-27b-it (27B Dense L3 終極救援)
+    DAILY_ROUTING[0],                 # gemini-3.1-flash-lite (500 RPD 極速保底)
+]
+
+GEOCODE_ROUTING: List[str] = WORKHORSE_ROUTING
 
 # ═══════════════════════════════════════════════════════════════
 # 🔗 Backward-Compatible Aliases (Phase 3 清除後可移除)
