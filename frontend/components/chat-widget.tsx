@@ -1167,11 +1167,12 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
             {/* Toggle Button - 2D Edge Draggable Liquid Glass */}
             <div
                 ref={dragRef}
-                className="fixed z-110"
+                className="fixed z-110 will-change-transform transform-gpu"
                 style={{
                     right: position.x,
                     bottom: position.y,
-                    touchAction: isDragging ? "none" : "auto"
+                    touchAction: isDragging ? "none" : "auto",
+                    willChange: isDragging ? "right, bottom" : "auto"
                 }}
             >
                 <Button

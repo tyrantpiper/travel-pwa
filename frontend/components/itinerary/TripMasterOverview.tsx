@@ -20,6 +20,7 @@ import { Trip, Activity, DailyLocation } from "@/lib/itinerary-types"
 import { useLanguage } from "@/lib/LanguageContext"
 import { resolveDayLocation, type ResolvedLocation } from "@/lib/location-resolver"
 import { DailyWeatherStrip } from "@/components/itinerary/DailyWeatherStrip"
+import { MultiDayMasterMap } from "@/components/itinerary/MultiDayMasterMap"
 import { useWeatherStore, type DailyForecastItem } from "@/lib/stores/weatherStore"
 import { fetchFiveDayForecast } from "@/lib/weather-api"
 
@@ -263,6 +264,18 @@ export function TripMasterOverview({
                 </div>
             </motion.div>
 
+            {/* 🗺️ 全行程多天軌跡地圖疊加 (Full-Trip Multi-Day Route Mesh) */}
+            <MultiDayMasterMap 
+                trip={currentTrip} 
+                onSelectDay={onSelectDay} 
+                onScrollToDay={(d) => {
+                    const card = document.getElementById(`overview-day-card-${d}`)
+                    if (card) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                }}
+            />
+
             {/* 🗓️ 2. Day-by-Day Master Timeline Cards */}
             <div className="space-y-4">
                 {dayNumbers.map((d, index) => {
@@ -279,6 +292,7 @@ export function TripMasterOverview({
                     return (
                         <motion.div
                             key={d}
+                            id={`overview-day-card-${d}`}
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.25, delay: index * 0.04 }}

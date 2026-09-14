@@ -892,50 +892,65 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
 
     return (
         <div className="space-y-2">
-            {/* 交通模式選擇器 + 底圖切換 */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            {/* 交通模式選擇器 + 底圖工具列 (現代流體毛玻璃膠囊) */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 mb-2">
+                {/* 交通模式切換膠囊 */}
+                <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs backdrop-blur-xs">
                     <button
+                        type="button"
                         onClick={() => setMode('walk')}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'walk' ? 'bg-white shadow text-green-600' : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                            mode === 'walk'
+                                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
+                        }`}
                     >
                         <Footprints className="w-3.5 h-3.5" />
                         {t('map_walk')}
                     </button>
                     <button
+                        type="button"
                         onClick={() => setMode('drive')}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'drive' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                            mode === 'drive'
+                                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
+                        }`}
                     >
                         <Car className="w-3.5 h-3.5" />
                         {t('map_drive')}
                     </button>
                     <button
+                        type="button"
                         onClick={() => setMode('transit')}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${mode === 'transit' ? 'bg-white shadow text-amber-600' : 'text-slate-500 hover:text-slate-700'
-                            }`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                            mode === 'transit'
+                                ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/50'
+                        }`}
                     >
                         <Bus className="w-3.5 h-3.5" />
                         {t('map_transit')}
                     </button>
                 </div>
 
-                {/* 🆕 底圖切換按鈕 */}
-                <div className="flex items-center gap-2">
+                {/* 右側工具列 (路線資訊 badge + 底圖切換 + Mapillary 街景) */}
+                <div className="flex items-center gap-1.5">
                     {routeInfo && (
-                        <div className="flex items-center gap-3 text-xs">
-                            <span className="text-slate-500">📏 {routeInfo.distance}</span>
-                            <span className="text-slate-500">⏱️ {routeInfo.duration}</span>
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100/80 dark:border-indigo-900/50 text-xs font-bold shadow-xs">
+                            <span>📏 {routeInfo.distance}</span>
+                            <span>⏱️ {routeInfo.duration}</span>
                             {loading && <span className="text-amber-500 animate-pulse">{t('map_loading')}</span>}
                         </div>
                     )}
                     <button
+                        type="button"
                         onClick={() => setMapMode(m => m === 'standard' ? 'satellite' : 'standard')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${mapMode === 'satellite'
-                            ? 'bg-blue-600 text-white border-blue-600'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
-                            }`}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                            mapMode === 'satellite'
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs'
+                        }`}
                         title={mapMode === 'satellite' ? t('map_switch_standard') : t('map_switch_satellite')}
                     >
                         {mapMode === 'satellite' ? (
@@ -947,6 +962,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     {/* 📸 Mapillary 街景覆蓋 toggle */}
                     {isMapillaryAvailable() && (
                         <button
+                            type="button"
                             onClick={() => {
                                 setShowMapillaryCoverage(prev => {
                                     const next = !prev
@@ -962,9 +978,10 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                                     return next
                                 })
                             }}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${showMapillaryCoverage
-                                ? 'bg-emerald-600 text-white border-emerald-600'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                                showMapillaryCoverage
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs'
                             }`}
                             title={t('mapillary_coverage')}
                         >
@@ -976,7 +993,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             </div>
 
             {/* 地圖容器 - 全裝置統一加大 h-[480px] 向上調整為響應式 500~600px，防止捲動干擾 + 消除震動 */}
-            <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm h-125 sm:h-135 lg:h-150 w-full z-0 relative overscroll-none">
+            <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm h-125 sm:h-135 lg:h-150 w-full z-0 relative overscroll-none isolate transform-gpu will-change-transform">
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}

@@ -103,7 +103,7 @@ export function ItineraryTimeline({
 
                                 const isHeader = item.category === 'header' || (item.time || "00:00") === '00:00' || item.time_slot === '00:00'
                                 return (
-                                    <div className="pb-4 min-h-[40px]">
+                                    <div className="pb-4 min-h-10">
                                         <SortableTimelineCard
                                             activity={item}
                                             index={realIndices[idx] || 0}
