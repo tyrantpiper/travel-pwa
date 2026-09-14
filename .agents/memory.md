@@ -38,6 +38,11 @@
 - **輸入法組合態攔截與自適應高度防線 (IME Composition Guard & Auto-Growing Textarea)**: 中文（注音/倉頡/拼音）與日文平假名輸入時，按下 Enter 選字常引發未完成文字提早發送的災難。輸入框全面升級為自適應高度 `<textarea>`（`min-h-9 max-h-32`），並在 `onKeyDown` 嚴格掛載 `if (e.nativeEvent.isComposing) return`，保障多語言選字體驗。
 - **離線快取真因釐清與過度工程化及時熔斷 (Over-engineering Circuit Breaker)**: 開發模式 (npm run dev) 預設阻斷 Service Worker 註冊以保護 HMR 免受污染，測試 PWA 離線能力應走標準生產預覽流程 (npm run build && npm start)，嚴禁盲目跨層在 RootLayout 注入 raw HTML/CSS inline splash 等破壞 Next.js 架構純潔性的補丁。
 - **微架構微調之零回歸硬核驗證 (Hardcore Zero-Regression Protocol)**: 元件渲染順序與 Tailwind v4 樣式微調後，必須強制執行 tsc、eslint 與 vitest 全量單元測試 (127 passed) 進行純客觀驗證，確保零語法與邏輯退化。
+- **虛擬化清單篩選器穿透機制 (Filter Penetration on Deep Link)**: 在虛擬化長清單（React Virtuoso）中，未渲染於 DOM 的項目無法藉由傳統 DOM API 定位；若使用者當前開著特定篩選器，目標甚至不會出現在計算清單中。架構上確立：深層連結尋址時，消費端必須具備「前置篩選器自動歸零」的穿透權威，隨後調用虛擬列表內部控制代碼 `scrollToIndex` 達成 100% 精準尋址。
+- **深層天數意圖優先於預設天數之階層判定 (Day-Zero Overview Precedence)**: 將行程載入從原本無腦執行 `setDay(1)` 升級為「優先尊重外部指定（如 deep link `day=0` 總覽），無外部指定才保底落地第 1 天」，成功解鎖推播直達 `day=0` 行程封面總覽卡片。
+- **暫時性目標參數脫敏與防震盪機制 (Ephemeral Target Parameter Cleanup)**: 在完成定位調度後，立即使用 `window.history.replaceState` 將 `expense_id` 從網址列拔除，達成「單次消費即銷毀」的冪等性保護，防止使用者 F5 重新整理時反覆重播定位動畫。
+- **氣象解析與城市地理編碼解耦 (Location Resolver Separation)**: 建立獨立的 `location-resolver.ts`，採取階梯式回退查找策略（`Trip Destination ➔ Day 1 First Spot ➔ Country Capital`），避免氣象元件直接侵入行程資料模型，對接 Open-Meteo 免費氣象 API。
+- **CSP Web Worker 同源靜態管線標準化 (MapLibre CSP Worker Pipeline)**: 不為求省事而放寬 CSP 安全標頭（堅決不用 `unsafe-eval` 或動態 blob），以建置期（Build-time Hook `copy-maplibre-worker.mjs`）自動化腳本將 Web Worker 轉換為同源靜態資產，消除嚴格 CSP 下的腳本注入阻擋。
 
 ## [Failed Paths]
 - **試圖在 React RootLayout 內嵌 Raw HTML/CSS 假裝原生 Splash (Inline Splash Over-Engineering Trap)**: 在 Next.js App Router 體系下硬塞 90 行 inline <style>、id="pwa-native-splash" 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 manifest.json 自動渲染原生啟動畫面的基本事實。問題本質在於開發模式根本未啟動快取，而非需要用粗暴補丁解決。
@@ -64,9 +69,9 @@
 - **跳過本地驗收的過早推送違規 (Premature Push Anti-pattern)**: 在使用者尚未於本地 `localhost:3000` 進行實機操作核驗前，過早執行了 Commit 與 Push，違反了「人類主權」與「謹慎防衛」核心原則。教訓：重大依賴更新必須由人類開發者於真實環境核可後，才能執行 Git 提交與推送。
 - **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB 的複製陷阱 (DataCloneError Trap)**: SWR 內部的 cacheMap 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
 - **推倒式拆檔引發的閉包斷裂與 SWR 快取丟失陷阱 (Premature Component Decomposition Trap)**: 曾嘗試將 `chat-widget.tsx` 暴力解耦拆分至 3 個獨立組件（`LiquidGlassOrb`, `ChatBottomSheet`, `ChatInputBar`），導致 `useDynamicPolling`、`prevTripIdRef` 雙清閉包、`textareaRef` 焦點控制以及多個自癒狀態遺失，引發大量測試報錯與死循環震盪。教訓：在缺乏完整抽象層保護前，高耦合高密度邏輯組件應優先採原地微創增強，嚴禁過度工程化的推倒重來。
-- **未攔截輸入法組合態引發的 Enter 誤送出語句災難 (CJK IME Premature Send Trap)**: 在 input/textarea 監聽 `onKeyDown` 的 Enter 事件時，若未檢查 `e.nativeEvent.isComposing`，使用者在注音或拼音選字確認按下 Enter 時會誤觸發 `handleSendMessage()`，將半形注音碼或未完成拼音直接送出。教訓：所有富文字或對話輸入框必須強制加入 `if (e.nativeEvent.isComposing) return`。
-
-
+- **直接在客戶端使用動態 new Worker(URL.createObjectURL(blob)) 的 CSP 阻擋 (Worker Blob CSP Trap)**: 嘗試在客戶端動態封裝 MapLibre Web Worker，在嚴格 CSP 標頭下立即遭瀏覽器安全攔截。教訓：第三方函式庫 Web Worker 必須走同源靜態檔案管道（如 `copy-maplibre-worker.mjs`）派發，杜絕動態 blob 捷徑。
+- **傳統 DOM scrollIntoView 在虛擬化清單下的無效陷阱 (Virtual List Null DOM Trap)**: 嘗試使用 `document.getElementById('expense-' + id)?.scrollIntoView()` 尋找目標項目。在項目數量超過可視區域時，Virtuoso 尚未將其渲染至 DOM 樹中，`document.getElementById` 必為 `null`。教訓：虛擬化滾動引擎必須使用虛擬庫提供的 Ref Handle（`virtuosoRef.current.scrollToIndex`）進行索引計算與滾動。
+- **行程切換無腦重置天數抹除外部深層意圖 (Blind Day-1 Overwrite Trap)**: 在 `itinerary-view.tsx` 中監聽 `[activeTripId]` 並直接調用 `setDay(1)`，導致推播傳入的 `day=0` 總覽參數被瞬間覆寫回第一天。教訓：在多狀態驅動視圖中，狀態重置必須檢查當前全域 Store 是否已有高優先順序的顯式指定值。
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
@@ -80,6 +85,8 @@
 - **未來 MLT (MapLibre Tile) 格式追蹤**: 待 OpenFreeMap 或自託管地圖伺服器正式普及 MLT 格式時，再行重啟評估 v6 升級。
 - **BackgroundSync iOS Safari 降級機制強化**: iOS Safari 原生不支援 W3C Background Sync API，目前依賴 Service Worker 重新啟動與連線 fetch 事件被動觸發。後續可評估在 `SyncManager` 前端組件中監聽 `window.addEventListener('online')` 作為雙重主動觸發保險。
 - **離線突變樂觀 UI 狀態提示 (Optimistic UI Badge)**: 當使用者於離線狀態新增費用或筆記時，可於 UI 卡片旁標註「等待連線同步中...」的徽章，提升使用者心理安全感。
+- **Service Worker 點擊深層喚起視窗**: 評估在 `sw.js` 的 `notificationclick` 加入 `clients.matchAll` 聚焦已有分頁，減少重複開分頁。
+- **VAPID 密鑰輪轉與 Supabase Webhook 監控**: 需持續觀測雲端 Edge Functions 派發推播的延遲與 410 Gone 回收率。
 
 ## [Vocabulary]
 - **Continuous Multi-Month Calendar**: iOS Swift 風格連續縱向多月份滾動日曆區間選擇器。
@@ -111,4 +118,9 @@
 - **Shoulder-of-Giants Offline Architecture**: 站在既有巨人肩膀上的輕量化離線架構，立足既有 Serwist、idb-keyval 與 SWR 快取規範，達成零冗餘體積的離線優先秒開。
 - **Arterial/Venous Read-Write Decoupling**: 動脈與靜脈讀寫分流架構，將 GET 離線讀取與 POST/PUT/PATCH/DELETE 突變寫入在 Service Worker 層物理分離。
 - **Hydration-Safe App Shell Fallback**: 水合安全 App Shell 導航降級，導航快取精確排除 _rsc 與 /api/ 以維護 React 19 RSC 水合安全。
-- **DataCloneError Trap**: 資料複製錯誤陷阱，嘗試將包含 Promise 或閉包的記憶體物件寫入 IndexedDB 時觸發的致命拋錯。
+- **DataCloneError Trap**: 資料複製錯誤陷阱，嘗試將包含 Promise 或閉包的記憶體物件寫入 IndexedDB 時觸發的致命拋錯。
+- **Filter Penetration on Deep Link**: 深度連結篩選器穿透機制，在尋址前自動重置 UI 篩選器以避免目標被遮蔽。
+- **Day-Zero Overview Precedence**: 零天總覽優先順序，外部深度連結指定天數優先於預設第 1 天的狀態調度原則。
+- **Ephemeral Target Parameter Cleanup**: 暫時性目標參數脫敏，消費完成後立即自 URL 抹除參數以達冪等性。
+- **Virtual List Null DOM Trap**: 虛擬列表 DOM 空值陷阱，虛擬化滾動未掛載 DOM 時使用原生選擇器必為 null 的邊界問題。
+- **MapLibre CSP Worker Pipeline**: MapLibre 內容安全策略 Worker 建置管線，將 Web Worker 同源靜態化之架構方案。
