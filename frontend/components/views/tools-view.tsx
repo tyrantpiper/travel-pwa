@@ -102,7 +102,7 @@ interface ExpenseItemProps {
     isHighlighted?: boolean
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
 
 const PAYMENT_METHODS = [
     { id: "Cash", label: "Cash", icon: Wallet, color: "text-green-600" },

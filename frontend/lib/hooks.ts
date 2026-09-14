@@ -4,7 +4,7 @@ import { travelDataApi } from './api'
 import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot, getTripsListSnapshotSync, saveTripsListSnapshot } from './idb-storage'
 import type { Trip } from './itinerary-types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
 
 
 import { toast } from "sonner"
@@ -29,8 +29,13 @@ export const fetcherWithUserId = ([url, uid]: [string, string]) =>
             return r.json()
         })
         .catch(err => {
-            console.error("fetcher error:", err)
-            throw err
+            if (err instanceof HttpError) {
+                throw err
+            }
+            // 🌐 網絡抖動或離線斷網（Failed to fetch / Connection Refused）
+            // 降級為 warn，避免 Next.js Turbopack 誤將背景 SWR 離線輪詢當作 Fatal Error Overlay 彈窗阻擋
+            console.warn("[Fetcher] Network degradation or offline:", err?.message || err)
+            throw new HttpError(0, err?.message || "Network error", { offline: true })
         })
 
 export function useTrips(userId: string | null) {

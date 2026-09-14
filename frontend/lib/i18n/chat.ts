@@ -10,7 +10,7 @@ export const chatTranslations = {
     en: {
         ai_subtitle: "Your AI Travel Expert",
         ai_greet_msg:
-            "👋 Hi! I'm Ryan, your AI travel expert!\n\n💡 **I can help you with:**\n• Translation, restaurant recommendations, transit info\n• Solve any travel problems\n• 🩺 **Itinerary checkup**: Just say \"Check if my itinerary makes sense?\"\n\nHow can I help? 😎",
+            "👋 Hi! I'm Ryan, your AI travel expert!\n\n💡 **I can help you with:**\n- Translation, restaurant recommendations, transit info\n- Solve any travel problems\n- 🩺 **Itinerary checkup**: Just say \"Check if my itinerary makes sense?\"\n\nHow can I help? 😎",
         ai_apikey_missing:
             "⚠️ Please set up your AI API Key first!\n\nGo to **Profile** → Click **AI API Key** to configure.\n\n💡 It's completely free!",
         ai_image_uploaded: " [Image uploaded]",
@@ -29,11 +29,14 @@ export const chatTranslations = {
         ai_sending_to_import: "Sending to import...",
         ai_one_click_import: "Import Itinerary",
         ai_ready_to_import: "Itinerary ready to import!",
+        ai_quick_checkup: "Check if my itinerary makes sense?",
+        ai_quick_food: "Recommend nearby popular food",
+        ai_quick_traffic: "How is transit arranged smoothly?",
     },
     zh: {
         ai_subtitle: "你的 AI 旅遊達人",
         ai_greet_msg:
-            "👋哈囉！我是 Ryan，你的 AI 旅遊達人！\n\n💡 **我能幫你：**\n• 翻譯、推薦美食、查詢交通\n• 解決旅途中的疑難雜症\n• 🩺 **行程健檢**：跟我說「幫我看這行程順不順？」\n\n有什麼我可以幫忙的嗎？😎",
+            "👋 哈囉！我是 Ryan，你的 AI 旅遊達人！\n\n💡 **我能幫你：**\n- 翻譯、推薦美食、查詢交通\n- 解決旅途中的疑難雜症\n- 🩺 **行程健檢**：跟我說「幫我看這行程順不順？」\n\n有什麼我可以幫忙的嗎？😎",
         ai_apikey_missing:
             "⚠️ 請先設定 AI API Key！\n\n前往 **Profile** 頁面 → 點擊 **AI API Key** 進行設定。\n\n💡 完全免費！",
         ai_image_uploaded: " [圖片已上傳]",
@@ -51,5 +54,9 @@ export const chatTranslations = {
         ai_sending_to_import: "傳送至匯入工具...",
         ai_one_click_import: "立即匯入行程",
         ai_ready_to_import: "行程已準備好匯入！",
+        ai_quick_checkup: "幫我看這行程順不順？",
+        ai_quick_food: "推薦這附近必吃美食",
+        ai_quick_traffic: "今天行程交通怎麼搭最順？",
     },
 } as const
+

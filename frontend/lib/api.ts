@@ -3,7 +3,7 @@
  * Provides typed API functions for all backend endpoints
  */
 
-const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_HOST = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
 console.log("🚀 [API] Connected to:", API_HOST)
 
 import { SyncQueue } from './sync-engine';

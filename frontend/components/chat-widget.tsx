@@ -76,7 +76,7 @@ interface Position {
     y: number
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
 
 // 城市座標映射
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
@@ -931,18 +931,72 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                                                         if (msg.displayContent === "__GREETING__") {
                                                             return (
                                                                 <div className="space-y-3">
-                                                                    <div className="flex items-center gap-3 p-3 rounded-xl bg-linear-to-r from-blue-500/10 via-indigo-500/10 to-cyan-500/10 border border-blue-200/60 dark:border-cyan-900/40 shadow-xs">
-                                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                        <img
-                                                                            src="/images/ryan-bot-hero.webp"
-                                                                            alt="Ryan AI Companion"
-                                                                            className="w-14 h-14 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(6,182,212,0.3)]"
-                                                                        />
-                                                                        <div className="min-w-0">
-                                                                            <h4 className="font-semibold text-xs text-blue-700 dark:text-cyan-400">Ryan AI 隨行旅伴</h4>
-                                                                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-snug mt-0.5">
+                                                                    <div className="p-3.5 rounded-xl bg-linear-to-br from-blue-500/10 via-indigo-500/5 to-cyan-500/10 border border-blue-200/60 dark:border-cyan-900/40 shadow-xs">
+                                                                        {/* 頂部 Header */}
+                                                                        <div className="flex items-center gap-3 pb-2.5 mb-2.5 border-b border-blue-100/80 dark:border-slate-800/80">
+                                                                            <div className="relative shrink-0">
+                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                                <img
+                                                                                    src="/images/ryan-bot-hero.webp"
+                                                                                    alt="Ryan AI Companion"
+                                                                                    className="w-11 h-11 object-contain drop-shadow-[0_4px_12px_rgba(6,182,212,0.3)]"
+                                                                                />
+                                                                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900" />
+                                                                            </div>
+                                                                            <div className="min-w-0">
+                                                                                <div className="flex items-center gap-1.5">
+                                                                                    <h4 className="font-semibold text-xs text-blue-700 dark:text-cyan-400">
+                                                                                        {zh ? 'Ryan AI 隨行旅伴' : 'Ryan AI Companion'}
+                                                                                    </h4>
+                                                                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/20">
+                                                                                        Online
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                                                    {t('ai_subtitle')}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* 迎賓內容 Markdown 渲染 */}
+                                                                        <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed [&_p]:my-1.5 [&_strong]:text-blue-700 dark:[&_strong]:text-cyan-300 [&_strong]:font-semibold [&_ul]:my-1.5 [&_ul]:space-y-1 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:leading-normal">
+                                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                                                 {t('ai_greet_msg')}
-                                                                            </p>
+                                                                            </ReactMarkdown>
+                                                                        </div>
+
+                                                                        {/* 🆕 快捷提示詞膠囊按鈕 */}
+                                                                        <div className="mt-3 pt-2.5 border-t border-blue-100/60 dark:border-slate-800/60 flex flex-wrap gap-1.5">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setInput(t('ai_quick_checkup' as TranslationKey) || "幫我看這行程順不順？")
+                                                                                    textareaRef.current?.focus()
+                                                                                }}
+                                                                                className="text-[11px] px-2.5 py-1 rounded-full bg-white/80 dark:bg-slate-800/80 text-blue-600 dark:text-cyan-300 border border-blue-200/80 dark:border-cyan-800/60 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors cursor-pointer active:scale-95 shadow-2xs font-medium flex items-center gap-1"
+                                                                            >
+                                                                                🩺 {t('ai_quick_checkup' as TranslationKey) || "幫我看這行程順不順？"}
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setInput(t('ai_quick_food' as TranslationKey) || "推薦這附近必吃美食")
+                                                                                    textareaRef.current?.focus()
+                                                                                }}
+                                                                                className="text-[11px] px-2.5 py-1 rounded-full bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer active:scale-95 shadow-2xs flex items-center gap-1"
+                                                                            >
+                                                                                🍜 {t('ai_quick_food' as TranslationKey) || "推薦這附近必吃美食"}
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setInput(t('ai_quick_traffic' as TranslationKey) || "今天行程交通怎麼搭最順？")
+                                                                                    textareaRef.current?.focus()
+                                                                                }}
+                                                                                className="text-[11px] px-2.5 py-1 rounded-full bg-white/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer active:scale-95 shadow-2xs flex items-center gap-1"
+                                                                            >
+                                                                                🚇 {t('ai_quick_traffic' as TranslationKey) || "今天行程交通怎麼搭？"}
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 </div>

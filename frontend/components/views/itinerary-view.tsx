@@ -56,9 +56,21 @@ function getDayData<T>(data: Record<number | string, T> | undefined, day: number
 export function ItineraryView() {
     const { t } = useLanguage()
     const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading, handleTripNotFound } = useTripContext()
-    const setFocusedDay = useTripStore((s) => s.setFocusedDay)
-    const focusedDay = useTripStore((s) => s.focusedDay)
-    const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
+    const day = useTripStore((s) => s.focusedDay)
+    const setDay = useTripStore((s) => s.setFocusedDay)
+    const [viewMode, setViewMode] = useState<'list' | 'detail'>(() => {
+        if (typeof window !== "undefined") {
+            const search = window.location.search
+            if (search && new URLSearchParams(search).has("trip")) {
+                return 'detail'
+            }
+            const pending = sessionStorage.getItem("pending_deep_link")
+            if (pending && new URLSearchParams(pending.startsWith("?") ? pending : `?${pending}`).has("trip")) {
+                return 'detail'
+            }
+        }
+        return 'list'
+    })
 
     // 🆕 Hyper-Heuristics: Dynamic Polling Interval
     const refreshInterval = useDynamicPolling()
@@ -136,9 +148,6 @@ export function ItineraryView() {
         }
     }
 
-
-    const [day, setDay] = useState(focusedDay ?? 1)
-
     // 🆕 2026: Integrated global refresh event listener
     useEffect(() => {
         const handleRefresh = () => {
@@ -150,19 +159,14 @@ export function ItineraryView() {
         return () => window.removeEventListener('refresh-active-view', handleRefresh)
     }, [reloadTripDetail, reloadTrips])
 
-    // 🧭 監聽 store 外部 (如 DeepLinkRouter) 對 focusedDay 的變更 (含 day=0 總覽)
+    // 🧭 監聽 Deep Link 喚起特定行程詳情事件 (定向導航)
     useEffect(() => {
-        if (focusedDay !== undefined && focusedDay !== null && focusedDay !== day) {
-            setDay(focusedDay)
+        const handleOpenDetail = () => {
+            setViewMode('detail')
         }
-    }, [focusedDay, day])
-
-    // 🆕 2026: Sync local day to global store for AI Adaptive Resolution
-    useEffect(() => {
-        if (useTripStore.getState().focusedDay !== day) {
-            setFocusedDay(day)
-        }
-    }, [day, setFocusedDay])
+        window.addEventListener('tabidachi-open-trip-detail', handleOpenDetail)
+        return () => window.removeEventListener('tabidachi-open-trip-detail', handleOpenDetail)
+    }, [])
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')
     const [resolvedLocation, setResolvedLocation] = useState<{ name: string, lat: number, lng: number } | null>(null) // 🆕 統一位置狀態
@@ -258,9 +262,7 @@ export function ItineraryView() {
     // 🔧 FIX: Clear stale data immediately when switching trips (before SWR cache loads)
     // This prevents "ghost date" flash from previous trip's cached data
     useEffect(() => {
-        setDailyLocs({})  // Clear immediately
-        const currentStoreFocused = useTripStore.getState().focusedDay
-        setDay(currentStoreFocused ?? 1) // 保持 deep link 或 store 設定的天數
+        setDailyLocs({})   // Clear immediately
         setWeatherData([]) // Clear weather
     }, [activeTripId])
 
@@ -1290,6 +1292,7 @@ export function ItineraryView() {
                                     isTripsLoading={isTripsLoading}
                                     onSelectTrip={(id) => {
                                         setActiveTripId(id)
+                                        setDay(1)
                                         setViewMode('detail')
                                     }}
                                     onDeleteTrip={handleDeleteTrip}

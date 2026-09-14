@@ -51,6 +51,10 @@ export function useDeepLinkRouter({ onTabChange }: UseDeepLinkRouterOptions) {
                         localStorage.setItem("active_trip_id", tripId)
                     }
                 }
+                // 🧭 Explicit deep link navigation: trigger detail view
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("tabidachi-open-trip-detail", { detail: { tripId } }))
+                }
             }
 
             // 2. Day synchronization (0 = Overview, 1..N = Specific Day)
