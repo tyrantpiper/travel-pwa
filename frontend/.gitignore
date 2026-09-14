@@ -46,6 +46,7 @@ next-env.d.ts
 # PWA files (auto-generated only)
 public/workbox-*.js
 public/worker-*.js
+public/maplibre/
 
 # Quality gate & diagnostic reports
 eslint-*.json

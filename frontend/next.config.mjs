@@ -15,7 +15,6 @@ const nextConfig = {
     experimental: {
         optimizePackageImports: [
             "lucide-react",
-            "maplibre-gl",
             "jspdf",
             "react-virtuoso",
             "@dnd-kit/core",
