@@ -43,6 +43,11 @@
 - **暫時性目標參數脫敏與防震盪機制 (Ephemeral Target Parameter Cleanup)**: 在完成定位調度後，立即使用 `window.history.replaceState` 將 `expense_id` 從網址列拔除，達成「單次消費即銷毀」的冪等性保護，防止使用者 F5 重新整理時反覆重播定位動畫。
 - **氣象解析與城市地理編碼解耦 (Location Resolver Separation)**: 建立獨立的 `location-resolver.ts`，採取階梯式回退查找策略（`Trip Destination ➔ Day 1 First Spot ➔ Country Capital`），避免氣象元件直接侵入行程資料模型，對接 Open-Meteo 免費氣象 API。
 - **CSP Web Worker 同源靜態管線標準化 (MapLibre CSP Worker Pipeline)**: 不為求省事而放寬 CSP 安全標頭（堅決不用 `unsafe-eval` 或動態 blob），以建置期（Build-time Hook `copy-maplibre-worker.mjs`）自動化腳本將 Web Worker 轉換為同源靜態資產，消除嚴格 CSP 下的腳本注入阻擋。
+- **WebKit 匿名文字節點隔離與 Flex 寬度守護 (Text-Node Isolation Architecture)**: 在 Flex 容器中，裸露文字搭配 `truncate` 會在 WebKit 引擎下產生匿名文字方塊（Anonymous Block Box），壓縮同級 `shrink-0` 標籤。架構上確立動態文本必須封裝於獨立 `<span className="truncate">` 節點中，與 `shrink-0` 元素形成明確 DOM 邊界。
+- **iOS 原生鑽取心智模型 (Tap-to-Focus, Tap-again-to-Drilldown)**: 在空間極度受限的行動裝置地圖頂部，杜絕塞入臃腫跳轉按鈕。初次點擊切換天數聚焦軌跡並浮現箭頭，再次點擊已選中項觸發平滑滾動（Smooth Scroll）直達卡片。
+- **WebGL Canvas 與 AssistiveTouch 雙向硬體隔離 (Hardware Composite Decoupling)**: 拖曳節點若直接以 CSS `right/bottom` 修改座標，會誘發主執行緒 Reflow 重繪 WebGL Canvas。地圖容器使用 `transform-gpu will-change-transform` 固定為獨立合成層，拖曳節點動態切換 `willChange: isDragging ? "right, bottom" : "auto"`，達成 60fps 零掉幀。
+- **MapLibre 圖層宣告順序與 `beforeId` 禁忌 (Declarative Layer Precedence)**: 在 React 宣告式地圖架構中，`<Layer>` 是依序加入 MapLibre 樣式表的。禁止在前面圖層宣告 `beforeId` 指向尚未宣告的後續圖層，避免引發 `Cannot add layer before non-existing layer`。應利用自然 JSX 宣告順序建立層次。
+- **景點抽屜容器內錨定原則 (Container-Anchored Sheet Decoupling)**: 在全景或總覽地圖中，景點抽屜必須支援 `isInternal` 模式，將容器限制在地圖內部（`absolute bottom-0`）而非視窗層級（`fixed inset-0`），防止抽屜破壞全域導航列。
 
 ## [Failed Paths]
 - **試圖在 React RootLayout 內嵌 Raw HTML/CSS 假裝原生 Splash (Inline Splash Over-Engineering Trap)**: 在 Next.js App Router 體系下硬塞 90 行 inline <style>、id="pwa-native-splash" 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 manifest.json 自動渲染原生啟動畫面的基本事實。問題本質在於開發模式根本未啟動快取，而非需要用粗暴補丁解決。
@@ -72,6 +77,9 @@
 - **直接在客戶端使用動態 new Worker(URL.createObjectURL(blob)) 的 CSP 阻擋 (Worker Blob CSP Trap)**: 嘗試在客戶端動態封裝 MapLibre Web Worker，在嚴格 CSP 標頭下立即遭瀏覽器安全攔截。教訓：第三方函式庫 Web Worker 必須走同源靜態檔案管道（如 `copy-maplibre-worker.mjs`）派發，杜絕動態 blob 捷徑。
 - **傳統 DOM scrollIntoView 在虛擬化清單下的無效陷阱 (Virtual List Null DOM Trap)**: 嘗試使用 `document.getElementById('expense-' + id)?.scrollIntoView()` 尋找目標項目。在項目數量超過可視區域時，Virtuoso 尚未將其渲染至 DOM 樹中，`document.getElementById` 必為 `null`。教訓：虛擬化滾動引擎必須使用虛擬庫提供的 Ref Handle（`virtuosoRef.current.scrollToIndex`）進行索引計算與滾動。
 - **行程切換無腦重置天數抹除外部深層意圖 (Blind Day-1 Overwrite Trap)**: 在 `itinerary-view.tsx` 中監聽 `[activeTripId]` 並直接調用 `setDay(1)`，導致推播傳入的 `day=0` 總覽參數被瞬間覆寫回第一天。教訓：在多狀態驅動視圖中，狀態重置必須檢查當前全域 Store 是否已有高優先順序的顯式指定值。
+- **Flex 容器未封裝文字直用 `truncate` 引發標籤被擠壓 (WebKit Anonymous Flex Truncation Trap)**: 在 Header 直接使用 `className="flex items-center min-w-0 truncate"` 包覆文字與 `<Badge>`，在 WebKit/iOS 渲染引擎下裸文字包入 Anonymous Block，計算寬度時將同級 `shrink-0` 徽章壓縮或推出可視範圍。教訓：Flex 容器內的文本溢出截斷，務必單獨由子 `<span className="truncate">` 承擔。
+- **未宣告 MapLibre 圖層時指定 `beforeId` 引發渲染引擎崩潰 (Premature beforeId Reference Trap)**: 在 JSX 中宣告底層衛星影像時指定 `beforeId="day-trajectories-layer"`，但該圖層在 JSX 中寫在衛星之後，MapLibre 依序解析引發致命錯誤。教訓：React-map-gl 圖層宣告應善用自然 JSX 階層排列，切忌跨越宣告順序參考不存在的圖層 ID。
+- **拖曳浮動節點誘發 WebGL Canvas 主執行緒 Reflow 掉幀 (Unisolated WebGL Reflow Trap)**: 在同一視圖內，若直接拖曳以 `right/bottom` 定位的 `chat-widget` 圓球，未開啟硬體加速時會誘發 Blink 重新計算佈局並重繪大型地圖 WebGL Canvas，導致掉幀至 20fps。教訓：包含 WebGL 地圖的複雜視圖中，浮動動態節點必須明確宣告 `transform-gpu` 與動態 `will-change`，建立獨立 GPU 合成層。
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
@@ -87,6 +95,8 @@
 - **離線突變樂觀 UI 狀態提示 (Optimistic UI Badge)**: 當使用者於離線狀態新增費用或筆記時，可於 UI 卡片旁標註「等待連線同步中...」的徽章，提升使用者心理安全感。
 - **Service Worker 點擊深層喚起視窗**: 評估在 `sw.js` 的 `notificationclick` 加入 `clients.matchAll` 聚焦已有分頁，減少重複開分頁。
 - **VAPID 密鑰輪轉與 Supabase Webhook 監控**: 需持續觀測雲端 Edge Functions 派發推播的延遲與 410 Gone 回收率。
+- **密集景點 Pin 的碰撞聚合 (POI Clustering)**: 多天總覽地圖疊加全行程數十個景點時，相鄰景點圖示容易重疊。後續需規劃導入 MapLibre 向量圖層原生 `cluster: true` 或依 Zoom Level 動態聚合展開機制。
+- **MapLibre 實例與記憶體生命週期監控 (WebGL Context Lifecycle)**: 切換視圖頻繁時需持續監測 WebGL 上下文釋放情況，確保地圖卸載時完整執行 `map.remove()`，杜絕行動端 Safari 報錯 `Too many active WebGL contexts`。
 
 ## [Vocabulary]
 - **Continuous Multi-Month Calendar**: iOS Swift 風格連續縱向多月份滾動日曆區間選擇器。
@@ -123,4 +133,10 @@
 - **Day-Zero Overview Precedence**: 零天總覽優先順序，外部深度連結指定天數優先於預設第 1 天的狀態調度原則。
 - **Ephemeral Target Parameter Cleanup**: 暫時性目標參數脫敏，消費完成後立即自 URL 抹除參數以達冪等性。
 - **Virtual List Null DOM Trap**: 虛擬列表 DOM 空值陷阱，虛擬化滾動未掛載 DOM 時使用原生選擇器必為 null 的邊界問題。
-- **MapLibre CSP Worker Pipeline**: MapLibre 內容安全策略 Worker 建置管線，將 Web Worker 同源靜態化之架構方案。
+- **MapLibre CSP Worker Pipeline**: MapLibre 內容安全策略 Worker 建置管線，將 Web Worker 同源靜態化之架構方案。
+- **Text-Node Isolation Architecture**: 文本節點隔離架構，Flex 容器內將文字單獨封裝於子 span 避免 WebKit 匿名文字區塊破壞同級排版。
+- **Tap-to-Focus, Tap-again-to-Drilldown**: iOS 鑽取心智模型，首次點擊聚焦軌跡，再次點擊深入平滑滾動至詳情卡片。
+- **Hardware Composite Decoupling**: 雙向硬體合成層解耦，透過 GPU 合成層隔離浮動節點拖曳與底層 WebGL 重繪。
+- **Declarative Layer Precedence**: 宣告式圖層順序優先，利用 JSX 物理順序定義 MapLibre 圖層層次而非無效跨層 beforeId。
+- **Container-Anchored Sheet Decoupling**: 容器錨定抽屜解耦，將抽屜限制於地圖容器內部避免竄出覆蓋全站 Header。
+- **Great-Circle Slerp Interpolation**: 大圓航線球面線性插值，在 2D/3D 平面上以球面幾何學平滑渲染長途跨城軌跡。
