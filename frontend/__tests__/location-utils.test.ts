@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractCoordsFromUrl, isGoogleMapsUrl, isGoogleMapsShortlink } from '@/lib/location-utils'
+import { extractCoordsFromUrl, isGoogleMapsUrl, isGoogleMapsShortlink, getSmartZoomConfig } from '@/lib/location-utils'
 
 describe('extractCoordsFromUrl', () => {
     it('should extract coords from Pattern A (@lat,lng)', () => {
@@ -81,5 +81,35 @@ describe('isGoogleMapsShortlink', () => {
 
     it('should not match standard google.com/maps', () => {
         expect(isGoogleMapsShortlink('https://www.google.com/maps/place/Tokyo')).toBe(false)
+    })
+})
+
+describe('getSmartZoomConfig (Photon 1.3.0 & MapLibre Globe 3D Adapter)', () => {
+    it('should map country (admin_level 2 or type country) to 3D Globe zoom (3.5)', () => {
+        expect(getSmartZoomConfig({ admin_level: 2 })).toEqual({ zoom: 3.5, duration: 2000 })
+        expect(getSmartZoomConfig({ type: 'country' })).toEqual({ zoom: 3.5, duration: 2000 })
+        expect(getSmartZoomConfig({ name: 'Japan', admin_level: 2, type: 'country' })).toEqual({ zoom: 3.5, duration: 2000 })
+    })
+
+    it('should map state / province (admin_level 3-4) to regional zoom (6.5)', () => {
+        expect(getSmartZoomConfig({ admin_level: 4 })).toEqual({ zoom: 6.5, duration: 1800 })
+        expect(getSmartZoomConfig({ type: 'province' })).toEqual({ zoom: 6.5, duration: 1800 })
+        expect(getSmartZoomConfig({ type: 'state' })).toEqual({ zoom: 6.5, duration: 1800 })
+    })
+
+    it('should map city / county (admin_level 5-6) to metro zoom (10.5)', () => {
+        expect(getSmartZoomConfig({ admin_level: 6 })).toEqual({ zoom: 10.5, duration: 1600 })
+        expect(getSmartZoomConfig({ type: 'city' })).toEqual({ zoom: 10.5, duration: 1600 })
+    })
+
+    it('should map district / town (admin_level 7-8) to locality zoom (13.5)', () => {
+        expect(getSmartZoomConfig({ admin_level: 8 })).toEqual({ zoom: 13.5, duration: 1400 })
+        expect(getSmartZoomConfig({ type: 'town' })).toEqual({ zoom: 13.5, duration: 1400 })
+    })
+
+    it('should fallback to street-level POI zoom (16.5) when admin_level is null or generic POI', () => {
+        expect(getSmartZoomConfig({})).toEqual({ zoom: 16.5, duration: 1200 })
+        expect(getSmartZoomConfig({ name: 'Tokyo Tower', type: 'apartments', admin_level: null })).toEqual({ zoom: 16.5, duration: 1200 })
+        expect(getSmartZoomConfig({ name: 'Sensoji', type: 'tourism', admin_level: undefined })).toEqual({ zoom: 16.5, duration: 1200 })
     })
 })
