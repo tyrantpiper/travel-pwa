@@ -285,35 +285,35 @@ export function TripMasterOverview({
                             className="bg-white dark:bg-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md border border-slate-200/80 dark:border-slate-700 transition-all group"
                         >
                             {/* Day Header Row */}
-                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3 mb-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl flex flex-col items-center justify-center font-bold shadow-sm">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/60 pb-3 mb-3 gap-2">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-12 h-12 shrink-0 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-xl flex flex-col items-center justify-center font-bold shadow-sm">
                                         <span className="text-[10px] opacity-75 leading-tight">{week}</span>
                                         <span className="text-sm font-extrabold leading-tight">D{d}</span>
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100 whitespace-nowrap">
                                                 Day {d} · {date}
                                             </h3>
                                             {dailyLocation && (
-                                                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800 flex items-center gap-1">
+                                                <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800 flex items-center gap-1 shrink-0">
                                                     <MapPin className="w-3 h-3" />
                                                     {dailyLocation.split(",")[0].trim()}
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
                                             {activities.length} {t('ov_total_spots')}
                                             {dayTotalCost > 0 && ` · ${t('ov_daily_estimated_cost')}: ${dayTotalCost.toLocaleString()} ${metrics.currency || "TWD"}`}
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Jump to Day Button */}
+                                {/* Jump to Day Button - Compact Details with Arrow */}
                                 <button
                                     onClick={() => onSelectDay(d)}
-                                    className="min-h-11 min-w-11 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 flex items-center gap-1.5 transition-all group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 active:scale-95 cursor-pointer"
+                                    className="shrink-0 px-2.5 py-1 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 flex items-center gap-1 transition-all group-hover:bg-slate-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 active:scale-95 cursor-pointer whitespace-nowrap shadow-2xs"
                                     aria-label={`Jump to Day ${d}`}
                                 >
                                     <span>{t('ov_view_day')}</span>

@@ -35,7 +35,7 @@ export function LedgerClient({ code }: { code: string }) {
 
         const fetchLedger = async () => {
             try {
-                const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+                const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
                 const res = await fetch(`${API_BASE}/api/ledger/${code}`)
                 if (!res.ok) {
                     throw new Error("Not Found")

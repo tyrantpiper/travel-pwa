@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
         // 4. Send to Python Backend /api/ai/parse_receipt
         // Note: Using NEXT_PUBLIC_API_URL or environment variable for the backend
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008";
 
         // Pass along the authorization token from the request headers
         const authHeader = request.headers.get("authorization");

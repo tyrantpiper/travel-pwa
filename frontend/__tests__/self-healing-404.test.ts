@@ -53,4 +53,30 @@ describe('Self-Healing 404 Guard & HttpError Tests', () => {
         // Ensure toast.error WAS called for 500
         expect(toast.error).toHaveBeenCalledWith('伺服器連線失敗，請稍後再試 (Server connection failed)')
     })
+
+    it('TC-4: fetcherWithUserId gracefully wraps TypeError("Failed to fetch") into HttpError(0) without console.error fatal blast', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+        const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+        // Mock global fetch rejecting with network TypeError
+        global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+        await expect(fetcherWithUserId(['/api/trips', 'user-123'])).rejects.toMatchObject({
+            name: 'HttpError',
+            status: 0,
+            message: 'Failed to fetch',
+            data: { offline: true }
+        })
+
+        // Ensure console.error was NOT called (preventing Turbopack fatal overlay)
+        expect(consoleErrorSpy).not.toHaveBeenCalled()
+        // Ensure graceful warn was recorded
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[Fetcher] Network degradation or offline:'),
+            'Failed to fetch'
+        )
+
+        consoleErrorSpy.mockRestore()
+        consoleWarnSpy.mockRestore()
+    })
 })
