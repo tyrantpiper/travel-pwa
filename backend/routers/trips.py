@@ -274,19 +274,17 @@ async def get_trip_by_id(
             except Exception as e:
                 print(f"⚠️ Failed to auto-migrate public_id: {e} (Maybe column missing?)")
 
-        # 🆕 判斷是否為成員 (擁有者或透過 Share Code 加入)
-        is_member = False
-        if user_id:
-            member_res = supabase.table("trip_members").select("user_id").eq("itinerary_id", trip_id).eq("user_id", user_id).execute()
-            is_member = len(member_res.data) > 0
-            print(f"🔍 [DEBUG] user_id={user_id}, trip_id={trip_id}, member_query_result={member_res.data}, is_member={is_member}")
-        else:
-            print(f"🔍 [DEBUG] No user_id provided, treating as non-member")
-        
-        # 🆕 取得所有成員 (用於成員列表功能)
+        # 🆕 取得所有成員 (整合查詢：一次性抓取全員，並在記憶體完成「成員 + 創立者」雙重核驗，節省 1 次海外 HTTP RTT)
         all_members_res = supabase.table("trip_members").select("user_id, user_name, user_avatar").eq("itinerary_id", trip_id).execute()
         members = all_members_res.data or []
         created_by = trip.get("created_by", "")
+        
+        is_member = False
+        if user_id:
+            is_member = (user_id == created_by) or any(m.get("user_id") == user_id for m in members)
+            print(f"🔍 [Trips] user_id={user_id}, is_creator={user_id == created_by}, is_member={is_member}")
+        else:
+            print(f"🔍 [Trips] No user_id provided, treating as non-member")
         
         # 2. 抓該行程的所有細項 (按 time_slot 排序，確保符合時間軸)
         items_res = supabase.table("itinerary_items").select("*").eq("itinerary_id", trip["id"]).order("day_number").order("time_slot").order("sort_order").execute()
@@ -1549,6 +1547,8 @@ async def create_item(
         
         print(f"✅ 單筆行程新增成功：{request.place_name}")
         return {"status": "success", "data": res.data}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"🔥 Create Item Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1747,10 +1747,10 @@ async def delete_item(
     """🗑️ 刪除單一細項"""
     print(f"🗑️ 嘗試刪除細項 {item_id}, user={user_id}")
     try:
-        # 🛡️ 權限檢查
-        item_check = supabase.table("itinerary_items").select("itinerary_id").eq("id", item_id).single().execute()
-        if item_check.data:
-            tid = item_check.data["itinerary_id"]
+        # 🛡️ 權限檢查 (非 single() 查詢，確保項目已刪除時具備天然冪等性)
+        item_check = supabase.table("itinerary_items").select("itinerary_id").eq("id", item_id).execute()
+        if item_check.data and len(item_check.data) > 0:
+            tid = item_check.data[0]["itinerary_id"]
             member_check = supabase.table("trip_members").select("user_id").eq("itinerary_id", tid).eq("user_id", user_id).execute()
             if not member_check.data:
                  raise HTTPException(status_code=403, detail="您沒有權限刪除此項目")
@@ -1758,12 +1758,14 @@ async def delete_item(
         res = supabase.table("itinerary_items").delete().eq("id", item_id).execute()
         
         if not res.data:
-             print(f"❌ 刪除失敗：找不到 ID {item_id}")
-             # 這裡不噴錯，因為可能已經被刪掉了
+             print(f"ℹ️ 刪除略過：找不到 ID {item_id} (已處於已刪除狀態)")
+             # 這裡不噴錯，滿足冪等性 (Idempotency)
              return {"status": "success", "message": "Item might already be deleted"}
              
-        print("✅ 刪除成功")
+        print(f"✅ 刪除成功：{item_id}")
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"🔥 Delete Item Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
