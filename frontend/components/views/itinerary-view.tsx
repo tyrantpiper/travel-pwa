@@ -57,6 +57,7 @@ export function ItineraryView() {
     const { t } = useLanguage()
     const { activeTripId, mutate: reloadTrips, userId, trips, setActiveTripId, isLoading: isTripsLoading, handleTripNotFound } = useTripContext()
     const setFocusedDay = useTripStore((s) => s.setFocusedDay)
+    const focusedDay = useTripStore((s) => s.focusedDay)
     const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
 
     // 🆕 Hyper-Heuristics: Dynamic Polling Interval
@@ -136,7 +137,7 @@ export function ItineraryView() {
     }
 
 
-    const [day, setDay] = useState(1)
+    const [day, setDay] = useState(focusedDay ?? 1)
 
     // 🆕 2026: Integrated global refresh event listener
     useEffect(() => {
@@ -149,9 +150,18 @@ export function ItineraryView() {
         return () => window.removeEventListener('refresh-active-view', handleRefresh)
     }, [reloadTripDetail, reloadTrips])
 
+    // 🧭 監聽 store 外部 (如 DeepLinkRouter) 對 focusedDay 的變更 (含 day=0 總覽)
+    useEffect(() => {
+        if (focusedDay !== undefined && focusedDay !== null && focusedDay !== day) {
+            setDay(focusedDay)
+        }
+    }, [focusedDay, day])
+
     // 🆕 2026: Sync local day to global store for AI Adaptive Resolution
     useEffect(() => {
-        setFocusedDay(day)
+        if (useTripStore.getState().focusedDay !== day) {
+            setFocusedDay(day)
+        }
     }, [day, setFocusedDay])
     const [weatherData, setWeatherData] = useState<DayWeather[]>([])
     const [weatherMode, setWeatherMode] = useState<'live' | 'forecast' | 'seasonal' | 'trend'>('live')
@@ -249,7 +259,8 @@ export function ItineraryView() {
     // This prevents "ghost date" flash from previous trip's cached data
     useEffect(() => {
         setDailyLocs({})  // Clear immediately
-        setDay(1)         // Reset to day 1
+        const currentStoreFocused = useTripStore.getState().focusedDay
+        setDay(currentStoreFocused ?? 1) // 保持 deep link 或 store 設定的天數
         setWeatherData([]) // Clear weather
     }, [activeTripId])
 

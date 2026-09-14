@@ -29,8 +29,9 @@ import { useTripContext } from "@/lib/trip-context"
 import { encryptData, decryptData, getSecureApiKey } from "@/lib/security"
 import { TripSwitcher } from "@/components/trip-switcher"
 import { ZenRenew } from "@/components/ui/zen-renew"
-import { Virtuoso } from "react-virtuoso"
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso"
 import { useExpenses, useHaptic, useTripDetail } from "@/lib/hooks"
+import { useTargetExpenseId, useTripStore } from "@/lib/stores/tripStore"
 import { debugLog } from "@/lib/debug"
 import { ExpenseDialog } from "@/components/expense-dialog"
 import { expensesApi, tripsApi, aiApi } from "@/lib/api"
@@ -98,6 +99,7 @@ interface ExpenseItemProps {
     members?: TripMember[]
     onEdit: (item: Expense) => void
     onDelete: (id: string) => void
+    isHighlighted?: boolean
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -230,6 +232,55 @@ export function ToolsView() {
     const [selectedDate, setSelectedDate] = useState<string>("")
     // 🆕 Chart Filtering State
     const [activeCategory, setActiveCategory] = useState<string | null>(null)
+
+    // 🧭 Deep Link target and virtual scroll ref
+    const virtuosoRef = useRef<VirtuosoHandle>(null)
+    const targetExpenseId = useTargetExpenseId()
+    const setTargetExpenseId = useTripStore((s) => s.setTargetExpenseId)
+    const [highlightedExpenseId, setHighlightedExpenseId] = useState<string | null>(null)
+
+    // 🎯 深度連結 (Deep Link) 虛擬滾動定位與發光高亮機制
+    useEffect(() => {
+        if (!targetExpenseId || expenses.length === 0) return
+
+        // 1. 確保切換至記帳頁籤
+        if (activeSection !== 'expense') {
+            setActiveSection('expense')
+        }
+
+        // 2. 篩選器穿透 (Filter Auto-Reset) - 防止條件遮蔽目標記帳
+        if (ownerFilter !== 'all') setOwnerFilter('all')
+        if (activeCategory !== null) setActiveCategory(null)
+        if (expenseView !== 'summary') setExpenseView('summary')
+
+        // 3. 虛擬滾動尋址
+        const targetIndex = expenses.findIndex(e => e.id === targetExpenseId)
+        if (targetIndex !== -1) {
+            debugLog("🎯 [ToolsView] Deep link target expense located at index:", targetIndex, targetExpenseId)
+            
+            // 延遲等待 Virtuoso DOM 節點與列表布局就緒
+            const scrollTimer = setTimeout(() => {
+                virtuosoRef.current?.scrollToIndex({
+                    index: targetIndex,
+                    align: 'center',
+                    behavior: 'smooth'
+                })
+            }, 120)
+
+            setHighlightedExpenseId(targetExpenseId)
+
+            // 3.5 秒後淡出發光效果並釋放 targetExpenseId
+            const clearTimer = setTimeout(() => {
+                setHighlightedExpenseId(null)
+                setTargetExpenseId(null)
+            }, 3500)
+
+            return () => {
+                clearTimeout(scrollTimer)
+                clearTimeout(clearTimer)
+            }
+        }
+    }, [targetExpenseId, expenses, activeSection, ownerFilter, activeCategory, expenseView, setTargetExpenseId])
 
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -1083,6 +1134,7 @@ export function ToolsView() {
                                 {/* Expense List (Virtualized) */}
                                 <div className="space-y-2 h-[50vh]">
                                     <Virtuoso
+                                        ref={virtuosoRef}
                                         style={{ height: '100%' }}
                                         scrollerRef={(ref) => {
                                             if (ref instanceof HTMLElement) scrollerRef.current = ref
@@ -1099,6 +1151,7 @@ export function ToolsView() {
                                                     members={activeTrip?.members}
                                                     onEdit={openEditDialog}
                                                     onDelete={handleDeleteExpense}
+                                                    isHighlighted={highlightedExpenseId === item.id}
                                                 />
                                             </div>
                                         )}
@@ -1563,7 +1616,7 @@ export function ToolsView() {
     )
 }
 
-const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onDelete }: ExpenseItemProps) {
+const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onDelete, isHighlighted }: ExpenseItemProps) {
     const { t } = useLanguage()
     const methodInfo = PAYMENT_METHODS.find(m => m.id === item.payment_method) || PAYMENT_METHODS[0]
     const catInfo = CATEGORIES[item.category as keyof typeof CATEGORIES] || CATEGORIES['general']
@@ -1581,7 +1634,12 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
         : (item.payer_name || (item.payer_id && !item.payer_id.includes('-') ? item.payer_id : null) || item.creator_name || null)
 
     return (
-        <div className="flex flex-col p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm group transition-colors">
+        <div className={cn(
+            "flex flex-col p-3 rounded-xl border shadow-sm group transition-all duration-500",
+            isHighlighted
+                ? "ring-2 ring-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 shadow-lg shadow-emerald-500/20 scale-[1.01]"
+                : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+        )}>
             <div className="flex justify-between items-center w-full">
                 <div className="flex items-center gap-3 overflow-hidden">
                     <div className={cn("p-2 rounded-full shrink-0 flex items-center justify-center min-w-8 min-h-8", catInfo.color)}>

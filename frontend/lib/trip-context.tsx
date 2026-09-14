@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, ReactNode, useTransition, useCallback } from "react"
+import { toast } from "sonner"
 import { useTrips } from "./hooks"
 import { useTripStore } from "./stores/tripStore"
 import { sampleTripApi } from "./api"
@@ -168,6 +169,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
                     const tripExists = trips.some((t: { id: string }) => t.id === activeTripId)
                     if (!tripExists) {
                         console.log("⚠️ 快取的行程已刪除，自動選擇最新行程")
+                        toast.warning("該行程不存在或無存取權限，已切換至預設行程")
                         deleteTripSnapshot(activeTripId)
                         const latestTrip = trips[0]
                         setActiveTripId(latestTrip.id)
