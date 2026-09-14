@@ -162,43 +162,27 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
             <div className="my-6 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm will-change-transform transform-gpu">
                 {/* 頂部操作列 */}
                 <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
                             <Route className="w-4.5 h-4.5" />
                         </div>
-                        <div className="min-w-0">
-                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 truncate">
-                                {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                                    {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
+                                </span>
                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 shrink-0">
                                     {validPoints.length} {zh ? "個景點" : "Spots"}
                                 </span>
-                            </h4>
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
+                            </div>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
                                 {zh ? "各天彩帶分色 · 支援自由縮放與漫遊" : "Multi-Day Routes · Zoom & Pan freely"}
                             </p>
                         </div>
                     </div>
 
-                    {/* 右側操作按鈕群 */}
+                    {/* 右側操作按鈕群 (僅保留全景置中與底圖切換，空間極致寬裕) */}
                     <div className="flex items-center gap-1.5 shrink-0">
-                        {activeDay !== 0 && (onScrollToDay || onSelectDay) && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (onScrollToDay) {
-                                        onScrollToDay(activeDay)
-                                    } else if (onSelectDay) {
-                                        onSelectDay(activeDay)
-                                    }
-                                }}
-                                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                                aria-label={`View Day ${activeDay} card`}
-                            >
-                                <span>{zh ? `跳轉 D${activeDay}` : `Day ${activeDay}`}</span>
-                                <ArrowRight className="w-3 h-3" />
-                            </button>
-                        )}
-
                         {/* 視野全景置中 */}
                         <button
                             type="button"
@@ -227,29 +211,55 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                     </div>
                 </div>
 
-                {/* 天數切換膠囊橫向導航列 */}
+                {/* 天數切換膠囊橫向導航列 (支援 iOS Swift 風格 Tap-to-Focus / Tap-again-to-Drill-down) */}
                 <div className="px-3 py-2 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800/60 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
                     {dayTabs.map(dayNum => {
                         const isSelected = activeDay === dayNum
+                        const isDay = dayNum !== 0
                         const dayColor = getDayColor(dayNum)
                         return (
                             <button
                                 key={dayNum}
                                 type="button"
-                                onClick={() => handleSelectDayFilter(dayNum)}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                onClick={() => {
+                                    if (isSelected && isDay) {
+                                        // 再次點選已選中天數：平滑滾動至該天卡片
+                                        if (onScrollToDay) {
+                                            onScrollToDay(dayNum)
+                                        } else if (onSelectDay) {
+                                            onSelectDay(dayNum)
+                                        }
+                                    } else {
+                                        // 首次點選：地圖聚焦該天軌跡
+                                        handleSelectDayFilter(dayNum)
+                                    }
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-200 shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
                                     isSelected
                                         ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs"
                                         : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
                                 }`}
+                                aria-label={
+                                    isSelected && isDay
+                                        ? (zh ? `再次點擊跳轉至 Day ${dayNum} 卡片` : `Tap again to view Day ${dayNum}`)
+                                        : (zh ? `切換至 Day ${dayNum}` : `Select Day ${dayNum}`)
+                                }
+                                title={
+                                    isSelected && isDay
+                                        ? (zh ? `再次點擊跳轉至 Day ${dayNum} 卡片` : `Tap again to view Day ${dayNum}`)
+                                        : undefined
+                                }
                             >
-                                {dayNum !== 0 && (
+                                {isDay && (
                                     <span
-                                        className="w-2 h-2 rounded-full"
+                                        className="w-2 h-2 rounded-full shrink-0"
                                         style={{ backgroundColor: dayColor }}
                                     />
                                 )}
                                 <span>{dayNum === 0 ? (zh ? "全部 (ALL)" : "ALL") : `Day ${dayNum}`}</span>
+                                {isSelected && isDay && (
+                                    <ArrowRight className="w-3 h-3 text-indigo-400 dark:text-indigo-600 shrink-0" />
+                                )}
                             </button>
                         )
                     })}
