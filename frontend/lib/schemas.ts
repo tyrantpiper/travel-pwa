@@ -150,6 +150,9 @@ export const GeocodeResultSchema = z.object({
     address: z.string().optional().nullable(),
     type: z.string().optional().nullable(),
     source: z.string().optional().nullable(),
+    admin_level: z.coerce.number().optional().nullable(),
+    osm_key: z.string().optional().nullable(),
+    extent: z.array(z.number()).optional().nullable(),
 });
 
 export const GeocodeResponseSchema = z.object({

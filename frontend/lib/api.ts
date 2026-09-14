@@ -892,9 +892,7 @@ export const geocodeApi = {
         // ... (rest of search logic) ... 
         // Geocode is read-only, so we keep using fetch directly, or use offlineFetch if we want to cache queries (Phase 8)
 
-        const geminiKey = typeof window !== 'undefined'
-            ? localStorage.getItem("user_gemini_key")
-            : null
+        const geminiKey = getSecureApiKey()
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json"
@@ -935,9 +933,7 @@ export const geocodeApi = {
 
     /** 📍 Resolve structured address using Nominatim (2026 High-Fidelity) */
     resolveAddress: async (address: string) => {
-        const geminiKey = typeof window !== 'undefined'
-            ? localStorage.getItem("user_gemini_key")
-            : null
+        const geminiKey = getSecureApiKey()
         const headers: Record<string, string> = {
             "Content-Type": "application/json"
         }

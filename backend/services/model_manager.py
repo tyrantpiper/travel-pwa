@@ -26,9 +26,12 @@ from typing import Optional, List, Dict, Any, Union, Tuple
 from utils.ai_config import (
     DAILY_ROUTING,
     HEAVY_ROUTING,
+    GEOCODE_ROUTING,
     WORKHORSE_MODEL,
+    WORKHORSE_MOE,
     WORKHORSE_PENULTIMATE,
     WORKHORSE_ULTIMATE,
+    WORKHORSE_ROUTING,
 )
 
 
@@ -49,6 +52,16 @@ class ModelCaps:
 
 
 MODEL_CAPS: Dict[str, ModelCaps] = {
+    "gemini-3.8-flash": ModelCaps(
+        supports_schema=True,
+        supports_tools=True,       # 🟢 啟用頂級神經連結能力
+        supports_media_resolution=True,
+        supports_thinking=True,    # 🚀 1,048,576 (1M) Tokens 超長上下文與長鏈推論
+        supports_grounding=True,   # 🚀 Google Search & Maps Grounding
+        requires_property_ordering=False,
+        allow_extraction_fallback=True,
+        family="gemini",
+    ),
     "gemini-3.7-flash": ModelCaps(
         supports_schema=True,
         supports_tools=True,       # 🟢 啟用頂級神經連結能力
@@ -134,7 +147,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=True,
         supports_media_resolution=True,
         supports_thinking=True,
-        supports_grounding=True,
+        supports_grounding=False,
         requires_property_ordering=False,
         allow_extraction_fallback=False,
         family="gemma",
@@ -144,7 +157,7 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
         supports_tools=True,
         supports_media_resolution=True,
         supports_thinking=False,
-        supports_grounding=True,
+        supports_grounding=False,
         requires_property_ordering=False,
         allow_extraction_fallback=False,
         family="gemma",
@@ -153,80 +166,130 @@ MODEL_CAPS: Dict[str, ModelCaps] = {
 
 # 宣告 AI 可用的神經連結卡片 (Neural Link Tools)
 # 🔒 必須使用 types.Tool(function_declarations=[...]) 包裝，裸列表會被 SDK 忽略
-NEURAL_LINK_TOOLS = [
-    types.Tool(
-        function_declarations=[
-            types.FunctionDeclaration(
-                name="add_itinerary_item",
-                description="Add a new point of interest to the user's itinerary for a specific day. Include as much detail as possible.",
-                parameters=types.Schema(
+
+ADD_ITINERARY_DECL = types.FunctionDeclaration(
+    name="add_itinerary_item",
+    description="Add one or multiple points of interest to the user's itinerary for a specific day. Include as much detail as possible. When adding multiple places, use the 'items' array.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
+            "place_name": types.Schema(type=types.Type.STRING, description="Name of the place"),
+            "category": types.Schema(type=types.Type.STRING, description="Category: restaurant, attraction, hotel, transport, shopping, cafe, bar, park, museum, temple, etc."),
+            "desc": types.Schema(type=types.Type.STRING, description="Brief description of the place (1-2 sentences)"),
+            "lat": types.Schema(type=types.Type.NUMBER, description="Latitude coordinate of the place"),
+            "lng": types.Schema(type=types.Type.NUMBER, description="Longitude coordinate of the place"),
+            "time_slot": types.Schema(type=types.Type.STRING, description="Suggested visit time in HH:MM format (e.g., '10:00', '14:30')"),
+            "duration": types.Schema(type=types.Type.STRING, description="Estimated visit duration (e.g., '1-2 hours', '30 min')"),
+            "rating": types.Schema(type=types.Type.NUMBER, description="Place rating from 0.0 to 5.0 if known"),
+            "estimated_cost": types.Schema(type=types.Type.INTEGER, description="Estimated cost in local currency"),
+            "link_url": types.Schema(type=types.Type.STRING, description="Official website URL or relevant link for the place (e.g., 'https://www.senso-ji.jp/')"),
+            "sub_items": types.Schema(
+                type=types.Type.ARRAY,
+                description="List of notable sub-items: recommended dishes for restaurants, must-see exhibits for museums, key shops for malls, etc.",
+                items=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "name": types.Schema(type=types.Type.STRING, description="Sub-item name (e.g., 'Tonkotsu Ramen', 'Mona Lisa')"),
+                        "desc": types.Schema(type=types.Type.STRING, description="Brief note about this sub-item"),
+                        "link": types.Schema(type=types.Type.STRING, description="URL for this sub-item if available"),
+                    },
+                    required=["name"]
+                )
+            ),
+            "items": types.Schema(
+                type=types.Type.ARRAY,
+                description="List of POI items when adding multiple activities at once. Each object contains day, place_name, category, desc, lat, lng, time_slot, duration, rating, etc.",
+                items=types.Schema(
                     type=types.Type.OBJECT,
                     properties={
                         "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
                         "place_name": types.Schema(type=types.Type.STRING, description="Name of the place"),
-                        "category": types.Schema(type=types.Type.STRING, description="Category: restaurant, attraction, hotel, transport, shopping, cafe, bar, park, museum, temple, etc."),
-                        "desc": types.Schema(type=types.Type.STRING, description="Brief description of the place (1-2 sentences)"),
-                        "lat": types.Schema(type=types.Type.NUMBER, description="Latitude coordinate of the place"),
-                        "lng": types.Schema(type=types.Type.NUMBER, description="Longitude coordinate of the place"),
-                        "time_slot": types.Schema(type=types.Type.STRING, description="Suggested visit time in HH:MM format (e.g., '10:00', '14:30')"),
-                        "duration": types.Schema(type=types.Type.STRING, description="Estimated visit duration (e.g., '1-2 hours', '30 min')"),
-                        "rating": types.Schema(type=types.Type.NUMBER, description="Place rating from 0.0 to 5.0 if known"),
-                        "estimated_cost": types.Schema(type=types.Type.INTEGER, description="Estimated cost in local currency"),
-                        "link_url": types.Schema(type=types.Type.STRING, description="Official website URL or relevant link for the place (e.g., 'https://www.senso-ji.jp/')"),
-                        "sub_items": types.Schema(
-                            type=types.Type.ARRAY,
-                            description="List of notable sub-items: recommended dishes for restaurants, must-see exhibits for museums, key shops for malls, etc.",
-                            items=types.Schema(
-                                type=types.Type.OBJECT,
-                                properties={
-                                    "name": types.Schema(type=types.Type.STRING, description="Sub-item name (e.g., 'Tonkotsu Ramen', 'Mona Lisa')"),
-                                    "desc": types.Schema(type=types.Type.STRING, description="Brief note about this sub-item"),
-                                    "link": types.Schema(type=types.Type.STRING, description="URL for this sub-item if available"),
-                                },
-                                required=["name"]
-                            )
-                        ),
+                        "category": types.Schema(type=types.Type.STRING, description="Category: restaurant, attraction, etc."),
+                        "desc": types.Schema(type=types.Type.STRING, description="Brief description"),
+                        "lat": types.Schema(type=types.Type.NUMBER),
+                        "lng": types.Schema(type=types.Type.NUMBER),
+                        "time_slot": types.Schema(type=types.Type.STRING, description="Suggested visit time in HH:MM format"),
+                        "duration": types.Schema(type=types.Type.STRING),
+                        "rating": types.Schema(type=types.Type.NUMBER),
+                        "estimated_cost": types.Schema(type=types.Type.INTEGER),
+                        "link_url": types.Schema(type=types.Type.STRING),
                     },
-                    required=["day", "place_name", "category", "lat", "lng", "desc"]
+                    required=["place_name"]
                 )
-            ),
-            types.FunctionDeclaration(
-                name="add_expense",
-                description="Add a new estimated expense to the user's daily budget.",
-                parameters=types.Schema(
+            )
+        }
+    )
+)
+
+REMOVE_ITINERARY_DECL = types.FunctionDeclaration(
+    name="remove_itinerary_item",
+    description="Propose removing a specific activity or place from the user's current itinerary.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "place_name": types.Schema(type=types.Type.STRING, description="Name of the place or activity to remove"),
+            "day": types.Schema(type=types.Type.INTEGER, description="Day number if specified by user (1-indexed)"),
+            "item_id": types.Schema(type=types.Type.STRING, description="Item ID if known from conversation context"),
+            "reason": types.Schema(type=types.Type.STRING, description="Brief reason for removal")
+        },
+        required=["place_name"]
+    )
+)
+
+ADD_EXPENSE_DECL = types.FunctionDeclaration(
+    name="add_expense",
+    description="Add a new estimated expense to the user's daily budget.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
+            "title": types.Schema(type=types.Type.STRING, description="Description of the expense"),
+            "amount": types.Schema(type=types.Type.NUMBER, description="Amount in local currency (supports decimals)"),
+            "currency": types.Schema(type=types.Type.STRING, description="Currency code (e.g., 'JPY', 'USD', 'TWD')"),
+            "category": types.Schema(type=types.Type.STRING, description="Expense category: food, transport, accommodation, ticket, shopping, other"),
+            "payment_method": types.Schema(type=types.Type.STRING, description="Payment method: cash, card, ic_card, other"),
+            "notes": types.Schema(type=types.Type.STRING, description="Additional notes about the expense"),
+            "items": types.Schema(
+                type=types.Type.ARRAY,
+                description="Itemized breakdown of the expense (e.g., individual dishes, tickets, products)",
+                items=types.Schema(
                     type=types.Type.OBJECT,
                     properties={
-                        "day": types.Schema(type=types.Type.INTEGER, description="The day number (1-indexed)"),
-                        "title": types.Schema(type=types.Type.STRING, description="Description of the expense"),
-                        "amount": types.Schema(type=types.Type.NUMBER, description="Amount in local currency (supports decimals)"),
-                        "currency": types.Schema(type=types.Type.STRING, description="Currency code (e.g., 'JPY', 'USD', 'TWD')"),
-                        "category": types.Schema(type=types.Type.STRING, description="Expense category: food, transport, accommodation, ticket, shopping, other"),
-                        "payment_method": types.Schema(type=types.Type.STRING, description="Payment method: cash, card, ic_card, other"),
-                        "notes": types.Schema(type=types.Type.STRING, description="Additional notes about the expense"),
-                        "items": types.Schema(
-                            type=types.Type.ARRAY,
-                            description="Itemized breakdown of the expense (e.g., individual dishes, tickets, products)",
-                            items=types.Schema(
-                                type=types.Type.OBJECT,
-                                properties={
-                                    "original_name": types.Schema(type=types.Type.STRING, description="Item name in original language"),
-                                    "translated_name": types.Schema(type=types.Type.STRING, description="Item name translated to user's language"),
-                                    "amount": types.Schema(type=types.Type.NUMBER, description="Price of this item"),
-                                },
-                                required=["original_name", "amount"]
-                            )
-                        ),
+                        "original_name": types.Schema(type=types.Type.STRING, description="Item name in original language"),
+                        "translated_name": types.Schema(type=types.Type.STRING, description="Item name translated to user's language"),
+                        "amount": types.Schema(type=types.Type.NUMBER, description="Price of this item"),
                     },
-                    required=["day", "title", "amount", "currency"]
+                    required=["original_name", "amount"]
                 )
             ),
+        },
+        required=["day", "title", "amount", "currency"]
+    )
+)
+
+# 個別工具實例
+ADD_ITINERARY_TOOL = types.Tool(function_declarations=[ADD_ITINERARY_DECL])
+REMOVE_ITINERARY_TOOL = types.Tool(function_declarations=[REMOVE_ITINERARY_DECL])
+EXPENSE_TOOL = types.Tool(function_declarations=[ADD_EXPENSE_DECL])
+
+# 組合工具集 (維持既有引用相容)
+NEURAL_LINK_TOOLS = [
+    types.Tool(
+        function_declarations=[
+            ADD_ITINERARY_DECL,
+            REMOVE_ITINERARY_DECL,
+            ADD_EXPENSE_DECL,
         ]
     )
 ]
 
 # 意圖分群
 INTENTS_REQUIRING_JSON = {"EXTRACTION", "PLANNING"}
-INTENTS_ALLOW_GEMMA_LAST_RESORT = {"PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS", "CHAT", "GEOCODE"}
+INTENTS_ALLOW_GEMMA_LAST_RESORT = {
+    "PLANNING", "SUMMARIZE", "POI_ENRICH", "DIAGNOSIS", "CHAT", "GEOCODE",
+    "ITINERARY", "REMOVE_ITINERARY", "EXPENSE", "COMPOSITE", "INTENT_PARSE"
+}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -415,14 +478,41 @@ def get_generation_config(intent_type: str) -> types.GenerateContentConfig:
             temperature=1.0,
             max_output_tokens=1024,
         ),
+        "POI_ENRICH": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=1024,
+        ),
         "GEOCODE": types.GenerateContentConfig(
             temperature=0,
             max_output_tokens=150,
         ),
+        "INTENT_PARSE": types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=256,
+        ),
+        "ITINERARY": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=4096,
+            tools=[ADD_ITINERARY_TOOL],
+        ),
+        "REMOVE_ITINERARY": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=2048,
+            tools=[REMOVE_ITINERARY_TOOL],
+        ),
+        "EXPENSE": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=2048,
+            tools=[EXPENSE_TOOL],
+        ),
+        "COMPOSITE": types.GenerateContentConfig(
+            temperature=1.0,
+            max_output_tokens=4096,
+            tools=[ADD_ITINERARY_TOOL, EXPENSE_TOOL],
+        ),
         "CHAT": types.GenerateContentConfig(
             temperature=1.0,
             max_output_tokens=2048,
-            tools=NEURAL_LINK_TOOLS,  # 🟢 注入神經連結卡片
         ),
     }
 
@@ -474,8 +564,8 @@ def sanitize_config_for_model(
     if hasattr(safe, 'media_resolution') and not caps.supports_media_resolution:
         safe.media_resolution = None
 
-    # 3. 🚀 2026 搜尋與地圖雙增強注入 (僅限非結構化任務)
-    if caps.supports_grounding and intent_type in ["CHAT", "DIAGNOSIS"]:
+    # 3. 🚀 2026 搜尋與地圖雙增強注入 (僅限 Gemini 家族與非結構化任務)
+    if caps.family == "gemini" and caps.supports_grounding and intent_type in ["CHAT", "DIAGNOSIS", "ITINERARY", "COMPOSITE"]:
         if not safe.tools:
             safe.tools = []
         # 2026 官方 Tool Combination: 同時注入 Google Search 與 Google Maps
@@ -592,10 +682,11 @@ def record_model_error(model_name: str):
 def classify_api_error(err: errors.APIError) -> str:
     """法典化錯誤分類規範"""
     code = getattr(err, "code", None)
-    msg = (getattr(err, "message", "") or "").lower()
+    raw_msg = getattr(err, "message", "") or ""
+    full_str = f"{raw_msg} {str(err)}".lower()
 
     # 🛡️ 2026 金鑰遷移增強：精準辨識 401/403、未授權金鑰、已廢棄或被封鎖 (Blocked) 金鑰
-    if code in (401, 403) or any(k in msg for k in [
+    if code in (401, 403) or any(k in full_str for k in [
         "api_key_invalid", "permission_denied", "api key not valid", 
         "blocked", "key expired", "unauthenticated", "invalid api key"
     ]):
@@ -604,7 +695,7 @@ def classify_api_error(err: errors.APIError) -> str:
         return "retryable"
     if code == 400:
         # 偵測是否為「參數不相容」導致的 400
-        schemaish = any(k in msg for k in [
+        schemaish = any(k in full_str for k in [
             "response_json_schema", "response_schema", "response schema", "response_mime_type",
             "invalid argument", "unsupported", "propertyordering", "tools"
         ])
@@ -617,17 +708,20 @@ def build_effective_routing(
     routing_strategy: Optional[List[str]] = None,
 ) -> List[str]:
     # 1. 建立初始路由並套用熔斷檢查
-    base_routing = list(routing_strategy or HEAVY_ROUTING)
-    
-    # 🚀 2026 優先級調整：若為地理編碼任務，強行將 Gemma 置於首位以節省成本
-    if intent_type == "GEOCODE":
-        base_routing = [WORKHORSE_MODEL] + base_routing
+    if routing_strategy:
+        base_routing = list(routing_strategy)
+    elif intent_type in ("GEOCODE", "SUMMARIZE", "INTENT_PARSE"):
+        base_routing = list(WORKHORSE_ROUTING)
+    elif intent_type == "POI_ENRICH":
+        base_routing = list(DAILY_ROUTING)
+    else:
+        base_routing = list(HEAVY_ROUTING)
 
     routing = [m for m in base_routing if not is_model_circuit_broken(m)]
 
     if intent_type in INTENTS_ALLOW_GEMMA_LAST_RESORT:
-        # 🚀 2026 多層級救援 (L2 Penultimate -> L3 Ultimate)
-        rescue_tier = [WORKHORSE_PENULTIMATE, WORKHORSE_ULTIMATE]
+        # 🚀 2026 多層級救援 (L1 Penultimate 31B -> L2 MoE 26B -> L3 Ultimate 27B)
+        rescue_tier = [WORKHORSE_PENULTIMATE, WORKHORSE_MOE, WORKHORSE_ULTIMATE]
         for model_name in rescue_tier:
             # 🛡️ 熔斷器檢查：若模型正在「冷卻」，則跳過此救援層
             if is_model_circuit_broken(model_name):
@@ -646,11 +740,14 @@ async def call_with_fallback(
     intent_type: str = "CHAT",
     routing_strategy: Optional[List[str]] = None,
     system_instruction: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """智能對話式呼叫 (v21 版)"""
     client = get_cached_client(api_key)
     chat_history = build_chat_history(history)
     base_config = get_generation_config(intent_type)
+    if tools is not None:
+        base_config.tools = copy.deepcopy(tools) if tools else None
     routing = build_effective_routing(intent_type, routing_strategy)
     require_json = intent_type in INTENTS_REQUIRING_JSON
 
@@ -684,7 +781,8 @@ async def call_with_fallback(
 
         except errors.APIError as e:
             kind = classify_api_error(e)
-            record_model_error(model_name) # 🚀 觸發熔斷計數
+            if kind not in ("auth_fail", "bad_request"):
+                record_model_error(model_name) # 🚀 只有服務端非認證異常才觸發熔斷計數
             attempts.append({"model": model_name, "decision": kind, "code": e.code})
 
             if kind == "auth_fail":
@@ -821,7 +919,8 @@ async def call_extraction(
 
         except errors.APIError as e:
             kind = classify_api_error(e)
-            record_model_error(model_name)
+            if kind not in ("auth_fail", "bad_request"):
+                record_model_error(model_name)
             attempts.append({"model": model_name, "decision": kind, "code": e.code})
 
             if kind == "auth_fail":

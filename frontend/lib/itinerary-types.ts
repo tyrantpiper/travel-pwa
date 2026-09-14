@@ -201,6 +201,9 @@ export interface SearchResult {
     wikipedia?: string
     cross_country?: boolean
     _distKm?: number | null
+    admin_level?: number | null
+    osm_key?: string | null
+    extent?: number[] | null
 }
 // 🆕 v22.1: Unified type for AI-generated/imported itineraries
 export interface ParsedItineraryItem {

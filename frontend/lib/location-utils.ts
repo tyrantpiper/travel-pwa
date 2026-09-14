@@ -79,3 +79,41 @@ export function getDistanceKm(
         Math.sin(dLng / 2) * Math.sin(dLng / 2);
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+export interface SmartZoomConfig {
+    zoom: number
+    duration: number
+}
+
+/**
+ * 依據 Photon 1.3.0 admin_level 與 osm_value/type 計算最佳相機縮放層級與飛行時長
+ */
+export function getSmartZoomConfig(result: {
+    name?: string
+    type?: string | null
+    admin_level?: number | null
+    osm_key?: string | null
+}): SmartZoomConfig {
+    const level = result.admin_level
+    const type = (result.type || "").toLowerCase()
+
+    // 1. 國家層級 (Level 2) -> 3D Globe 地球儀視野
+    if (level === 2 || type === "country") {
+        return { zoom: 3.5, duration: 2000 }
+    }
+    // 2. 州 / 省層級 (Level 3-4)
+    if (level === 3 || level === 4 || type === "state" || type === "province") {
+        return { zoom: 6.5, duration: 1800 }
+    }
+    // 3. 縣市 / 都會區層級 (Level 5-6)
+    if (level === 5 || level === 6 || type === "city" || type === "county") {
+        return { zoom: 10.5, duration: 1600 }
+    }
+    // 4. 市鎮 / 區層級 (Level 7-8)
+    if (level === 7 || level === 8 || type === "district" || type === "town" || type === "suburb") {
+        return { zoom: 13.5, duration: 1400 }
+    }
+    // 5. 一般景點、餐廳、飯店或具體門牌 (預設 POI)
+    return { zoom: 16.5, duration: 1200 }
+}
+
