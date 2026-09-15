@@ -12,8 +12,71 @@ import dynamic from "next/dynamic"
 
 // 🚀 [Perf Audit 2026] 斷開首頁與核心 App 的強連結
 // 這將使首頁體積減少 90% (移除地圖、DND、PDF 等重型庫)
+function AppShellSkeleton() {
+    return (
+        <div className="min-h-screen bg-stone-50 dark:bg-slate-900 flex flex-col animate-pulse">
+            <header className="h-14 border-b border-stone-200/60 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 px-4 flex items-center justify-between">
+                <div className="h-6 w-28 bg-stone-200 dark:bg-slate-700 rounded-lg" />
+                <div className="h-8 w-20 bg-stone-200 dark:bg-slate-700 rounded-xl" />
+            </header>
+            <main className="flex-1 p-4 space-y-4">
+                <div className="h-32 bg-stone-200/70 dark:bg-slate-800 rounded-2xl" />
+                <div className="h-24 bg-stone-200/50 dark:bg-slate-800/60 rounded-2xl" />
+                <div className="h-24 bg-stone-200/50 dark:bg-slate-800/60 rounded-2xl" />
+            </main>
+            <nav className="h-16 border-t border-stone-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 flex items-center justify-around">
+                {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="w-8 h-8 rounded-full bg-stone-200 dark:bg-slate-700" />
+                ))}
+            </nav>
+        </div>
+    )
+}
+
+// 🛡️ 防禦 ChunkLoadError 導致的 React 根樹白屏
+import React from "react"
+class ChunkErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean }
+> {
+    state = { hasError: false };
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+    componentDidCatch(error: Error) {
+        console.warn("⚠️ [ChunkBoundary] AppShell failed to mount:", error);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="min-h-screen bg-stone-50 dark:bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400 mb-4 text-2xl">
+                        ☁️
+                    </div>
+                    <h2 className="text-lg font-bold text-stone-800 dark:text-stone-100">離線載入中</h2>
+                    <p className="text-sm text-stone-500 dark:text-stone-400 mt-1 mb-6 max-w-xs">
+                        核心模組正在嘗試從本地離線快取載入，請確認裝置快取或重試
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            this.setState({ hasError: false });
+                            window.location.reload();
+                        }}
+                        className="px-5 py-2.5 bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900 rounded-xl text-sm font-medium active:scale-95 transition-transform shadow-md cursor-pointer"
+                    >
+                        重新整理
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
 const AppShell = dynamic(() => import("@/components/views/app-shell").then(mod => mod.AppShell), {
     ssr: false,
+    loading: () => <AppShellSkeleton />,
 })
 
 import { toast } from "sonner"
@@ -175,7 +238,13 @@ export function LandingPage() {
         )
     }
 
-    if (isLoggedIn) return <AppShell />
+    if (isLoggedIn) {
+        return (
+            <ChunkErrorBoundary>
+                <AppShell />
+            </ChunkErrorBoundary>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-stone-50 dark:bg-slate-900 flex flex-col relative">

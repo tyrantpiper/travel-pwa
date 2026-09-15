@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { resolveDayLocation, CITY_COORDS } from '@/lib/location-resolver'
 import { fetchFiveDayForecast } from '@/lib/weather-api'
 import { useWeatherStore, DailyForecastItem, fetchFiveDayForecastWithDedup } from '@/lib/stores/weatherStore'
-import { vi } from 'vitest'
 import { Activity, DailyLocation } from '@/lib/itinerary-types'
 
 describe('location-resolver: resolveDayLocation 4-tier fallback', () => {

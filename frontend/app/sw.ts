@@ -129,6 +129,32 @@ const serwist = new Serwist({
       }),
     },
     {
+      // ⚡ Next.js 核心 JS Chunks 離線快取 (CacheFirst 保證秒開，30天)
+      matcher: /\/_next\/static.+\.js$/i,
+      handler: new CacheFirst({
+        cacheName: "next-static-js-assets",
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 128,
+            maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+          }),
+        ],
+      }),
+    },
+    {
+      // 🎨 Next.js 靜態樣式檔與全域 CSS 離線快取 (CacheFirst，30天)
+      matcher: /\.(?:css|less)$/i,
+      handler: new CacheFirst({
+        cacheName: "static-style-assets",
+        plugins: [
+          new ExpirationPlugin({
+            maxEntries: 64,
+            maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+          }),
+        ],
+      }),
+    },
+    {
       // 🚀 導航離線備援 (Navigation Fallback: 斷網重開瀏覽器時直接提供已快取的 App Shell)
       // 嚴格排除 /api/ 與 Next.js 的 _rsc 參數，徹底杜絕水合撕裂
       matcher: ({ request, url }) => 
@@ -143,6 +169,13 @@ const serwist = new Serwist({
             maxEntries: 30,
             maxAgeSeconds: 60 * 60 * 24 * 30, // 快取 30 天
           }),
+          {
+            // 🛡️ 關鍵容錯保險：任何未快取子路徑離線訪問失敗時，保底自快取吐出根目錄 App Shell (/)
+            handlerDidError: async () => {
+              const cache = await caches.open("app-shell-navigation");
+              return (await cache.match("/")) || Response.error();
+            },
+          },
         ],
         // 🛡️ 關鍵補足：忽略 URL query 參數差異 (?source=pwa 等均能 100% 命中快取的 App Shell)
         matchOptions: {
