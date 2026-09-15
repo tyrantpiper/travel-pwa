@@ -112,12 +112,30 @@ export function useDeepLinkRouter({ onTabChange }: UseDeepLinkRouterOptions) {
             }
         }
 
+        // 🔔 E5: Listen for Service Worker postMessage (Smart Tab Focus & Push Navigation)
+        const handleSwMessage = (event: MessageEvent) => {
+            if (event.data?.type === "TABIDACHI_PUSH_NAVIGATE" && event.data?.url) {
+                const targetUrl = event.data.url
+                debugLog("🔔 [DeepLinkRouter] SW Push message received:", targetUrl)
+                const searchPart = targetUrl.includes("?") ? targetUrl.split("?")[1] : ""
+                if (searchPart) {
+                    processDeepLink(searchPart)
+                }
+            }
+        }
+
         window.addEventListener("popstate", handlePopState)
         window.addEventListener("tabidachi-deep-link", handleCustomDeepLink)
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.addEventListener("message", handleSwMessage)
+        }
 
         return () => {
             window.removeEventListener("popstate", handlePopState)
             window.removeEventListener("tabidachi-deep-link", handleCustomDeepLink)
+            if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.removeEventListener("message", handleSwMessage)
+            }
         }
     }, [processDeepLink])
 }

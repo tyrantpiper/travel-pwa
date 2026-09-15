@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { SyncQueue, MAX_RETRIES, SyncRequest } from './sync-engine';
 import { toast } from "sonner";
+import { useSyncStatusStore } from './stores/syncStatusStore';
 
 /**
  * 🛠️ React Hook: useOfflineMutation
@@ -92,6 +93,7 @@ export function useBackgroundSync() {
                             }
 
                             console.log(`[SyncEngine] ▶️ Replaying: ${req.url}`);
+                            useSyncStatusStore.getState().updateStatus(req.id, 'syncing');
                             const res = await fetch(req.url, {
                                 method: req.method,
                                 headers: req.headers,
@@ -103,14 +105,18 @@ export function useBackgroundSync() {
                                 toast.success(`☁️ 已自動同步: ${req.method} ${req.url.split('/').pop()}`);
                             } else {
                                 if (req.retryCount >= MAX_RETRIES) {
+                                    useSyncStatusStore.getState().updateStatus(req.id, 'failed', `HTTP ${res.status}`);
                                     await SyncQueue.dequeue(req.id);
                                 } else {
+                                    useSyncStatusStore.getState().updateStatus(req.id, 'pending', `重試中 (${req.retryCount + 1}/${MAX_RETRIES})`);
                                     await SyncQueue.incrementRetry(req.id);
                                 }
                                 break; // ❌ 如果失敗，停止該分組後續操作以保證順序性
                             }
-                        } catch (e) {
-                            console.error(`[SyncEngine] 💥 Network Error in group sync:`, e);
+                        } catch (e: unknown) {
+                            const err = e as Error;
+                            console.error(`[SyncEngine] 💥 Network Error in group sync:`, err);
+                            useSyncStatusStore.getState().updateStatus(req.id, 'pending', err?.message);
                             break;
                         }
                     }
@@ -125,12 +131,22 @@ export function useBackgroundSync() {
             }
         };
 
+        const handleOnline = () => {
+            useSyncStatusStore.getState().setIsOnline(true);
+            processQueue();
+        };
+        const handleOffline = () => {
+            useSyncStatusStore.getState().setIsOnline(false);
+        };
+
         const interval = setInterval(processQueue, 30000);
-        window.addEventListener('online', processQueue);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
 
         return () => {
             clearInterval(interval);
-            window.removeEventListener('online', processQueue);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
         };
     }, []);
 }

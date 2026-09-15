@@ -89,7 +89,7 @@ export function TripProvider({ children }: { children: ReactNode }) {
         }
     }, [setUserId])
 
-    const { trips, isLoading, mutate } = useTrips(userId)
+    const { trips, isLoading, isError, mutate } = useTrips(userId)
 
     // 🔧 FIX: 當 userId 從 Zustand hydration 準備好後，保底刷新 trips (帶 2 秒去重時間閘門)
     const lastTripsMutateTimeRef = useRef(0)
@@ -186,14 +186,18 @@ export function TripProvider({ children }: { children: ReactNode }) {
                     if (latestTrip.title) localStorage.setItem("active_trip_title", latestTrip.title)
                 }
             } else if (trips.length === 0 && activeTripId) {
-                // 🛡️ 邊界防禦：使用者名下無任何行程，清理無效的 activeTripId
-                setActiveTripId(null)
-                setActiveTripTitle(null)
-                localStorage.removeItem("active_trip_id")
-                localStorage.removeItem("active_trip_title")
+                // 🛡️ 零誤判離線防禦：只有在確實在線且無 API 錯誤的情況下，清單為空才判定名下無行程
+                // 斷網或離線時，100% 保留 activeTripId，杜絕冷啟動自我抹殺
+                const isDefinitelyOnline = typeof navigator !== "undefined" ? navigator.onLine : true
+                if (isDefinitelyOnline && !isError) {
+                    setActiveTripId(null)
+                    setActiveTripTitle(null)
+                    localStorage.removeItem("active_trip_id")
+                    localStorage.removeItem("active_trip_title")
+                }
             }
         }
-    }, [isLoading, trips, activeTripId, setActiveTripId, setActiveTripTitle])
+    }, [isLoading, isError, trips, activeTripId, setActiveTripId, setActiveTripTitle])
 
     // 當切換行程時的處理函數
     const handleSetActiveTripId = (id: string | null) => {

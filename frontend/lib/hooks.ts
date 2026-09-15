@@ -1,7 +1,7 @@
 import useSWR from "swr"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { travelDataApi } from './api'
-import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot, getTripsListSnapshotSync, saveTripsListSnapshot } from './idb-storage'
+import { getTripSnapshotSync, saveTripSnapshot, preloadTripSnapshot, getTripsListSnapshotSync, preloadTripsListSnapshot, saveTripsListSnapshot } from './idb-storage'
 import type { Trip } from './itinerary-types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
@@ -39,7 +39,19 @@ export const fetcherWithUserId = ([url, uid]: [string, string]) =>
         })
 
 export function useTrips(userId: string | null) {
-    const initialSnapshot = useMemo(() => getTripsListSnapshotSync<Trip[]>(userId), [userId])
+    const [idbTrips, setIdbTrips] = useState<Trip[] | null>(() => getTripsListSnapshotSync<Trip[]>(userId))
+
+    useEffect(() => {
+        if (userId && !idbTrips) {
+            preloadTripsListSnapshot<Trip[]>(userId).then((data) => {
+                if (data && Array.isArray(data) && data.length > 0) {
+                    setIdbTrips(data)
+                }
+            })
+        }
+    }, [userId, idbTrips])
+
+    const initialSnapshot = useMemo(() => getTripsListSnapshotSync<Trip[]>(userId) || idbTrips, [userId, idbTrips])
     const { data, error, mutate } = useSWR<Trip[]>(
         userId ? ["/api/trips", userId] : null,
         fetcherWithUserId,
@@ -53,10 +65,11 @@ export function useTrips(userId: string | null) {
             }
         }
     )
+    const effectiveTrips = Array.isArray(data) ? data : (Array.isArray(initialSnapshot) ? initialSnapshot : [])
     return {
-        trips: Array.isArray(data) ? data : (Array.isArray(initialSnapshot) ? initialSnapshot : []),
+        trips: effectiveTrips,
         isLoading: !error && !data && !initialSnapshot,
-        isError: error,
+        isError: !!error,
         mutate
     }
 }

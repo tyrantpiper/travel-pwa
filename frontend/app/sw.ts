@@ -137,13 +137,17 @@ const serwist = new Serwist({
         !url.searchParams.has("_rsc"),
       handler: new NetworkFirst({
         cacheName: "app-shell-navigation",
-        networkTimeoutSeconds: 3, // 3 秒內網路不通立即自本地快取提取 App Shell
+        networkTimeoutSeconds: 2, // 2 秒內網路不通立即自本地快取提取 App Shell
         plugins: [
           new ExpirationPlugin({
-            maxEntries: 10,
-            maxAgeSeconds: 60 * 60 * 24 * 7, // 快取 7 天
+            maxEntries: 30,
+            maxAgeSeconds: 60 * 60 * 24 * 30, // 快取 30 天
           }),
         ],
+        // 🛡️ 關鍵補足：忽略 URL query 參數差異 (?source=pwa 等均能 100% 命中快取的 App Shell)
+        matchOptions: {
+          ignoreSearch: true,
+        },
       }),
     },
     ...defaultCache,
@@ -167,7 +171,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// === Notification Click Handler (Ported from legacy sw.js) ===
+// === E5: Notification Click Handler (Smart Tab Focus via postMessage) ===
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const link = event.notification.data?.link || "/";
@@ -176,10 +180,14 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
           client.focus();
-          return (client as WindowClient).navigate(link);
+          // 🔔 E5: 零重新整理 SPA 平滑導航，派發深層連結訊息
+          client.postMessage({ type: "TABIDACHI_PUSH_NAVIGATE", url: link });
+          return;
         }
       }
-      return self.clients.openWindow(link);
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(link);
+      }
     })
   );
 });

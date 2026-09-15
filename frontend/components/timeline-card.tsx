@@ -28,6 +28,8 @@ import { Activity, SubItem } from "@/lib/itinerary-types"
 import { searchNearbyImage, uploadMapillaryToCloudinary } from "@/lib/mapillary"
 import { toast } from "sonner"
 import { useLanguage } from "@/lib/LanguageContext"
+import { SyncStatusBadge } from "@/components/ui/SyncStatusBadge"
+import { useSyncStatusStore } from "@/lib/stores/syncStatusStore"
 
 interface TimelineCardProps {
     activity: Activity
@@ -51,6 +53,11 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
         setImageError(false)
         setLastImageUrl(firstImageUrl)
     }
+
+    // ⚡ E4: 取得景點離線樂觀同步狀態
+    const syncMeta = useSyncStatusStore(state => 
+        activity?.id ? (state.mutations[activity.id] || Object.values(state.mutations).find(m => m.entityId === activity.id || m.tempId === activity.id)) : undefined
+    )
 
     if (!activity) return null;
 
@@ -174,8 +181,9 @@ export const TimelineCard = memo(function TimelineCard({ activity, isLast, index
                 )}
 
                 <div className="flex justify-between items-start mb-1 pr-6">
-                    <h3 className={cn("font-bold text-slate-900 dark:text-white leading-tight truncate", isHeader ? "text-xl" : "text-lg")}>
-                        {activity.place || "Unknown Place"}
+                    <h3 className={cn("font-bold text-slate-900 dark:text-white leading-tight truncate flex items-center gap-2", isHeader ? "text-xl" : "text-lg")}>
+                        <span>{activity.place || "Unknown Place"}</span>
+                        {syncMeta && <SyncStatusBadge status={syncMeta.status} errorMessage={syncMeta.errorMessage} />}
                     </h3>
                 </div>
 
