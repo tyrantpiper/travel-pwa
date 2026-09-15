@@ -21,8 +21,7 @@ import { useLanguage } from "@/lib/LanguageContext"
 import { resolveDayLocation, type ResolvedLocation } from "@/lib/location-resolver"
 import { DailyWeatherStrip } from "@/components/itinerary/DailyWeatherStrip"
 import { MultiDayMasterMap } from "@/components/itinerary/MultiDayMasterMap"
-import { useWeatherStore, type DailyForecastItem } from "@/lib/stores/weatherStore"
-import { fetchFiveDayForecast } from "@/lib/weather-api"
+import { useWeatherStore, fetchFiveDayForecastWithDedup } from "@/lib/stores/weatherStore"
 
 interface TripMasterOverviewProps {
     currentTrip?: Trip
@@ -149,44 +148,34 @@ export function TripMasterOverview({
         return clusters
     }, [dayLocations])
 
-    // 📦 3. Weather Store integration
-    const getFiveDayData = useWeatherStore((s) => s.getFiveDayData)
-    const setFiveDayData = useWeatherStore((s) => s.setFiveDayData)
-
-    const [fiveDayMap, setFiveDayMap] = useState<Record<string, DailyForecastItem[]>>({})
+    // 📦 3. 響應式天氣狀態機綁定 (Reactive Store Subscription)
+    const fiveDayCache = useWeatherStore((s) => s.fiveDayCache)
     const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
 
-    useEffect(() => {
-        const todayStr = new Date().toISOString().split("T")[0]
-        let isMounted = true
+    // 本地時區安全鍵 (避免 UTC 跨日時區漂移)
+    const todayStr = useMemo(() => new Date().toLocaleDateString('en-CA'), [])
 
+    // 座標指紋 (防禦父層 SWR reference 抖動引發的無效 Cleanup)
+    const clusterFingerprint = useMemo(() => {
+        return Array.from(uniqueClusters.keys()).sort().join("|")
+    }, [uniqueClusters])
+
+    // 觸發層：僅在座標指紋或本地日期實質改變時發起，徹底解除 isMounted 誤殺
+    useEffect(() => {
         uniqueClusters.forEach(({ lat, lng }, clusterKey) => {
-            // Check cache first
-            const cached = getFiveDayData(lat, lng, todayStr)
-            if (cached) {
-                setFiveDayMap((prev) => ({ ...prev, [clusterKey]: cached }))
+            const cacheKey = `${clusterKey}_5d_${todayStr}`
+            // 優先檢查全域狀態機快取
+            if (useWeatherStore.getState().fiveDayCache?.[cacheKey]?.data) {
                 return
             }
 
-            // Fetch in parallel
             setLoadingMap((prev) => ({ ...prev, [clusterKey]: true }))
-            fetchFiveDayForecast(lat, lng)
-                .then((items) => {
-                    if (!isMounted || !items) return
-                    setFiveDayData(lat, lng, todayStr, items)
-                    setFiveDayMap((prev) => ({ ...prev, [clusterKey]: items }))
-                })
+            fetchFiveDayForecastWithDedup(lat, lng, todayStr)
                 .finally(() => {
-                    if (isMounted) {
-                        setLoadingMap((prev) => ({ ...prev, [clusterKey]: false }))
-                    }
+                    setLoadingMap((prev) => ({ ...prev, [clusterKey]: false }))
                 })
         })
-
-        return () => {
-            isMounted = false
-        }
-    }, [uniqueClusters, getFiveDayData, setFiveDayData])
+    }, [clusterFingerprint, uniqueClusters, todayStr])
 
     return (
         <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -284,8 +273,9 @@ export function TripMasterOverview({
                     const resolvedLoc = dayLocations[d]
                     const dailyLocation = dailyLocs[d]?.name || resolvedLoc?.name
                     const clusterKey = resolvedLoc ? `${resolvedLoc.lat.toFixed(2)}_${resolvedLoc.lng.toFixed(2)}` : ""
-                    const forecastItems = fiveDayMap[clusterKey]
-                    const isWeatherLoading = loadingMap[clusterKey]
+                    const cacheKey = clusterKey ? `${clusterKey}_5d_${todayStr}` : ""
+                    const forecastItems = cacheKey ? fiveDayCache?.[cacheKey]?.data : undefined
+                    const isWeatherLoading = clusterKey ? loadingMap[clusterKey] : false
                     const hasActivities = activities.length > 0
                     const dayTotalCost = activities.reduce((sum, item) => sum + Number(item.cost ?? item.cost_amount ?? 0), 0)
 
@@ -343,6 +333,15 @@ export function TripMasterOverview({
                                     forecastItems={forecastItems}
                                     isLoading={isWeatherLoading}
                                     targetDate={date}
+                                    onRetry={() => {
+                                        if (resolvedLoc) {
+                                            setLoadingMap((prev) => ({ ...prev, [clusterKey]: true }))
+                                            fetchFiveDayForecastWithDedup(resolvedLoc.lat, resolvedLoc.lng, todayStr)
+                                                .finally(() => {
+                                                    setLoadingMap((prev) => ({ ...prev, [clusterKey]: false }))
+                                                })
+                                        }
+                                    }}
                                 />
                             </div>
 

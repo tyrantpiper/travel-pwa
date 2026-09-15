@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { 
     Sun, 
     CloudSun, 
@@ -13,7 +13,8 @@ import {
     Wind, 
     ShieldAlert, 
     Sparkles,
-    X
+    X,
+    RefreshCw
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useHaptic } from "@/lib/hooks"
@@ -27,6 +28,7 @@ interface DailyWeatherStripProps {
     forecastItems?: DailyForecastItem[] | null
     isLoading?: boolean
     targetDate?: string // 行程排定之當日日期 (YYYY-MM-DD)，若相符則高亮
+    onRetry?: () => void
 }
 
 /**
@@ -102,11 +104,56 @@ export function DailyWeatherStrip({
     locationName,
     forecastItems,
     isLoading = false,
-    targetDate
+    targetDate,
+    onRetry
 }: DailyWeatherStripProps) {
     const { t } = useLanguage()
     const haptic = useHaptic()
     const [openIndex, setOpenIndex] = useState<number | null>(null)
+    const [isTimedOut, setIsTimedOut] = useState(false)
+
+    // 4 秒逾時保護：避免無快取或斷網時永久卡在灰色閃爍骨架屏
+    useEffect(() => {
+        if (forecastItems && forecastItems.length > 0) {
+            return
+        }
+        const timer = setTimeout(() => {
+            setIsTimedOut(true)
+        }, 4000)
+        return () => clearTimeout(timer)
+    }, [forecastItems])
+
+    const hasData = Boolean(forecastItems && forecastItems.length > 0)
+    const showTimeoutFallback = isTimedOut && !hasData && !isLoading
+
+    // 逾時優雅降級態 (Graceful Fallback on Timeout or Network Offline)
+    if (showTimeoutFallback) {
+        return (
+            <div 
+                className="w-full py-2 px-3 rounded-xl bg-slate-50/80 dark:bg-slate-900/40 border border-dashed border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400 select-none"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <span className="flex items-center gap-1.5">
+                    <Cloud className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{locationName ? `${locationName} · ` : ""}暫無氣象資料</span>
+                </span>
+                {onRetry && (
+                    <button 
+                        type="button" 
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            setIsTimedOut(false)
+                            onRetry()
+                        }}
+                        className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
+                    >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>重試</span>
+                    </button>
+                )}
+            </div>
+        )
+    }
 
     // 骨架屏載入態 (Skeleton Loading)
     if (isLoading || !forecastItems || forecastItems.length === 0) {
