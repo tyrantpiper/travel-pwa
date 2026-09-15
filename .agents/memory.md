@@ -48,6 +48,8 @@
 - **WebGL Canvas 與 AssistiveTouch 雙向硬體隔離 (Hardware Composite Decoupling)**: 拖曳節點若直接以 CSS `right/bottom` 修改座標，會誘發主執行緒 Reflow 重繪 WebGL Canvas。地圖容器使用 `transform-gpu will-change-transform` 固定為獨立合成層，拖曳節點動態切換 `willChange: isDragging ? "right, bottom" : "auto"`，達成 60fps 零掉幀。
 - **MapLibre 圖層宣告順序與 `beforeId` 禁忌 (Declarative Layer Precedence)**: 在 React 宣告式地圖架構中，`<Layer>` 是依序加入 MapLibre 樣式表的。禁止在前面圖層宣告 `beforeId` 指向尚未宣告的後續圖層，避免引發 `Cannot add layer before non-existing layer`。應利用自然 JSX 宣告順序建立層次。
 - **景點抽屜容器內錨定原則 (Container-Anchored Sheet Decoupling)**: 在全景或總覽地圖中，景點抽屜必須支援 `isInternal` 模式，將容器限制在地圖內部（`absolute bottom-0`）而非視窗層級（`fixed inset-0`），防止抽屜破壞全域導航列。
+- **PowerShell 確定性熔斷守門架構 (Fail-Fast PowerShell Execution Harness)**: 在 Windows 環境下，嚴禁依賴非熔斷的 `;` 串接指令。所有工作流與守門腳本必須明確宣告 `$LASTEXITCODE` 檢查（`if ($LASTEXITCODE -ne 0) { exit 1 }`），確保任何一級（TypeScript、ESLint、Vitest、Pytest）失敗時能立即物理中斷，杜絕偽綠燈提交。
+- **雙模 AST/正則防禦架構 (Dual-Mode AST/Regex Audit Pipeline)**: 對於 JSX 樹狀結構複雜的樣式反模式（如 Flex Truncate 匿名區塊），放棄過度工程化的單一 AST 比對，採 AST 節點鎖定搭配正則約束，兼顧精確度與零偽陽性。
 
 ## [Failed Paths]
 - **試圖在 React RootLayout 內嵌 Raw HTML/CSS 假裝原生 Splash (Inline Splash Over-Engineering Trap)**: 在 Next.js App Router 體系下硬塞 90 行 inline <style>、id="pwa-native-splash" 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 manifest.json 自動渲染原生啟動畫面的基本事實。問題本質在於開發模式根本未啟動快取，而非需要用粗暴補丁解決。
@@ -80,6 +82,8 @@
 - **Flex 容器未封裝文字直用 `truncate` 引發標籤被擠壓 (WebKit Anonymous Flex Truncation Trap)**: 在 Header 直接使用 `className="flex items-center min-w-0 truncate"` 包覆文字與 `<Badge>`，在 WebKit/iOS 渲染引擎下裸文字包入 Anonymous Block，計算寬度時將同級 `shrink-0` 徽章壓縮或推出可視範圍。教訓：Flex 容器內的文本溢出截斷，務必單獨由子 `<span className="truncate">` 承擔。
 - **未宣告 MapLibre 圖層時指定 `beforeId` 引發渲染引擎崩潰 (Premature beforeId Reference Trap)**: 在 JSX 中宣告底層衛星影像時指定 `beforeId="day-trajectories-layer"`，但該圖層在 JSX 中寫在衛星之後，MapLibre 依序解析引發致命錯誤。教訓：React-map-gl 圖層宣告應善用自然 JSX 階層排列，切忌跨越宣告順序參考不存在的圖層 ID。
 - **拖曳浮動節點誘發 WebGL Canvas 主執行緒 Reflow 掉幀 (Unisolated WebGL Reflow Trap)**: 在同一視圖內，若直接拖曳以 `right/bottom` 定位的 `chat-widget` 圓球，未開啟硬體加速時會誘發 Blink 重新計算佈局並重繪大型地圖 WebGL Canvas，導致掉幀至 20fps。教訓：包含 WebGL 地圖的複雜視圖中，浮動動態節點必須明確宣告 `transform-gpu` 與動態 `will-change`，建立獨立 GPU 合成層。
+- **PowerShell 分號串接導致錯誤吞噬與假性放行 (PowerShell Unhalted Chain Trap)**: 在 Windows PowerShell 中使用 `cmd1; cmd2; cmd3` 串接指令時，即使 `cmd1` 噴錯，PowerShell 依然會繼續執行後續指令。若最後一條指令成功，整個任務會被誤判為通過。教訓：Windows 終端工作流必須顯式包裝 `if ($LASTEXITCODE -ne 0) { exit 1 }` 實施嚴格熔斷。
+- **粗糙 AST Pattern 比對引發的偽陽性爆發 (AST Pattern Overmatching Trap)**: 企圖以單一 AST Pattern 比對包含特定 CSS 類別的動態文字標籤，若未指定確切約束，會把全站所有 JSX 文字節點全部誤判。教訓：語法審核必須採約束性 AST 規則（Constraints & Regex）。
 
 ## [Technical Debt]
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
@@ -139,4 +143,6 @@
 - **Hardware Composite Decoupling**: 雙向硬體合成層解耦，透過 GPU 合成層隔離浮動節點拖曳與底層 WebGL 重繪。
 - **Declarative Layer Precedence**: 宣告式圖層順序優先，利用 JSX 物理順序定義 MapLibre 圖層層次而非無效跨層 beforeId。
 - **Container-Anchored Sheet Decoupling**: 容器錨定抽屜解耦，將抽屜限制於地圖容器內部避免竄出覆蓋全站 Header。
-- **Great-Circle Slerp Interpolation**: 大圓航線球面線性插值，在 2D/3D 平面上以球面幾何學平滑渲染長途跨城軌跡。
+- **Great-Circle Slerp Interpolation**: 大圓航線球面線性插值，在 2D/3D 平面上以球面幾何學平滑渲染長途跨城軌跡。
+- **Fail-Fast PowerShell Execution Harness**: 確定性熔斷 PowerShell 執行架構，透過 `$LASTEXITCODE` 即刻中止失敗連鎖。
+- **Dual-Mode AST/Regex Audit Pipeline**: 雙模 AST/正則審核管線，結合語法樹與模式約束消除誤報。
