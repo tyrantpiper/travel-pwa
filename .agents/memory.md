@@ -20,6 +20,9 @@
 - **虛擬化清單篩選器穿透機制 (Filter Penetration on Deep Link)**: 虛擬化長清單（React Virtuoso）尋址時，消費端必須具備「前置篩選器自動歸零」的穿透權威，隨後調用虛擬列表內部控制代碼 `virtuosoRef.current.scrollToIndex` 達成 100% 精準尋址，嚴禁調用 DOM 原生選擇器。
 - **表現層截斷與資料層無損分離 (Presentation Layer Truncation Separation)**: 資料傳輸與儲存層保持 100% 原始語義完整性，字數截斷完全由前端 CSS (`line-clamp-2`, `truncate`) 控制。
 - **天數物理可見性雙向防衛 (Physical Visibility Defense)**: 前端天數分頁以 `Math.max(日期天數, 資料庫景點天數)` 渲染，後端 `save_itinerary` 與 `ai.py` 強制以 `max_day` 動態展延 `end_date`，防止日期字串截斷 UI 顯示。
+- **長耗時外部網路請求全域狀態機解耦與 In-Flight 去重 (Decoupled Global Write & Deduplication)**: 在頻繁重繪架構下，非同步長耗時請求（如 Open-Meteo API）嚴禁寫入組件局部 state 或依賴 `isMounted` 閉包；必須由獨立模組寫入全域狀態機（Zustand store），並維護 In-Flight Promise 池避免相同座標重複請求。組件僅在渲染階段以響應式 selector 讀取，杜絕組件因父層 SWR 抖動卸載後誤殺回傳資料。
+- **本地時區安全日期鍵規範 (Local Timezone Date Safety)**: 使用 `new Date().toISOString().split("T")[0]` 在 UTC+8 深夜 00:00~08:00 會回傳前一天的 UTC 日期造成快取鍵與本地行程錯位。前端所有快取鍵與日期排程統一採用 `new Date().toLocaleDateString('en-CA')` 對齊客戶端本地時區。
+- **骨架屏硬逾時優雅降級 (Hard-Timeout Skeleton Fallback)**: 依賴非同步遠端資料的骨架屏（如 `DailyWeatherStrip`），嚴禁無限期 pulse 閃爍。必須內建 4 秒硬逾時定時器，連線中斷或逾時自動切換至「暫無氣象資料 · 重試」狀態並支援手動重新整理。
 
 ### 3. iOS 原生體驗、微動效與 UI 元件架構 (iOS Ergonomics, Motion & Decoupled UI)
 - **WebKit 匿名文字節點隔離與 Flex 寬度守護 (Text-Node Isolation Architecture)**: 在 Flex 容器中，裸露文字搭配 `truncate` 會在 WebKit 引擎下產生匿名文字方塊（Anonymous Block Box），在 390px 窄螢幕下壓縮同級 `shrink-0` 標籤。架構上確立動態文本必須封裝於獨立 `<span className="truncate">` 節點中，與同級元素形成明確 DOM 邊界。
@@ -35,6 +38,10 @@
 ### 4. 離線架構與 PWA 快取 (Offline, Service Worker & PWA)
 - **站在既有巨人肩膀上的輕量化離線原則 (Shoulder-of-Giants Offline Architecture)**: 拒絕盲目引入 PowerSync 或 RxDB 等肥大客戶端複寫引擎，完全立足於專案既有的 `serwist`、`idb-keyval` 與 `SWRConfig provider` 官方標準模式，以最小代碼增量完成離線優先秒開閉環。
 - **動脈與靜脈讀寫分流架構 (Arterial/Venous Read-Write Decoupling)**: 在 Service Worker 層將 GET 查詢（SWR 快取）與 POST/PUT/PATCH/DELETE 突變（BackgroundSync 離線重試）物理隔離，杜絕突變請求被快取誤吞或 GET 查詢誤進背景佇列。
+- **PWA 帶參冷啟動導航防線 (Ignore-Search Navigation Pipeline)**: 手機 Standalone PWA 啟動或推播跳轉常帶有 `/?source=pwa` 或查詢參數。Service Worker `app-shell-navigation` 必須宣告 `matchOptions: { ignoreSearch: true }`，且導航逾時緊縮至 2s，確保離網冷啟動 100% 命中 App Shell 快取，防止字串嚴格比對失敗拋出瀏覽器小恐龍。
+- **行程上下文離線防自我抹殺雙守衛 (Offline Trip Non-Destructive Invariance)**: SWR 在斷網或 API 異常時回傳的空陣列不可作為「使用者無行程」之業務假設；`trip-context.tsx` 強制守衛 `isDefinitelyOnline && !isError`，只有確實在線且無錯誤時才允許清空當前行程，斷網狀態死守本機現存 ID 與 localStorage。
+- **SWR ES6 Proxy 防抖硬碟持久化 (L2 IndexedDB Auto-Persistence)**: 透過 `createPersistedCacheMap()` 以 ES6 Proxy 攔截 SWR 成功寫入操作，1500ms 防抖自動序列化持久化至 IndexedDB `tabidachi_swr_persisted_cache`，冷啟動重啟秒出。
+- **既有 Client 喚醒與內部事件廣播 (Smart Tab Focus & Push Navigation)**: 推播點擊由暴力 `client.navigate()` 重載升級為 `client.focus()` 喚醒分頁，並透過 `client.postMessage({ type: "TABIDACHI_PUSH_NAVIGATE", url })` 內部廣播，由 `useDeepLinkRouter` 實現無刷新平滑切換，保留當前滾動位置與編輯狀態。
 - **以體驗為先解鎖圖片快取容量 (Experience-First Media Cache Unlocking)**: 外部景點圖片上限擴充至 300 張（約 30MB），保障出國離線重度使用體驗，並透過 Cloudflare Worker 反向代理注入 `Access-Control-Allow-Origin: *`，防止 Safari 7~10MB Opaque 填充配額爆炸。
 - **離線快取真因釐清與過度工程化及時熔斷 (Over-engineering Circuit Breaker)**: 開發模式 (npm run dev) 預設阻斷 Service Worker 註冊以保護 HMR 免受污染，測試 PWA 離線能力應走標準生產預覽流程 (npm run build && npm start)，嚴禁盲目跨層在 RootLayout 注入 raw HTML/CSS inline splash 等破壞 Next.js 架構純潔性的補丁。
 
@@ -71,14 +78,19 @@
 - **Zustand 與 legacy localStorage 雙重持久化漂移 (`Dual Persistence Drift Trap`)**: 僅透過 `localStorage.removeItem('active_trip_id')` 清理快取，忽略了 Zustand 的 `persist` 中介軟體仍將舊 ID 儲存在 `trip-storage`，重新整理後死 ID 再次復發。教訓：具備多重持久化機制時，必須以 Zustand store action 為單一真實來源並同步清理 legacy 鍵。
 - **傳統 DOM scrollIntoView 在虛擬化清單下的無效陷阱 (`Virtual List Null DOM Trap`)**: 嘗試使用 `document.getElementById('expense-' + id)?.scrollIntoView()` 尋找目標項目。在項目數量超過可視區域時，Virtuoso 尚未將其渲染至 DOM 樹中，`document.getElementById` 必為 `null`。教訓：虛擬化滾動引擎必須使用虛擬庫提供的 Ref Handle（`virtuosoRef.current.scrollToIndex`）進行索引計算與滾動。
 - **行程切換無腦重置天數抹除外部深層意圖 (`Blind Day-1 Overwrite Trap`)**: 在 `itinerary-view.tsx` 中監聽 `[activeTripId]` 並直接調用 `setDay(1)`，導致推播傳入的 `day=0` 總覽參數被瞬間覆寫回第一天。教訓：在多狀態驅動視圖中，狀態重置必須檢查當前全域 Store 是否已有高優先順序的顯式指定值。
+- **父層 SWR 抖動引發 isMounted 誤殺非同步回傳 (`isMounted Weather Drop Trap`)**: 總覽天氣卡片在 `useEffect` 中發起耗時 1 秒的 Open-Meteo 請求。首次點入時父層 SWR revalidate 觸發 `setDailyLocs`，引發 Effect cleanup（`isMounted = false`），導致氣象回傳時被 `if (!isMounted) return` 丟棄，卡在骨架屏。教訓：長耗時資料抓取應委託全域 Store，回寫全域狀態而非組件局部 state。
+- **Zustand 非同步 IDB 靜態取值未響應 (`Zustand Async IDB Silent Trap`)**: `weatherStore` 使用非同步 `idbStorage`，若組件僅呼叫靜態 getter，IndexedDB 完成 rehydrate 後組件無法感知。教訓：組件頂層必須以 `useWeatherStore((s) => s.fiveDayCache)` 響應式訂閱。
 
 ### 3. iOS 原生與 UI 元件踩坑
 - **Flex 容器未封裝文字直用 truncate 引發擠壓 (`WebKit Anonymous Flex Truncation Trap`)**: 在 Header 直接使用 `className="flex items-center min-w-0 truncate"` 包覆文字與 `<Badge>`，在 WebKit/iOS 渲染引擎下裸文字包入 Anonymous Block，計算寬度時強制將同級 `shrink-0` 徽章壓縮或推出可視範圍。教訓：Flex 容器內的文本溢出截斷，務必單獨由子 `<span className="truncate">` 承擔。
 - **推倒式拆檔引發的閉包斷裂與 SWR 快取丟失 (`Premature Component Decomposition Trap`)**: 曾嘗試將 `chat-widget.tsx` 暴力解耦拆分至 3 個獨立組件，導致 `useDynamicPolling`、`prevTripIdRef` 雙清閉包、`textareaRef` 焦點控制以及多個自癒狀態遺失，引發大量測試報錯與死循環震盪。教訓：在缺乏完整抽象層保護前，高耦合高密度邏輯組件應優先採原地微創增強，嚴禁過度工程化的推倒重來。
 - **Framer Motion 動態 Key 引發元件重新掛載與重複請求 (`Dynamic Key Remount Trap`)**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 銷毀重新掛載引發 API 重複發送。教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
+- **React 19 在 useEffect 內同步 setState 觸發 cascading renders (`React 19 Cascading Renders Trap`)**: 在 `DailyWeatherStrip` 的 `useEffect` 內若同步呼叫 `setIsTimedOut(false)`，會被 React Compiler 判定為串聯重新渲染引發 Linter 報錯。教訓：改用衍生狀態 `const showTimeoutFallback = isTimedOut && !hasData && !isLoading`，`useEffect` 僅負責逾時定時器生命週期。
 - **試圖在 React RootLayout 內嵌 Raw HTML 假裝原生 Splash (`Inline Splash Over-Engineering Trap`)**: 在 Next.js App Router 體系下硬塞 90 行 inline `<style>`、`id="pwa-native-splash"` 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 `manifest.json` 自動渲染原生啟動畫面的基本事實。
 
 ### 4. 離線架構與 PWA 踩坑
+- **Service Worker 嚴格路徑比對導致帶參冷啟動白屏 (`Strict Navigation URL Mismatch Trap`)**: PWA 從桌面圖示啟動時常攜帶 `?source=pwa`，若 Service Worker 宣告 `navigateFallback` 未開啟 `ignoreSearch: true`，比對失敗直接由瀏覽器發起真實網路請求，在斷網情境下拋出小恐龍死白屏。教訓：離線 App Shell 導航快取必須宣告 `matchOptions: { ignoreSearch: true }`。
+- **斷網時誤信 SWR 空清單抹殺本機行程 (`Offline Empty-Array Wipe Trap`)**: 斷網冷啟動時 SWR 請求 `/api/trips` 失敗回退為空陣列，`trip-context.tsx` 誤判使用者無行程而調用 `setActiveTripId(null)` 並清空 localStorage，使整個 App 癱瘓。教訓：斷網時 SWR 狀態不可信，必須嚴格捍衛本機快取與 activeTripId。
 - **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB (`DataCloneError Trap`)**: SWR 內部的 `cacheMap` 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
 - **盲目 npm audit fix --force 引發的破壞性降級 (`Serwist Destructive Downgrade Trap`)**: `npm audit fix --force` 試圖將 `@serwist/turbopack` 降級至骨董版本 9.5.2 破壞 Next.js 16 打包。教訓：間接依賴漏洞治理應優先採用 npm 原生 overrides 原地鎖定，杜絕向後降級。
 
@@ -101,7 +113,8 @@
 
 - **多天總覽 POI Pin 碰撞聚合 (Clustering)**: 當多天行程累積超過 20+ 密集景點時，地圖 Pin 存在重疊遮蔽，待規劃導入 MapLibre 原生向量聚合圓圈或 Zoom Level 動態展延機制。
 - **MapLibre 實例與記憶體生命週期監控 (WebGL Context Lifecycle)**: 切換視圖頻繁時需持續監測 WebGL 上下文釋放情況，確保地圖卸載時完整執行 `map.remove()`，杜絕行動端 Safari 報錯 `Too many active WebGL contexts`。
-- **Service Worker 點擊深層喚起現有視窗**: 目前推播點擊跳轉依賴頁面加載。評估在 `sw.js` 的 `notificationclick` 加入 `clients.matchAll({ type: 'window' })` 智慧聚焦已開啟之分頁。
+- **離線照片二進位暫存隊列 (Offline Photo Blob Persistence)**: 目前離線隊列對 `FormData`（如現場收據拍照上傳）採取跳過並彈出 Toast 提示的保守策略。未來需支援將照片轉為 IndexedDB Blob 本機排程隊列，待連網時自動重播二進位上傳。
+- **氣象 API 伺服器端邊緣快取 (Open-Meteo Edge Cache)**: 目前客戶端直連 Open-Meteo。未來使用者量增長時，應在 FastAPI 後端透過 Redis 實作城市級反向代理快取，減少對第三方服務的依賴。
 - **Dependabot #83 安全依賴修復**: Default branch 存在 1 個 Moderate severity 安全漏洞（Dependabot #83），需排程安全升級。
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
 - **FastAPI ORJSONResponse 遷移評估**: FastAPI 新版本提出 `FastAPIDeprecationWarning: ORJSONResponse is deprecated`，後續可評估直接交由 Pydantic response_model 序列化。
@@ -128,6 +141,10 @@
 - **Filter Penetration on Deep Link**: 深度連結篩選器穿透機制，在尋址前自動重置 UI 篩選器以避免目標被遮蔽。
 - **Day-Zero Overview Precedence**: 零天總覽優先順序，外部深度連結指定天數優先於預設第 1 天的狀態調度原則。
 - **Ephemeral Target Parameter Cleanup**: 暫時性目標參數脫敏，消費完成後立即自 URL 抹除參數以達冪等性。
+- **Decoupled Global Write**: 請求生命週期全域解耦寫入，將外部 API 請求由組件局部 state 升級為全域 Store 寫入，避免組件卸載誤殺回傳資料。
+- **In-Flight Request Deduplication**: 飛航中請求池去重，以座標/參數為 Key 快取進行中的 Promise，避免多卡片並發重複發送相同請求。
+- **Local Timezone Date Safety**: 本地時區安全日期，採用 `toLocaleDateString('en-CA')` 杜絕 UTC 跨日時區漂移。
+- **Hard-Timeout Skeleton Fallback**: 骨架屏硬逾時優雅降級，定時終止 pulse 動效並展示友善重試介面。
 
 ### 3. iOS 原生體驗與 UI 元件領域
 - **Text-Node Isolation Architecture**: 文本節點隔離架構，Flex 容器內將文字單獨封裝於子 span 避免 WebKit 匿名文字區塊破壞同級排版。
@@ -141,6 +158,9 @@
 ### 4. 離線架構與 PWA 領域
 - **Shoulder-of-Giants Offline Architecture**: 站在既有巨人肩膀上的輕量化離線架構，立足既有 Serwist、idb-keyval 與 SWR 快取規範，達成零冗餘體積的離線優先秒開。
 - **Arterial/Venous Read-Write Decoupling**: 動脈與靜脈讀寫分流架構，將 GET 離線讀取與 POST/PUT/PATCH/DELETE 突變寫入在 Service Worker 層物理分離。
+- **Ignore-Search Navigation Pipeline**: 忽略查詢參數的離線導航管線，透過 `matchOptions: { ignoreSearch: true }` 保障帶參啟動 PWA 100% 命中 App Shell。
+- **Offline Trip Non-Destructive Invariance**: 離線行程不可抹除性，在網路中斷或 API 報錯時守護本地行程資料與選定狀態。
+- **Smart Tab Focus & Push Navigation**: 智慧分頁聚焦與無刷新推播導航，喚醒既有 Client 並透過 postMessage 內部事件平滑切換視圖。
 - **Hydration-Safe App Shell Fallback**: 水合安全 App Shell 導航降級，導航快取精確排除 _rsc 與 /api/ 以維護 React 19 RSC 水合安全。
 
 ### 5. 後端高併發與健康探針領域
