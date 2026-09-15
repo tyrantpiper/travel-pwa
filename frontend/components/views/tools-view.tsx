@@ -37,6 +37,8 @@ import { ExpenseDialog } from "@/components/expense-dialog"
 import { expensesApi, tripsApi, aiApi } from "@/lib/api"
 import { ActuaryDialogCard } from "@/components/ActuaryDialogCard"
 import { useOfflineMutation } from "@/lib/sync-hooks"
+import { SyncStatusBadge } from "@/components/ui/SyncStatusBadge"
+import { useSyncStatusStore } from "@/lib/stores/syncStatusStore"
 
 interface TripMember {
     user_id: string;
@@ -1633,6 +1635,9 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
         ? member.user_name 
         : (item.payer_name || (item.payer_id && !item.payer_id.includes('-') ? item.payer_id : null) || item.creator_name || null)
 
+    // ⚡ E4: 取得該筆費用的離線樂觀同步狀態
+    const syncMeta = useSyncStatusStore(state => state.mutations[item.id] || Object.values(state.mutations).find(m => m.entityId === item.id || m.tempId === item.id))
+
     return (
         <div className={cn(
             "flex flex-col p-3 rounded-xl border shadow-sm group transition-all duration-500",
@@ -1651,7 +1656,8 @@ const ExpenseItem = memo(function ExpenseItem({ item, rate, members, onEdit, onD
                     </div>
                     <div className="min-w-0">
                         <div className="font-bold text-slate-800 dark:text-slate-100 truncate text-sm flex items-center gap-2">
-                            {item.title}
+                            <span>{item.title}</span>
+                            {syncMeta && <SyncStatusBadge status={syncMeta.status} errorMessage={syncMeta.errorMessage} />}
                             {item.image_url && (
                                 <a href={item.image_url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-500">
                                     <ImageIcon className="w-3 h-3" />

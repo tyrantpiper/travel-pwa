@@ -141,6 +141,31 @@ export function getTripsListSnapshotSync<T = unknown>(userId: string | null | un
 }
 
 /**
+ * 🚀 非同步預熱行程清單：自 L2 (IndexedDB) 載入快照至 L1 (記憶體)，保障斷網冷啟動秒開
+ */
+export async function preloadTripsListSnapshot<T = unknown>(userId: string | null | undefined): Promise<T | null> {
+    if (!userId) return null
+
+    // 若 L1 命中則直接返回
+    const memoryHit = getTripsListSnapshotSync<T>(userId)
+    if (memoryHit) return memoryHit
+
+    if (!isBrowserWithStorage()) return null
+
+    try {
+        const stored = await get<SnapshotPayload<T>>(TRIPS_LIST_KEY_PREFIX + userId)
+        if (stored && stored.version === SNAPSHOT_SCHEMA_VERSION && stored.data) {
+            l1TripsListCache.set(userId, stored)
+            return stored.data
+        }
+        return null
+    } catch (err) {
+        console.warn("[Storage] L2 IndexedDB trips list read warning (safely ignored):", err)
+        return null
+    }
+}
+
+/**
  * 同步寫入行程清單至 L1 記憶體，並非同步持久化至 L2 IndexedDB
  */
 export async function saveTripsListSnapshot<T = unknown>(userId: string | null | undefined, data: T): Promise<void> {

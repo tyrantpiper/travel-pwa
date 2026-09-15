@@ -11,6 +11,9 @@ import { useDeepLinkRouter } from "@/lib/hooks/useDeepLinkRouter" // 🧭
 import { debugLog } from "@/lib/debug"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { AIStatusButton } from "@/components/ai/ai-status-button"
+import { SyncStatusCapsule } from "@/components/layout/SyncStatusCapsule"
+import { useTripRealtime } from "@/lib/hooks/useTripRealtime"
+import { useTripContext } from "@/lib/trip-context"
 
 import { motion } from "framer-motion"
 
@@ -58,31 +61,30 @@ const ToolsView = dynamic(() => import("@/components/views/tools-view").then(mod
     ssr: false,
     loading: () => (
         <div className="flex-1 flex flex-col bg-stone-50 animate-pulse p-6 space-y-6">
-            <div className="h-14 bg-stone-200/40 rounded-2xl w-full" />
-            <div className="grid grid-cols-2 gap-4">
-                <div className="h-32 bg-stone-200/30 rounded-2xl" />
-                <div className="h-32 bg-stone-200/30 rounded-2xl" />
-            </div>
+            <div className="h-10 bg-stone-200/50 rounded-xl w-1/3" />
+            <div className="h-48 bg-stone-200/30 rounded-3xl w-full" />
+            <div className="h-32 bg-stone-200/30 rounded-3xl w-full" />
         </div>
     )
 })
 const ProfileView = dynamic(() => import("@/components/views/profile-view").then(mod => mod.ProfileView), {
     ssr: false,
     loading: () => (
-        <div className="flex-1 flex flex-col bg-stone-50 animate-pulse">
-            <div className="h-48 bg-stone-200/40" />
-            <div className="p-6 -mt-12 space-y-6">
-                <div className="w-24 h-24 bg-stone-300/50 rounded-full border-4 border-white" />
-                <div className="space-y-3">
-                    <div className="h-6 bg-stone-200/50 rounded-lg w-1/3" />
-                    <div className="h-4 bg-stone-200/30 rounded-lg w-1/4" />
-                </div>
+        <div className="flex-1 flex flex-col bg-stone-50 animate-pulse p-6 space-y-6">
+            <div className="h-20 bg-stone-200/50 rounded-2xl w-full" />
+            <div className="space-y-3">
+                <div className="h-12 bg-stone-200/30 rounded-xl w-full" />
+                <div className="h-12 bg-stone-200/30 rounded-xl w-full" />
             </div>
         </div>
     )
 })
 
 export function AppShell() {
+    const { activeTripId, userId } = useTripContext()
+    // 🔄 E6: Supabase Realtime 跨裝置即時協同
+    useTripRealtime(activeTripId, userId)
+
     const [activeView, setActiveView] = useState("itinerary")
     const [direction, setDirection] = useState<1 | -1>(1)
     const prevViewRef = useRef(activeView)
@@ -182,8 +184,9 @@ export function AppShell() {
                         <AIStatusButton />
                     </div>
 
-                    {/* 🔔 通知鈴鐺 — 右上角固定定位 */}
-                    <div className="absolute top-2 right-3 z-100">
+                    {/* 🔔 通知鈴鐺與 ☁️ 離線同步狀態膠囊 — 右上角固定定位 */}
+                    <div className="absolute top-2 right-3 z-100 flex items-center gap-2">
+                        <SyncStatusCapsule />
                         <NotificationBell />
                     </div>
 
