@@ -34,20 +34,24 @@ python backend/scripts/health_check.py
 *If this fails, STOP and fix the reported errors immediately.*
 
 **2. Run the Full Regression Workflow**
-For a comprehensive check including frontend:
-```bash
-# Refer to the workflow file for steps
-# .agents/workflows/regression-check.md
+For a comprehensive check including frontend and backend:
+```powershell
+# 呼叫統一大門 /test 工作流
+# 檔案路徑: .agents/workflows/test.md
+cd frontend; npx vitest run; cd ..
+cd backend; pytest; cd ..
 ```
 
-**3. Manual Audit Checklist (Agent Thought Process)**
-- [ ] **Data Persistence**: Did I change how data is saved? verification: Check corresponding `INSERT/UPDATE` SQL or Supabase calls.
-- [ ] **Access Control**: Did I change permission logic (e.g., `is_member`)? verification: Verify logic covers edge cases (e.g., creator vs member).
-- [ ] **Legacy Compatibility**: Does the new code handle old data formats? verification: Check for `get(field, default)` usage.
+**3. Critical Seam Regression Checklist (關鍵縫隙回歸防線)**
+- [ ] **Deep Linking & Filter Penetration**: 驗證 URL 深層參數傳入時，篩選器是否自動穿透且虛擬清單平滑尋址（`frontend/__tests__/deep-link-router.test.ts`）。
+- [ ] **SWR 404 Silent Self-Healing**: 驗證死行程 ID 是否雙清自癒，合法行程是否雙重核驗絕不誤刪（`frontend/__tests__/self-healing-simulation.test.tsx`）。
+- [ ] **Multi-Day Map & Great-Circle Geometry**: 驗證大圓航線球面插值演算法與天數色盤映射（`frontend/__tests__/multi-day-map.test.ts`）。
+- [ ] **POI Lifespan & Backend Geocoding**: 驗證景點經緯度為空防禦與非同步保活連線池（`backend/tests/test_poi_lifespan.py`）。
+- [ ] **Decoupled Button DOM**: 驗證卡片未嵌套 `<button>`。
 
 ## Resources
 - Script: `backend/scripts/health_check.py`
-- Workflow: `.agents/workflows/regression-check.md`
+- Workflow: `.agents/workflows/test.md`
 
 ## [NEURAL] Neural Linkage
 4. **Signal Sentinel**:

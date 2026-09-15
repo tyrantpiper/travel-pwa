@@ -41,6 +41,16 @@ Systematically design, generate, and refactor React 19 / Next.js 16 UI component
    - Respect user motion preferences (`prefers-reduced-motion`).
 4. **Internationalization (i18n)**:
    - Zero hardcoded English/Chinese text strings in UI. All labels MUST consume translation dictionaries (`zh-TW`, `en`).
+5. **WebKit 匿名文本溢出防擠壓 (Text-Node Isolation)**:
+   - 在 Flex 容器（`flex items-center`）中，若包含同級 Badge / Button，動態文字**必須封裝於獨立的 `<span className="truncate">`**，嚴禁直接裸放文字於帶有 `truncate` 的父級 Flex 容器中。同級標籤/按鈕必須宣告 `shrink-0`。
+6. **解耦按鈕 DOM 架構 (Decoupled Button DOM Architecture)**:
+   - HTML5 嚴禁 `<button>` 嵌套 `<button>`。卡片操作列按鈕（如刪除、PDF、編輯）與卡片本體點擊區域，必須在 DOM 結構中解耦為同級 Sibling 節點，杜絕事件冒泡衝突與合法性違規。
+7. **WebGL Canvas 與浮動手勢硬體隔離 (Hardware Compositing)**:
+   - 跨越 WebGL Canvas 的可拖曳浮動節點（如 `chat-widget` 圓球），必須使用 `transform-gpu` 與動態 `willChange: isDragging ? "right, bottom" : "auto"`，地圖容器宣告 `transform-gpu will-change-transform`，阻斷拖曳時觸發主執行緒 Reflow 重繪 WebGL。
+8. **虛擬列表篩選穿透與 Ref 尋址 (Filter Penetration on Deep Link)**:
+   - 虛擬化列表（React Virtuoso）項目未渲染至 DOM 時，嚴禁直接使用 `document.getElementById(...).scrollIntoView()`。必須調用 `virtuosoRef.current.scrollToIndex`，且尋址前必須先重置衝突的 UI 篩選器（Filter Reset）。
+9. **觸控防護與輸入法選字防禦 (Touch Guards & IME Composition)**:
+   - 行動端按鈕一律提供 `active:scale-95` 觸覺回彈；多行文字輸入框必須在 `onKeyDown` 檢查 `if (e.nativeEvent.isComposing) return`，防止 CJK 注音/拼音選字時提前觸發發送。
 
 ---
 
