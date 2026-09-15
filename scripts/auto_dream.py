@@ -94,7 +94,7 @@ async def trigger_llm_compaction(history_content):
         process = await asyncio.create_subprocess_exec(
             AGY_CMD,
             "--print",
-            prompt[:8000],
+            prompt[:64000],  # 解除 8K 歷史截斷閥，支援結構化記憶體完整上下文
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
