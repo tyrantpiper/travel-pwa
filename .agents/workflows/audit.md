@@ -46,12 +46,19 @@ triggers:
        `ast_grep_search(lang="typescript", path="frontend", pattern="<button $$$PRE><button $$$INNER>$$$CONTENT</button>$$$POST</button>")`
      - `RULE-TS-02` (Radix a11y): 檢測 `DialogContent` 缺少 `DialogDescription`。
      - `RULE-TS-03` (Zero-Remount): 檢測常駐視圖容器是否誤用動態 `key={$KEY}`。
+     - `RULE-TS-04` (Bare Text in Flex Truncate): 檢測 Flex 標題列是否直接裸露文字並以父級 truncate 擠壓同級 Badge（應使用 `<span className="truncate">` 封裝）。
+     - `RULE-TS-05` (Virtual List Direct DOM Access): 檢測是否對虛擬列表（Virtuoso）直接調用 DOM `scrollIntoView`。
+       `ast_grep_search(lang="typescript", path="frontend", pattern="document.getElementById($ID).scrollIntoView($$$ARGS)")`
+     - `RULE-TS-06` (MapLibre Premature beforeId): 檢測 MapLibre `<Layer>` 是否包含 `beforeId` 並人工核驗其是否指向尚未宣告之圖層。
+       `ast_grep_search(lang="typescript", path="frontend", pattern="<Layer beforeId=$BEFORE $$$PROPS />")`
    - **Backend High-Concurrency Rules**:
      - `RULE-PY-01` (Async Blocking Trap): 檢測 `async def` 路由內直接調用 `time.sleep` 或同步 blocking I/O。
        `ast_grep_search(lang="python", path="backend", pattern="async def $FUNC($$$ARGS): $$$BODY time.sleep($SEC) $$$TAIL")`
      - `RULE-PY-02` (Supabase Thread-Safe Guard): 檢測線程池中執行非安全 Supabase Client。
        `ast_grep_search(lang="python", path="backend", pattern="asyncio.to_thread($CLIENT.$$$METHOD, $$$ARGS)")`
      - `RULE-PY-03` (Zero-Blocking Health Probe): 檢測 `/health` 內包含任何 I/O 或 DB 操作。
+     - `RULE-PY-04` (Timezone-Aware Datetime): 檢測後端 `datetime.now()` 是否遺漏 `timezone.utc`（杜絕 naive/aware 相減引發 TypeError）。
+       `ast_grep_search(lang="python", path="backend", pattern="datetime.now()")`
 
 ---
 
