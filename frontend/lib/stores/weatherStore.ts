@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware'
 import { get, set, del } from 'idb-keyval'
-import { WeatherResult } from '../weather-api'
+import { WeatherResult, fetchFiveDayForecast } from '../weather-api'
 
 /**
  * 💡 2026 Neural Connection: Global Weather Store
@@ -153,3 +153,45 @@ export const useWeatherStore = create<WeatherState>()(
         }
     )
 )
+
+// 🆕 In-Flight Promise Deduping Map
+const inFlightFiveDayRequests = new Map<string, Promise<DailyForecastItem[] | null>>()
+
+/**
+ * 🌤️ 帶有全域去重與背景寫入的 5 天氣象請求
+ * 即使組件短態卸載或生命週期重置，Promise 亦保證寫入全域狀態機，徹底阻絕 isMounted 誤殺
+ */
+export async function fetchFiveDayForecastWithDedup(
+    lat: number,
+    lng: number,
+    todayStr: string
+): Promise<DailyForecastItem[] | null> {
+    const key = `${lat.toFixed(2)}_${lng.toFixed(2)}_5d_${todayStr}`
+
+    // 1. 若全域快取已有資料，直接返回
+    const cached = useWeatherStore.getState().getFiveDayData(lat, lng, todayStr)
+    if (cached) return cached
+
+    // 2. 若已有進行中的同座標請求，直接共享 Promise
+    const inFlight = inFlightFiveDayRequests.get(key)
+    if (inFlight) return inFlight
+
+    // 3. 發起全新請求並登記至 In-Flight 池
+    const promise = (async () => {
+        try {
+            const items = await fetchFiveDayForecast(lat, lng)
+            if (items && items.length > 0) {
+                useWeatherStore.getState().setFiveDayData(lat, lng, todayStr, items)
+            }
+            return items
+        } catch (e) {
+            console.warn(`[weatherStore] ⚠️ fetchFiveDayForecast failed for (${lat}, ${lng}):`, e)
+            return null
+        } finally {
+            inFlightFiveDayRequests.delete(key)
+        }
+    })()
+
+    inFlightFiveDayRequests.set(key, promise)
+    return promise
+}

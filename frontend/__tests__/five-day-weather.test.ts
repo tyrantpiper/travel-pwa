@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { resolveDayLocation, CITY_COORDS } from '@/lib/location-resolver'
 import { fetchFiveDayForecast } from '@/lib/weather-api'
-import { useWeatherStore, DailyForecastItem } from '@/lib/stores/weatherStore'
+import { useWeatherStore, DailyForecastItem, fetchFiveDayForecastWithDedup } from '@/lib/stores/weatherStore'
+import { vi } from 'vitest'
 import { Activity, DailyLocation } from '@/lib/itinerary-types'
 
 describe('location-resolver: resolveDayLocation 4-tier fallback', () => {
@@ -93,4 +94,26 @@ describe('weatherStore: 5-Day forecast cache integration', () => {
         const result = store.getFiveDayData(35.6895, 139.6917, '2026-09-99')
         expect(result).toBeNull()
     })
+
+    it('fetchFiveDayForecastWithDedup should return cached data without refetching', async () => {
+        const sampleItems: DailyForecastItem[] = [
+            {
+                date: '2026-09-15',
+                dayLabel: '今日',
+                weatherCode: 0,
+                tempMax: 28,
+                tempMin: 20,
+                precipProb: 5
+            }
+        ]
+
+        // 預載入快取
+        useWeatherStore.getState().setFiveDayData(35.0116, 135.7681, '2026-09-15', sampleItems)
+
+        // 呼叫去重包裝函式
+        const result = await fetchFiveDayForecastWithDedup(35.0116, 135.7681, '2026-09-15')
+        expect(result).toEqual(sampleItems)
+        expect(result?.[0].tempMax).toBe(28)
+    })
 })
+
