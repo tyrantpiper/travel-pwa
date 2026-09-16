@@ -86,9 +86,11 @@ export function useTripDetail(
     const swrKey = (tripId && userId) ? [`/api/trips/${tripId}`, userId] : null
 
     // ⚡ 0ms L1 記憶體微秒級快顯 (首幀 0 骨架屏)
-    const initialSnapshot = useMemo(() => getTripSnapshotSync(tripId), [tripId])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const initialSnapshot = useMemo(() => getTripSnapshotSync<any>(tripId), [tripId])
 
-    const { data, error, mutate, isValidating } = useSWR(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error, mutate, isValidating } = useSWR<any>(
         swrKey,
         ([url, uid]: [string, string]) =>
             fetch(API_BASE + url, {
@@ -104,8 +106,9 @@ export function useTripDetail(
                 }
                 return r.json()
             }).catch(err => {
-                console.error("fetcher error:", err)
-                throw err
+                if (err instanceof HttpError) throw err
+                console.warn("🌐 [Fetcher] Offline network suppression:", err?.message || err)
+                throw new HttpError(0, err?.message || "Offline", { offline: true })
             }),
         {
             fallbackData: initialSnapshot || undefined,

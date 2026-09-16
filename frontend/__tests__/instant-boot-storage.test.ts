@@ -144,4 +144,20 @@ describe('Instant Boot L1/L2 Storage Engine Tests', () => {
         // 驗證 L2 IndexedDB 已持久化
         expect(mockIdbStore.has('tabidachi_trips_list_user-test-uuid')).toBe(true)
     })
+
+    it('TC-7: Process Kill Simulation — L0 LocalStorage mirror recovers data synchronously when L1 RAM is cleared', async () => {
+        const { saveTripSnapshot, getTripSnapshotSync, clearAllMemorySnapshots } = await import('@/lib/idb-storage')
+        const tripData = { id: 'trip-cold-boot', title: '北海道破冰船', days: [] }
+
+        // 1. 寫入快照 (L1 RAM + L0 LocalStorage + L2 IndexedDB)
+        await saveTripSnapshot('trip-cold-boot', tripData)
+
+        // 2. 模擬手機 App 被滑掉 (殺死進程，RAM 全部清空)
+        clearAllMemorySnapshots()
+
+        // 3. 驗證冷啟動第 0 毫秒：即使 L1 RAM 是空的，L0 LocalStorage 依然 100% 同步秒回資料！
+        const coldBootResult = getTripSnapshotSync('trip-cold-boot')
+        expect(coldBootResult).toEqual(tripData)
+    })
 })
+
