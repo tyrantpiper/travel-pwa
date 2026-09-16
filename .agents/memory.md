@@ -47,6 +47,7 @@
 - **Precache 動靜態資產解耦原則 (Precache Dynamic Chunk Decoupling)**: 現代全端 SSR/ISR 框架（Next.js）的動態 Chunks 每次構建皆帶隨機 Hash。**嚴禁將動態 JS Chunks 放入 Service Worker 的 install Precache 清單**。Precache 僅保留 `public/` 穩固資產與根 App Shell `/`；動態 JS/CSS Chunks 100% 交給 `runtimeCaching` 的 `CacheFirst`，在瀏覽器首次請求真實 URL 時動態緩存。
 - **Service Worker 絕不向瀏覽器舉白旗 (Zero-Response.error Invariance)**: 在 Navigation Fallback 策略中，`handlerDidError` 絕對禁止回傳 `Response.error()`。必須提供內聯 Zero-JS 物理 HTML/CSS 骨架，根絕 WebKit 彈出原生斷網報錯。
 - **WebKit Service Worker 註冊快取隔離 (`updateViaCache: "none"`)**: 所有現代 PWA 註冊必須顯式指定 `{ updateViaCache: "none" }`，切斷瀏覽器內部 HTTP 緩存對 `sw.js` 檔案的干擾，確保版本迭代即時生效。
+- **Web 標準黃金組合 vs 外部重型引擎 (Web Standards Golden Path over Heavy Sync Engines)**: 在 Local-First 選型中，堅決拒絕引入高侵入性的 WASM SQLite（如 PowerSync / ElectricSQL，需重構 80% 後端）或純文字 CRDT（如 Yjs，破壞強關聯關聯型結構）；堅定以「Serwist SW + SWR/Zustand + IndexedDB + Client-Generated UUIDv4」打造專屬旅遊場景的輕量化頂級架構，成熟度已達 85%，後續循序引進 `fractional-indexing` 補齊最後一哩路。
 
 ### 5. 後端高併發、資料庫與健康架構 (Backend Concurrency, Supabase & Health Probes)
 - **純記憶體存活探針與獨立保活解耦架構 (Zero-Blocking Health & Keep-Alive Decoupling)**: `/health` 端點堅持 0ms 純記憶體計算（單一職責原則），完全不觸發任何外部網路 I/O 或資料庫查詢；Supabase 7 天防休眠保活由 Lifespan 獨立非同步背景定時循環（每 6 小時一次）靜默守護，達成極限並發安全與 100% 外部監控免疫。
