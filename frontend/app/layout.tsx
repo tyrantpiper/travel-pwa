@@ -14,6 +14,7 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { AppClientLayer } from "@/components/app-client-layer"
 import { SpeculationRules } from "@/components/core/speculation-rules"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
+import { PwaHardSkeleton } from "@/components/core/pwa-hard-skeleton"
 
 import { IdbSwrProvider } from "@/lib/idb-swr-provider"
 
@@ -63,6 +64,7 @@ export default function RootLayout({
         <meta name="agd-partner-manual-verification" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
+        <PwaHardSkeleton />
         {process.env.NEXT_PUBLIC_TP_DRIVE_URL && (
           <Script 
             src={process.env.NEXT_PUBLIC_TP_DRIVE_URL} 

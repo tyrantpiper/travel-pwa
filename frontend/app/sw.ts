@@ -10,11 +10,27 @@ const bgSyncPlugin = new BackgroundSyncPlugin("tabidachi-offline-mutations", {
   maxRetentionTime: 24 * 60, // 最長保留重試 24 小時
 });
 
+/**
+ * 🛡️ WebKit 重定向淨化器 (Clean Response)
+ * 消除 Vercel CDN 或重定向帶有的 redirected: true 毒丸標記
+ * 避免 iOS WebKit WebClip 容器在離線載入時拒絕呈現引發死白屏
+ */
+function cleanResponse(res: Response | undefined): Response | undefined {
+  if (!res) return res;
+  if (!res.redirected) return res;
+  if (res.bodyUsed) return res;
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: new Headers(res.headers),
+  });
+}
+
 const serwist: Serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
-  navigationPreload: true,
+  navigationPreload: false, // 🛑 徹底停用，消除 iOS WebKit Standalone 冷啟動 Race Condition
   fallbacks: {
     entries: [
       {
@@ -183,12 +199,12 @@ const serwist: Serwist = new Serwist({
             // 🛡️ 關鍵容錯保險：任何未快取子路徑離線訪問失敗時，保底自快取吐出根目錄 App Shell (/)
             handlerDidError: async (): Promise<Response> => {
               const navCache = await caches.open("app-shell-navigation");
-              const cachedNav = await navCache.match("/");
-              if (cachedNav) return cachedNav;
+              const cachedNav = await navCache.match("/", { ignoreSearch: true });
+              if (cachedNav) return cleanResponse(cachedNav)!;
 
               try {
                 const precachedShell: Response | undefined = await serwist.matchPrecache("/");
-                if (precachedShell) return precachedShell;
+                if (precachedShell) return cleanResponse(precachedShell)!;
               } catch (e) {
                 console.warn("[SW] matchPrecache failed:", e);
               }
@@ -197,8 +213,8 @@ const serwist: Serwist = new Serwist({
               for (const key of cacheKeys) {
                 if (key.includes("precache")) {
                   const pCache = await caches.open(key);
-                  const match = await pCache.match("/");
-                  if (match) return match;
+                  const match = await pCache.match("/", { ignoreSearch: true });
+                  if (match) return cleanResponse(match)!;
                 }
               }
 
