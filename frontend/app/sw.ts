@@ -198,9 +198,13 @@ const serwist: Serwist = new Serwist({
           {
             // 🛡️ 關鍵容錯保險：任何未快取子路徑離線訪問失敗時，保底自快取吐出根目錄 App Shell (/)
             handlerDidError: async (): Promise<Response> => {
-              const navCache = await caches.open("app-shell-navigation");
-              const cachedNav = await navCache.match("/", { ignoreSearch: true });
-              if (cachedNav) return cleanResponse(cachedNav)!;
+              try {
+                const navCache = await caches.open("app-shell-navigation");
+                const cachedNav = await navCache.match("/", { ignoreSearch: true });
+                if (cachedNav) return cleanResponse(cachedNav)!;
+              } catch (e) {
+                console.warn("[SW] navCache match failed:", e);
+              }
 
               try {
                 const precachedShell: Response | undefined = await serwist.matchPrecache("/");
@@ -209,16 +213,27 @@ const serwist: Serwist = new Serwist({
                 console.warn("[SW] matchPrecache failed:", e);
               }
 
-              const cacheKeys = await caches.keys();
-              for (const key of cacheKeys) {
-                if (key.includes("precache")) {
-                  const pCache = await caches.open(key);
-                  const match = await pCache.match("/", { ignoreSearch: true });
-                  if (match) return cleanResponse(match)!;
+              try {
+                const cacheKeys = await caches.keys();
+                for (const key of cacheKeys) {
+                  if (key.includes("precache")) {
+                    const pCache = await caches.open(key);
+                    const match = await pCache.match("/", { ignoreSearch: true });
+                    if (match) return cleanResponse(match)!;
+                  }
                 }
+              } catch (e) {
+                console.warn("[SW] precache keys search failed:", e);
               }
 
-              return Response.error();
+              // 🛡️ 絕不向 WebKit 回傳 Response.error()！回傳內聯 Zero-JS 物理硬骨架，杜絕「Safari無法打開網頁」
+              return new Response(
+                `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Tabidachi</title><style>body{margin:0;background:#fafaf9;font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;height:100vh}.hdr{height:56px;background:#fff;border-bottom:1px solid #e7e5e4;display:flex;align-items:center;padding:0 16px;font-weight:700}.cnt{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px}.bx{height:96px;background:#e7e5e4;border-radius:16px;animation:pulse 1.5s ease-in-out infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}</style></head><body><div class="hdr">Tabidachi</div><div class="cnt"><div class="bx"></div><div class="bx"></div><div class="bx"></div></div></body></html>`,
+                {
+                  status: 200,
+                  headers: { "Content-Type": "text/html; charset=utf-8" },
+                }
+              );
             },
           },
         ],

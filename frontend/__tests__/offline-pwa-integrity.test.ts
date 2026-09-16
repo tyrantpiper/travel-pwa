@@ -27,7 +27,8 @@ describe("🛡️ PWA 離線秒開與 Precache 完整性硬核驗證 (Offline PW
         // 透過 eval 解析 manifest 陣列
         const manifest = eval(manifestSnippet) as Array<{ url: string; revision?: string | null }>;
         
-        expect(manifest.length).toBeGreaterThan(50); // 至少包含 50+ 項靜態資源
+        expect(manifest.length).toBeGreaterThan(20); // 包含 public/ 核心靜態資產與根目錄 App Shell
+        expect(manifest.some(e => e.url.includes("_next"))).toBe(false); // 🛡️ 徹底排除脆弱動態 chunks，杜絕 404
         
         // 關鍵斷言：根目錄 / 必須存在
         const rootEntry = manifest.find(e => e.url === "/");
@@ -59,7 +60,7 @@ describe("🛡️ PWA 離線秒開與 Precache 完整性硬核驗證 (Offline PW
         expect(fs.existsSync(swRegisterPath)).toBe(true);
         const registerSource = fs.readFileSync(swRegisterPath, "utf-8");
         expect(registerSource).toContain("navigator.serviceWorker");
-        expect(registerSource).toContain('.register("/sw.js")');
+        expect(registerSource).toContain('.register("/sw.js"');
     });
 
     it("TC-5: landing-page.tsx 未掛載門鎖已拔除，禁止 return null 白屏", () => {

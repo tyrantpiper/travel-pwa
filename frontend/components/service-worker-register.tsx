@@ -23,9 +23,9 @@ export function ServiceWorkerRegister() {
             }
             document.addEventListener("visibilitychange", handleVisibilityChange)
 
-            // 🚀 2. 註冊 Service Worker
+            // 🚀 2. 註冊 Service Worker (強制切斷 WebKit 內部 HTTP 快取)
             navigator.serviceWorker
-                .register("/sw.js")
+                .register("/sw.js", { updateViaCache: "none" })
                 .then((registration) => {
                     activeRegistration = registration
                     console.log("[SW] Registered with scope:", registration.scope)
