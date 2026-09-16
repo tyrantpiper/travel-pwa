@@ -10,11 +10,24 @@ process.env.NODE_ENV = "production";
 
 console.log("[build-sw] Starting build-time Service Worker compilation...");
 
+import { execSync } from "node:child_process";
+
+const gitRev = (() => {
+  try {
+    return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
+  } catch {
+    return "prod-" + Date.now();
+  }
+})();
+
 const { createSerwistRoute } = await import("@serwist/turbopack");
 
 const { generateStaticParams, GET } = createSerwistRoute({
   swSrc: path.join(frontendDir, "app", "sw.ts"),
   useNativeEsbuild: true,
+  additionalPrecacheEntries: [
+    { url: "/", revision: gitRev },
+  ],
   esbuildOptions: {
     define: {
       "process.env.NODE_ENV": '"production"',

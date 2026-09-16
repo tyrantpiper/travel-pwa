@@ -143,7 +143,7 @@ export function LocationEditDialog({
 
                     {/* 從活動同步按鈕 */}
                     {(() => {
-                        const activityLoc = currentTrip?.days?.find((d) => d.day === day)?.activities?.find((a) => a.lat && a.lng)
+                        const activityLoc = (Array.isArray(currentTrip?.days) ? currentTrip.days : []).find((d) => d.day === day)?.activities?.find((a) => a.lat && a.lng)
                         if (activityLoc) {
                             return (
                                 <Button

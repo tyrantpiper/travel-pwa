@@ -13,6 +13,7 @@ import { HtmlLangSync } from "@/components/ui/html-lang-sync"
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt"
 import { AppClientLayer } from "@/components/app-client-layer"
 import { SpeculationRules } from "@/components/core/speculation-rules"
+import { ServiceWorkerRegister } from "@/components/service-worker-register"
 
 import { IdbSwrProvider } from "@/lib/idb-swr-provider"
 
@@ -92,6 +93,7 @@ export default function RootLayout({
                 </Suspense>
                 <AppClientLayer />
                 <SpeculationRules />
+                <ServiceWorkerRegister />
                 <PWAInstallPrompt />
               </TripProvider>
             </IdbSwrProvider>

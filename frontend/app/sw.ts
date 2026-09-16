@@ -10,11 +10,21 @@ const bgSyncPlugin = new BackgroundSyncPlugin("tabidachi-offline-mutations", {
   maxRetentionTime: 24 * 60, // 最長保留重試 24 小時
 });
 
-const serwist = new Serwist({
+const serwist: Serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
+  fallbacks: {
+    entries: [
+      {
+        url: "/",
+        matcher({ request }) {
+          return request.destination === "document";
+        },
+      },
+    ],
+  },
   runtimeCaching: [
     {
       // 🏝️ 本地地理編碼資料 (離線優先)
@@ -171,9 +181,28 @@ const serwist = new Serwist({
           }),
           {
             // 🛡️ 關鍵容錯保險：任何未快取子路徑離線訪問失敗時，保底自快取吐出根目錄 App Shell (/)
-            handlerDidError: async () => {
-              const cache = await caches.open("app-shell-navigation");
-              return (await cache.match("/")) || Response.error();
+            handlerDidError: async (): Promise<Response> => {
+              const navCache = await caches.open("app-shell-navigation");
+              const cachedNav = await navCache.match("/");
+              if (cachedNav) return cachedNav;
+
+              try {
+                const precachedShell: Response | undefined = await serwist.matchPrecache("/");
+                if (precachedShell) return precachedShell;
+              } catch (e) {
+                console.warn("[SW] matchPrecache failed:", e);
+              }
+
+              const cacheKeys = await caches.keys();
+              for (const key of cacheKeys) {
+                if (key.includes("precache")) {
+                  const pCache = await caches.open(key);
+                  const match = await pCache.match("/");
+                  if (match) return match;
+                }
+              }
+
+              return Response.error();
             },
           },
         ],

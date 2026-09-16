@@ -304,7 +304,7 @@ export function ItineraryView() {
 
     useEffect(() => {
         const getFirstActivityWithCoords = () => {
-            if (!currentTrip?.days) return null
+            if (!currentTrip?.days || !Array.isArray(currentTrip.days)) return null
 
             // Priority 1: Search current day
             const currentDayData = currentTrip.days.find((d) => d.day === day)
@@ -1218,9 +1218,9 @@ export function ItineraryView() {
             }
         }
         // 🛡️ 雙重防禦守衛：以「日期計算天數」與「景點實際最大天數」取最大值，絕不隱藏任何一天！
-        const maxDayFromItems = currentTrip.days?.length > 0
+        const maxDayFromItems = (Array.isArray(currentTrip.days) && currentTrip.days.length > 0)
             ? Math.max(...currentTrip.days.map((d) => d.day || 1))
-            : 1
+            : (typeof (currentTrip as unknown as { days?: unknown })?.days === "number" ? (currentTrip as unknown as { days: number }).days : 1)
         return Math.max(daysFromDates, maxDayFromItems)
     })()
     const dayNumbers = Array.from({ length: totalDays }, (_, i) => i + 1)

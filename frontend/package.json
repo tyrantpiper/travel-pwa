@@ -10,7 +10,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:pwa-offline": "node ./scripts/verify-offline-swipe-reopen.mjs",
+    "test:pwa-itinerary-offline": "node ./scripts/verify-offline-itinerary-screen.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
