@@ -44,6 +44,9 @@
 - **既有 Client 喚醒與內部事件廣播 (Smart Tab Focus & Push Navigation)**: 推播點擊由暴力 `client.navigate()` 重載升級為 `client.focus()` 喚醒分頁，並透過 `client.postMessage({ type: "TABIDACHI_PUSH_NAVIGATE", url })` 內部廣播，由 `useDeepLinkRouter` 實現無刷新平滑切換，保留當前滾動位置與編輯狀態。
 - **以體驗為先解鎖圖片快取容量 (Experience-First Media Cache Unlocking)**: 外部景點圖片上限擴充至 300 張（約 30MB），保障出國離線重度使用體驗，並透過 Cloudflare Worker 反向代理注入 `Access-Control-Allow-Origin: *`，防止 Safari 7~10MB Opaque 填充配額爆炸。
 - **離線快取真因釐清與過度工程化及時熔斷 (Over-engineering Circuit Breaker)**: 開發模式 (npm run dev) 預設阻斷 Service Worker 註冊以保護 HMR 免受污染，測試 PWA 離線能力應走標準生產預覽流程 (npm run build && npm start)，嚴禁盲目跨層在 RootLayout 注入 raw HTML/CSS inline splash 等破壞 Next.js 架構純潔性的補丁。
+- **Precache 動靜態資產解耦原則 (Precache Dynamic Chunk Decoupling)**: 現代全端 SSR/ISR 框架（Next.js）的動態 Chunks 每次構建皆帶隨機 Hash。**嚴禁將動態 JS Chunks 放入 Service Worker 的 install Precache 清單**。Precache 僅保留 `public/` 穩固資產與根 App Shell `/`；動態 JS/CSS Chunks 100% 交給 `runtimeCaching` 的 `CacheFirst`，在瀏覽器首次請求真實 URL 時動態緩存。
+- **Service Worker 絕不向瀏覽器舉白旗 (Zero-Response.error Invariance)**: 在 Navigation Fallback 策略中，`handlerDidError` 絕對禁止回傳 `Response.error()`。必須提供內聯 Zero-JS 物理 HTML/CSS 骨架，根絕 WebKit 彈出原生斷網報錯。
+- **WebKit Service Worker 註冊快取隔離 (`updateViaCache: "none"`)**: 所有現代 PWA 註冊必須顯式指定 `{ updateViaCache: "none" }`，切斷瀏覽器內部 HTTP 緩存對 `sw.js` 檔案的干擾，確保版本迭代即時生效。
 
 ### 5. 後端高併發、資料庫與健康架構 (Backend Concurrency, Supabase & Health Probes)
 - **純記憶體存活探針與獨立保活解耦架構 (Zero-Blocking Health & Keep-Alive Decoupling)**: `/health` 端點堅持 0ms 純記憶體計算（單一職責原則），完全不觸發任何外部網路 I/O 或資料庫查詢；Supabase 7 天防休眠保活由 Lifespan 獨立非同步背景定時循環（每 6 小時一次）靜默守護，達成極限並發安全與 100% 外部監控免疫。
@@ -93,6 +96,9 @@
 - **斷網時誤信 SWR 空清單抹殺本機行程 (`Offline Empty-Array Wipe Trap`)**: 斷網冷啟動時 SWR 請求 `/api/trips` 失敗回退為空陣列，`trip-context.tsx` 誤判使用者無行程而調用 `setActiveTripId(null)` 並清空 localStorage，使整個 App 癱瘓。教訓：斷網時 SWR 狀態不可信，必須嚴格捍衛本機快取與 activeTripId。
 - **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB (`DataCloneError Trap`)**: SWR 內部的 `cacheMap` 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
 - **盲目 npm audit fix --force 引發的破壞性降級 (`Serwist Destructive Downgrade Trap`)**: `npm audit fix --force` 試圖將 `@serwist/turbopack` 降級至骨董版本 9.5.2 破壞 Next.js 16 打包。教訓：間接依賴漏洞治理應優先採用 npm 原生 overrides 原地鎖定，杜絕向後降級。
+- **Precache 動態 Chunk 導致 Service Worker 物理銷毀 (`Precache 404 Poison Pill Trap`)**: 本地編譯生成帶 Hash 的 `sw.js`（含 56 個本地 chunk hash），推送到 Vercel 後雲端 Hash 改變。手機安裝 SW 時請求本地 Hash 回傳 404，觸發 W3C 規範直接銷毀 SW，導致手機完全無 SW 服務。教訓：Precache 清單必須永遠保持 100% 命中率，脆弱的動態編譯產物絕不可放入 Precache。
+- **`Response.error()` 引發 WebKit 原生報錯彈窗 (`Response.error Safari Crash Trap`)**: 當多層快取落空時直接 `return Response.error()`，WebKit 將其視為致命連線失敗，向使用者彈出「Safari無法打開網頁，因為你 iPhone尚未連接網際網路。」教訓：PWA 的最底層防線必須是合法的 200 HTML 實體，絕不能向瀏覽器拋出硬錯誤。
+- **WebKit 頑固 HTTP 快取阻礙 SW 更新 (`WebKit sw.js Cache Retention Trap`)**: 未設定 `updateViaCache: "none"`，iOS 常常連續數天使用舊的 Service Worker 檔案，導致新部署的修正無法觸達使用者。教訓：`navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })` 是 iOS PWA 的標配。
 
 ### 5. 後端高併發、資料庫與健康探針踩坑
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`Supabase Client Deadlock`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。

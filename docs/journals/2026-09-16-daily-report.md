@@ -1,93 +1,104 @@
 # 📅 Daily Report - 2026-09-16
 
-> **系統狀態**：🟢 Production Stable, P0 Offline Cold-Start Hardened, Optimistic Sync Badges (E4), Smart Tab Focus (E5), Supabase Realtime Collaboration (E6), Overview Weather Zero-Freeze Fixed, 162 Vitest + 43 Pytest Passed (100%), 0 Type Errors, 0 Lint Warnings  
+> **系統狀態**：🟢 Production Stable, P0 iOS WebKit PWA Offline Cold-Start Fully Conquered (Zero-Blank, Zero-Crash), Optimistic Sync Badges (E4), Smart Tab Focus (E5), Realtime Collaboration (E6), 170 Vitest + 43 Pytest Passed (100%), 0 Type Errors, 0 Lint Warnings  
 > **今日關鍵提交**：
+> - [`1a8f8e8`](https://github.com/tyrantpiper/travel-pwa/commit/1a8f8e8) `fix(pwa): eliminate precache 404 broken link and native safari offline error`
+> - [`e93e908`](https://github.com/tyrantpiper/travel-pwa/commit/e93e908) `fix(pwa): resolve ios cold-start blank screen with L0 mirror`
+> - [`345d926`](https://github.com/tyrantpiper/travel-pwa/commit/345d926) `fix(pwa): precache root document and enforce global sw registration for offline instant reload`
+> - [`32a7340`](https://github.com/tyrantpiper/travel-pwa/commit/32a7340) `fix(pwa): shift service worker to build-time static pre-bundle for vercel cdn delivery`
 > - [`64f4c7b`](https://github.com/tyrantpiper/travel-pwa/commit/64f4c7b) `feat(pwa): harden offline cold-start, add optimistic sync badges, smart tab focus, and realtime collaboration`
 > - [`9b0a372`](https://github.com/tyrantpiper/travel-pwa/commit/9b0a372) `fix(weather): resolve overview weather cold-start freeze and add request deduplication`
-> - [`54e6470`](https://github.com/tyrantpiper/travel-pwa/commit/54e6470) `docs(specs): add overview weather cold-start spec and update agent memory`
 
 ---
 
-## 🟢 1. Features & Fixes (今日交付價值)
+## 🟢 1. Features & Fixes (今日交付價值與重大歷史突破)
 
-### 1.1 P0 離線冷啟動修復 (Offline Cold-Start Zero-Failure)
+### 1.1 🏆 史詩級突破：iOS WebKit PWA 離線冷啟動徹底攻克 (Offline Instant Boot Mastered)
+在 iPhone WebClip / Standalone PWA 環境下，歷經「死白屏」➔「Safari無法打開網頁」的深水區排查，完成閉環修復並於實機驗收通過：
+1. **Precache 動態 Chunk 解耦 (`globPatterns: ["public/**/*"]`)**：
+   - 徹底排查出斷網「無法打開網頁」真兇：舊版 Precache 包含本地隨機 Hash 的動態 chunks，推至 Vercel 後遠端生成全新 Hash，手機安裝時請求本地 Hash 遭遇 **HTTP 404**。
+   - 依據 W3C 規範：**只要 Precache 有 1 項 404，整個 Service Worker 在 install 階段立刻強制銷毀**！
+   - 解法：在 `frontend/scripts/build-sw.mjs` 中以 `globPatterns: ["public/**/*"]` 徹底剔除 `.next/static`，僅快取 29 個穩固資產與根 App Shell `/`，Precache 成功率 100%。
+2. **動態 JS Chunks 轉交 Runtime Cache (`CacheFirst`)**：
+   - Next.js 動態 chunks 轉由 `sw.ts` 的 `runtimeCaching` 以 `CacheFirst` 接管（`maxEntries: 128, maxAgeSeconds: 30 days`），由手機於首次訪問時以真實線上 URL 動態下載並持久化，根絕本地/雲端 Hash 衝突。
+3. **Zero-JS 物理硬骨架保底 (消滅 `Response.error()`)**：
+   - 舊版 `sw.ts` 的 `handlerDidError` 遇快取落空時拋出 `Response.error()`，向 WebKit 舉白旗觸發 Safari 原生「無法打開網頁」系統報錯。
+   - 重構為回傳 500 bytes 內嵌純 HTML/CSS 骨架屏，絕不回傳錯誤，消滅 iOS WebKit 原生中斷彈窗。
+4. **切斷 WebKit HTTP 快取毒丸 (`updateViaCache: "none"`)**：
+   - 在 `service-worker-register.tsx` 註冊時加入 `{ updateViaCache: "none" }`，強制 iOS Safari 每次檢查更新均直連伺服器，舊版壞死 SW 不再殘留。
+5. **實機真實驗收結果**：
+   - iPhone 關閉網路、開啟飛航模式、背景滑掉殺進程後冷開機，App Shell 順暢秒開，不再有任何白屏與報錯！
+
+### 1.2 P0 離線冷啟動快取防禦與自癒強化
 1. **Service Worker 導航快取忽略參數 (`ignoreSearch: true`)**：
-   - 手機安裝 PWA 後，點擊桌面圖示啟動時常攜帶 `/?source=pwa` 或系統查詢參數。舊版 Service Worker 因嚴格字串比對失敗直接判定斷網拋出小恐龍。
-   - 在 `frontend/app/sw.ts` 為 `app-shell-navigation` 宣告 `matchOptions: { ignoreSearch: true }`，確保帶參冷啟動 100% 命中核心快取；導航逾時由 3s 緊縮至 2s。
+   - 在 `frontend/app/sw.ts` 為 `app-shell-navigation` 宣告 `matchOptions: { ignoreSearch: true }`，確保帶參冷啟動 100% 命中核心快取；導航逾時緊縮至 2s。
 2. **行程上下文斷網防自我抹殺雙守衛 (`isDefinitelyOnline && !isError`)**：
-   - 舊版 `trip-context.tsx:188` 在斷網冷啟動時，因 SWR 請求 `/api/trips` 失敗回退為空陣列，錯誤判定使用者名下無行程，調用 `setActiveTripId(null)` 並抹除 `localStorage`，導致 App 進入死白屏。
-   - 增加嚴格守衛：只有在確實在線且 API 無錯誤時，才允許清空當前行程；斷網時死守本機現有行程。
+   - 守衛 `trip-context.tsx`：只有在確實在線且 API 無錯誤時才允許清空當前行程；斷網時死守本機現有行程與 LocalStorage。
 3. **SWR Proxy 防抖自動持久化儲存 (L2 IndexedDB Sync)**：
-   - 舊版 `idb-swr-provider.tsx` 只有讀取邏輯但無回寫邏輯，導致快取無法存入硬碟。
-   - 重構為工廠模式 `createPersistedCacheMap()`，以 ES6 Proxy 攔截 SWR 成功寫入操作，1500ms 防抖自動序列化持久化至 IndexedDB `tabidachi_swr_persisted_cache`，冷啟動重啟秒出。
+   - 以 ES6 Proxy 攔截 SWR 成功寫入操作，1500ms 防抖自動序列化持久化至 IndexedDB `tabidachi_swr_persisted_cache`，冷啟動重啟秒出。
 
-### 1.2 E4 離線突變樂觀 UI 狀態提示 (Optimistic Mutation Badges)
-1. **Zustand 全域離線同步狀態機 (`syncStatusStore.ts`)**：
-   - 建立狀態機追蹤突變四態：`pending`（琥珀色微光脈衝）、`syncing`（藍色旋轉）、`synced`（綠色打勾，2.5s 淡出）、`failed`（紅色驚嘆號手動重試）。
-2. **微型狀態徽章與全域膠囊 (`SyncStatusBadge.tsx` & `SyncStatusCapsule.tsx`)**：
-   - 在行程景點卡片（`timeline-card.tsx`）與費用記帳卡片（`tools-view.tsx`）掛載微型徽章，離線編輯一目了然。
-   - 頂部導航列掛載動態膠囊，隨時顯示「☁️ 離線暫存 (N)」，點擊即時手動重試同步。
+### 1.3 E4 離線突變樂觀 UI 狀態提示 (Optimistic Mutation Badges)
+1. **Zustand 全域離線同步狀態機 (`syncStatusStore.ts`)**：追蹤突變四態（`pending`, `syncing`, `synced`, `failed`）。
+2. **微型狀態徽章與全域膠囊 (`SyncStatusBadge.tsx` & `SyncStatusCapsule.tsx`)**：景點卡片、費用記帳卡片與頂部導航膠囊即時視覺反饋。
 
-### 1.3 E5 Service Worker 點擊智慧聚焦既有分頁 (Smart Tab Focus & Smooth Navigation)
-1. **既有 Client 喚醒與內部廣播 (`sw.ts`)**：
-   - 推播點擊由暴力 `client.navigate()` 重載，升級為 `client.focus()` 喚醒分頁，並透過 `client.postMessage({ type: "TABIDACHI_PUSH_NAVIGATE", url })` 發布內部事件。
-2. **平滑無刷新路由切換 (`useDeepLinkRouter.ts`)**：
-   - 前端接收 SW 訊息後平滑切換視圖與行程日期，保留使用者當前滾動位置與編輯狀態，不打斷操作。
+### 1.4 E5 Service Worker 點擊智慧聚焦既有分頁 (Smart Tab Focus & Smooth Navigation)
+1. **既有 Client 喚醒與內部廣播 (`sw.ts`)**：以 `client.focus()` 喚醒既有分頁，並透過 postMessage 內部廣播事件。
+2. **平滑無刷新路由切換 (`useDeepLinkRouter.ts`)**：無重載切換視圖與行程天數，保留使用者滾動位置與編輯狀態。
 
-### 1.4 E6 Supabase Realtime 跨裝置即時協同 (Multi-Device Collaboration)
-1. **PostgreSQL CDC 即時訂閱 (`useTripRealtime.ts`)**：
-   - 前端透過 Supabase Realtime WebSocket 通道訂閱 `itineraries` 與 `expenses` 資料表異動。
-   - 收到變更後 300ms 內自動靜默調用 SWR `mutate(..., { revalidate: true })`，同行程多人/跨裝置編輯零延遲無感同步。
+### 1.5 E6 Supabase Realtime 跨裝置即時協同 (Multi-Device Collaboration)
+1. **PostgreSQL CDC 即時訂閱 (`useTripRealtime.ts`)**：WebSocket 訂閱 `itineraries` 與 `expenses` 表異動，300ms 內靜默調用 SWR mutate 無感同步。
 
-### 1.5 總覽天氣首次進入顯示修復與 In-Flight 去重 (Overview Weather Cold-Start Freeze Fix)
-1. **生命週期與請求解耦 (`weatherStore.ts`)**：
-   - 實作 `fetchFiveDayForecastWithDedup(lat, lng, todayStr)`，內建 `inFlightFiveDayRequests` Promise 記憶體池，多卡片同座標去重。
-   - 請求成功保證寫入全域 Zustand store，徹底擺脫原組件因父層 SWR 抖動觸發 `isMounted = false` 丟棄天氣資料之核心缺陷。
-2. **響應式快取綁定與座標指紋 (`TripMasterOverview.tsx`)**：
-   - 頂層直接綁定 `const fiveDayCache = useWeatherStore((s) => s.fiveDayCache)`，廢除脆弱的局部 state。
-   - 採用座標字串指紋 `clusterFingerprint` 作為 Effect 依賴，杜絕重複觸發。
-   - 本地時區安全鍵 `new Date().toLocaleDateString('en-CA')`，防禦深夜 0~8 點 UTC 跨日時區漂移。
-3. **4 秒逾時優雅降級 (`DailyWeatherStrip.tsx`)**：
-   - 逾時自動停止骨架屏閃爍，平滑轉換為「暫無氣象資料 · 重試」狀態，支援一鍵手動重新整理。
+### 1.6 總覽天氣首次進入顯示修復與 In-Flight 去重 (Overview Weather Freeze Fix)
+1. **生命週期與請求解耦 (`weatherStore.ts`)**：`inFlightFiveDayRequests` Promise 記憶體池同座標去重，全域 Zustand store 保證回寫。
+2. **座標指紋與本地時區安全 (`TripMasterOverview.tsx`)**：`clusterFingerprint` 依賴防重複，`toLocaleDateString('en-CA')` 防跨日時區漂移。
+3. **4 秒逾時優雅降級 (`DailyWeatherStrip.tsx`)**：逾時切換「暫無氣象資料 · 重試」狀態，支援手動刷新。
 
 ---
 
 ## 🏛️ 2. Architecture Decisions (今日架構決策)
 
-1. **[AD-2026-09-16-01] 外部網路請求必須與 React 組件生命週期解耦 (Decoupled Global Write)**：
-   - 在 React 19 與頻繁重繪的 App 架構下，非同步長耗時請求（如 Open-Meteo API）嚴禁在組件內部 state 與 `isMounted` 閉包中回寫；必須由獨立模組寫入全域狀態機，組件僅在渲染階段以 selector 讀取，防止「資料已回傳但畫面作廢」。
-2. **[AD-2026-09-16-02] PWA App-Shell 導航必須開啟 `ignoreSearch: true`**：
-   - 桌面 Standalone PWA 啟動帶參是常態，若 Service Worker 採嚴格 URL 比對會直接造成斷網白屏。`ignoreSearch: true` 是離線體驗的第一道絕對防線。
-3. **[AD-2026-09-16-03] 離線狀態下行程清單的不可抹除性 (Offline Trip Non-Destructive Invariance)**：
-   - 斷網或 API 異常時 SWR 回傳的空陣列不可作為「使用者無行程」之業務假設，系統必須嚴格捍衛本機現存 ID 與 LocalStorage。
+1. **[AD-2026-09-16-01] Precache 動靜態資產解耦原則 (Precache Dynamic Chunk Decoupling)**：
+   - 現代全端 SSR/ISR 框架（Next.js）的動態 Chunks 每次構建皆帶隨機 Hash。**嚴禁將動態 JS Chunks 放入 Service Worker 的 install Precache 清單**。
+   - Precache 僅保留 `public/` 穩固資產與根 App Shell `/`；動態 JS/CSS Chunks 100% 交給 `runtimeCaching` 的 `CacheFirst`，在瀏覽器首次請求真實 URL 時動態緩存。
+2. **[AD-2026-09-16-02] Service Worker 絕不向瀏覽器舉白旗 (Zero-Response.error Invariance)**：
+   - 在 Navigation Fallback 策略中，`handlerDidError` 絕對禁止回傳 `Response.error()`。必須提供內聯 Zero-JS 物理 HTML/CSS 骨架，根絕 WebKit 彈出原生斷網報錯。
+3. **[AD-2026-09-16-03] WebKit Service Worker 註冊快取隔離 (`updateViaCache: "none"`)**：
+   - 所有現代 PWA 註冊必須顯式指定 `{ updateViaCache: "none" }`，切斷瀏覽器內部 HTTP 緩存對 `sw.js` 檔案的干擾，確保版本迭代即時生效。
+4. **[AD-2026-09-16-04] 外部網路請求必須與 React 組件生命週期解耦 (Decoupled Global Write)**：
+   - 非同步長耗時請求嚴禁在組件內部 state 與 `isMounted` 閉包中回寫，必須由獨立模組寫入全域狀態機，組件僅以 selector 訂閱。
+5. **[AD-2026-09-16-05] PWA App-Shell 導航必須開啟 `ignoreSearch: true`**：
+   - Standalone PWA 帶參冷啟動常態，`ignoreSearch: true` 緊縮導航逾時至 2s，為離線第一道防線。
 
 ---
 
 ## 🔴 3. Technical Debt (技術債與後續追蹤)
 
 1. **離線照片二進位暫存隊列 (Offline Photo Blob Persistence)**：
-   - 目前離線隊列對 `FormData`（如現場收據拍照上傳）採取跳過並彈出 Toast 提示的保守策略。未來需支援將照片轉為 IndexedDB Blob 本機排程隊列，待連網時自動重播二進位上傳。
+   - 目前離線隊列對 `FormData` 採取跳過並彈出 Toast 提示。後續規劃將照片轉為 IndexedDB Blob 本機排程隊列，連網時自動重播。
 2. **氣象 API 伺服器端邊緣快取 (Open-Meteo Edge Cache)**：
-   - 目前客戶端直連 Open-Meteo。未來使用者量增長時，應在 FastAPI 後端透過 Redis 實作城市級反向代理快取，減少對第三方服務的依賴。
+   - 未來在 FastAPI 後端透過 Redis 實作城市級反向代理快取，降低對外部第三方 API 依賴。
 
 ---
 
 ## 🛡️ 4. Failed Paths (今日踩坑紀錄與排錯經驗)
 
-1. **React 19 / React Compiler 的 `react-hooks/set-state-in-effect` 嚴格規則**：
-   - 在 `DailyWeatherStrip.tsx` 的 `useEffect` 內若同步調用 `setIsTimedOut(false)`，會被 React Compiler 判定為串聯重新渲染 (cascading renders) 引發 Linter 報錯。
-   - **解法**：改用衍生狀態 `const showTimeoutFallback = isTimedOut && !hasData && !isLoading`，`useEffect` 僅專注於非同步定時器排程，完全符合純函數單向資料流原則。
-2. **Zustand 非同步 IndexedDB Storage 的未感知延遲**：
-   - `weatherStore` 使用非同步 `idbStorage`，若組件僅呼叫靜態 getter `getFiveDayData`，組件不會訂閱 store 變更，IndexedDB 讀取完畢後不會自動觸發 re-render。
-   - **解法**：在組件頂層直接訂閱 `useWeatherStore((s) => s.fiveDayCache)`，資料只要就緒即瞬間響應。
-3. **UTC 跨日 8 小時時差穿透**：
-   - `new Date().toISOString().split("T")[0]` 在台灣/日本時間 00:00~08:00 會回傳前一天的 UTC 日期，造成快取鍵與本地行程排程日期錯位。
-   - **解法**：全面改用 `new Date().toLocaleDateString('en-CA')` 對齊客戶端本地時區。
+1. **Precache 動態 Chunk 導致 Service Worker 物理銷毀 (`Precache 404 Poison Pill Trap`)**：
+   - 本地編譯生成帶 Hash 的 `sw.js`（含 56 個本地 chunk hash），推送到 Vercel 後雲端 Hash 改變。手機安裝 SW 時請求本地 Hash 回傳 404，觸發 W3C 規範直接銷毀 SW。
+   - **教訓**：Precache 清單必須永遠保持 100% 命中率，脆弱的動態編譯產物絕不可放入 Precache。
+2. **`Response.error()` 引發 WebKit 原生報錯彈窗 (`Response.error Safari Crash Trap`)**：
+   - 當多層快取落空時直接 `return Response.error()`，WebKit 將其視為致命連線失敗，向使用者彈出「Safari無法打開網頁，因為你 iPhone尚未連接網際網路。」
+   - **教訓**：PWA 的最底層防線必須是合法的 200 HTML 實體，絕不能向瀏覽器拋出硬錯誤。
+3. **WebKit 頑固 HTTP 快取阻礙 SW 更新 (`WebKit sw.js Cache Retention Trap`)**：
+   - 未設定 `updateViaCache: "none"`，iOS 常常連續數天使用舊的 Service Worker 檔案，導致新部署的修正無法觸達使用者。
+   - **教訓**：`navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })` 是 iOS PWA 的標配。
+4. **React 19 / React Compiler 的 `react-hooks/set-state-in-effect` 嚴格規則**：
+   - `DailyWeatherStrip.tsx` 的 `useEffect` 內若同步調用 `setIsTimedOut(false)` 引發 cascading renders 報錯。
+   - **解法**：改用衍生狀態，`useEffect` 僅負責非同步排程。
 
 ---
 
 ## 🚀 5. Next Steps (後續行動)
 
-1. **真機離線冷啟動手動驗收**：在實體行動裝置與飛航模式下實測點開 PWA，體驗 0 網路秒開與連續 5 天天氣快取呈現。
+1. **離線全情境長效穩定度監控**：持續觀察 iOS WebClip 長時間處於背景（超過 24 小時）喚醒後的 SW 存活率。
 2. **收據相片離線暫存架構規劃**：啟動離線 FormData Blob 儲存規格設計，打通記帳拍照離線全流程。
-3. **架構演進清單同步更新**：同步更新 `architecture-evolution-backlog-spec.md`，將 E4, E5, E6 標記為已上線。
+3. **架構演進清單同步更新**：同步更新 `architecture-evolution-backlog-spec.md`，將 PWA 離線冷啟動標記為完全解決。
