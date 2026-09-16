@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, cp } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,8 @@ const { createSerwistRoute } = await import("@serwist/turbopack");
 const { generateStaticParams, GET } = createSerwistRoute({
   swSrc: path.join(frontendDir, "app", "sw.ts"),
   useNativeEsbuild: true,
+  // 🛡️ 關鍵修復：僅快取 public/ 穩固資產，徹底剔除 .next/static 動態臨時 chunks，杜絕 404
+  globPatterns: ["public/**/*"],
   additionalPrecacheEntries: [
     { url: "/", revision: gitRev },
   ],
@@ -48,6 +51,18 @@ for (const { path: filePath } of params) {
   const targetPath = path.join(outDir, filePath);
   await writeFile(targetPath, content, "utf-8");
   console.log(`[build-sw] ✅ Generated static asset: ${targetPath} (${(content.length / 1024).toFixed(2)} KiB)`);
+
+  // 🛡️ 關鍵補足：若在 Vercel 雲端構建環境，同步輸出至 .vercel/output/static
+  const vercelStaticDir = path.join(frontendDir, ".vercel", "output", "static");
+  if (existsSync(vercelStaticDir)) {
+    try {
+      await cp(targetPath, path.join(vercelStaticDir, filePath));
+      console.log(`[build-sw] 🚀 Synced to Vercel output: ${filePath}`);
+    } catch (copyErr) {
+      console.warn(`[build-sw] ⚠️ Vercel sync warning (non-fatal): ${copyErr.message}`);
+    }
+  }
 }
 
 console.log("[build-sw] Service Worker build complete! Assets ready in public/ directory.");
+
