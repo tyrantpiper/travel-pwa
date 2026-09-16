@@ -222,7 +222,8 @@ export function LandingPage() {
         }
     }
 
-    if (!mounted) return null;
+    // 🛡️ 徹底消滅未 Hydration 期間的純白屏死鎖，立即給出骨架屏
+    if (!mounted) return <AppShellSkeleton />;
 
     // 🆕 Show welcome wizard overlay
     if (showWizard) {

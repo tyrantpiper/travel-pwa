@@ -5,7 +5,7 @@ import { PushPermissionPrompt } from "@/components/notifications/push-permission
 import dynamic from "next/dynamic"
 import { BottomNav } from "@/components/bottom-nav"
 import { OfflineBanner } from "@/components/ui/offline-banner"
-import { useServiceWorker, useHaptic } from "@/lib/hooks"
+import { useHaptic } from "@/lib/hooks"
 import { useScrollState } from "@/lib/hooks/useScrollState" // 🆕
 import { useDeepLinkRouter } from "@/lib/hooks/useDeepLinkRouter" // 🧭
 import { debugLog } from "@/lib/debug"
@@ -123,9 +123,6 @@ export function AppShell() {
     // 🆕 滾動狀態監測 (2026 Smart UI)
     const { isNavVisible, isAtTop, scrollToTop } = useScrollState()
     const haptic = useHaptic() // 🆕 震動回饋
-
-    // Register Service Worker in production
-    useServiceWorker()
 
     // Listen for navigation events from other components
     useEffect(() => {
