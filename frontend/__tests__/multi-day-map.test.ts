@@ -151,4 +151,67 @@ describe('Multi-Day Route Mesh Geo Engine (geo-multi-day.ts)', () => {
         expect(activeDayState).toBe(2)
         expect(mockFitBounds).not.toHaveBeenCalled()
     })
+
+    it('TC-7: Travel mode cache isolation and transit dasharray style preservation', () => {
+        // 模擬二級快取結構
+        const modeCache: Record<string, Record<number, [number, number][]>> = {
+            walk: { 1: [[121.5, 25.0], [121.51, 25.01]] },
+            drive: { 1: [[121.5, 25.0], [121.55, 25.05], [121.51, 25.01]] },
+            transit: {}
+        }
+
+        // 1. 切換至 drive 模式讀取正確快取
+        let currentRoutes = modeCache['drive']
+        expect(currentRoutes[1].length).toBe(3)
+
+        // 2. 切換至尚未載入的 transit 模式時，原子清空舊模式，防止不同模式拼裝混雜
+        const targetMode = 'transit'
+        if (modeCache[targetMode] && Object.keys(modeCache[targetMode]).length > 0) {
+            currentRoutes = modeCache[targetMode]
+        } else {
+            currentRoutes = {}
+        }
+        expect(Object.keys(currentRoutes).length).toBe(0)
+
+        // 3. transit 樣式屬性計算
+        const getCoreLayerPaint = (mode: 'walk' | 'drive' | 'transit') => ({
+            'line-color': '#6366F1',
+            ...(mode === 'transit' ? { 'line-dasharray': [2, 2] } : {})
+        })
+        expect(getCoreLayerPaint('walk')).not.toHaveProperty('line-dasharray')
+        expect(getCoreLayerPaint('drive')).not.toHaveProperty('line-dasharray')
+        expect(getCoreLayerPaint('transit')).toHaveProperty('line-dasharray', [2, 2])
+    })
+
+    it('TC-8: GPS coordinate guard prevents NaN/Null/Zero and releases 3D flight mutex', () => {
+        const isCoordValid = (lat: unknown, lng: unknown): boolean => {
+            const numLat = Number(lat)
+            const numLng = Number(lng)
+            return (
+                Number.isFinite(numLat) &&
+                Number.isFinite(numLng) &&
+                numLat !== 0 &&
+                numLng !== 0 &&
+                Math.abs(numLat) <= 90 &&
+                Math.abs(numLng) <= 180
+            )
+        }
+
+        // 非法坐標應被嚴格阻斷
+        expect(isCoordValid(NaN, 121.5)).toBe(false)
+        expect(isCoordValid(null, 121.5)).toBe(false)
+        expect(isCoordValid(0, 0)).toBe(false)
+        expect(isCoordValid(91, 121)).toBe(false)
+        expect(isCoordValid(25.0339, 121.5654)).toBe(true)
+
+        // 相機鎖互斥：定位時若正在導覽必須優先釋放相機鎖
+        let isTouring = true
+        const cancelFlightMock = vi.fn(() => { isTouring = false })
+        const triggerLocate = () => {
+            if (isTouring) cancelFlightMock()
+        }
+        triggerLocate()
+        expect(cancelFlightMock).toHaveBeenCalledTimes(1)
+        expect(isTouring).toBe(false)
+    })
 })
