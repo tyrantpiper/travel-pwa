@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
-import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane } from "lucide-react"
+import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane, Footprints, Car, Bus, Eye, Crosshair, Loader2 } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { setWorkerUrl } from "maplibre-gl"
 
@@ -11,7 +11,7 @@ if (typeof window !== "undefined") {
 }
 
 import { Trip, Activity } from "@/lib/itinerary-types"
-import { MAP_STYLES } from "@/lib/constants"
+import { MAP_STYLES, MAPILLARY } from "@/lib/constants"
 import { useLanguage } from "@/lib/LanguageContext"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import {
@@ -24,6 +24,9 @@ import { TourHudCapsule } from "@/components/TourHudCapsule"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
 import { toast } from "sonner"
+
+// API 基礎路徑 (模組頂部常數化，避免在並行閉包內重複解析 process.env)
+const ROUTE_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
 
 interface MultiDayMasterMapProps {
     trip?: Trip
@@ -44,6 +47,21 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
 
     // 兩階段道路 Polyline 快取 (DayNum ➔ Coordinates)
     const [roadRoutesByDay, setRoadRoutesByDay] = useState<Record<number, [number, number][]>>({})
+    // 交通模式狀態 (預設 'walk')
+    const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
+    // 模式二級快取引用 (杜絕跨模式軌跡混雜與重複請求)
+    const modeCacheRef = useRef<Record<string, Record<number, [number, number][]>>>({
+        walk: {},
+        drive: {},
+        transit: {}
+    })
+
+    // GPS 定位狀態
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [isLocating, setIsLocating] = useState<boolean>(false)
+
+    // 街景覆蓋圖層開關
+    const [showMapillaryCoverage, setShowMapillaryCoverage] = useState<boolean>(false)
 
     const mapRef = useRef<MapRef>(null)
 
@@ -65,6 +83,54 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     // 街景狀態
     const [mapillaryViewerOpen, setMapillaryViewerOpen] = useState(false)
     const [mapillaryTarget, setMapillaryTarget] = useState<{ lat: number; lng: number } | null>(null)
+
+    // 切換交通模式 (帶相機鎖釋放與二級快取極速載入)
+    const handleModeChange = useCallback((newMode: 'walk' | 'drive' | 'transit') => {
+        if (mode === newMode) return
+        if (isTouring || isFlying) cancelFlight()
+        setMode(newMode)
+        const cached = modeCacheRef.current[newMode]
+        if (cached && Object.keys(cached).length > 0) {
+            setRoadRoutesByDay(cached)
+        } else {
+            setRoadRoutesByDay({})
+        }
+    }, [mode, isTouring, isFlying, cancelFlight])
+
+    // GPS 定位到我 (帶相機鎖釋放、高精度防禦與平滑 flyTo)
+    const handleLocateMe = useCallback(() => {
+        if (typeof window === 'undefined' || !navigator?.geolocation) {
+            toast.error(zh ? "您的瀏覽器不支援地理定位功能" : "Geolocation not supported")
+            return
+        }
+        if (isTouring || isFlying) cancelFlight()
+        setIsLocating(true)
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords
+                if (Number.isFinite(latitude) && Number.isFinite(longitude) && latitude !== 0 && longitude !== 0) {
+                    setUserLocation({ lat: latitude, lng: longitude })
+                    mapRef.current?.flyTo({
+                        center: [longitude, latitude],
+                        zoom: 15,
+                        duration: 1800,
+                        essential: true
+                    })
+                    toast.success(zh ? "已定位至當前位置" : "Located to your position")
+                }
+                setIsLocating(false)
+            },
+            (error) => {
+                setIsLocating(false)
+                if (error.code === error.PERMISSION_DENIED) {
+                    toast.error(zh ? "定位權限遭拒，請至瀏覽器設定允許" : "Location permission denied")
+                } else {
+                    toast.error(zh ? "無法取得定位，請稍後再試" : "Location acquisition failed")
+                }
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+        )
+    }, [zh, isTouring, isFlying, cancelFlight])
 
     // 1. 構建全行程 GeoJSON
     const { featureCollection, validPoints } = useMemo(() => {
@@ -91,7 +157,6 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
         return [0, ...availableDays]
     }, [trip])
 
-    // 5. 兩階段漸進式路網請求 (背景非同步載入)
     // 5. 兩階段漸進式路網請求 (獨立並行非同步載入 + 抵達即刻渲染)
     useEffect(() => {
         if (!trip || !trip.days || trip.days.length === 0) return
@@ -120,13 +185,12 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
             globalController.signal.addEventListener('abort', onGlobalAbort, { once: true })
 
             try {
-                const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
-                const res = await fetch(`${API_BASE}/api/route`, {
+                const res = await fetch(`${ROUTE_API_BASE}/api/route`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         stops: validDayStops,
-                        mode: "walk",
+                        mode: mode,
                         optimize: false
                     }),
                     signal: dayController.signal
@@ -136,6 +200,12 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                     const data = await res.json()
                     const coords = data?.route?.geometry?.coordinates
                     if (coords && Array.isArray(coords) && isMounted) {
+                        // 寫入二級快取
+                        if (!modeCacheRef.current[mode]) {
+                            modeCacheRef.current[mode] = {}
+                        }
+                        modeCacheRef.current[mode][dayNum] = coords
+
                         // 單天抵達立即更新，消滅序列 Waterfall 延遲
                         setRoadRoutesByDay(prev => ({
                             ...prev,
@@ -160,7 +230,7 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
             isMounted = false
             globalController.abort()
         }
-    }, [trip])
+    }, [trip, mode])
 
     // 6. 安全縮放聚焦 (Fit Bounds)
     const fitMapToBounds = useCallback((targetMap: MapRef | null) => {
@@ -244,29 +314,75 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     return (
         <>
             <div className="my-6 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm will-change-transform transform-gpu">
-                {/* 頂部操作列 */}
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                            <Route className="w-4.5 h-4.5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                                    {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
-                                </span>
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 shrink-0">
-                                    {validPoints.length} {zh ? "個景點" : "Spots"}
-                                </span>
+                {/* 頂部操作列 (毛玻璃階層佈局：標題 + 交通模式膠囊 + 工具按鈕群) */}
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3 min-w-0">
+                        {/* 標題與景點計數 */}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                <Route className="w-4.5 h-4.5" />
                             </div>
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                                {zh ? "各天彩帶分色 · 支援自由縮放與漫遊" : "Multi-Day Routes · Zoom & Pan freely"}
-                            </p>
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                                        {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
+                                    </span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 shrink-0">
+                                        {validPoints.length} {zh ? "個景點" : "Spots"}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                    {zh ? "各天彩帶分色 · 支援自由縮放與漫遊" : "Multi-Day Routes · Zoom & Pan freely"}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* 🚶🚗🚌 交通模式切換膠囊 (與 day-map.tsx 100% 統一) */}
+                        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs backdrop-blur-xs">
+                            <button
+                                type="button"
+                                onClick={() => handleModeChange('walk')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                                    mode === 'walk'
+                                        ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                                }`}
+                                title={zh ? "步行模式" : "Walking Mode"}
+                            >
+                                <Footprints className="w-3.5 h-3.5" />
+                                <span>{zh ? "步行" : "Walk"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleModeChange('drive')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                                    mode === 'drive'
+                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                                }`}
+                                title={zh ? "開車模式" : "Driving Mode"}
+                            >
+                                <Car className="w-3.5 h-3.5" />
+                                <span>{zh ? "開車" : "Drive"}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleModeChange('transit')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                                    mode === 'transit'
+                                        ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-slate-200/40 dark:border-slate-800'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                                }`}
+                                title={zh ? "大眾運輸模式" : "Transit Mode"}
+                            >
+                                <Bus className="w-3.5 h-3.5" />
+                                <span>{zh ? "大眾運輸" : "Transit"}</span>
+                            </button>
                         </div>
                     </div>
 
-                    {/* 右側操作按鈕群 (包含 3D 導覽、全景置中與底圖切換) */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    {/* 右側操作按鈕群 (3D 導覽、街景覆蓋、GPS 定位、全景置中、底圖切換) */}
+                    <div className="flex items-center gap-1.5 shrink-0 self-end lg:self-auto">
                         {/* ✈️ 3D 巡航導覽按鈕 */}
                         {validPoints.length > 0 && (
                             <button
@@ -287,10 +403,47 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                             </button>
                         )}
 
+                        {/* 👁️ Mapillary 街景覆蓋綠網 toggle */}
+                        {isMapillaryAvailable() && (
+                            <button
+                                type="button"
+                                onClick={() => setShowMapillaryCoverage(prev => !prev)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                                    showMapillaryCoverage
+                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent'
+                                }`}
+                                title={zh ? "切換街景覆蓋圖層" : "Toggle Street View Coverage"}
+                                aria-label="Toggle Street View Coverage"
+                            >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">{zh ? "街景" : "Street View"}</span>
+                            </button>
+                        )}
+
+                        {/* 📍 GPS 定位到我按鈕 */}
+                        <button
+                            type="button"
+                            onClick={handleLocateMe}
+                            disabled={isLocating}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                            title={zh ? "定位到我的位置" : "Locate Me"}
+                            aria-label="Locate Me"
+                        >
+                            {isLocating ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                            ) : (
+                                <Crosshair className="w-4 h-4 text-indigo-500" />
+                            )}
+                        </button>
+
                         {/* 視野全景置中 */}
                         <button
                             type="button"
-                            onClick={() => fitMapToBounds(mapRef.current)}
+                            onClick={() => {
+                                if (isTouring || isFlying) cancelFlight()
+                                fitMapToBounds(mapRef.current)
+                            }}
                             className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all active:scale-95 cursor-pointer"
                             title={zh ? "全景置中聚焦" : "Fit All Bounds"}
                             aria-label="Fit Bounds"
@@ -307,7 +460,7 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                                     ? "bg-indigo-600 text-white shadow-xs"
                                     : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
                             }`}
-                            title={mapMode === 'satellite' ? "切換至向量地圖" : "切換至衛星影像"}
+                            title={mapMode === 'satellite' ? (zh ? "切換至向量地圖" : "Vector Map") : (zh ? "切換至衛星影像" : "Satellite")}
                             aria-label="Toggle Map Style"
                         >
                             {mapMode === 'satellite' ? <MapIcon className="w-4 h-4" /> : <Satellite className="w-4 h-4" />}
@@ -416,6 +569,42 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                             />
                         </Source>
 
+                        {/* 📸 Mapillary 街景覆蓋向量圖層 (宣告式拓撲，在彩帶之下) */}
+                        {isMapillaryAvailable() && MAPILLARY.TOKEN && (
+                            <Source
+                                id="mapillary-coverage"
+                                type="vector"
+                                tiles={[MAPILLARY.TILES_URL]}
+                                minzoom={MAPILLARY.COVERAGE_MIN_ZOOM}
+                                maxzoom={MAPILLARY.COVERAGE_MAX_ZOOM}
+                            >
+                                <Layer
+                                    id="mapillary-sequences"
+                                    type="line"
+                                    source-layer="sequence"
+                                    layout={{ visibility: showMapillaryCoverage ? 'visible' : 'none' }}
+                                    paint={{
+                                        'line-color': '#05CB63',
+                                        'line-width': 2,
+                                        'line-opacity': 0.7,
+                                    }}
+                                />
+                                <Layer
+                                    id="mapillary-images"
+                                    type="circle"
+                                    source-layer="image"
+                                    minzoom={MAPILLARY.IMAGE_POINT_MIN_ZOOM}
+                                    layout={{ visibility: showMapillaryCoverage ? 'visible' : 'none' }}
+                                    paint={{
+                                        'circle-radius': 4,
+                                        'circle-color': '#05CB63',
+                                        'circle-stroke-width': 1,
+                                        'circle-stroke-color': '#fff',
+                                    }}
+                                />
+                            </Source>
+                        )}
+
                         {/* 路線渲染 Source */}
                         <Source id="multi-day-route-source" type="geojson" data={featureCollection}>
                             {/* 1. 當日發光柔光層 (Glow Layer) - 提供微霓虹立體質感 */}
@@ -463,7 +652,8 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                                         ["case", ["==", activeDay, 0], 0.92, 0.2]
                                     ],
                                     // 依天數做輕量平行側移，避免相同幹道路段重疊覆蓋
-                                    "line-offset": ["*", ["-", ["get", "day"], 1], 1.2]
+                                    "line-offset": ["*", ["-", ["get", "day"], 1], 1.2],
+                                    ...(mode === 'transit' ? { "line-dasharray": [2, 2] } : {})
                                 }}
                             />
 
@@ -533,6 +723,22 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                                 </Marker>
                             )
                         })}
+
+                        {/* 📍 使用者位置藍點脈衝標記 */}
+                        {userLocation && (
+                            <Marker
+                                longitude={userLocation.lng}
+                                latitude={userLocation.lat}
+                                anchor="center"
+                            >
+                                <div className="relative">
+                                    {/* 外層脈動圓 */}
+                                    <div className="absolute -inset-3 bg-blue-400/30 rounded-full animate-ping pointer-events-none" />
+                                    {/* 藍點實體 */}
+                                    <div className="w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg" />
+                                </div>
+                            </Marker>
+                        )}
 
                         {/* 縮放與旋轉控制器 */}
                         <NavigationControl position="bottom-right" showCompass={true} />
