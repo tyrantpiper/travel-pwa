@@ -1,7 +1,7 @@
 ---
 name: "Full-Stack Feature Builder"
-description: "Build complete features using Adaptive System 2 Architecture"
-version: "2.0.0"
+description: "Build complete features using Adaptive System 2 Architecture and Context7 documentation verification"
+version: "2.1.0"
 depends_on:
   - ui-component-architect
   - api-generator (inline)
@@ -35,13 +35,27 @@ Analyze the user request to determine the execution path.
    - **System 1**: Skip to [Step 3: Frontend Implementation].
    - **System 2**: Proceed to [Step 2: Architect Phase].
 
-### Step 2: Phase 0 - Architect (System 2 Only)
-*Objective: Prevent backtracking by planning first.*
+### Step 2: Phase 0 - Architect & Anti-Hallucination Gate (System 2 Only)
+*Objective: Prevent backtracking by verifying official docs and planning first.*
 
-1. **Context Load**: Read `references/SCHEMAS.md` (Section 1).
-2. **Action**: Generate a `mini_design_doc` artifact.
+1. **Upstream Documentation Check (via @mcp:context7)**:
+   - 若功能涉及第三方庫（如 Next.js 16、React 19、Tailwind v4、MapLibre、Supabase、Pydantic v2）：
+     * **必填參數**: 同時傳入 `libraryName` 與 `query`，嚴格遵守 3 次呼叫熔斷：
+       ```json
+       call_mcp_tool("context7", "resolve-library-id", {
+         "libraryName": "Next.js",
+         "query": "app router server actions"
+       })
+       call_mcp_tool("context7", "query-docs", {
+         "libraryId": "/vercel/next.js",
+         "query": "server actions error handling"
+       })
+       ```
+     * **熔斷降級**: 若連續 3 次查無對應 libraryId，自動降級至本地程式碼庫型別定義，禁止反覆重試。
+2. **Context Load**: Read `references/SCHEMAS.md` (Section 1).
+3. **Action**: Generate a `mini_design_doc` artifact using verified API specs.
    - Define: Component Hierarchy, API Endpoints, DB Schema.
-3. **Approval**: Ask user: "是否同意此架構設計？" (Block until confirmed).
+4. **Approval**: Ask user: "是否同意此架構設計？" (Block until confirmed).
 
 ### Step 3: Phase 1 - Frontend Component
 *Objective: Create the UI layer.*
