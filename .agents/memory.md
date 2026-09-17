@@ -9,6 +9,8 @@
 - **雙套件依賴強耦合原子升級鎖 (Coupled Dependency Atomic Lock)**: `react-map-gl` 與 `maplibre-gl` 存在深層私有 API（內部 transform 實例）綁定，嚴禁獨立升級單一套件。未來升級必須視為「原子包 (Atomic Pair)」同步評估與實機雙重核驗。
 - **務實穩定勝於盲目追新原則 (Pragmatic Stabilization over Chasing SemVer Major)**: 在核心商業邏輯未受阻且維持 0 安全漏洞前提下，不為了追求版本號承擔生態斷層與 WebGL1 淘汰的代價。
 - **本地真機活體驗收守門 (Local Native Probing Gate)**: Node.js / JSDOM 單元測試無法模擬真實 WebGL Context。凡涉及圖形渲染、地圖底圖與事件循環的核心變更，必須在本地真機瀏覽器確認無誤後方可提交。
+- **Liquid Glass 物理材質純 CSS + GPU 合成層準則 (CSS Inset Specular over Heavy WebGL Shader)**: 堅決反對社群中盲目引入全屏 WebGL/WebGPU Shader（如 liquidGL）為按鈕製作液態玻璃效果的「反模式」。在已有 MapLibre 畫布的情況下，雙 WebGL Context 會引發 iOS Safari Context Loss 崩潰。規範一律使用純 CSS `backdrop-blur`、`saturate`、`shadow-[inset_...]` 搭配 `transform-gpu will-change-transform`，0ms JS 執行緒開銷，穩健交付 60~120fps。
+- **MapLibre 相機排程原子化原則 (Atomic Camera Transition Invariance)**: 連續呼叫 `easeTo` 與 `fitBounds` 會引發相機動畫排程競爭，後者會直接掐斷前者。若需在縮放視角的同時歸零角度，必須在 `fitBounds` 的 options 中顯式注入 `bearing: 0, pitch: 0`，使相機邊界縮放與方位重置在同一底層矩陣運算中原子化完成。
 
 ### 2. 狀態持久化、SWR 快取與自癒機制 (State, SWR, Routing & Self-Healing)
 - **雙重核驗型別化自癒架構 (Double-Checked Silent Self-Healing)**: 分散式快取自癒嚴禁僅憑單次 HTTP 404 就草率清除快取（避免網路抖動導致正常行程被誤判跳轉）。必須透過「行程總清單存活二次核驗（List Double-Check）」證實死透後，才在 300ms 內完全靜默導正至最新有效行程。
@@ -34,8 +36,10 @@
 - **合成點擊與拖曳手勢競態防衛 (Drag-Release Synthetic Click Race-Condition Guard)**: 透過 `hasMovedRef` 追蹤位移並於 `handleDragEnd` 中設置 80ms 延遲釋放閥，徹底杜絕拖曳完放開手指誤開面板的手勢衝突。
 - **輸入法組合態攔截與自適應高度防線 (IME Composition Guard & Auto-Growing Textarea)**: 中文（注音/倉頡/拼音）與日文選字時，輸入框全面升級為自適應高度 `<textarea>`（`min-h-9 max-h-32`），並在 `onKeyDown` 嚴格掛載 `if (e.nativeEvent.isComposing) return`，防止提前觸發發送。
 - **高密度對話組件原地微創升級原則 (In-Place Surgical Modernization over Premature Component Splitting)**: 對於承載 12+ 項複雜閉包的高密度邏輯組件（如 `chat-widget.tsx`、`ExpenseDialog.tsx`），堅決抵制盲目拆檔，改以原地微創升級保持閉包穩定，取得最高穩定度與安全 ROI。
+- **導覽列原生 CSS 暗黑適配優先於 React State (Native CSS Dark Token over Runtime Hydration)**: 核心 UI 控制項（如常駐 Bottom Nav）的指示器背景與邊框，嚴禁在客戶端尚未 Hydration 前依賴 React `isDark` state 進行 inline style 賦值。必須以 Tailwind CSS 原生 `dark:` 類別接管，確保 SSR 渲染至客戶端繪製期間零延遲、無色彩跳動。
 
 ### 4. 離線架構與 PWA 快取 (Offline, Service Worker & PWA)
+- **Service Worker 構建路徑絕對化標準 (Hermetic Build-Time Path Resolution)**: 工具腳本中的靜態資產掃描嚴禁依賴非確定性的 `process.cwd()`。必須以模組目錄 `import.meta.url` 為錨點解析絕對路徑，確保無論從專案根目錄或子模組呼叫皆具備相同的產出確定性。
 - **站在既有巨人肩膀上的輕量化離線原則 (Shoulder-of-Giants Offline Architecture)**: 拒絕盲目引入 PowerSync 或 RxDB 等肥大客戶端複寫引擎，完全立足於專案既有的 `serwist`、`idb-keyval` 與 `SWRConfig provider` 官方標準模式，以最小代碼增量完成離線優先秒開閉環。
 - **動脈與靜脈讀寫分流架構 (Arterial/Venous Read-Write Decoupling)**: 在 Service Worker 層將 GET 查詢（SWR 快取）與 POST/PUT/PATCH/DELETE 突變（BackgroundSync 離線重試）物理隔離，杜絕突變請求被快取誤吞或 GET 查詢誤進背景佇列。
 - **PWA 帶參冷啟動導航防線 (Ignore-Search Navigation Pipeline)**: 手機 Standalone PWA 啟動或推播跳轉常帶有 `/?source=pwa` 或查詢參數。Service Worker `app-shell-navigation` 必須宣告 `matchOptions: { ignoreSearch: true }`，且導航逾時緊縮至 2s，確保離網冷啟動 100% 命中 App Shell 快取，防止字串嚴格比對失敗拋出瀏覽器小恐龍。
@@ -75,6 +79,8 @@
 - **未宣告圖層指定 beforeId 引發崩潰 (`Premature beforeId Reference Trap`)**: 在 JSX 中宣告底層衛星影像時指定 `beforeId="day-trajectories-layer"`，但該圖層在 JSX 代碼中寫在衛星之後，MapLibre 依序解析引發 `Cannot add layer before non-existing layer` 致命錯誤。教訓：React-map-gl 圖層宣告應善用自然 JSX 階層排列，切忌跨越宣告順序參考不存在的圖層 ID。
 - **拖曳手勢誘發 WebGL Canvas 重排掉幀 (`Unisolated WebGL Reflow Trap`)**: 拖曳以 `right/bottom` 定位的浮動圓球，未開啟硬體加速時會誘發主執行緒重新計算佈局並重繪大型地圖 WebGL Canvas，導致拖曳掉幀至 20fps。教訓：包含 WebGL 地圖的複雜視圖中，浮動動態節點必須明確宣告 `transform-gpu` 與動態 `will-change`，建立獨立 GPU 合成層。
 - **JSDOM / SSR 建置通過帶來的偽陽性安全感 (`WebGL Canvas Testing Blind Spot`)**: `tsc --noEmit` 與 `vitest` 在 Node.js / JSDOM 環境下無法模擬真實 WebGL 上下文與 Canvas 交互，誤導做出「升級通過」的斷言。教訓：WebGL 與 Canvas 相關改動必須以瀏覽器真實繪製為唯一驗收標準。
+- **MapLibre 動畫排程競爭陷阱 (`Camera Animation Preemption Trap`)**: 在羅盤點擊處理器中先調用 `targetMap.easeTo({ bearing: 0, pitch: 0, duration: 400 })`，接著同步調用 `targetMap.fitBounds(...)`。使用者在旋轉地圖後點擊羅盤，地圖僅縮放了邊界，相機角度依然保持歪斜。原因在於 MapLibre 相機是單一狀態機排程，後續的 `fitBounds` 立即掐斷了先前的 `easeTo` 動畫且預設維持原有視角。教訓：複合相機運動必須整合在單一呼叫（`fitBounds(bounds, { bearing: 0, pitch: 0, ... })`）原子執行。
+- **雙 WebGL 上下文引發 Safari 崩潰 (`Dual WebGL Context Safari Crash Trap`)**: 探討使用 WebGL 片段著色器為 UI 按鈕繪製次表面折射效果，但在 iOS 測試機上偶發白屏，終端出現 `WebGL: CONTEXT_LOST_WEBGL` 警告。原因在於頁面中已運行大型 MapLibre WebGL 地圖畫布，在 DOM 上額外掛載小型 WebGL Context 容易突破 iOS Safari 嚴格的 GPU 記憶體與 Context 總數配額。教訓：PWA 的 UI 控制項嚴禁使用額外 WebGL Context，一律採用純 CSS 濾鏡與 Inset 陰影模擬光學折射。
 
 ### 2. 狀態持久化、快取與自癒踩坑
 - **原生 fetch 吞沒 404 引發 SWR 假成功 (`Raw Fetch 404 Swallowing Trap`)**: 在 fetcher 中直接使用 `fetch().then(r => r.json())` 未檢查 `r.ok`。後端回傳 404 時 Promise 依然正常 resolve，SWR 將 `{ detail: "Trip not found" }` 判定為成功資料寫入快取，導致 `error` 永遠為 `undefined`，SWR 的 `onErrorRetry` 與自癒完全啞火。教訓：所有底層 Fetcher 必須嚴格檢驗 `!r.ok` 並主動拋出標準 `HttpError`。
@@ -91,6 +97,7 @@
 - **Framer Motion 動態 Key 引發元件重新掛載與重複請求 (`Dynamic Key Remount Trap`)**: 在 `app-shell.tsx` 中為四大視圖外層加上 `key={`view-${activeView}`}` 時，導致換頁時 React 銷毀重新掛載引發 API 重複發送。教訓：常駐型主頁面切換動效嚴禁使用動態 `key`，應使用靜態標識搭配屬性動畫。
 - **React 19 在 useEffect 內同步 setState 觸發 cascading renders (`React 19 Cascading Renders Trap`)**: 在 `DailyWeatherStrip` 的 `useEffect` 內若同步呼叫 `setIsTimedOut(false)`，會被 React Compiler 判定為串聯重新渲染引發 Linter 報錯。教訓：改用衍生狀態 `const showTimeoutFallback = isTimedOut && !hasData && !isLoading`，`useEffect` 僅負責逾時定時器生命週期。
 - **試圖在 React RootLayout 內嵌 Raw HTML 假裝原生 Splash (`Inline Splash Over-Engineering Trap`)**: 在 Next.js App Router 體系下硬塞 90 行 inline `<style>`、`id="pwa-native-splash"` 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 `manifest.json` 自動渲染原生啟動畫面的基本事實。
+- **React State 延遲導致 Hydration FOUC 閃爍 (`Hydration Dark Mode FOUC Trap`)**: 在 `bottom-nav.tsx` 的指示器使用 `style={{ backgroundColor: isDark ? "rgba(...)" : "rgba(...)" }}`，深色模式重新整理頁面時，指示器在第 1 幀短暫顯示為淺色底塊。原因在於 `ThemeContext` 初始 state 為 `isDark = false`，需待客戶端掛載後透過 `useEffect` 讀取 `localStorage`。此時 HTML 標籤早已由 SSR 帶有 `class="dark"`，但 inline style 的 React state 尚未更新。教訓：常駐型核心元件的暗黑適配必須由 CSS `dark:` 變體承擔，堅決不讓未就緒的 React state 決定首屏關鍵樣式。
 
 ### 4. 離線架構與 PWA 踩坑
 - **Service Worker 嚴格路徑比對導致帶參冷啟動白屏 (`Strict Navigation URL Mismatch Trap`)**: PWA 從桌面圖示啟動時常攜帶 `?source=pwa`，若 Service Worker 宣告 `navigateFallback` 未開啟 `ignoreSearch: true`，比對失敗直接由瀏覽器發起真實網路請求，在斷網情境下拋出小恐龍死白屏。教訓：離線 App Shell 導航快取必須宣告 `matchOptions: { ignoreSearch: true }`。
