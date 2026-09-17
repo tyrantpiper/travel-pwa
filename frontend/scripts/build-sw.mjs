@@ -26,7 +26,8 @@ const { createSerwistRoute } = await import("@serwist/turbopack");
 const { generateStaticParams, GET } = createSerwistRoute({
   swSrc: path.join(frontendDir, "app", "sw.ts"),
   useNativeEsbuild: true,
-  // 🛡️ 關鍵修復：僅快取 public/ 穩固資產，徹底剔除 .next/static 動態臨時 chunks，杜絕 404
+  // 🛡️ 關鍵修復：明確指定 globDirectory，防止從專案根目錄調用時 cwd 不匹配
+  globDirectory: frontendDir,
   globPatterns: ["public/**/*"],
   additionalPrecacheEntries: [
     { url: "/", revision: gitRev },
