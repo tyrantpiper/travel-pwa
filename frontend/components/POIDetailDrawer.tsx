@@ -6,7 +6,7 @@ import {
     X, MapPin, Phone, Globe, Clock,
     Navigation, Share2, Plus, Sparkles,
     ExternalLink, Image as ImageIcon, Loader2,
-    BookOpen, Tent, AlertCircle
+    BookOpen, Tent, AlertCircle, Plane
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useHaptic } from "@/lib/hooks"
@@ -70,6 +70,7 @@ interface POIDetailDrawerProps {
     isInternal?: boolean    // 🆕 是否在容器內部 (例如地圖內)
     onSelectClusterItem?: (item: ClusterItem) => void // 🆕 點擊群聚項目
     onOpenStreetView?: (lat: number, lng: number) => void // 📸 街景按鈕
+    onFlyover?: (lat: number, lng: number) => void // ✈️ 3D 飛越按鈕
 }
 
 export default function POIDetailDrawer({
@@ -80,7 +81,8 @@ export default function POIDetailDrawer({
     suggestedTime = "10:00",
     isInternal = false,
     onSelectClusterItem,
-    onOpenStreetView
+    onOpenStreetView,
+    onFlyover
 }: POIDetailDrawerProps) {
     const haptic = useHaptic()
     const { t } = useLanguage()
@@ -228,7 +230,7 @@ export default function POIDetailDrawer({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={onClose}
-                            className={`${isInternal ? 'absolute' : 'fixed'} inset-0 bg-black/50 ${isInternal ? 'z-[40]' : 'z-[100]'}`}
+                            className={`${isInternal ? 'absolute' : 'fixed'} inset-0 bg-black/50 ${isInternal ? 'z-40' : 'z-100'}`}
                         />
                     )}
 
@@ -238,7 +240,7 @@ export default function POIDetailDrawer({
                         animate={{ y: 0 }}
                         exit={{ y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className={`${isInternal ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 ${isInternal ? 'z-[50] border-t border-x border-slate-200 dark:border-slate-800' : 'z-[100] shadow-2xl'} bg-white dark:bg-slate-900 rounded-t-3xl overflow-hidden transition-all ${isMinimized ? 'max-h-[110px]' : (isInternal ? 'max-h-[70%]' : 'max-h-[85vh]')}`}
+                        className={`${isInternal ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 ${isInternal ? 'z-50 border-t border-x border-slate-200 dark:border-slate-800' : 'z-100 shadow-2xl'} bg-white dark:bg-slate-900 rounded-t-3xl overflow-hidden transition-all ${isMinimized ? 'max-h-27.5' : (isInternal ? 'max-h-[70%]' : 'max-h-[85vh]')}`}
                     >
                         {/* 🆕 拖曳把手 - 點擊切換最小化 */}
                         <button
@@ -275,7 +277,7 @@ export default function POIDetailDrawer({
                                     <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
                                     <h3 className="text-lg font-black text-slate-900 dark:text-white">{poi.name}</h3>
                                 </div>
-                                <div className={`grid gap-2 overflow-y-auto ${isInternal ? 'max-h-[220px]' : 'max-h-[50vh]'} pr-1`}>
+                                <div className={`grid gap-2 overflow-y-auto ${isInternal ? 'max-h-55' : 'max-h-[50vh]'} pr-1`}>
                                     {poi.clusterItems?.map((item, idx) => (
                                         <button
                                             key={item.id || idx}
@@ -313,7 +315,7 @@ export default function POIDetailDrawer({
                                 <p className="text-[10px] text-slate-400 text-center italic">{t('poi_tap_to_view')}</p>
                             </div>
                         ) : (
-                            <div className={`px-6 pb-6 space-y-4 overflow-y-auto ${isInternal ? 'max-h-[240px]' : 'max-h-[calc(85vh-100px)]'}`}>
+                            <div className={`px-6 pb-6 space-y-4 overflow-y-auto ${isInternal ? 'max-h-60' : 'max-h-[calc(85vh-100px)]'}`}>
                                 {/* ========== Layer 1: OSM 骨架層 ========== */}
 
                                 {/* Header */}
@@ -339,7 +341,7 @@ export default function POIDetailDrawer({
                                 <div className="space-y-2 text-sm">
                                     {poi.address && (
                                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                            <MapPin className="w-4 h-4 flex-shrink-0" />
+                                            <MapPin className="w-4 h-4 shrink-0" />
                                             <span className="line-clamp-2">{poi.address}</span>
                                         </div>
                                     )}
@@ -348,7 +350,7 @@ export default function POIDetailDrawer({
                                             href={`tel:${poi.phone}`}
                                             className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
                                         >
-                                            <Phone className="w-4 h-4 flex-shrink-0" />
+                                            <Phone className="w-4 h-4 shrink-0" />
                                             <span>{poi.phone}</span>
                                         </a>
                                     )}
@@ -359,14 +361,14 @@ export default function POIDetailDrawer({
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
                                         >
-                                            <Globe className="w-4 h-4 flex-shrink-0" />
+                                            <Globe className="w-4 h-4 shrink-0" />
                                             <span className="truncate">{poi.website}</span>
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
                                     )}
                                     {poi.opening_hours && (
                                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                            <Clock className="w-4 h-4 flex-shrink-0" />
+                                            <Clock className="w-4 h-4 shrink-0" />
                                             <span>{poi.opening_hours}</span>
                                         </div>
                                     )}
@@ -397,7 +399,7 @@ export default function POIDetailDrawer({
                                     {onAddToItinerary && (
                                         <Button
                                             onClick={handleAddToItinerary}
-                                            className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
+                                            className="flex-1 gap-2 bg-linear-to-r from-indigo-500 to-purple-500 text-white"
                                         >
                                             <Plus className="w-4 h-4" />
                                             {t('poi_add_to_trip')}
@@ -422,6 +424,16 @@ export default function POIDetailDrawer({
                                         >
                                             <Camera className="w-4 h-4" />
                                             {t('mapillary_streetview')}
+                                        </Button>
+                                    )}
+                                    {onFlyover && (
+                                        <Button
+                                            onClick={() => onFlyover(poi.lat, poi.lng)}
+                                            variant="outline"
+                                            className="flex-1 gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:text-indigo-400 dark:border-indigo-900/50 dark:hover:bg-indigo-900/20"
+                                        >
+                                            <Plane className="w-4 h-4" />
+                                            {t('flyover_poi')}
                                         </Button>
                                     )}
                                 </div>
@@ -486,7 +498,7 @@ export default function POIDetailDrawer({
                                             className="space-y-4"
                                         >
                                             {/* Layer 1: AI / Core Summary */}
-                                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-4 space-y-3">
+                                            <div className="bg-linear-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-xl p-4 space-y-3">
                                                 <div className="flex items-center gap-2">
                                                     <Sparkles className="w-4 h-4 text-purple-500" />
                                                     <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">
@@ -524,17 +536,17 @@ export default function POIDetailDrawer({
                                                     </span>
                                                 </div>
                                                 
-                                                <div className="relative min-h-[100px]">
+                                                <div className="relative min-h-25">
                                                     {hasCulturalDesc ? (
                                                         <div 
                                                             tabIndex={0}
                                                             role="region"
                                                             aria-labelledby="wiki-insight-label"
-                                                            className="max-h-[140px] overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-sm text-slate-600 dark:text-slate-300 leading-relaxed focus:ring-2 focus:ring-indigo-500/50 outline-none transition-shadow"
+                                                            className="max-h-35 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-sm text-slate-600 dark:text-slate-300 leading-relaxed focus:ring-2 focus:ring-indigo-500/50 outline-none transition-shadow"
                                                         >
                                                             {aiData.cultural_desc}
                                                             {/* Bottom Fade Overlay */}
-                                                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/90 dark:from-slate-900/90 to-transparent pointer-events-none rounded-b-xl" />
+                                                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-white/90 dark:from-slate-900/90 to-transparent pointer-events-none rounded-b-xl" />
                                                         </div>
                                                     ) : showWikipediaHint ? (
                                                         <div className="p-4 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center gap-2 text-slate-400">

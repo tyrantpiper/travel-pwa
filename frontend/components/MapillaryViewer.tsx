@@ -180,6 +180,7 @@ export default function MapillaryViewer({
                     container: container,
                     component: { 
                         cover: false,
+                        spatial: false, // ⚠️ 關閉 3D 空間點雲請求，防止 Graph API 批量超限拋出 "Failed to fetch data"
                     },
                 })
 
@@ -305,7 +306,7 @@ export default function MapillaryViewer({
                         animate={{ opacity: isMinimized ? 0 : 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.3 }}
-                        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] ${
+                        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-9998 ${
                             isMinimized ? 'pointer-events-none' : ''
                         }`}
                         onClick={() => { if (!isMinimized) onClose() }}
@@ -324,7 +325,7 @@ export default function MapillaryViewer({
                                 setAnimationComplete(true)
                             }
                         }}
-                        className={`fixed bottom-0 left-0 right-0 z-[9999] bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-in-out
+                        className={`fixed bottom-0 left-0 right-0 z-9999 bg-white dark:bg-slate-900 shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-in-out
                             ${isMinimized ? 'h-[50vh] rounded-t-xl' : 'h-[80vh] rounded-t-2xl'}`}
                     >
                         {/* Header */}
