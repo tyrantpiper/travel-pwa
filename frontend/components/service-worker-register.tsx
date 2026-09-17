@@ -42,9 +42,19 @@ export function ServiceWorkerRegister() {
                     console.error("[SW] Registration failed:", error)
                 })
 
-            // 🚀 3. 當 SW 控制權切換時 (New SW Activated)，記錄事件
+            // 🛡️ 記錄頁面載入時是否已有舊版 Controller 控制
+            const hadControllerAtLaunch = Boolean(navigator.serviceWorker.controller)
+            let isReloading = false
+
+            // 🚀 3. 當 SW 控制權切換時 (New SW Activated)，執行熱重載
             const handleControllerChange = () => {
                 console.log("⚡ [SW] Controller changed: New SW is now in control.")
+                // 🛡️ 防禦性判定：只有在非初次安裝（確定為版本升級）且尚未重載過時才刷新
+                if (hadControllerAtLaunch && !isReloading) {
+                    isReloading = true
+                    console.log("🔄 [SW] Applying latest update seamlessly...")
+                    window.location.reload()
+                }
             }
             navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
 

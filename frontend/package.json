@@ -5,7 +5,7 @@
   "scripts": {
     "predev": "node ./scripts/copy-maplibre-worker.mjs && node ./scripts/build-sw.mjs",
     "dev": "next dev",
-    "prebuild": "node ./scripts/copy-maplibre-worker.mjs",
+    "prebuild": "node ./scripts/copy-maplibre-worker.mjs && node ./scripts/build-sw.mjs",
     "build": "next build && node ./scripts/build-sw.mjs",
     "start": "next start",
     "lint": "eslint",
