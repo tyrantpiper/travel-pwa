@@ -15,10 +15,12 @@ import { setWorkerUrl } from "maplibre-gl"
 if (typeof window !== "undefined") {
     setWorkerUrl("/maplibre/maplibre-gl-worker.mjs")
 }
-import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash, Plane } from "lucide-react"
 import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
+import { useFlyoverController } from "@/hooks/useFlyoverController"
+import { TourHudCapsule } from "@/components/TourHudCapsule"
 import { Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { geocodeApi } from "@/lib/api"
@@ -265,6 +267,21 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         imageId?: string; lat?: number; lng?: number
     } | null>(null)
     const [streetViewLocation, setStreetViewLocation] = useState<{ lat: number; lng: number; bearing: number } | null>(null)
+
+    // ✈️ 3D 航線飛機視角控制器
+    const {
+        isFlying,
+        isTouring,
+        isOrbiting,
+        isPaused,
+        currentTourIndex,
+        currentTourPOI,
+        triggerFlyover,
+        startTour,
+        skipToNext,
+        togglePauseTour,
+        cancelFlight
+    } = useFlyoverController(mapRef)
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
@@ -989,11 +1006,71 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                             {t('mapillary_coverage')}
                         </button>
                     )}
+                    {/* ✈️ 3D 航線巡航導覽 (Tour Mode) */}
+                    {markers && markers.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isTouring || isFlying) {
+                                    cancelFlight()
+                                } else {
+                                    const validTourPois = (markers || [])
+                                        .filter(it => Number.isFinite(it.lat) && Number.isFinite(it.lng) && it.lat !== 0 && it.lng !== 0)
+                                        .map(it => ({
+                                            lat: it.lat,
+                                            lng: it.lng,
+                                            name: it.place,
+                                        }))
+
+                                    if (validTourPois.length === 0) {
+                                        toast.info(t('flyover_no_spots') || '目前沒有可導覽的景點')
+                                        return
+                                    }
+
+                                    startTour(
+                                        validTourPois,
+                                        (poi) => {
+                                            setMapillaryTarget({ lat: poi.lat, lng: poi.lng })
+                                        },
+                                        () => {
+                                            toast.success(t('flyover_completed') || '🎉 本日行程導覽完畢')
+                                        }
+                                    )
+                                }
+                            }}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                                isTouring
+                                    ? 'bg-linear-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-xs animate-pulse'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-xs'
+                            }`}
+                            title={isTouring ? (t('flyover_stop') || '停止導覽') : (t('flyover_tour') || '3D 導覽')}
+                        >
+                            <Plane className={`w-3.5 h-3.5 ${isTouring ? 'animate-bounce' : ''}`} />
+                            {isTouring ? (t('flyover_stop') || '停止導覽') : (t('flyover_tour') || '3D 導覽')}
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* 地圖容器 - 全裝置統一加大 h-[480px] 向上調整為響應式 500~600px，防止捲動干擾 + 消除震動 */}
             <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm h-125 sm:h-135 lg:h-150 w-full z-0 relative overscroll-none isolate transform-gpu will-change-transform">
+                {/* ✈️ 3D 巡航導覽懸浮膠囊 (共用 TourHudCapsule 元件) */}
+                <TourHudCapsule
+                    isTouring={isTouring}
+                    isOrbiting={isOrbiting}
+                    isPaused={isPaused}
+                    currentIndex={currentTourIndex}
+                    currentPOI={currentTourPOI}
+                    onTogglePause={togglePauseTour}
+                    onSkipNext={skipToNext}
+                    onCancel={cancelFlight}
+                    onOpenStreetView={(lat, lng) => {
+                        setMapillaryTarget({ lat, lng })
+                        setMapillaryViewerOpen(true)
+                    }}
+                    hasStreetView={isMapillaryAvailable()}
+                />
+
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}
@@ -1531,6 +1608,11 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     onOpenStreetView={(lat, lng) => {
                         setMapillaryTarget({ lat, lng })
                         setMapillaryViewerOpen(true)
+                    }}
+                    onFlyover={(lat, lng) => {
+                        triggerFlyover({ lat, lng, name: selectedPOI?.name }, () => {
+                            setMapillaryTarget({ lat, lng })
+                        }, true)
                     }}
                 />
             </div>

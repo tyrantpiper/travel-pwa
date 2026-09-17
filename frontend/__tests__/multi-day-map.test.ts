@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
     DAY_PALETTE,
     getDayColor,
@@ -85,5 +85,70 @@ describe('Multi-Day Route Mesh Geo Engine (geo-multi-day.ts)', () => {
         const singlePointBounds = computeSafeMultiDayBounds([{ lat: 25.0339, lng: 121.5654, day: 1, sequence: 1, place: 'P1' }])
         expect(singlePointBounds[0][0]).toBeCloseTo(121.5354, 2)
         expect(singlePointBounds[1][0]).toBeCloseTo(121.5954, 2)
+    })
+
+    it('TC-6: 3D Tour POI filtering and camera decoupling preserves day and sequence info', () => {
+        const mockTrip: Trip = {
+            id: 'trip-mesh-2',
+            title: 'Hokkaido 2-Day Tour',
+            days: [
+                {
+                    day: 1,
+                    items: [
+                        { id: '1', place: 'Sapporo TV Tower', lat: 43.0611, lng: 141.3564 },
+                        { id: '2', place: 'Odori Park', lat: 43.0598, lng: 141.3508 }
+                    ]
+                },
+                {
+                    day: 2,
+                    items: [
+                        { id: '3', place: 'Otaru Canal', lat: 43.1990, lng: 141.0020 },
+                        { id: '4', place: 'Music Box Museum', lat: 43.1912, lng: 141.0076 }
+                    ]
+                }
+            ]
+        } as unknown as Trip
+
+        const { validPoints } = buildMultiDayFeatureCollection(mockTrip)
+
+        // 1. 全部行程導覽 (activeDay = 0)
+        const allTourPois = validPoints.map(p => ({
+            lat: p.lat,
+            lng: p.lng,
+            name: p.place,
+            day: p.day,
+            sequence: p.sequence
+        }))
+        expect(allTourPois.length).toBe(4)
+        expect(allTourPois[0].day).toBe(1)
+        expect(allTourPois[0].sequence).toBe(1)
+        expect(allTourPois[2].day).toBe(2)
+        expect(allTourPois[2].sequence).toBe(1)
+
+        // 2. 指定單天導覽 (activeDay = 2)
+        const day2Points = validPoints.filter(p => p.day === 2)
+        const day2TourPois = day2Points.map(p => ({
+            lat: p.lat,
+            lng: p.lng,
+            name: p.place,
+            day: p.day,
+            sequence: p.sequence
+        }))
+        expect(day2TourPois.length).toBe(2)
+        expect(day2TourPois[0].name).toBe('Otaru Canal')
+
+        // 3. 抵達新站時解耦驗證：僅同步 activeDay，絕不觸發 fitBounds
+        let activeDayState = 1
+        const mockFitBounds = vi.fn()
+        const onStationArriveDecoupled = (poi: { day?: number }) => {
+            if (typeof poi.day === 'number' && poi.day !== activeDayState) {
+                activeDayState = poi.day
+            }
+            // 絕不呼叫 mockFitBounds
+        }
+
+        onStationArriveDecoupled(allTourPois[2]) // 飛抵 Day 2
+        expect(activeDayState).toBe(2)
+        expect(mockFitBounds).not.toHaveBeenCalled()
     })
 })

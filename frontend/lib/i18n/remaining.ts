@@ -481,6 +481,19 @@ export const remainingTranslations = {
         mapillary_fetch_success: "Street view image fetched successfully",
         fetch_streetview: "Fetch Street View",
 
+        // 3D Flyover
+        flyover_tour: "3D Tour",
+        flyover_poi: "3D Flyover",
+        flyover_flying: "Flying...",
+        flyover_stop: "Stop Tour",
+        flyover_completed: "🎉 Day itinerary tour completed",
+        flyover_orbiting: "🔄 360° Orbiting",
+        flyover_next: "Next Stop",
+        flyover_pause: "Pause",
+        flyover_resume: "Resume",
+        flyover_paused: "⏸️ Tour Paused",
+        flyover_no_spots: "No spots to tour",
+
         // Sprint 5: map
         map_rain: "Rain",
         map_walk: "Walk",
@@ -1135,6 +1148,19 @@ export const remainingTranslations = {
         mapillary_webgl_unsupported: "此裝置不支援街景功能",
         mapillary_fetch_success: "成功抓取街景圖片",
         fetch_streetview: "抓取街景",
+
+        // 3D Flyover
+        flyover_tour: "3D 導覽",
+        flyover_poi: "3D 飛越",
+        flyover_flying: "巡航中...",
+        flyover_stop: "停止導覽",
+        flyover_completed: "🎉 本日行程導覽完畢",
+        flyover_orbiting: "🔄 360° 環繞盤旋中",
+        flyover_next: "下一站",
+        flyover_pause: "暫停",
+        flyover_resume: "繼續",
+        flyover_paused: "⏸️ 導覽已暫停 (可自由瀏覽周邊)",
+        flyover_no_spots: "目前沒有可導覽的景點",
 
         // Sprint 5: map
         map_rain: "雨",

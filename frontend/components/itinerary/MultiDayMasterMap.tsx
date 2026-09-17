@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
-import { Satellite, Map as MapIcon, Route, Compass, ArrowRight } from "lucide-react"
+import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { setWorkerUrl } from "maplibre-gl"
 
@@ -19,6 +19,11 @@ import {
     computeSafeMultiDayBounds,
     getDayColor
 } from "@/lib/geo-multi-day"
+import { useFlyoverController } from "@/hooks/useFlyoverController"
+import { TourHudCapsule } from "@/components/TourHudCapsule"
+import MapillaryViewer from "@/components/MapillaryViewer"
+import { isMapillaryAvailable } from "@/lib/mapillary"
+import { toast } from "sonner"
 
 interface MultiDayMasterMapProps {
     trip?: Trip
@@ -41,6 +46,25 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     const [roadRoutesByDay, setRoadRoutesByDay] = useState<Record<number, [number, number][]>>({})
 
     const mapRef = useRef<MapRef>(null)
+
+    // ✈️ 3D 航線巡航控制器
+    const {
+        isFlying,
+        isTouring,
+        isOrbiting,
+        isPaused,
+        currentTourIndex,
+        currentTourPOI,
+        triggerFlyover,
+        startTour,
+        skipToNext,
+        togglePauseTour,
+        cancelFlight
+    } = useFlyoverController(mapRef)
+
+    // 街景狀態
+    const [mapillaryViewerOpen, setMapillaryViewerOpen] = useState(false)
+    const [mapillaryTarget, setMapillaryTarget] = useState<{ lat: number; lng: number } | null>(null)
 
     // 1. 構建全行程 GeoJSON
     const { featureCollection, validPoints } = useMemo(() => {
@@ -68,58 +92,74 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     }, [trip])
 
     // 5. 兩階段漸進式路網請求 (背景非同步載入)
+    // 5. 兩階段漸進式路網請求 (獨立並行非同步載入 + 抵達即刻渲染)
     useEffect(() => {
         if (!trip || !trip.days || trip.days.length === 0) return
 
         let isMounted = true
-        const fetchRoadRoutes = async () => {
-            for (const dayPlan of trip.days) {
-                const dayNum = dayPlan.day
-                const acts: Activity[] = dayPlan.activities || (dayPlan as { items?: Activity[] }).items || []
-                const validDayStops = acts
-                    .filter((a: Activity) => a.category !== 'header' && !isNaN(Number(a.lat)) && !isNaN(Number(a.lng)) && Number(a.lat) !== 0)
-                    .map((a: Activity) => ({
-                        lat: Number(a.lat),
-                        lng: Number(a.lng),
-                        name: a.place || a.place_name || undefined
-                    }))
+        const globalController = new AbortController()
 
-                if (validDayStops.length < 2) continue
+        const fetchSingleDayRoute = async (dayPlan: (typeof trip.days)[0]) => {
+            const dayNum = dayPlan.day
+            const acts: Activity[] = dayPlan.activities || (dayPlan as { items?: Activity[] }).items || []
+            const validDayStops = acts
+                .filter((a: Activity) => a.category !== 'header' && !isNaN(Number(a.lat)) && !isNaN(Number(a.lng)) && Number(a.lat) !== 0)
+                .map((a: Activity) => ({
+                    lat: Number(a.lat),
+                    lng: Number(a.lng),
+                    name: a.place || a.place_name || undefined
+                }))
 
-                try {
-                    const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
-                    const controller = new AbortController()
-                    const timeoutId = setTimeout(() => controller.abort(), 10000)
+            if (validDayStops.length < 2) return
 
-                    const res = await fetch(`${API_BASE}/api/route`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            stops: validDayStops,
-                            mode: "walk",
-                            optimize: false
-                        }),
-                        signal: controller.signal
-                    })
-                    clearTimeout(timeoutId)
+            const dayController = new AbortController()
+            const timeoutId = setTimeout(() => dayController.abort(), 10000)
 
-                    if (res.ok) {
-                        const data = await res.json()
-                        if (data.route && data.route.geometry && data.route.geometry.coordinates && isMounted) {
-                            setRoadRoutesByDay(prev => ({
-                                ...prev,
-                                [dayNum]: data.route.geometry.coordinates
-                            }))
-                        }
+            // 綁定組件卸載全域訊號
+            const onGlobalAbort = () => dayController.abort()
+            globalController.signal.addEventListener('abort', onGlobalAbort, { once: true })
+
+            try {
+                const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
+                const res = await fetch(`${API_BASE}/api/route`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        stops: validDayStops,
+                        mode: "walk",
+                        optimize: false
+                    }),
+                    signal: dayController.signal
+                })
+
+                if (res.ok && isMounted) {
+                    const data = await res.json()
+                    const coords = data?.route?.geometry?.coordinates
+                    if (coords && Array.isArray(coords) && isMounted) {
+                        // 單天抵達立即更新，消滅序列 Waterfall 延遲
+                        setRoadRoutesByDay(prev => ({
+                            ...prev,
+                            [dayNum]: coords
+                        }))
                     }
-                } catch {
-                    // 容錯靜默降級，維持第一階段幾何線
                 }
+            } catch {
+                // 容錯靜默降級，維持第一階段幾何線
+            } finally {
+                clearTimeout(timeoutId)
+                globalController.signal.removeEventListener('abort', onGlobalAbort)
             }
         }
 
-        fetchRoadRoutes()
-        return () => { isMounted = false }
+        // 各天獨立併發啟動
+        trip.days.forEach(dayPlan => {
+            fetchSingleDayRoute(dayPlan)
+        })
+
+        return () => {
+            isMounted = false
+            globalController.abort()
+        }
     }, [trip])
 
     // 6. 安全縮放聚焦 (Fit Bounds)
@@ -157,6 +197,50 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
         }
     }
 
+    // 8. 3D 巡航導覽切換 (全部巡航 vs 當天巡航)
+    const handleToggleTour = () => {
+        if (isTouring || isFlying) {
+            cancelFlight()
+            return
+        }
+
+        const targetPoints = activeDay === 0
+            ? validPoints
+            : validPoints.filter(p => p.day === activeDay)
+
+        if (targetPoints.length === 0) {
+            toast.info(zh ? "目前沒有可導覽的景點" : "No spots to tour")
+            return
+        }
+
+        const tourPois = targetPoints.map(p => ({
+            lat: p.lat,
+            lng: p.lng,
+            name: p.place,
+            day: p.day,
+            sequence: p.sequence
+        }))
+
+        startTour(
+            tourPois,
+            (poi) => {
+                setMapillaryTarget({ lat: poi.lat, lng: poi.lng })
+                // 嚴格相機解耦：僅同步 activeDay 狀態以高亮彩帶與標記，絕不調用 fitBounds
+                if (typeof poi.day === "number" && poi.day !== activeDay) {
+                    setActiveDay(poi.day)
+                }
+            },
+            () => {
+                fitMapToBounds(mapRef.current)
+                toast.success(
+                    activeDay === 0
+                        ? (zh ? "🎉 全行程 3D 巡航導覽完畢" : "🎉 Full trip 3D tour completed")
+                        : (zh ? `🎉 Day ${activeDay} 3D 巡航導覽完畢` : `🎉 Day ${activeDay} 3D tour completed`)
+                )
+            }
+        )
+    }
+
     return (
         <>
             <div className="my-6 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm will-change-transform transform-gpu">
@@ -181,8 +265,28 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         </div>
                     </div>
 
-                    {/* 右側操作按鈕群 (僅保留全景置中與底圖切換，空間極致寬裕) */}
+                    {/* 右側操作按鈕群 (包含 3D 導覽、全景置中與底圖切換) */}
                     <div className="flex items-center gap-1.5 shrink-0">
+                        {/* ✈️ 3D 巡航導覽按鈕 */}
+                        {validPoints.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleToggleTour}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+                                    isTouring
+                                        ? "bg-linear-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-xs animate-pulse"
+                                        : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent"
+                                }`}
+                                title={isTouring ? (zh ? "停止 3D 導覽" : "Stop 3D Tour") : (zh ? "開啟 3D 巡航導覽" : "Start 3D Tour")}
+                                aria-label="Toggle 3D Tour"
+                            >
+                                <Plane className={`w-3.5 h-3.5 ${isTouring ? "animate-bounce" : ""}`} />
+                                <span className="hidden sm:inline">
+                                    {isTouring ? (zh ? "結束導覽" : "Stop") : (zh ? "3D 導覽" : "3D Tour")}
+                                </span>
+                            </button>
+                        )}
+
                         {/* 視野全景置中 */}
                         <button
                             type="button"
@@ -222,6 +326,9 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                                 key={dayNum}
                                 type="button"
                                 onClick={() => {
+                                    if (isTouring || isFlying) {
+                                        cancelFlight()
+                                    }
                                     if (isSelected && isDay) {
                                         // 再次點選已選中天數：平滑滾動至該天卡片
                                         if (onScrollToDay) {
@@ -265,8 +372,28 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                     })}
                 </div>
 
-                {/* 地圖主容器：自適應螢幕高度 (h-[52vh] min-h-95 max-h-145)，支援平移縮放 */}
-                <div className="relative w-full h-[52vh] min-h-95 max-h-145 bg-slate-100 dark:bg-slate-800 overflow-hidden isolate transform-gpu will-change-transform">
+                {/* 地圖主容器：大視野自適應高度 (style 實體保底 65vh / 520px~780px，杜絕 Tailwind JIT 類別未掃描造成 height: 0px 塌陷) */}
+                <div
+                    className="relative w-full bg-slate-100 dark:bg-slate-800 overflow-hidden isolate transform-gpu will-change-transform"
+                    style={{ height: "65vh", minHeight: "520px", maxHeight: "780px" }}
+                >
+                    {/* ✈️ 3D 巡航導覽懸浮膠囊 (共用 TourHudCapsule 元件) */}
+                    <TourHudCapsule
+                        isTouring={isTouring}
+                        isOrbiting={isOrbiting}
+                        isPaused={isPaused}
+                        currentIndex={currentTourIndex}
+                        currentPOI={currentTourPOI}
+                        onTogglePause={togglePauseTour}
+                        onSkipNext={skipToNext}
+                        onCancel={cancelFlight}
+                        onOpenStreetView={(lat, lng) => {
+                            setMapillaryTarget({ lat, lng })
+                            setMapillaryViewerOpen(true)
+                        }}
+                        hasStreetView={isMapillaryAvailable()}
+                    />
+
                     <Map
                         ref={mapRef}
                         initialViewState={initialCenter}
@@ -418,6 +545,23 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         onClose={() => setPoiDrawerOpen(false)}
                         poi={selectedPOI}
                         isInternal={true}
+                        onOpenStreetView={(lat, lng) => {
+                            setMapillaryTarget({ lat, lng })
+                            setMapillaryViewerOpen(true)
+                        }}
+                        onFlyover={(lat, lng) => {
+                            triggerFlyover({ lat, lng, name: selectedPOI?.name }, () => {
+                                setMapillaryTarget({ lat, lng })
+                            }, true)
+                        }}
+                    />
+
+                    {/* 🆕 Mapillary 實景街景 Viewer */}
+                    <MapillaryViewer
+                        isOpen={mapillaryViewerOpen}
+                        lat={mapillaryTarget?.lat}
+                        lng={mapillaryTarget?.lng}
+                        onClose={() => setMapillaryViewerOpen(false)}
                     />
                 </div>
             </div>
