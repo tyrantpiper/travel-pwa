@@ -24,6 +24,7 @@ import { TourHudCapsule } from "@/components/TourHudCapsule"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 // API 基礎路徑 (模組頂部常數化，避免在並行閉包內重複解析 process.env)
 const ROUTE_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
@@ -233,11 +234,12 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     }, [trip, mode])
 
     // 6. 安全縮放聚焦 (Fit Bounds)
-    const fitMapToBounds = useCallback((targetMap: MapRef | null) => {
+    const fitMapToBounds = useCallback((targetMap: MapRef | null, resetBearingPitch = false) => {
         if (!targetMap || validPoints.length === 0) return
         try {
             targetMap.fitBounds(bounds, {
                 padding: { top: 60, bottom: 60, left: 50, right: 50 },
+                ...(resetBearingPitch ? { bearing: 0, pitch: 0 } : {}),
                 duration: 900,
                 maxZoom: 16
             })
@@ -314,31 +316,32 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     return (
         <>
             <div className="my-6 rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm will-change-transform transform-gpu">
-                {/* 頂部操作列 (毛玻璃階層佈局：標題 + 交通模式膠囊 + 工具按鈕群) */}
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3 min-w-0">
-                        {/* 標題與景點計數 */}
-                        <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                                <Route className="w-4.5 h-4.5" />
-                            </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                                        {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
-                                    </span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 shrink-0">
-                                        {validPoints.length} {zh ? "個景點" : "Spots"}
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
-                                    {zh ? "各天彩帶分色 · 支援自由縮放與漫遊" : "Multi-Day Routes · Zoom & Pan freely"}
-                                </p>
-                            </div>
+                {/* 頂部操作列：第一排標題與景點統計，第二排左側交通方式膠囊、右側3大功能鍵 (3D導覽/街景/衛星) */}
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex flex-col gap-2.5">
+                    {/* 第一排：標題與景點計數 */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            <Route className="w-4.5 h-4.5" />
                         </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
+                                    {zh ? "全行程多天軌跡" : "Full-Trip Route Mesh"}
+                                </span>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 shrink-0">
+                                    {validPoints.length} {zh ? "個景點" : "Spots"}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                                {zh ? "各天彩帶分色 · 支援自由縮放與漫遊" : "Multi-Day Routes · Zoom & Pan freely"}
+                            </p>
+                        </div>
+                    </div>
 
-                        {/* 🚶🚗🚌 交通模式切換膠囊 (與 day-map.tsx 100% 統一) */}
-                        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs backdrop-blur-xs">
+                    {/* 第二排（下面那一排）：左側交通方式，右側3個旗艦功能鍵 */}
+                    <div className="flex items-center justify-between gap-2 pt-0.5 overflow-x-auto scrollbar-none">
+                        {/* 🚶🚗🚌 交通方式左邊 */}
+                        <div className="flex items-center gap-0.5 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-xs backdrop-blur-xs shrink-0">
                             <button
                                 type="button"
                                 onClick={() => handleModeChange('walk')}
@@ -379,92 +382,63 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                                 <span>{zh ? "大眾運輸" : "Transit"}</span>
                             </button>
                         </div>
-                    </div>
 
-                    {/* 右側操作按鈕群 (3D 導覽、街景覆蓋、GPS 定位、全景置中、底圖切換) */}
-                    <div className="flex items-center gap-1.5 shrink-0 self-end lg:self-auto">
-                        {/* ✈️ 3D 巡航導覽按鈕 */}
-                        {validPoints.length > 0 && (
+                        {/* ✈️👁️🛰️ 剩下的3個功能鍵在對應的右邊 */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {/* ✈️ 3D 巡航導覽按鈕 */}
+                            {validPoints.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleToggleTour}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+                                        isTouring
+                                            ? "bg-linear-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-xs animate-pulse"
+                                            : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent"
+                                    }`}
+                                    title={isTouring ? (zh ? "停止 3D 導覽" : "Stop 3D Tour") : (zh ? "開啟 3D 巡航導覽" : "Start 3D Tour")}
+                                    aria-label="Toggle 3D Tour"
+                                >
+                                    <Plane className={`w-3.5 h-3.5 ${isTouring ? "animate-bounce" : ""}`} />
+                                    <span className="hidden sm:inline">
+                                        {isTouring ? (zh ? "結束導覽" : "Stop") : (zh ? "3D 導覽" : "3D Tour")}
+                                    </span>
+                                </button>
+                            )}
+
+                            {/* 👁️ Mapillary 街景覆蓋綠網 toggle */}
+                            {isMapillaryAvailable() && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMapillaryCoverage(prev => !prev)}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
+                                        showMapillaryCoverage
+                                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                            : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent'
+                                    }`}
+                                    title={zh ? "切換街景覆蓋圖層" : "Toggle Street View Coverage"}
+                                    aria-label="Toggle Street View Coverage"
+                                >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">{zh ? "街景" : "Street View"}</span>
+                                </button>
+                            )}
+
+                            {/* 🛰️ 衛星/向量底圖切換 */}
                             <button
                                 type="button"
-                                onClick={handleToggleTour}
+                                onClick={() => setMapMode(prev => prev === 'standard' ? 'satellite' : 'standard')}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
-                                    isTouring
-                                        ? "bg-linear-to-r from-indigo-600 to-purple-600 text-white border-transparent shadow-xs animate-pulse"
+                                    mapMode === 'satellite'
+                                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
                                         : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent"
                                 }`}
-                                title={isTouring ? (zh ? "停止 3D 導覽" : "Stop 3D Tour") : (zh ? "開啟 3D 巡航導覽" : "Start 3D Tour")}
-                                aria-label="Toggle 3D Tour"
+                                title={mapMode === 'satellite' ? (zh ? "切換至向量地圖" : "Vector Map") : (zh ? "切換至衛星影像" : "Satellite")}
+                                aria-label="Toggle Map Style"
                             >
-                                <Plane className={`w-3.5 h-3.5 ${isTouring ? "animate-bounce" : ""}`} />
-                                <span className="hidden sm:inline">
-                                    {isTouring ? (zh ? "結束導覽" : "Stop") : (zh ? "3D 導覽" : "3D Tour")}
-                                </span>
+                                {mapMode === 'satellite' ? <MapIcon className="w-3.5 h-3.5" /> : <Satellite className="w-3.5 h-3.5" />}
+                                <span className="hidden sm:inline">{mapMode === 'satellite' ? (zh ? "地圖" : "Map") : (zh ? "衛星" : "Satellite")}</span>
                             </button>
-                        )}
-
-                        {/* 👁️ Mapillary 街景覆蓋綠網 toggle */}
-                        {isMapillaryAvailable() && (
-                            <button
-                                type="button"
-                                onClick={() => setShowMapillaryCoverage(prev => !prev)}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer border ${
-                                    showMapillaryCoverage
-                                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-transparent'
-                                }`}
-                                title={zh ? "切換街景覆蓋圖層" : "Toggle Street View Coverage"}
-                                aria-label="Toggle Street View Coverage"
-                            >
-                                <Eye className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">{zh ? "街景" : "Street View"}</span>
-                            </button>
-                        )}
-
-                        {/* 📍 GPS 定位到我按鈕 */}
-                        <button
-                            type="button"
-                            onClick={handleLocateMe}
-                            disabled={isLocating}
-                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                            title={zh ? "定位到我的位置" : "Locate Me"}
-                            aria-label="Locate Me"
-                        >
-                            {isLocating ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                            ) : (
-                                <Crosshair className="w-4 h-4 text-indigo-500" />
-                            )}
-                        </button>
-
-                        {/* 視野全景置中 */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isTouring || isFlying) cancelFlight()
-                                fitMapToBounds(mapRef.current)
-                            }}
-                            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-all active:scale-95 cursor-pointer"
-                            title={zh ? "全景置中聚焦" : "Fit All Bounds"}
-                            aria-label="Fit Bounds"
-                        >
-                            <Compass className="w-4 h-4 text-indigo-500" />
-                        </button>
-
-                        {/* 衛星/向量底圖切換 */}
-                        <button
-                            type="button"
-                            onClick={() => setMapMode(prev => prev === 'standard' ? 'satellite' : 'standard')}
-                            className={`p-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
-                                mapMode === 'satellite'
-                                    ? "bg-indigo-600 text-white shadow-xs"
-                                    : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
-                            }`}
-                            title={mapMode === 'satellite' ? (zh ? "切換至向量地圖" : "Vector Map") : (zh ? "切換至衛星影像" : "Satellite")}
-                            aria-label="Toggle Map Style"
-                        >
-                            {mapMode === 'satellite' ? <MapIcon className="w-4 h-4" /> : <Satellite className="w-4 h-4" />}
-                        </button>
+                        </div>
                     </div>
                 </div>
 
@@ -546,6 +520,72 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         }}
                         hasStreetView={isMapillaryAvailable()}
                     />
+
+                    {/* 🧭📍 地圖內部右上角懸浮控制膠囊 (Liquid Glass 物理晶透：高飽和透光 + 雙重鏡面光緣 + 隔離 WebGL 防重繪) */}
+                    <div
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        className={cn(
+                            "absolute top-3 right-3 z-10 flex flex-col items-center gap-1.5 p-1 rounded-2xl pointer-events-auto select-none",
+                            "transform-gpu will-change-transform", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
+                            // 保持 82% 物理混色基底，消弭 iOS Safari WebGL 穿透採樣噪點
+                            "bg-white/82 dark:bg-slate-900/82 backdrop-blur-xl saturate-180",
+                            "border border-white/50 dark:border-slate-700/60",
+                            "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]"
+                        )}
+                    >
+                        {/* 📍 GPS 定位到我按鈕 */}
+                        <button
+                            type="button"
+                            onClick={handleLocateMe}
+                            disabled={isLocating}
+                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer disabled:opacity-50"
+                            title={zh ? "定位到我的位置" : "Locate Me"}
+                            aria-label="Locate Me"
+                        >
+                            {isLocating ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                            ) : (
+                                <Crosshair className="w-4 h-4 text-indigo-500" />
+                            )}
+                        </button>
+
+                        <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
+
+                        {/* 🧭 羅盤 / 視角聚焦 (正北歸零 + 俯視角歸零 + 智能行程聚焦) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isTouring || isFlying) cancelFlight()
+                                const targetMap = mapRef.current
+                                if (!targetMap) return
+
+                                if (activeDay !== 0) {
+                                    const dayPoints = validPoints.filter(p => p.day === activeDay)
+                                    if (dayPoints.length > 0) {
+                                        const dayBounds = computeSafeMultiDayBounds(dayPoints)
+                                        targetMap.fitBounds(dayBounds, {
+                                            padding: { top: 60, bottom: 60, left: 40, right: 40 },
+                                            bearing: 0,
+                                            pitch: 0,
+                                            duration: 800,
+                                            maxZoom: 16
+                                        })
+                                        return
+                                    }
+                                }
+                                fitMapToBounds(targetMap, true)
+                            }}
+                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
+                            title={activeDay === 0 ? (zh ? "全景置中 (正北歸零)" : "Fit All Bounds (North)") : (zh ? `聚焦 Day ${activeDay} (正北歸零)` : `Fit Day ${activeDay}`)}
+                            aria-label="Fit Bounds and Reset North"
+                        >
+                            <Compass className="w-4 h-4 text-indigo-500" />
+                        </button>
+                    </div>
 
                     <Map
                         ref={mapRef}

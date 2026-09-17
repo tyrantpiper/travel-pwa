@@ -51,7 +51,7 @@ export function TourHudCapsule({
                 onTouchStart={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
-                className="absolute top-3 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-md text-white rounded-2xl px-3.5 py-2.5 shadow-2xl border border-white/15 flex items-center justify-between gap-3 max-w-sm sm:max-w-md w-auto pointer-events-auto select-none"
+                className="absolute top-3 left-3 right-16 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-20 bg-slate-900/90 backdrop-blur-md text-white rounded-2xl px-3.5 py-2.5 shadow-2xl border border-white/15 flex items-center justify-between gap-3 max-w-sm sm:max-w-md w-auto pointer-events-auto select-none"
             >
                 <div className="flex items-center gap-2.5 min-w-0">
                     <span className="flex h-7 px-2 shrink-0 items-center justify-center rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/40 text-xs font-black shadow-xs">
