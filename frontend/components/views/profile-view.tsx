@@ -60,6 +60,7 @@ export function ProfileView() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false)
     const [usageGuideOpen, setUsageGuideOpen] = useState(false)
+    const [pushGuideOpen, setPushGuideOpen] = useState(false)
 
     // 🆕 捐贈功能 state（獨立區塊，不影響現有邏輯）
     const [donationProgress, setDonationProgress] = useState({ current: 0, goal: 2000 })
@@ -1082,7 +1083,14 @@ export function ProfileView() {
                         {/* 🔔 推播通知開關 */}
                         {isSupported && (
                             <>
-                                <div className="flex items-center justify-between p-4 text-slate-700 dark:text-slate-200">
+                                <div 
+                                    className="flex items-center justify-between p-4 text-slate-700 dark:text-slate-200 cursor-pointer hover:bg-stone-50 dark:hover:bg-slate-800/40 transition-colors"
+                                    onClick={() => {
+                                        if (permissionState === "denied") {
+                                            setPushGuideOpen(true)
+                                        }
+                                    }}
+                                >
                                     <div className="flex items-center gap-3">
                                         <BellRing className="w-5 h-5 text-purple-500" />
                                         <div className="flex flex-col">
@@ -1090,19 +1098,28 @@ export function ProfileView() {
                                                 {zh ? "推播通知" : "Push Notifications"}
                                             </span>
                                             {permissionState === "denied" && (
-                                                <span className="text-[10px] text-red-400">
-                                                    {zh ? "已在瀏覽器設定中封鎖" : "Blocked in browser settings"}
+                                                <span className="text-[10px] text-red-500 hover:underline">
+                                                    {zh ? "已在系統中封鎖 (點此查看解除指南)" : "Blocked in system (tap to view guide)"}
                                                 </span>
                                             )}
                                         </div>
                                     </div>
                                     <Switch
                                         checked={isSubscribed}
-                                        disabled={permissionState === "denied" || isPushLoading}
+                                        disabled={isPushLoading}
+                                        className={`cursor-pointer ${permissionState === "denied" ? "opacity-60" : ""}`}
                                         onCheckedChange={async (checked) => {
+                                            if (permissionState === "denied") {
+                                                setPushGuideOpen(true)
+                                                return
+                                            }
                                             if (checked) {
                                                 const ok = await subscribe()
-                                                if (ok) toast.success(zh ? "推播通知已開啟 🔔" : "Notifications enabled 🔔")
+                                                if (ok) {
+                                                    toast.success(zh ? "推播通知已開啟 🔔" : "Notifications enabled 🔔")
+                                                } else {
+                                                    toast.error(zh ? "開啟推播失敗，請確認推播支援與服務狀態" : "Failed to enable notifications")
+                                                }
                                             } else {
                                                 await unsubscribe()
                                                 toast.info(zh ? "推播通知已關閉" : "Notifications disabled")
@@ -1391,6 +1408,56 @@ export function ProfileView() {
 
     {/* 📖 使用說明 Dialog */}
     <UsageGuideDialog open={usageGuideOpen} onOpenChange={setUsageGuideOpen} />
+
+    {/* 🔔 推播權限解鎖引導 Dialog */}
+    <Dialog open={pushGuideOpen} onOpenChange={setPushGuideOpen}>
+        <DialogContent className="max-w-md p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
+                    <BellRing className="w-5 h-5 text-purple-500" />
+                    {zh ? "如何解除推播通知封鎖？" : "How to Unblock Notifications"}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    {zh ? "通知權限目前在您的系統或瀏覽器中被設定為封鎖，請依照下方指引手動允許：" : "Notifications are currently blocked. Please follow the steps below to allow them:"}
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3.5 my-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                    <p className="font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5 text-[13px]">
+                        <Smartphone className="w-4 h-4 text-indigo-500" />
+                        {zh ? "🍎 iPhone / iPad (iOS PWA)" : "🍎 iPhone / iPad (iOS PWA)"}
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400">
+                        <li>{zh ? "回到手機主畫面，開啟「設定」" : "Go to iPhone Settings"}</li>
+                        <li>{zh ? "往下滑找到「Tabidachi」或「Safari」" : "Scroll down to 'Tabidachi' or 'Safari'"}</li>
+                        <li>{zh ? "點選「通知」並開啟「允許通知」" : "Tap 'Notifications' and toggle 'Allow'"}</li>
+                    </ol>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                    <p className="font-bold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5 text-[13px]">
+                        <Globe className="w-4 h-4 text-blue-500" />
+                        {zh ? "🌐 Android / Chrome / Edge" : "🌐 Android / Chrome / Edge"}
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-500 dark:text-slate-400">
+                        <li>{zh ? "點擊網址列左側的「鎖頭 🔒」或「網站控制項」" : "Click the lock icon 🔒 next to the URL"}</li>
+                        <li>{zh ? "點選「網站設定」或「權限」" : "Tap 'Site settings' or 'Permissions'"}</li>
+                        <li>{zh ? "將「通知」改為「允許」，完成後重新整理頁面" : "Change 'Notifications' to 'Allow' and reload"}</li>
+                    </ol>
+                </div>
+            </div>
+
+            <DialogFooter>
+                <Button
+                    className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold cursor-pointer"
+                    onClick={() => setPushGuideOpen(false)}
+                >
+                    {zh ? "我知道了" : "Got it"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 </div>
     )
 }
