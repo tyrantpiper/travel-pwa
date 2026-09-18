@@ -49,7 +49,18 @@ export function getSupabaseClient(): SupabaseClient | null {
         return null
     }
 
-    // 創建並存儲單例
-    globalForSupabase.supabaseClient = createClient(supabaseUrl, supabaseKey)
+    // 創建並存儲單例 (注入自定義 fetch wrapper，動態附加 x-user-id 請求頭以滿足 Supabase RLS 政策)
+    globalForSupabase.supabaseClient = createClient(supabaseUrl, supabaseKey, {
+        global: {
+            fetch: (url, options = {}) => {
+                const headers = new Headers(options.headers)
+                const uid = typeof window !== 'undefined' ? localStorage.getItem("user_uuid") : null
+                if (uid) {
+                    headers.set("x-user-id", uid)
+                }
+                return fetch(url, { ...options, headers })
+            }
+        }
+    })
     return globalForSupabase.supabaseClient
 }
