@@ -25,7 +25,7 @@
   <img src="https://img.shields.io/badge/Tailwind_CSS-v4.1-38B2AC?logo=tailwind-css" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi" />
   <img src="https://img.shields.io/badge/Gemini_3.7_Flash_&_Gemma-4285F4?logo=google" />
-  <img src="https://img.shields.io/badge/Tests-155_Passed-success?logo=vitest" />
+  <img src="https://img.shields.io/badge/Tests-191_Passed-success?logo=vitest" />
   <img src="https://img.shields.io/badge/PWA-Installable-5A0FC8?logo=pwa" />
   <img src="https://img.shields.io/badge/License-MIT-green" />
 </p>
@@ -43,9 +43,10 @@
 | 🚀 創新亮點 | 💡 技術實作 | 🏆 評審價值 |
 | :--- | :--- | :--- |
 | **Agentic Deep Linking** | 全鏈路推播深層調度 + Virtuoso 穿透重置 + 3.5s 光暈尋址 | **零迷航落地**：推播點擊精準直達特定記帳項目或總覽儀表板，打破傳統 Web Push 跳轉首頁的痛點。 |
+| **3D Cinematic Tour Engine** | 60° 俯衝大圓航線低空巡航 + 360° 盤旋 + VisionOS 晶透面板 | **身臨其境導覽**：以無人機視角飛掠跨日景點，搭配 Mapillary 全球 360 度真實街景無縫預覽。 |
 | **Generative Intelligence** | Gemini 3.7 Flash 思考推論 + 批次景點推薦 + 原生時鐘選取器 | **極致操作感**：告別純文字 Chatbot，對話直接驅動原生 UI 元件、批次加入與行程變更。 |
-| **PWA & CSP Pipeline** | MapLibre Web Worker 同源靜態管線 + Serwist 離線雙引擎 | **企業級安全**：徹底根除動態 `blob:` 注入阻擋，離線環境圖資與行程 100% 可用。 |
-| **Zero-Regression Rigor** | 雙重核驗 404 靜默自癒 + 155 項全維度測試自動守門 | **高可用架構**：網路波動絕不誤判白屏，單一事實來源狀態機確保代碼與型別零退化。 |
+| **Offline-First & PWA** | 本地 IndexedDB 雙層存儲 + Serwist 離線秒開 + 背景樂觀同步 | **全天候可用**：零網路/飛航模式依然秒開瀏覽行程與記帳，連網後自動無衝突向雲端閉環。 |
+| **Zero-Regression Rigor** | 雙重核驗 404 靜默自癒 + 191 項全維度測試自動守門 | **高可用架構**：網路波動絕不誤判白屏，單一事實來源狀態機確保代碼與型別零退化。 |
 
 ---
 
@@ -63,10 +64,11 @@
 - **BYOK (Bring Your Own Key)** — Your API key, your privacy / 自帶金鑰，隱私至上
 
 ### 🗺️ Interactive Maps / 互動地圖
+- **3D Cinematic Tour Engine & VisionOS HUD** — 60° 俯衝大圓航線低空巡航導覽、景點 360° 自動盤旋與 Apple VisionOS 曜黑晶透懸浮面板
+- **Mapillary Global Street View** — 整合式 360 度真實街景沉浸式探索，隨時預覽實體地標外觀
 - **MapLibre GL & CSP Pipeline** — Web Worker 同源靜態管線，符合最嚴格 CSP 安全防護標準
-- **3D Buildings & Satellite View** — 支援 3D 建築視圖、衛星空拍圖與中日雙語標籤
-- **Mapillary Street View Integration** — 無縫同步的地圖與街景互動 / 整合式街景探索
-- **Multi-mode Routing** — Walking, driving, transit with real distance & duration / 步行、開車、大眾運輸路線
+- **3D Buildings & Satellite View** — 支援 3D 建築視圖、Esri 高清衛星空拍圖與 OpenFreeMap 向量街道切換
+- **Multi-mode Routing** — Walking, driving, transit with real distance & duration / 步行、開車、大眾運輸路線即時切換
 - **L1 Local Instant Search** — Offline-capable MiniSearch for stations & landmarks / 本地即時搜尋（離線可用）
 - **L2 5-Source POI Fusion Engine** — OSM, OpenTripMap, WikiVoyage, Wikipedia, Wikidata 聚合 / 五源 POI 聚合引擎
 - **Global Language Matrix** — CJK (中日韓) 語系變體擴充與 10x 地理感知搜尋 / 多語系智慧地名擴充
@@ -86,10 +88,10 @@
 
 ### 💰 Expense Tracker & Deep Linking / 記帳工具與深層連結
 - **Agentic Deep Linking Engine** — 點擊推播直達指定記帳項目，虛擬列表穿透尋址與 3.5 秒翠綠發光定位
-- **9 Major Currencies** — JPY, USD, EUR, KRW, TWD, and more with auto-inferred default / 支援 9 種主流貨幣
+- **110+ Official Sovereign Fiat Currencies** — 支援全球 110+ 種官方 ISO 4217 法定貨幣白名單，純淨過濾加密貨幣
 - **Real-time Exchange Rates** — Auto-convert to your home currency / 即時匯率換算
 - **Category Analytics** — Interactive pie charts and daily/total views / 分類統計與圓餅圖表
-- **Receipt Photo Upload** — Cloudinary integration / 收據照片上傳
+- **Receipt Photo Upload & AI Parse** — Cloudinary 整合收據存證與 AI 圖片自動拆分 (Subtotal, Tax, Tip)
 - **Shared & Private Ledgers** — Split expenses with travel buddies / 公帳私帳分離
 
 ### 🔐 Privacy & Security / 隱私安全
@@ -101,7 +103,7 @@
 ### 📱 PWA & UX
 - **Installable PWA** — Works on iOS, Android, and Desktop / 可安裝到主畫面
 - **Real-time Push Notifications** — 實時推播、倒數提醒與共同編輯廣播 / PWA 推播引擎
-- **Serwist Offline Engine** — 強大的 Service Worker 離線快取策略，無網路依然秒開
+- **Offline-First Instant Boot** — 本地 L1 快取 + L2 IndexedDB 存儲與 Serwist 離線引擎，無網路依然秒開並自動背景樂觀同步
 - **Integrated Navigation Hub** — 懸浮藥丸式 (Floating pill) 底部導覽列與雙擊刷新 / 整合式導航中樞
 - **Dark Mode** — System-aware theme switching / 深色模式
 - **Bilingual** — Traditional Chinese & English / 繁體中文 + 英文
@@ -110,7 +112,7 @@
 
 ### 🛡️ Architecture & DevOps / 架構與維運
 - **Double-Checked 404 Self-Healing** — 雙重核驗死行程自癒防線，網路抖動不誤判、幽靈快取 300ms 內秒級靜默自癒
-- **155 Full-Dimension Automated Tests** — Vitest 單元與整合測試 100% 守護，杜絕狀態死鎖與迴歸
+- **191 Full-Dimension Automated Tests** — Vitest 單元與整合測試 100% 守護，杜絕狀態死鎖與迴歸
 - **Autonomous Agent Ecosystem** — `.agents` L0-L3 工作流與多角色 (@dev, @qa, @security) 自動化治理
 - **Enterprise-grade Security** — MapLibre CSP Worker Pipeline、Anti-SSRF 與嚴格 CORS 策略
 - **Observability** — Prometheus Metrics 與 Supabase 連線池深度健康檢查 / 系統可觀測性監控
