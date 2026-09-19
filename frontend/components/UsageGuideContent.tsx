@@ -44,7 +44,7 @@ export function UsageGuideContent() {
                         {zh ? 'Tabidachi 全功能操作手冊' : 'Tabidachi Comprehensive Guide'}
                     </h3>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                        {zh ? '點擊下方分類展開詳細步驟與使用技巧' : 'Tap any category below to expand steps and tips'}
+                        {zh ? '收錄 3D 巡航、全球實景、離線同步與 11 大核心模組操作詳解' : 'Complete instructions for 3D tours, street view, offline sync, and 11 core modules'}
                     </p>
                 </div>
             </div>
@@ -76,12 +76,16 @@ export function UsageGuideContent() {
                             desc={zh ? '點擊頂部行程名稱旁的下拉箭頭，即可在不同行程之間快速切換。' : 'Tap the dropdown arrow next to the trip name at the top to switch between trips.'}
                         />
                         <Step n={5}
-                            title={zh ? '新增 / 刪除天數' : 'Add / Delete Days'}
-                            desc={zh ? '滑到行程底部可看到「新增天數」按鈕。系統支援智能克隆：可複製前一天的 Checklist、Notes 等資料到新的一天。' : 'Scroll to the bottom to find "Add Day". Smart clone can copy previous day\'s checklist and notes.'}
+                            title={zh ? '增減與管理天數' : 'Adjust & Manage Days'}
+                            desc={zh ? '點擊行程頂部的日期區間膠囊，即可在日曆中重新挑選起訖日期以增減天數；在天數標籤列選取特定日期時，亦可點擊「刪除此天」進行單日刪減。' : 'Tap the date capsule at the top to pick new dates and adjust trip duration. When viewing a specific day, you can also tap "Delete Day" to remove it.'}
                         />
                         <Step n={6}
                             title={zh ? '分享行程' : 'Share Trip'}
                             desc={zh ? '點擊行程頁面頂端導覽列的分享按鈕 📤，可透過原生分享或複製公開連結分享。' : 'Tap the share button 📤 at the top. Share via native share or copy the public link.'}
+                        />
+                        <Step n={7}
+                            title={zh ? '⛅ 5 天微氣候即時預報帶' : '⛅ 5-Day Live Microclimate Forecast'}
+                            desc={zh ? '行程總覽（Day 0）頂部提供 5 天連續氣象帶，即時監控最高/最低溫與降水機率，輔助行程打包穿搭。' : 'Trip Master Overview (Day 0) features a 5-day live weather strip showing high/low temps and rain probabilities.'}
                         />
                         <Tip>{zh ? '只有行程創建者可以刪除行程；其他成員可以選擇離開行程。' : 'Only the trip creator can delete a trip; other members can choose to leave.'}</Tip>
                     </AccordionContent>
@@ -116,8 +120,8 @@ export function UsageGuideContent() {
                             desc={zh ? '編輯活動時選擇分類（🍽️ 餐飲 / 🚃 交通 / 🛍️ 購物 / 🏨 住宿 / 🎭 活動），卡片會顯示對應圖示。' : 'Choose a category when editing (🍽️ Food / 🚃 Transit / 🛍️ Shopping / 🏨 Hotel / 🎭 Activity) for icon display.'}
                         />
                         <Step n={6}
-                            title={zh ? '自訂 Tags' : 'Custom Tags'}
-                            desc={zh ? '在編輯活動底部可加入自訂標籤，方便分類和搜尋。' : 'Add custom tags at the bottom of the activity editor for easy categorization.'}
+                            title={zh ? '📅 跨月份日曆區間選取' : '📅 Multi-Month Date Range Picker'}
+                            desc={zh ? '建立或調整行程時，可上下滑動連續瀏覽各月份日曆，直覺點選出發與回程日期。' : 'Scroll smoothly across months to effortlessly select your trip departure and return dates.'}
                         />
                         <Tip>{zh ? '支援各種格式的 Google Maps 連結，包括短網址和完整網址，貼上即自動辨識！' : 'All Google Maps link formats are supported, including short URLs and full URLs. Just paste and go!'}</Tip>
                     </AccordionContent>
@@ -136,29 +140,37 @@ export function UsageGuideContent() {
                             desc={zh ? '點擊任何活動卡片可展開詳情，在備忘欄（memo）記錄注意事項、營業時間等資訊。' : 'Tap any activity card to expand details. Use the memo field to record notes, opening hours, etc.'}
                         />
                         <Step n={2}
-                            title={zh ? '相關連結' : 'Related Links'}
-                            desc={zh ? '活動詳情中可新增多個連結（訂位連結、餐廳官網、IG 頁面等），點擊即可開啟。' : 'Add multiple links in activity details (booking links, restaurant pages, etc.). Tap to open.'}
+                            title={zh ? '活動官網與訂位連結' : 'Official Website & Booking Links'}
+                            desc={zh ? '活動詳情中可填入店家官網、訂位網址或 IG 頁面，點擊即可一鍵開啟外部瀏覽；亦可填入導航連結自動解析座標！' : 'Add restaurant websites, booking links, or social pages to any activity card for one-tap browsing, alongside map navigation links!'}
                         />
                         <Step n={3}
                             title={zh ? '⭐ 連結中貼入地圖網址' : '⭐ Paste Map URL in Links'}
                             desc={zh ? '在連結欄位貼入 Google Maps 網址，系統會自動解析座標，活動卡片上會顯示導航按鈕。' : 'Paste a Google Maps URL in the link field. The system auto-resolves coordinates and shows navigation.'}
                         />
                         <Step n={4}
-                            title={zh ? '每日注意事項（Info 頁）' : 'Daily Notes (Info Page)'}
-                            desc={zh ? '切換到 Info 頁 → 展開每日提示區 → 可新增多條注意事項，支援 emoji 圖示選擇（⚠️💡✈️🚇等）。' : 'Go to Info tab → expand daily tips → add notes with emoji icons (⚠️💡✈️🚇 etc.).'}
+                            title={zh ? '每日注意事項與備忘' : 'Daily Tips & Notes'}
+                            desc={zh ? '在每日行程的時間軸上方展開提示區，即可為當天新增多條注意事項，支援 emoji 圖示（⚠️💡✈️🚇等）醒目標記。' : 'Expand the daily tips section above your timeline to add notes with emoji icons (⚠️💡✈️🚇 etc.) for quick reminders.'}
                         />
                         <Step n={5}
+                            title={zh ? '每日 Checklist 待辦清單' : 'Daily Checklist'}
+                            desc={zh ? '在每日行程頂部可建立當天專屬待辦清單，勾選完成會自動排序到底部，支援編輯與刪除。' : 'Create a daily to-do list at the top of each day. Checked items automatically sort to the bottom.'}
+                        />
+                        <Step n={6}
+                            title={zh ? '每日花費與票券記錄' : 'Daily Costs & Tickets'}
+                            desc={zh ? '展開每日提示區可預先登記當日門票與花費項目，並支援「私人模式」（點擊 👁️）對同團旅伴隱藏。' : 'Record daily tickets and estimated expenses above the timeline, with private mode (👁️) to hide personal items from group members.'}
+                        />
+                        <Step n={7}
                             title={zh ? '照片紀錄' : 'Photo Gallery'}
                             desc={zh ? '在活動詳情中可上傳多張照片作為行程紀錄，支援圖片預覽與縮放。' : 'Upload multiple photos in activity details as travel records. Supports preview and zoom.'}
                         />
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 4. Info 資訊頁 ===== */}
+                {/* ===== 4. Info 資訊與預訂中心 ===== */}
                 <AccordionItem value="info" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            📋 {zh ? 'Info 資訊頁' : 'Info Page'}
+                            📋 {zh ? 'Info 資訊與預訂中心' : 'Info & Booking Center'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
@@ -167,184 +179,245 @@ export function UsageGuideContent() {
                             desc={zh ? '記錄去程/回程的航空公司、班號、PNR 確認碼、座位、起降時間。卡片式展示一目了然。' : 'Record airline, flight number, PNR, seats, and times for outbound/inbound flights.'}
                         />
                         <Step n={2}
-                            title={zh ? '住宿資訊' : 'Accommodation'}
+                            title={zh ? '住宿資訊' : 'Accommodation & Hotels'}
                             desc={zh ? '新增飯店名稱、地址、訂單編號、電話。支援貼入 Google Maps 連結自動解析位置！還可加入 Wi-Fi 密碼、門鎖密碼等備忘。' : 'Add hotel name, address, booking ID, phone. Supports Google Maps link auto-resolve! Add Wi-Fi/lock codes in memo.'}
                         />
                         <Step n={3}
-                            title={zh ? '每日花費預估' : 'Daily Cost Estimate'}
-                            desc={zh ? '展開每日花費區塊，預先估算每日預算項目與金額，支援多幣別（JPY/USD/TWD 等）。' : 'Expand daily cost section to estimate budget items. Supports multiple currencies (JPY/USD/TWD).'}
+                            title={zh ? '機酒與景點票券預訂' : 'Travel Booking Hub'}
+                            desc={zh ? '預訂專區依據你的行程目的地，自動提供各大平台的飯店住宿、熱門景點門票與一日遊專屬推薦特惠。' : 'The booking tab automatically curates hotel stays, popular attraction passes, and day tours tailored to your trip destination.'}
                         />
                         <Step n={4}
-                            title={zh ? '每日票券' : 'Daily Tickets'}
-                            desc={zh ? '記錄每日需要的門票、車票、體驗票券的名稱與價格。' : 'Record daily tickets, passes, and experience tickets with names and prices.'}
-                        />
-                        <Step n={5}
-                            title={zh ? '每日 Checklist 待辦' : 'Daily Checklist'}
-                            desc={zh ? '建立每日待辦清單，勾選完成後會自動排序到底部。支援編輯和刪除。' : 'Create daily to-do lists. Checked items auto-sort to the bottom. Supports edit and delete.'}
-                        />
-                        <Step n={6}
-                            title={zh ? '🔒 隱私模式' : '🔒 Privacy Mode'}
-                            desc={zh ? 'Checklist、花費、票券項目支援「私人」模式（點擊眼睛圖示 👁️），設為私人後其他行程成員看不到該項目。' : 'Checklist, costs, and tickets support "Private" mode (tap 👁️). Private items are hidden from other trip members.'}
+                            title={zh ? '多航段彈性管理' : 'Multi-Leg Flight Segments'}
+                            desc={zh ? '支援去程與回程自由增減多個航段（Leg），包含轉機航班、不同航廈與座位號碼皆可完整登記。' : 'Easily add or remove flight legs for outbound and inbound journeys, supporting layovers, terminal details, and seats.'}
                         />
                         <Tip>{zh ? '住宿的「導航網址」欄位可直接貼 Google Maps 連結，自動抓取座標！' : 'Paste a Google Maps link in the hotel "Navigation URL" field for auto coordinate extraction!'}</Tip>
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 5. 地圖功能 ===== */}
+                {/* ===== 5. 2D 多日大地圖功能 ===== */}
                 <AccordionItem value="map" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            🗺️ {zh ? '地圖功能' : 'Map Features'}
+                            🗺️ {zh ? '多日大地圖與交通' : 'Multi-Day Master Map & Routing'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
                         <Step n={1}
-                            title={zh ? '每日路線圖' : 'Daily Route Map'}
-                            desc={zh ? '每天的行程會自動根據地點座標繪製路線圖，可看到整天的移動軌跡。' : 'Daily itineraries auto-generate route maps based on coordinates, showing the full day\'s path.'}
+                            title={zh ? '跨天總覽與單日切換' : 'Multi-Day Overview & Day Views'}
+                            desc={zh ? '點擊頂部天數切換籤，地圖相機將自動計算最佳視角邊界，平滑飛行至當天所有景點的全覽視野。' : 'Switching days smoothly animates the camera viewport to fit all activities of that day.'}
                         />
                         <Step n={2}
-                            title={zh ? '全螢幕地圖' : 'Fullscreen Map'}
-                            desc={zh ? '點擊地圖可展開為全螢幕模式，支援 POI 搜尋和地點探索。' : 'Tap the map to expand fullscreen. Supports POI search and place discovery.'}
+                            title={zh ? '🚶‍♂️🚗🚌 多模態交通路線切換' : '🚶‍♂️🚗🚌 Travel Mode Switching'}
+                            desc={zh ? '地圖控制列可即時切換「步行」、「開車」與「大眾運輸」三種路線，即時重新規劃並顯示清楚的道路軌跡。' : 'Toggle between Walking, Driving, and Transit modes on the fly to view clear, real-time route paths.'}
                         />
                         <Step n={3}
-                            title={zh ? 'POI 搜尋 & 加入行程' : 'POI Search & Add'}
-                            desc={zh ? '在全螢幕地圖中搜尋附近景點、餐廳等，點擊查看詳情（評價、照片），一鍵加入當天行程。' : 'Search nearby spots and restaurants in fullscreen map. View details (ratings, photos) and add to today\'s plan.'}
+                            title={zh ? '🛰️ 衛星空拍與街道地圖' : '🛰️ Satellite & Street Map Views'}
+                            desc={zh ? '點擊衛星按鈕即可切換真實衛星空拍圖與清晰街道地圖，山川地形與街道建築一覽無遺。' : 'Switch between high-resolution satellite imagery and clean street maps to explore your surroundings.'}
                         />
                         <Step n={4}
-                            title={zh ? '設定每日位置' : 'Set Daily Location'}
-                            desc={zh ? '點擊天氣面板的「修改地點」可手動設定每日所在城市，影響天氣預報和搜尋偏好。' : 'Tap "Change Location" on the weather panel to set the daily city, affecting weather forecasts and search.'}
+                            title={zh ? '📍 即時定位' : '📍 Live Location'}
+                            desc={zh ? '點擊右上角懸浮按鈕的定位圖示，地圖立即平滑移動至你所在的即時位置。' : 'Tap the locate button in the floating capsule to smoothly center the map on your current position.'}
                         />
+                        <Step n={5}
+                            title={zh ? '景點搜尋與加入行程' : 'Explore Places & Add to Trip'}
+                            desc={zh ? '在全螢幕地圖中搜尋附近景點、餐廳與地標，點擊查看評分與照片，一鍵直接排入行程。' : 'Search nearby places and attractions. View ratings and photos, and add them directly to your itinerary.'}
+                        />
+                        <Tip>{zh ? '長按地圖任意位置可插下自訂紅針，快速建立私房景點！' : 'Long-press anywhere on the map to drop a custom pin and create secret spots!'}</Tip>
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 6. 工具箱 ===== */}
+                {/* ===== 6. 3D 景觀巡航與全球實景 (全新專屬章節) ===== */}
+                <AccordionItem value="tour" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                    <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                            ✈️ {zh ? '3D 景觀巡航與全球實景' : '3D Cinematic Tour & Street View'}
+                        </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4 space-y-3">
+                        <Step n={1}
+                            title={zh ? '啟動 3D 低空巡航' : 'Launch 3D Low-Altitude Tour'}
+                            desc={zh ? '當天有 2 個以上景點時，地圖上方會出現「✈️ 3D 巡航」按鈕。點擊後視角自動切換為立體俯瞰，順著飛行路線低空飛掠各景點。' : 'When 2+ spots exist, tap "✈️ 3D Tour". The view smoothly shifts to a 3D aerial perspective, gliding across all spots along your itinerary.'}
+                        />
+                        <Step n={2}
+                            title={zh ? '🔄 360° 景點上空盤旋' : '🔄 360° Orbiting at POIs'}
+                            desc={zh ? '抵達每個景點後，鏡頭會自動進入 360 度低空環繞盤旋模式，全景欣賞地標四周風景。' : 'Upon reaching each destination, the camera automatically enters smooth 360° orbital rotation.'}
+                        />
+                        <Step n={3}
+                            title={zh ? '🎛️ 懸浮控制面板' : '🎛️ Floating Tour Controls'}
+                            desc={zh ? '懸浮面板即時顯示當前站點與飛行進度。可隨時按「暫停」自由瀏覽地圖、「繼續」或跳至「下一站」。' : 'The floating control pill displays your current stop and tour progress. Tap "Pause" to explore freely, "Resume", or skip to "Next".'}
+                        />
+                        <Step n={4}
+                            title={zh ? '📷 360° 全球真實街景' : '📷 360° Real-World Street View'}
+                            desc={zh ? '在控制面板或景點資訊中點擊「街景」，即可開啟 360 度全景真實街景視圖，身臨其境預覽景點周邊。' : 'Tap "Street View" in the tour controls or place details to launch an immersive 360° panoramic view of your destination.'}
+                        />
+                        <Tip>{zh ? '巡航過程中可隨時暫停或切換視角，自由探索景點四周環境！' : 'You can pause the tour or adjust your viewing angle anytime to freely explore surrounding areas!'}</Tip>
+                    </AccordionContent>
+                </AccordionItem>
+
+                {/* ===== 7. 離線優先與秒開同步 (全新專屬章節) ===== */}
+                <AccordionItem value="offline" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
+                    <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                            📶 {zh ? '離線模式與秒開同步' : 'Offline-First & Auto Sync'}
+                        </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4 space-y-3">
+                        <Step n={1}
+                            title={zh ? '飛航模式 0 秒極速啟動' : 'Zero-Second Instant Boot in Airplane Mode'}
+                            desc={zh ? 'Tabidachi 具備極速離線運算架構，即使完全沒有網路或處於飛航模式，也能瞬間秒開查閱！' : 'Tabidachi features an instant offline architecture, booting and loading your plans immediately even without internet or in airplane mode.'}
+                        />
+                        <Step n={2}
+                            title={zh ? '離線查閱行程與快取圖資' : 'Browse Itinerary & Cached Tiles Offline'}
+                            desc={zh ? '已瀏覽過的行程細節、筆記、航班住宿與地圖瓦片皆會持久化保存於本機，出國未辦漫遊也能隨時查閱。' : 'Previously loaded itineraries, notes, flights, and map tiles remain fully accessible offline without roaming.'}
+                        />
+                        <Step n={3}
+                            title={zh ? '離線無憂查閱與行程快照' : 'Offline Browsing & Local Snapshots'}
+                            desc={zh ? '在完全沒有網路的地下鐵或機艙內，依然能順暢瀏覽行程安排、景點筆記、航班住宿資訊與地圖瓦片。' : 'Freely browse all itinerary details, notes, flight/hotel bookings, and map tiles even without network in subways or flights.'}
+                        />
+                        <Step n={4}
+                            title={zh ? '🔄 安全網路自動重連' : '🔄 Seamless Auto-Reconnection'}
+                            desc={zh ? '重新連上網路時，系統會自動核驗最新雲端版本並靜默同步更新，確保跨裝置資料始終保持一致。' : 'Upon reconnecting, the system automatically verifies the latest cloud version and syncs updates seamlessly.'}
+                        />
+                        <Tip>{zh ? '出發前先在飯店連線開啟一次行程，讓地圖與資料完成預熱快取，旅途更加安心！' : 'Open your trip once on hotel Wi-Fi before heading out to pre-warm offline map caches!'}</Tip>
+                    </AccordionContent>
+                </AccordionItem>
+
+                {/* ===== 8. 工具箱與智慧記帳 ===== */}
                 <AccordionItem value="tools" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            🧰 {zh ? '工具箱' : 'Toolbox'}
+                            🧰 {zh ? '工具箱與智慧記帳' : 'Toolbox & Smart Expense'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
                         <Step n={1}
-                            title={zh ? '消費記錄' : 'Expense Tracking'}
-                            desc={zh ? '切到「工具 🧰」頁面，點擊「+」新增消費，可選分類（餐飲/交通/購物等）、付款方式（現金/Suica/信用卡等）。' : 'Go to "Tools 🧰", tap "+" to add expenses. Choose category and payment method.'}
+                            title={zh ? '新增消費記錄' : 'Add Expense'}
+                            desc={zh ? '切換至「工具 🧰」頁，點擊「+」新增消費，選擇分類（餐飲/交通/購物/住宿）與付款方式。' : 'Go to "Tools 🧰", tap "+" to record costs. Choose category and payment method.'}
                         />
                         <Step n={2}
-                            title={zh ? '多幣別自動換算' : 'Multi-Currency'}
-                            desc={zh ? '記帳時可選擇幣別（JPY/USD/EUR/KRW/HKD/TWD），系統會自動以即時匯率換算成預設貨幣。' : 'Select currency when recording (JPY/USD/EUR/KRW/HKD/TWD). Auto-converts with real-time exchange rates.'}
+                            title={zh ? '🌍 全球 110+ 國幣別與國旗支援' : '🌍 110+ World Currencies with Flags'}
+                            desc={zh ? '支援全球超過 110 種各國貨幣，每一種皆配有清晰的國旗圖示，出國記帳一目了然。' : 'Supports over 110 world currencies with clear country flag icons, making foreign expense tracking effortless.'}
                         />
                         <Step n={3}
-                            title={zh ? '消費圖表分析' : 'Expense Charts'}
-                            desc={zh ? '自動生成消費比例圖表，直覺了解錢花在哪裡。' : 'Auto-generated spending charts show where your money goes at a glance.'}
+                            title={zh ? '💡 目的地智慧貨幣判定' : '💡 Smart Destination Currency Default'}
+                            desc={zh ? '建立行程時系統會依據目的地國家名稱（如日本、美國、歐洲），自動判定並優先為你選定官方貨幣（JPY、USD、EUR）。' : 'Auto-infers and presets the official currency based on destination (e.g. Japan -> JPY, USA -> USD).'}
                         />
                         <Step n={4}
-                            title={zh ? '信用卡回饋管理' : 'Credit Card Rewards'}
-                            desc={zh ? '新增信用卡資訊（名稱、回饋率、回饋上限），記帳時選擇信用卡可自動計算回饋金額。' : 'Add credit cards (name, reward rate, limit). Selecting a card auto-calculates cashback.'}
+                            title={zh ? '信用卡回饋即時折抵試算' : 'Instant Credit Card Cashback Calculation'}
+                            desc={zh ? '記帳選擇信用卡付款時，可直接填入該卡海外回饋率（%），系統會自動換算折抵金額並顯示於總帳明細中。' : 'When paying by credit card, enter your card\'s cashback percentage to auto-calculate savings right on your expense breakdown.'}
                         />
                         <Step n={5}
-                            title={zh ? '收據上傳' : 'Receipt Upload'}
-                            desc={zh ? '記帳時可拍照或上傳收據圖片，方便日後查看和退稅。' : 'Take a photo or upload receipt images when recording expenses for future reference and tax refunds.'}
+                            title={zh ? '收據拍照存證' : 'Receipt Photo Archiving'}
+                            desc={zh ? '每筆消費可拍攝或上傳實體收據圖片，日後可原圖放大查看明細，退稅出示極方便。' : 'Attach physical receipt photos to any expense for easy tax refund verification.'}
                         />
                         <Step n={6}
-                            title={zh ? 'AI 辨識記帳' : 'AI Receipt Parsing'}
-                            desc={zh ? '在工具箱中使用「AI 辨識」功能，貼上收據文字或截圖，AI 會自動精準拆分各個品項與金額。' : 'Use "AI Parse" in Toolbox to paste receipt text or screenshots. AI auto-splits items and amounts accurately.'}
+                            title={zh ? '🧾 AI 收據圖片自動拆分' : '🧾 AI Receipt Auto-Parsing'}
+                            desc={zh ? '使用 AI 辨識功能上傳收據照片，AI 自動萃取商家名稱、品項明細、稅金 (Tax) 與服務費 (Tip)。' : 'Upload receipt images to AI Parse. It automatically extracts merchant name, items, taxes, and tips.'}
                         />
                         <Step n={7}
-                            title={zh ? '旅遊公帳分享' : 'Travel Ledger Share'}
-                            desc={zh ? '點擊工具箱頂部的分享按鈕 📤 可產生公帳連結，分享給旅伴即可讓他們即時查看所有消費明細。' : 'Tap the share button 📤 to generate a ledger link for trip mates to view all expenses instantly.'}
+                            title={zh ? '多人旅費公帳即時同步' : 'Shared Group Travel Ledger'}
+                            desc={zh ? '記帳時可選擇付款人與分攤成員，旅伴開啟各自手機即可即時查看最新總支出與分類明細，結算帳目清晰省心。' : 'Assign payers and split members on any expense. Travel companions see real-time shared expenses and category breakdowns on their own devices.'}
                         />
-                        <Tip>{zh ? 'AI 工具可以幫你自動解析截圖中的消費明細！拍照就能記帳。' : 'AI tools can auto-parse expense details from screenshots! Just take a photo to record.'}</Tip>
+                        <Tip>{zh ? '點擊統計圖表可隨時切換分類佔比與每日花費趨勢，讓你輕鬆掌握每筆旅費預算！' : 'Tap expense charts to view category breakdowns and daily spending trends, keeping your trip budget on track!'}</Tip>
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 7. AI 助手 ===== */}
+                {/* ===== 9. AI 助手 ===== */}
                 <AccordionItem value="ai" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            🤖 {zh ? 'AI 助手' : 'AI Assistant'}
+                            🤖 {zh ? 'AI 旅遊助手 (Ryan AI)' : 'AI Assistant (Ryan AI)'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
                         <Step n={1}
-                            title={zh ? '開啟 AI 聊天' : 'Open AI Chat'}
-                            desc={zh ? '點擊右下角的藍紫色圓球 💬 即可開啟 AI 對話。可拖曳調整圓球位置。' : 'Tap the blue-purple circle 💬 at bottom-right to open AI chat. Drag to reposition.'}
+                            title={zh ? '懸浮 AI 伴遊小球' : 'Floating AI Companion Orb'}
+                            desc={zh ? '右下角的藍紫色小球可隨心拖曳至螢幕任意位置，點擊即可召喚 Ryan AI 伴遊助手。' : 'Drag the floating blue-purple orb anywhere on your screen and tap to open your Ryan AI travel assistant.'}
                         />
                         <Step n={2}
-                            title={zh ? '行程健檢' : 'Trip Health Check'}
-                            desc={zh ? '跟 AI 說「幫我看這行程順不順」或「幫我健檢」，AI 會分析你目前的行程安排，提供優化建議。' : 'Ask AI "Check if my itinerary makes sense" and it will analyze your schedule and provide optimization tips.'}
+                            title={zh ? '行程健檢與智慧診斷' : 'Itinerary Health Check & Advice'}
+                            desc={zh ? '直接對話「幫我健檢行程」或「看路線順不順」，AI 會深度評估時間緊湊度、交通合理性並提出優化方案。' : 'Ask "Check my itinerary", and AI evaluates transit feasibility, schedule density, and optimizes order.'}
                         />
                         <Step n={3}
-                            title={zh ? '圖片辨識' : 'Image Recognition'}
-                            desc={zh ? '點擊聊天視窗左下角的圖片圖示 🖼️ 上傳照片，AI 可辨識菜單、翻譯、推薦餐點。' : 'Tap the image icon 🖼️ to upload a photo. AI can read menus, translate, and recommend dishes.'}
+                            title={zh ? '多國菜單與圖片辨識' : 'Menu Translation & Vision Recognition'}
+                            desc={zh ? '上傳各國餐廳菜單照片，AI 即時翻譯菜色、標註過敏原並推薦招牌必吃餐點。' : 'Upload foreign restaurant menus. AI translates dishes, highlights allergens, and recommends favorites.'}
                         />
                         <Step n={4}
-                            title={zh ? 'API Key 設定（免費）' : 'API Key Setup (Free)'}
-                            desc={zh ? '前往「個人檔案」→ 點擊「API 金鑰設定」圖示 → 按照指示取得 API Key。' : 'Go to Profile → Tap the "API Key Settings" icon → Follow steps to get a free key.'}
+                            title={zh ? '✨ 景點推薦卡片一鍵排入' : '✨ One-Tap Spot Recommendation Cards'}
+                            desc={zh ? '請 AI 推薦景點時，對話中會生成精美景點卡片，勾選喜歡的地點即可一鍵加入指定天數！' : 'When AI recommends places, it presents interactive cards. Check your favorites to add them directly to your itinerary in one tap.'}
                         />
                         <Step n={5}
-                            title={zh ? 'AI 偏好記憶' : 'AI Adaptive Memory'}
-                            desc={zh ? '系統會自動記錄你的旅行偏好（如：評價優先、距離優先）。可在「個人檔案」查看、刪除或將其摺疊收納。' : 'System auto-learns your travel preferences (e.g., rating or distance). View, delete, or collapse them in your Profile.'}
+                            title={zh ? '💬 對話即時記帳與景點異動' : '💬 In-Chat Expense & Item Actions'}
+                            desc={zh ? '告訴 AI「剛吃了 1500 日圓拉麵」或「刪除明天的某個景點」，AI 會即時在對話中生成操作確認卡片，確認後立即生效！' : 'Tell AI "Spent 1500 JPY on ramen" or "Remove a spot tomorrow", and interactive action cards appear in chat to execute directly.'}
                         />
-                        <Tip>{zh ? 'AI 助手會自動讀取你目前的行程資料，所以回答會根據你的行程量身定制！' : 'AI assistant auto-reads your current itinerary, so answers are tailored to your specific trip!'}</Tip>
+                        <Step n={6}
+                            title={zh ? '自備免費金鑰與偏好記憶' : 'Free API Key & Travel Preferences'}
+                            desc={zh ? '支援填入個人免費的 Gemini API 金鑰（僅儲存於手機保護隱私），AI 同時會自動記住你的旅遊喜好。' : 'Add your own free Gemini API key (safely stored on your device only), while AI automatically adapts to your travel preferences.'}
+                        />
+                        <Tip>{zh ? 'AI 伴遊助手會自動整合你當前的行程資訊與偏好，所有建議皆為你的旅程量身定制！' : 'Ryan AI automatically references your current itinerary and preferences to provide tailored suggestions for your trip!'}</Tip>
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 8. 多人協作 ===== */}
+                {/* ===== 10. 多人協作 ===== */}
                 <AccordionItem value="collab" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            👥 {zh ? '多人協作' : 'Collaboration'}
+                            👥 {zh ? '多人即時協作' : 'Real-time Collaboration'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
                         <Step n={1}
-                            title={zh ? '邀請成員' : 'Invite Members'}
-                            desc={zh ? '每個行程都有一個邀請碼（行程設定中可看到），將邀請碼分享給朋友即可邀請他們加入。' : 'Each trip has an invite code (visible in trip settings). Share it with friends to invite them.'}
+                            title={zh ? '專屬邀請碼' : 'Trip Invite Code'}
+                            desc={zh ? '在行程設定中可取得 6 碼專屬邀請碼，發送給好友即可直接加入共同編輯行程。' : 'Find your 6-character invite code in trip settings. Share it with friends for collaborative planning.'}
                         />
                         <Step n={2}
-                            title={zh ? '成員管理' : 'Member Management'}
-                            desc={zh ? '點擊行程頁面的成員圖示 👥，可查看所有成員。行程創建者可以踢出成員。' : 'Tap the members icon 👥 on the trip page to view all members. Trip creator can remove members.'}
+                            title={zh ? '成員權限管理' : 'Member Management'}
+                            desc={zh ? '行程創建者可點擊成員圖示隨時檢視旅伴清單，並擁有管理與退出行程之權限。' : 'Trip creators can view the members list and manage permissions at any time.'}
                         />
                         <Step n={3}
-                            title={zh ? '即時同步' : 'Real-time Sync'}
-                            desc={zh ? '所有成員的編輯會即時同步，不需要手動重新整理。多人同時編輯不會互相覆蓋。' : 'All edits sync in real-time. No need to refresh. Simultaneous edits won\'t overwrite each other.'}
+                            title={zh ? '毫秒級即時同步' : 'Millisecond Real-time Sync'}
+                            desc={zh ? '所有人的排程更動皆能跨裝置毫秒級即時廣播，多人同時編輯不互相覆蓋。' : 'Edits sync across all devices in real-time. Simultaneous editing is fully conflict-safe.'}
                         />
                         <Step n={4}
-                            title={zh ? '公開分享連結' : 'Public Share Link'}
-                            desc={zh ? '透過分享按鈕可產生公開連結，非成員也能以唯讀方式瀏覽整份行程。' : 'Generate a public link via the share button. Non-members can view the full itinerary (read-only).'}
+                            title={zh ? '免登入公開分享' : 'Login-Free Public Share'}
+                            desc={zh ? '產生只讀公開網址，長輩或非 App 用戶點擊即可在瀏覽器完整瀏覽精美行程。' : 'Generate read-only public URLs so family members can view your itinerary without logging in.'}
                         />
                     </AccordionContent>
                 </AccordionItem>
 
-                {/* ===== 9. 設定與帳號 ===== */}
+                {/* ===== 11. 設定、推播與帳號安全 ===== */}
                 <AccordionItem value="settings" className="border border-stone-200/60 dark:border-slate-700/60 bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-xs">
                     <AccordionTrigger className="px-4 py-3.5 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-700/50">
                         <span className="text-sm font-semibold flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                            ⚙️ {zh ? '設定與帳號' : 'Settings & Account'}
+                            ⚙️ {zh ? '設定、推播與帳號' : 'Settings, Push & Security'}
                         </span>
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4 space-y-3">
                         <Step n={1}
-                            title={zh ? '主題切換' : 'Theme Switch'}
-                            desc={zh ? '支援深色 / 淺色模式切換，以及 5 種主題色可選。' : 'Toggle dark/light mode and choose from 5 accent colors.'}
+                            title={zh ? '主題與配色風格' : 'Theme & Color Accents'}
+                            desc={zh ? '支援深色 (Dark Mode) 與淺色模式切換，並提供 5 款高級主題色彩自由配置。' : 'Toggle between Dark and Light mode, with 5 curated accent colors to personalize your view.'}
                         />
                         <Step n={2}
-                            title={zh ? '語言切換' : 'Language Switch'}
-                            desc={zh ? '支援繁體中文與 English 切換，大部分介面文字會即時更新。' : 'Switch between Traditional Chinese and English. Most UI text updates instantly.'}
+                            title={zh ? '多國語言切換' : 'Instant Language Toggle'}
+                            desc={zh ? '支援繁體中文（zh-TW）與 English 即時熱切換，所有介面元素同步更新。' : 'Seamlessly switch between Traditional Chinese and English with real-time UI updates.'}
                         />
                         <Step n={3}
-                            title={zh ? '⚠️ Recovery Key（引繼碼）' : '⚠️ Recovery Key'}
-                            desc={zh ? '這是你的帳號識別碼！更換手機或清除瀏覽器資料前，務必複製並妥善保存。可在 Profile 頁面找到。' : 'This is your account ID! Before switching phones or clearing browser data, copy and save it. Found on Profile page.'}
+                            title={zh ? '🔔 推播通知與出發倒數' : '🔔 Push Notifications & Countdown'}
+                            desc={zh ? '開啟推播通知後，可在行前收到行程倒數預警與即時異動提醒。' : 'Enable push notifications to receive countdown alerts and live itinerary updates before your trip.'}
                         />
                         <Step n={4}
-                            title={zh ? 'PWA 安裝到桌面' : 'Install as PWA'}
-                            desc={zh ? '在手機瀏覽器中點擊「加入主畫面」，即可像原生 App 一樣從桌面開啟，享受全螢幕體驗。' : 'Tap "Add to Home Screen" in your mobile browser to use like a native app with fullscreen experience.'}
+                            title={zh ? '🎯 通知即時直達卡片' : '🎯 Direct Notification Navigation'}
+                            desc={zh ? '收到提醒或變更推播時，點擊即可直接跳轉至該筆活動或記帳明細，並以醒目高亮標出位置。' : 'Tapping a push notification navigates straight to the target activity or expense item with clear visual highlighting.'}
                         />
                         <Step n={5}
-                            title={zh ? '聯絡開發者' : 'Contact Developer'}
-                            desc={zh ? '如果您有任何建議、發現問題或有合作意向，歡迎透過「個人檔案」選單中的按鈕與我聯繫。' : 'If you have suggestions, issues, or collaboration ideas, contact the developer via the Profile menu button.'}
+                            title={zh ? '🔑 Recovery Key（引繼備份碼）' : '🔑 Recovery Key Account Backup'}
+                            desc={zh ? '這是你的專屬身份憑證！換手機或清空快取前請至個人檔案複製保存，這是還原帳號的唯一金鑰。' : 'Your unique account credential! Copy and backup your recovery key in Profile to restore on new devices.'}
                         />
-                        <Tip>{zh ? 'Recovery Key 非常重要！這是唯一能還原帳號的方式，請務必備份。' : 'Recovery Key is critical! It\'s the only way to restore your account. Always back it up.'}</Tip>
+                        <Step n={6}
+                            title={zh ? '📲 PWA 安裝至手機主畫面' : '📲 Install as Native PWA'}
+                            desc={zh ? '在 iOS Safari 點擊「分享」→「加入主畫面」，或在 Android Chrome 點擊「安裝應用程式」，享受原生全螢幕體驗。' : 'Tap "Add to Home Screen" on iOS Safari or Android Chrome to enjoy a fullscreen native experience.'}
+                        />
+                        <Tip>{zh ? '若推播通知被系統誤封鎖，可至手機系統設定 → 應用程式 → 瀏覽器中重新解除「通知」權限。' : 'If push is blocked, check your phone OS settings under Browser > Notifications to unblock.'}</Tip>
                     </AccordionContent>
                 </AccordionItem>
 
