@@ -68,47 +68,88 @@ export interface CurrencyInfo {
 let cachedCurrencyList: CurrencyInfo[] | null = null;
 
 /**
- * Helper to get ISO country code from currency code.
- * Most currencies use the first two letters as the ISO country code.
+ * Authoritative ISO 4217 fiat currency to ISO 3166-1 alpha-2 country code mapping.
+ * Prevents cryptocurrencies (e.g. BTC, 1INCH, ETH) from generating bogus country codes or 404s.
  */
-export const getCountryCode = (currencyCode: string): string => {
-    const code = currencyCode.toUpperCase();
-    const overrides: Record<string, string> = {
-        'EUR': 'eu', 'USD': 'us', 'TWD': 'tw', 'JPY': 'jp', 'KRW': 'kr',
-        'CNY': 'cn', 'HKD': 'hk', 'THB': 'th', 'SGD': 'sg', 'GBP': 'gb',
-        'AUD': 'au', 'CAD': 'ca', 'CHF': 'ch', 'VND': 'vn', 'PHP': 'ph',
-        'IDR': 'id', 'MYR': 'my', 'BRL': 'br', 'TRY': 'tr', 'ANG': 'an'
-    };
+export const FIAT_TO_COUNTRY: Record<string, string> = {
+    // 東亞與東南亞 (East & Southeast Asia)
+    'TWD': 'tw', 'JPY': 'jp', 'KRW': 'kr', 'CNY': 'cn', 'HKD': 'hk',
+    'MOP': 'mo', 'SGD': 'sg', 'MYR': 'my', 'THB': 'th', 'VND': 'vn',
+    'PHP': 'ph', 'IDR': 'id', 'KHR': 'kh', 'LAK': 'la', 'MMK': 'mm',
+    'BND': 'bn', 'MNT': 'mn',
 
-    if (overrides[code]) return overrides[code].toLowerCase();
-    return currencyCode.substring(0, 2).toLowerCase();
+    // 南亞與中亞 (South & Central Asia)
+    'INR': 'in', 'PKR': 'pk', 'BDT': 'bd', 'LKR': 'lk', 'NPR': 'np',
+    'MVR': 'mv', 'AFN': 'af', 'KZT': 'kz', 'UZS': 'uz', 'KGS': 'kg',
+    'TJS': 'tj', 'TMT': 'tm',
+
+    // 中東 (Middle East)
+    'AED': 'ae', 'SAR': 'sa', 'QAR': 'qa', 'KWD': 'kw', 'BHD': 'bh',
+    'OMR': 'om', 'JOD': 'jo', 'ILS': 'il', 'TRY': 'tr', 'LBP': 'lb',
+    'IQD': 'iq',
+
+    // 歐洲 (Europe)
+    'EUR': 'eu', 'GBP': 'gb', 'CHF': 'ch', 'NOK': 'no', 'SEK': 'se',
+    'DKK': 'dk', 'ISK': 'is', 'PLN': 'pl', 'CZK': 'cz', 'HUF': 'hu',
+    'RON': 'ro', 'BGN': 'bg', 'RSD': 'rs', 'HRK': 'hr', 'BAM': 'ba',
+    'MKD': 'mk', 'ALL': 'al', 'MDL': 'md', 'UAH': 'ua', 'GEL': 'ge',
+    'AMD': 'am', 'AZN': 'az', 'RUB': 'ru',
+
+    // 北美與中美加勒比 (North & Central America, Caribbean)
+    'USD': 'us', 'CAD': 'ca', 'MXN': 'mx', 'CRC': 'cr', 'PAB': 'pa',
+    'DOP': 'do', 'GTQ': 'gt', 'HNL': 'hn', 'NIO': 'ni', 'BZD': 'bz',
+    'JMD': 'jm', 'TTD': 'tt', 'BBD': 'bb', 'BSD': 'bs', 'KYD': 'ky',
+    'BMD': 'bm', 'AWG': 'aw', 'ANG': 'cw', 'HTG': 'ht',
+
+    // 南美 (South America)
+    'BRL': 'br', 'ARS': 'ar', 'CLP': 'cl', 'COP': 'co', 'PEN': 'pe',
+    'UYU': 'uy', 'PYG': 'py', 'BOB': 'bo', 'GYD': 'gy', 'SRD': 'sr',
+
+    // 大洋洲 (Oceania)
+    'AUD': 'au', 'NZD': 'nz', 'FJD': 'fj', 'PGK': 'pg', 'WST': 'ws',
+    'TOP': 'to', 'VUV': 'vu', 'SBD': 'sb',
+
+    // 非洲 (Africa)
+    'ZAR': 'za', 'EGP': 'eg', 'MAD': 'ma', 'DZD': 'dz', 'TND': 'tn',
+    'LYD': 'ly', 'KES': 'ke', 'NGN': 'ng', 'GHS': 'gh', 'ETB': 'et',
+    'TZS': 'tz', 'UGX': 'ug', 'RWF': 'rw', 'MUR': 'mu', 'SCR': 'sc',
+    'BWP': 'bw', 'NAD': 'na', 'ZMW': 'zm', 'MZN': 'mz', 'AOA': 'ao'
+};
+
+/**
+ * Helper to get ISO country code from currency code.
+ * Strictly returns a verified ISO country code, or undefined for cryptos/non-fiat.
+ */
+export const getCountryCode = (currencyCode?: string | null): string | undefined => {
+    if (!currencyCode || typeof currencyCode !== 'string') return undefined;
+    const code = currencyCode.toUpperCase();
+    return FIAT_TO_COUNTRY[code] || undefined;
 }
 
 /**
  * Helper to get flag emoji from currency code.
- * Most currencies use the first two letters as the ISO country code.
+ * Safely guards against non-A-Z characters to avoid invalid Unicode code points.
  */
-export const getFlagEmoji = (currencyCode: string): string => {
-    // Hardcoded overrides for common ones where the 2-letter rule might fail or needs specifics
-    const overrides: Record<string, string> = {
-        'TWD': '🇹🇼', 'JPY': '🇯🇵', 'USD': '🇺🇸', 'EUR': '🇪🇺', 'KRW': '🇰🇷',
-        'HKD': '🇭🇰', 'CNY': '🇨🇳', 'THB': '🇹🇭', 'SGD': '🇸🇬', 'GBP': '🇬🇧',
-        'AUD': '🇦🇺', 'CAD': '🇨🇦', 'CHF': '🇨🇭', 'VND': '🇻🇳', 'PHP': '🇵🇭',
-        'IDR': '🇮🇩', 'MYR': '🇲🇾', 'BRL': '🇧🇷', 'TRY': '🇹🇷'
-    };
+export const getFlagEmoji = (currencyCode?: string | null): string => {
+    if (!currencyCode || typeof currencyCode !== 'string') return '🪙';
+    const code = currencyCode.toUpperCase();
+    const country = FIAT_TO_COUNTRY[code];
 
-    if (overrides[currencyCode.toUpperCase()]) return overrides[currencyCode.toUpperCase()];
+    if (!country || country === 'eu') {
+        return country === 'eu' ? '🇪🇺' : '🪙';
+    }
 
-    // Generic fallback: Use first two letters as country code
-    // Example: ARS -> AR, JPY -> JP
-    const countryCode = currencyCode.substring(0, 2).toUpperCase();
-    return countryCode.replace(/./g, char => 
-        String.fromCodePoint(char.charCodeAt(0) + 127397)
-    );
+    const cc = country.toUpperCase();
+    if (/^[A-Z]{2}$/.test(cc)) {
+        return cc.replace(/./g, char => 
+            String.fromCodePoint(char.charCodeAt(0) + 127397)
+        );
+    }
+    return '🪙';
 }
 
 /**
- * Fetches all available currencies from open-source API.
+ * Fetches all available currencies from open-source API, strictly filtered to official fiat currencies.
  */
 export const getAllSupportedCurrencies = async (): Promise<CurrencyInfo[]> => {
     if (cachedCurrencyList) return cachedCurrencyList;
@@ -117,16 +158,22 @@ export const getAllSupportedCurrencies = async (): Promise<CurrencyInfo[]> => {
         const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies.json');
         const data = await res.json();
         
-        const list = Object.entries(data).map(([code, name]) => {
-            const upperCode = code.toUpperCase();
-            return {
-                code: upperCode,
-                name: String(name),
-                zhName: ZH_CURRENCY_MAP[code.toLowerCase()],
-                flag: getFlagEmoji(upperCode),
-                countryCode: getCountryCode(upperCode)
-            }
-        });
+        // 🛡️ 嚴格白名單：僅保留經認證的法定主權貨幣 (Fiat)，徹底剔除加密貨幣與衍生資產
+        const list = Object.entries(data)
+            .filter(([code]) => Boolean(FIAT_TO_COUNTRY[code.toUpperCase()]))
+            .map(([code, name]) => {
+                const upperCode = code.toUpperCase();
+                return {
+                    code: upperCode,
+                    name: String(name),
+                    zhName: ZH_CURRENCY_MAP[code.toLowerCase()],
+                    flag: getFlagEmoji(upperCode),
+                    countryCode: getCountryCode(upperCode)
+                }
+            });
+
+        // 依貨幣代碼字母順序排序
+        list.sort((a, b) => a.code.localeCompare(b.code));
 
         cachedCurrencyList = list;
         return list;

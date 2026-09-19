@@ -180,7 +180,15 @@ export function ExpenseDialog({
     const [parseResult, setParseResult] = useState<Partial<Expense> | null>(null)
     const [allCurrencies, setAllCurrencies] = useState<CurrencyInfo[]>([])
     const [currencySearch, setCurrencySearch] = useState("")
+    const [currencyOpen, setCurrencyOpen] = useState(false)
     const [deferredShow, setDeferredShow] = useState(false) // 🆕 Phase 24: 防止主執行緒阻塞
+
+    const handleSelectCurrency = (code: string) => {
+        setInputCurrency(code)
+        setCurrencySearch("")
+        setCurrencyOpen(false)
+        haptic.selection()
+    }
 
     const formInitializedRef = useRef(false)
     const skipRateFetchRef = useRef(false)
@@ -279,6 +287,10 @@ export function ExpenseDialog({
             }
         } else {
             formInitializedRef.current = false
+            setCurrencyOpen(false)
+            setCurrencySearch("")
+            setPayerOpen(false)
+            setPayerSearch("")
         }
     }, [open, editItem, selectedCurrency, activeTrip])
 
@@ -306,22 +318,25 @@ export function ExpenseDialog({
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
+        let isMounted = true;
+
         const loadAll = async () => {
             const list = await getAllSupportedCurrencies()
-            if (list.length > 0) setAllCurrencies(list)
+            if (isMounted && list.length > 0) setAllCurrencies(list)
         }
         
         if (open) {
             loadAll()
             // 🆕 Phase 24: 延遲 150ms 再顯示重型組件，確保 Popover 彈出動畫流暢 (60fps)
             timer = setTimeout(() => {
-                setDeferredShow(true)
+                if (isMounted) setDeferredShow(true)
             }, 150)
         } else {
             setDeferredShow(false)
         }
 
         return () => {
+            isMounted = false;
             if (timer) clearTimeout(timer)
         }
     }, [open])
@@ -519,7 +534,7 @@ export function ExpenseDialog({
                                 💰 {t('exp_amount')}
                             </Label>
 
-                            <Popover modal={true}>
+                            <Popover modal={true} open={currencyOpen} onOpenChange={setCurrencyOpen}>
                                 <PopoverTrigger asChild>
                                     <Button 
                                         variant="outline" 
@@ -537,6 +552,7 @@ export function ExpenseDialog({
                                                             width={20}
                                                             height={14}
                                                             className="w-full h-full object-cover"
+                                                            unoptimized
                                                         />
                                                     </div>
                                                 ) : (
@@ -579,7 +595,7 @@ export function ExpenseDialog({
                                                                 key={c.code}
                                                                 variant="ghost"
                                                                 className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] touch-pan-y hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
-                                                                onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
+                                                                onClick={() => handleSelectCurrency(c.code)}
                                                             >
                                                                 {c.countryCode ? (
                                                                     <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm shrink-0 mr-3">
@@ -589,6 +605,7 @@ export function ExpenseDialog({
                                                                             width={20}
                                                                             height={14}
                                                                             className="w-full h-full object-cover"
+                                                                            unoptimized
                                                                         />
                                                                     </div>
                                                                 ) : (
@@ -612,7 +629,7 @@ export function ExpenseDialog({
                                                                 key={c.code}
                                                                 variant="ghost"
                                                                 className={cn("w-full justify-start h-10 px-2 font-medium rounded-lg mb-0.5 transition-all active:scale-[0.98] touch-pan-y hover:bg-slate-50 dark:hover:bg-slate-800/50", inputCurrency === c.code && "bg-slate-100 dark:bg-slate-800 border-primary/20")}
-                                                                onClick={() => { setInputCurrency(c.code); setCurrencySearch(""); }}
+                                                                onClick={() => handleSelectCurrency(c.code)}
                                                             >
                                                                 {c.countryCode ? (
                                                                     <div className="w-5 h-3.5 bg-slate-100 rounded-[2px] overflow-hidden border border-slate-200/50 shadow-sm shrink-0 mr-3">
@@ -622,6 +639,7 @@ export function ExpenseDialog({
                                                                             width={20}
                                                                             height={14}
                                                                             className="w-full h-full object-cover"
+                                                                            unoptimized
                                                                         />
                                                                     </div>
                                                                 ) : (
