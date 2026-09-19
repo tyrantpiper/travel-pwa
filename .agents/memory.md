@@ -52,6 +52,10 @@
 - **Service Worker 絕不向瀏覽器舉白旗 (Zero-Response.error Invariance)**: 在 Navigation Fallback 策略中，`handlerDidError` 絕對禁止回傳 `Response.error()`。必須提供內聯 Zero-JS 物理 HTML/CSS 骨架，根絕 WebKit 彈出原生斷網報錯。
 - **WebKit Service Worker 註冊快取隔離 (`updateViaCache: "none"`)**: 所有現代 PWA 註冊必須顯式指定 `{ updateViaCache: "none" }`，切斷瀏覽器內部 HTTP 緩存對 `sw.js` 檔案的干擾，確保版本迭代即時生效。
 - **Web 標準黃金組合 vs 外部重型引擎 (Web Standards Golden Path over Heavy Sync Engines)**: 在 Local-First 選型中，堅決拒絕引入高侵入性的 WASM SQLite（如 PowerSync / ElectricSQL，需重構 80% 後端）或純文字 CRDT（如 Yjs，破壞強關聯關聯型結構）；堅定以「Serwist SW + SWR/Zustand + IndexedDB + Client-Generated UUIDv4」打造專屬旅遊場景的輕量化頂級架構，成熟度已達 85%，後續循序引進 `fractional-indexing` 補齊最後一哩路。
+- **Service Worker Ready 永不裸奔原則 (Service Worker Ready Hard-Timeout Invariance)**: `navigator.serviceWorker.ready` 嚴禁直接無防護 `await`（在未就緒環境下為永不 reject 的 pending Promise）。必須封裝 `getReadyServiceWorker(timeoutMs = 5000)` 搭配 `Promise.race` 與動態按需註冊，逾時安全回退並由 `finally { setIsLoading(false) }` 釋放按鈕狀態，根除介面無限轉圈死鎖。
+- **客戶端自訂 Fetch Wrapper 授權傳遞標準 (Dynamic Auth Header Injection over Supabase Client Tampering)**: 在匿名或自訂 ID（`user_uuid`）場景下寫入啟用 RLS 的 Supabase 資料表（如 `push_subscriptions`），不破壞 Client 純潔性亦不放寬 RLS 安全標準；改在 `createClient` 建立時透過 `global.fetch` 動態注入 `x-user-id` 標頭，達成安全透明且無副作用的認證傳遞。
+- **明確退出意圖優先於實體訂閱存在 (Explicit Opt-Out State over Blind Rehydration)**: 解決瀏覽器底層實體訂閱與應用層偏好不同步問題。引入 `localStorage.setItem("push_opt_out", "true")`，在狀態還原時若偵測到 opt-out 標記，即便瀏覽器底層仍回傳訂閱，前端強制視為已退訂，杜絕重新整理時的流氓重開。
+- **權限封鎖情境下的同理心引導原則 (Actionable Guidance over Dead-end Disabled UI)**: 系統權限被拒（`Notification.permission === 'denied'`）絕不可直接將開關設為 `disabled` 讓使用者陷入死胡同。應保持按鈕可點擊並彈出圖文引導對話框，教學網址列解鎖步驟，賦予使用者自我修復能力。
 
 ### 5. 後端高併發、資料庫與健康架構 (Backend Concurrency, Supabase & Health Probes)
 - **純記憶體存活探針與獨立保活解耦架構 (Zero-Blocking Health & Keep-Alive Decoupling)**: `/health` 端點堅持 0ms 純記憶體計算（單一職責原則），完全不觸發任何外部網路 I/O 或資料庫查詢；Supabase 7 天防休眠保活由 Lifespan 獨立非同步背景定時循環（每 6 小時一次）靜默守護，達成極限並發安全與 100% 外部監控免疫。
@@ -105,8 +109,11 @@
 - **直接將未過濾的 SWR 快取 Map 序列化至 IndexedDB (`DataCloneError Trap`)**: SWR 內部的 `cacheMap` 包含未決的 Promise、變異調度器與閉包函式，若未經過濾直接對其執行 IndexedDB `set()` 會觸發瀏覽器 `DataCloneError: could not clone` 致命崩潰。教訓：SWR 持久化必須將資料層（Data Snapshot）與排程/Promise 狀態解耦，由 `idb-storage.ts` 定向寫入純乾淨的 JSON 快照。
 - **盲目 npm audit fix --force 引發的破壞性降級 (`Serwist Destructive Downgrade Trap`)**: `npm audit fix --force` 試圖將 `@serwist/turbopack` 降級至骨董版本 9.5.2 破壞 Next.js 16 打包。教訓：間接依賴漏洞治理應優先採用 npm 原生 overrides 原地鎖定，杜絕向後降級。
 - **Precache 動態 Chunk 導致 Service Worker 物理銷毀 (`Precache 404 Poison Pill Trap`)**: 本地編譯生成帶 Hash 的 `sw.js`（含 56 個本地 chunk hash），推送到 Vercel 後雲端 Hash 改變。手機安裝 SW 時請求本地 Hash 回傳 404，觸發 W3C 規範直接銷毀 SW，導致手機完全無 SW 服務。教訓：Precache 清單必須永遠保持 100% 命中率，脆弱的動態編譯產物絕不可放入 Precache。
-- **`Response.error()` 引發 WebKit 原生報錯彈窗 (`Response.error Safari Crash Trap`)**: 當多層快取落空時直接 `return Response.error()`，WebKit 將其視為致命連線失敗，向使用者彈出「Safari無法打開網頁，因為你 iPhone尚未連接網際網路。」教訓：PWA 的最底層防線必須是合法的 200 HTML 實體，絕不能向瀏覽器拋出硬錯誤。
 - **WebKit 頑固 HTTP 快取阻礙 SW 更新 (`WebKit sw.js Cache Retention Trap`)**: 未設定 `updateViaCache: "none"`，iOS 常常連續數天使用舊的 Service Worker 檔案，導致新部署的修正無法觸達使用者。教訓：`navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" })` 是 iOS PWA 的標配。
+- **`navigator.serviceWorker.ready` 永久掛死陷阱 (`SW Ready Infinite Hang Trap`)**: `navigator.serviceWorker.ready` 規格為永不 reject 的 Promise。在未註冊或 Safari 無痕模式下調用會永久卡在 pending 狀態，導致後續代碼與 finally 區塊無法執行，介面轉圈永久鎖死。教訓：所有 `serviceWorker.ready` 調用必須搭配 `Promise.race` 與 5 秒硬逾時定時器。
+- **Supabase RLS 政策引發的靜默拒絕陷阱 (`Silent RLS Rejection Trap`)**: 啟用 RLS 的資料表（如 `push_subscriptions`）在匿名客戶端寫入時遭 PostgreSQL 阻擋，Supabase 不拋例外僅回傳空成功或 403。前端若無嚴格 error 判定會產生偽成功幻覺。教訓：全局注入 fetch wrapper 攜帶 `x-user-id`，並嚴格判定 `if (error) return false`。
+- **Service Worker 重新整理時的流氓重開陷阱 (`Aggressive Push Re-subscription Trap`)**: 使用者退訂時若瀏覽器後台撤銷稍慢，頁面重新整理初始化會再次查詢到現存 subscription 並誤將狀態設為已開啟。教訓：引入 `localStorage.setItem("push_opt_out", "true")` 作為主動退出意志憑證，初始化時強制維持關閉。
+- **權限遭阻擋時將按鈕設為 Disabled 的死胡同陷阱 (`Disabled State Dead-end Trap`)**: 在 `Notification.permission === 'denied'` 時直接設置 `disabled`，剝奪使用者自救路徑。教訓：移除 disabled，改以點擊彈出引導彈窗，教學至瀏覽器網址列手動解鎖。
 
 ### 5. 後端高併發、資料庫與健康探針踩坑
 - **多線程背景調用非 Thread-Safe 的 Supabase Client (`Supabase Client Deadlock`)**: 在 `/health` 每次請求中透過 `asyncio.to_thread` 調用 `supabase.Client`，當 UptimeRobot 多節點併發打入時觸發 `httpcore` 連線池內部死鎖 (Deadlock)，導致全域線程池耗盡、請求掛起 30s 並由 GFE 拋出 500。教訓：禁止在多線程中調用非 Thread-Safe 的同步 SDK，應使用原生非同步 `httpx.AsyncClient` 或將保活與請求完全解耦。
