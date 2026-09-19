@@ -530,11 +530,12 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         onDoubleClick={(e) => e.stopPropagation()}
                         className={cn(
                             "absolute top-3 right-3 z-10 flex flex-col items-center gap-1.5 p-1 rounded-2xl pointer-events-auto select-none",
-                            "transform-gpu will-change-transform", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
+                            "transform-gpu will-change-transform transition-all duration-300 ease-out", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
                             // 保持 82% 物理混色基底，消弭 iOS Safari WebGL 穿透採樣噪點
                             "bg-white/82 dark:bg-slate-900/82 backdrop-blur-xl saturate-180",
                             "border border-white/50 dark:border-slate-700/60",
-                            "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]"
+                            "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]",
+                            isTouring ? "opacity-0 pointer-events-none scale-90 -translate-y-2" : "opacity-100 scale-100 translate-y-0"
                         )}
                     >
                         {/* 📍 GPS 定位到我按鈕 */}
