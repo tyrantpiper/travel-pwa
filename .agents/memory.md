@@ -72,6 +72,9 @@
 - **overrides 原地安全合併原則 (In-Place Override Merging)**: 在既有 package.json 配置依賴覆蓋時，嚴禁盲目新增重複鍵，必須採增量原地合併以保留既有修復，杜絕 JSON 語法解析錯誤。
 - **基礎設施宣告權威性原則 (Infra-as-Code Authority)**: 雲端資源參數（如 Cloud Run `--timeout 600s`）必須在 `.github/workflows/deploy-backend.yml` 宣告，杜絕 Console 手動設定被 CI/CD 無預警洗回。
 - **Tiered Memory 架構與神經重組 (Auto Dream & AI Recombination)**: 大腦記憶維護採用分層神經壓縮模式，以原生 Antigravity CLI 驅動，新舊日誌無縫融合並保留歷史脈絡與技術債。
+- **手冊即事實單一來源原則 (Documentation Truthfulness over Aspirational Copy)**: 軟體系統說明手冊必須 1-to-1 忠實映射代碼庫實作，堅決杜絕早期規劃的「願景型功能（Aspirational Features）」或工程術語；未實作機制絕不寫入手冊，所有操作路徑必須完全符合當前介面。
+- **3D 巡航空間避讓與人體工學 (Dynamic Spatial Evacuation over Static Overlap)**: 3D 動態低空巡航啟動時，右上角常駐地圖控制項透過 CSS Transition 宣告式動態淡出與禁用指標事件（`pointer-events-none`），退出後平滑恢復，解決相機視角干擾與按鈕物理碰撞。
+- **ISO 4217 法定貨幣白名單與國旗安全回退標準 (Strict ISO 4217 Fiat & Flag Fallback Standard)**: 在記帳中間層建立 110+ 種官方主權法幣白名單切斷非主流代幣雜訊，並維護 `CURRENCY_TO_COUNTRY_CODE` 確定性映射與本地多層 SVG 回退，徹底根除 Flag CDN 404 破圖。
 
 ---
 
@@ -128,6 +131,10 @@
 - **JSON 重複鍵盲區 (`Duplicate Key Trap`)**: 在已有 overrides 的 package.json 粗暴追加新區塊產生重複鍵語法錯誤。教訓：工程修改前必須嚴格確認既有代碼結構，堅持原地增量合併。
 - **GFE 逾時引發的偽性 CORS 誤診 (`GFE 60s Timeout False CORS Trap`)**: 連線在到達 FastAPI Middleware Stack 前被 Google Front End 依據 60s 逾時強制斷開回傳不帶 CORS Headers 的 504 頁面。修改程式碼層 CORS Middleware 無效，根因在於基礎設施層逾時配置。
 
+### 7. 文件審核、UI 狀態與國際化踩坑
+- **依據手冊修詞卻未查證功能存在的盲目覆寫陷阱 (`Blind Rephrasing without Implementation Verification`)**: 在最佳化使用者使用手冊或介面文字時，直接根據既有文案進行文字美化或擴寫，卻未同步審查核心程式碼與元件功能清單（例如文案描述了「智能克隆前一天資料到新天數」、「手動發送測試推播」，實際上系統根本未實作該 API/按鈕），導致手冊給出空頭支票誤導使用者。教訓：任何文案修正必須以真實程式碼實作作為單一事實來源（Single Source of Truth），無對應實作者應果斷自手冊中剔除或先行實作。
+- **國旗圖示盲目直連外部 CDN 導致 404 報錯陷阱 (`Flag CDN 404 Direct Dependency Trap`)**: 採用靜態 CDN 圖片作為法幣對應國旗時，因 ISO 4217 代碼（如 EUR 歐元、XAU 黃金）無法直接 1:1 對應 ISO 3166-1 國旗代碼，造成大量 404 資源載入失敗與控制台報警。教訓：法幣選單應以標準 ISO 4217 代碼為主鍵，圖示應支援本地靜態回退或純符號降級，杜絕單點外部網路依賴。
+
 ---
 
 ## [Technical Debt]
@@ -140,6 +147,8 @@
 - **Radix DialogContent a11y 補充**: 部分彈窗缺少 `aria-describedby` 或 `Description` 產生 Accessibility Warning，需補齊 `<DialogDescription>`。
 - **FastAPI ORJSONResponse 遷移評估**: FastAPI 新版本提出 `FastAPIDeprecationWarning: ORJSONResponse is deprecated`，後續可評估直接交由 Pydantic response_model 序列化。
 - **BackgroundSync iOS Safari 降級機制強化**: iOS Safari 原生不支援 W3C Background Sync API，目前依賴 Service Worker 被動重啟。後續可評估在 `SyncManager` 前端組件中監聽 `window.addEventListener('online')` 作為主動觸發保險。
+- **離線記帳本機暫存與背景重播隊列 (Offline Mutation Queue)**: 目前記帳頁面新增支出若處於斷網狀態，尚未整合 IndexedDB Background Sync 隊列自動重播。
+- **活動多連結陣列化擴充 (Activity Dynamic Links Array)**: 行程活動項目目前支援單一外部連結，手冊中已標註預留多連結與訂位憑證結構，未來可將 `activity.link` 擴展為 link 物件陣列。
 
 ---
 
@@ -199,3 +208,8 @@
 - **In-Place Override Merging**: 原地覆蓋合併，在既有 package.json overrides 區塊增量注入而不破壞既有補丁。
 - **Infra-as-Code Authority**: 基礎設施程式碼權威，雲端執行時配置以 CI/CD Workflow 定義為唯一真實來源。
 - **AI Recombination**: 大腦記憶壓縮重組模式，使新舊日誌無縫融合並保留歷史脈絡與技術債。
+
+### 7. 文件真實性與介面工程領域
+- **Documentation Reality Alignment**: 手冊與實作真實對齊原則，手冊所有操作流程與功能描述必須具備真實可運行的前端 DOM 或後端 API 支撐，禁止幽靈功能預先宣傳。
+- **Dynamic Spatial Evacuation**: 動態空間避讓機制，3D 運鏡巡航時頂部 GPS/視角面板自動平滑淡出（`opacity-0 pointer-events-none`），最大化觀景視野且巡航終止時無縫復原。
+- **Strict ISO 4217 Fiat Standard**: 嚴格 ISO 4217 法幣規範，記帳貨幣嚴格收斂至法定貨幣與標準三位代碼，防止非標貨幣符號破壞匯率換算精確度。
