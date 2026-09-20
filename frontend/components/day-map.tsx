@@ -7,7 +7,7 @@
 // See: https://maplibre.org/news/2026-01-23-mlt-release/
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import Map, { Marker, Popup, Source, Layer, NavigationControl, AttributionControl, GlobeControl } from "react-map-gl/maplibre"
+import Map, { Marker, Popup, Source, Layer, AttributionControl } from "react-map-gl/maplibre"
 import type { MapRef, LngLatBoundsLike, MapLayerMouseEvent } from "react-map-gl/maplibre"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { setWorkerUrl } from "maplibre-gl"
@@ -15,7 +15,7 @@ import { setWorkerUrl } from "maplibre-gl"
 if (typeof window !== "undefined") {
     setWorkerUrl("/maplibre/maplibre-gl-worker.mjs")
 }
-import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash, Plane } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash, Plane, Compass, Globe } from "lucide-react"
 import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
@@ -214,7 +214,8 @@ interface DayMapProps {
 }
 
 export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: DayMapProps) {
-    const { t } = useLanguage()
+    const { t, lang } = useLanguage()
+    const zh = lang === 'zh'
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
     const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
@@ -282,6 +283,24 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         togglePauseTour,
         cancelFlight
     } = useFlyoverController(mapRef)
+
+    // 🌐 3D 地球儀切換狀態 (純指令式呼叫底層，不傳入 Map props，零干擾拖曳)
+    const [isGlobe, setIsGlobe] = useState<boolean>(true) // DayMap 原生預設為 globe
+    const toggleGlobeProjection = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation()
+        const rawMap = mapRef.current?.getMap() as unknown as {
+            getProjection?: () => { type: string } | undefined
+            setProjection?: (spec: { type: string }) => void
+        } | undefined
+        const current = rawMap?.getProjection?.()?.type
+        if (current === 'globe') {
+            rawMap?.setProjection?.({ type: 'mercator' })
+            setIsGlobe(false)
+        } else {
+            rawMap?.setProjection?.({ type: 'globe' })
+            setIsGlobe(true)
+        }
+    }, [])
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
@@ -585,6 +604,26 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
         const timer = setTimeout(fitBounds, 100)
         return () => clearTimeout(timer)
     }, [fitBounds])
+
+    // 🧭 羅盤正北歸零與全景置中 (與行程總覽完全相同邏輯)
+    const handleCompassReset = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (isTouring || isFlying) cancelFlight()
+        const map = mapRef.current
+        if (!map) return
+
+        if (markers.length > 0) {
+            const lngs = markers.map(m => m.lng)
+            const lats = markers.map(m => m.lat)
+            const bounds: LngLatBoundsLike = [
+                [Math.min(...lngs), Math.min(...lats)],
+                [Math.max(...lngs), Math.max(...lats)]
+            ]
+            map.fitBounds(bounds, { padding: 60, bearing: 0, pitch: 0, duration: 600 })
+        } else {
+            map.easeTo({ bearing: 0, pitch: 0, duration: 500 })
+        }
+    }, [isTouring, isFlying, cancelFlight, markers])
 
     // 🆕 地圖載入後添加衛星圖層
     const handleMapLoad = useCallback(() => {
@@ -1071,6 +1110,65 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     hasStreetView={isMapillaryAvailable()}
                 />
 
+                {/* 🧭📍🌐 地圖右上角懸浮控制膠囊 (Liquid Glass 物理晶透，與行程總覽完全相同封裝) */}
+                <div
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    className={cn(
+                        "absolute top-3 right-3 z-10 flex flex-col items-center gap-1.5 p-1 rounded-2xl pointer-events-auto select-none",
+                        "transform-gpu will-change-transform transition-all duration-300 ease-out", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
+                        "bg-white/82 dark:bg-slate-900/82 backdrop-blur-xl saturate-180",
+                        "border border-white/50 dark:border-slate-700/60",
+                        "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]",
+                        isTouring ? "opacity-0 pointer-events-none scale-90 -translate-y-2" : "opacity-100 scale-100 translate-y-0"
+                    )}
+                >
+                    {/* 🌐 3D 地球儀 / 2D 平面切換 */}
+                    <button
+                        type="button"
+                        onClick={toggleGlobeProjection}
+                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
+                        title={isGlobe ? (zh ? "切換至平面地圖" : "Switch to 2D Mercator") : (zh ? "切換至 3D 地球儀" : "Switch to 3D Globe")}
+                        aria-label="Toggle Globe Projection"
+                    >
+                        <Globe className={cn("w-4 h-4 transition-colors", isGlobe ? "text-sky-500 dark:text-sky-400" : "text-slate-600 dark:text-slate-300")} />
+                    </button>
+
+                    <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
+
+                    {/* 📍 GPS 定位到我按鈕 */}
+                    <button
+                        type="button"
+                        onClick={handleLocateMe}
+                        disabled={isLocating}
+                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer disabled:opacity-50"
+                        title={t('map_my_location')}
+                        aria-label="Locate Me"
+                    >
+                        {isLocating ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                        ) : (
+                            <Crosshair className="w-4 h-4 text-indigo-500" />
+                        )}
+                    </button>
+
+                    <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
+
+                    {/* 🧭 羅盤 / 視角聚焦 */}
+                    <button
+                        type="button"
+                        onClick={handleCompassReset}
+                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
+                        title={zh ? "全景置中 (正北歸零)" : "Fit Bounds and Reset North"}
+                        aria-label="Fit Bounds and Reset North"
+                    >
+                        <Compass className="w-4 h-4 text-indigo-500" />
+                    </button>
+                </div>
+
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
                     onClick={() => setIsSearchOpen(true)}
@@ -1283,21 +1381,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     maxZoom={20}
                     projection="globe"
                 >
-                    {/* 📍 自定義定位按鈕 (取代有 bug 的 GeolocateControl) */}
-                    <button
-                        onClick={handleLocateMe}
-                        disabled={isLocating}
-                        className="absolute top-36 right-2 z-10 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 disabled:opacity-50 transition-all"
-                        title={t('map_my_location')}
-                    >
-                        {isLocating ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                        ) : (
-                            <Crosshair className="w-5 h-5 text-gray-600" />
-                        )}
-                    </button>
-                    <NavigationControl position="top-right" showCompass={true} />
-                    <GlobeControl position="top-right" />
+
                     <AttributionControl
                         customAttribution="© OpenStreetMap · © OpenFreeMap · © Esri"
                         position="bottom-right"

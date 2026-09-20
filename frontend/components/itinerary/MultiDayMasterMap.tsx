@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
-import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane, Footprints, Car, Bus, Eye, Crosshair, Loader2 } from "lucide-react"
+import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
+import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane, Footprints, Car, Bus, Eye, Crosshair, Loader2, Globe, Calendar } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { setWorkerUrl } from "maplibre-gl"
 
@@ -11,7 +12,7 @@ if (typeof window !== "undefined") {
 }
 
 import { Trip, Activity } from "@/lib/itinerary-types"
-import { MAP_STYLES, MAPILLARY } from "@/lib/constants"
+import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
 import { useLanguage } from "@/lib/LanguageContext"
 import POIDetailDrawer, { POIBasicData } from "@/components/POIDetailDrawer"
 import {
@@ -25,6 +26,8 @@ import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 // API 基礎路徑 (模組頂部常數化，避免在並行閉包內重複解析 process.env)
 const ROUTE_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
@@ -33,9 +36,10 @@ interface MultiDayMasterMapProps {
     trip?: Trip
     onSelectDay?: (day: number) => void
     onScrollToDay?: (day: number) => void
+    onAddPOI?: (poi: POIBasicData, time: string, notes?: string, targetDay?: number) => void
 }
 
-function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiDayMasterMapProps) {
+function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay, onAddPOI }: MultiDayMasterMapProps) {
     const { lang } = useLanguage()
     const zh = lang === 'zh'
 
@@ -45,6 +49,18 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     // POI 抽屜狀態
     const [selectedPOI, setSelectedPOI] = useState<POIBasicData | null>(null)
     const [poiDrawerOpen, setPoiDrawerOpen] = useState<boolean>(false)
+    // 🆕 搜尋與長按結果標記（紅色跳動大頭針）
+    const [searchResultMarker, setSearchResultMarker] = useState<{ lat: number; lng: number; name: string } | null>(null)
+
+    // 🆕 多日天數選擇彈窗狀態 (在 ALL 模式下加入行程時彈出)
+    const [isDayPickerOpen, setIsDayPickerOpen] = useState<boolean>(false)
+    const [pendingPoiData, setPendingPoiData] = useState<{ poi: POIBasicData; time: string; notes?: string } | null>(null)
+    const [isAddingActivity, setIsAddingActivity] = useState<boolean>(false)
+
+    // 🆕 跨設備長按防手震手勢引用 (500ms / 5px 門檻)
+    const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+    const isMoveDetectedRef = useRef<boolean>(false)
 
     // 兩階段道路 Polyline 快取 (DayNum ➔ Coordinates)
     const [roadRoutesByDay, setRoadRoutesByDay] = useState<Record<number, [number, number][]>>({})
@@ -61,10 +77,180 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [isLocating, setIsLocating] = useState<boolean>(false)
 
+    // 🌐 3D 地球儀切換狀態
+    const [isGlobe, setIsGlobe] = useState<boolean>(false)
+    const toggleGlobeProjection = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation()
+        const rawMap = mapRef.current?.getMap() as unknown as {
+            getProjection?: () => { type: string } | undefined
+            setProjection?: (spec: { type: string }) => void
+        } | undefined
+        const current = rawMap?.getProjection?.()?.type
+        if (current === 'globe') {
+            rawMap?.setProjection?.({ type: 'mercator' })
+            setIsGlobe(false)
+        } else {
+            rawMap?.setProjection?.({ type: 'globe' })
+            setIsGlobe(true)
+        }
+    }, [])
+
     // 街景覆蓋圖層開關
     const [showMapillaryCoverage, setShowMapillaryCoverage] = useState<boolean>(false)
 
     const mapRef = useRef<MapRef>(null)
+
+    // 🆕 處理底圖 POI 點擊 (MapLibre queryRenderedFeatures 查詢)
+    const handleMapClick = useCallback((e: MapLayerMouseEvent) => {
+        const map = mapRef.current?.getMap()
+        if (!map) return
+
+        // 查詢點擊位置 (使用 5px 緩衝區增加命中率)
+        const bbox: [[number, number], [number, number]] = [
+            [e.point.x - 5, e.point.y - 5],
+            [e.point.x + 5, e.point.y + 5]
+        ]
+
+        // ① 優先查詢 Mapillary 影像點 (circle 圖層，僅在覆蓋層可見時)
+        if (showMapillaryCoverage && map.getLayer('mapillary-images')) {
+            const mlyFeatures = map.queryRenderedFeatures(bbox, {
+                layers: ['mapillary-images']
+            })
+            if (mlyFeatures.length > 0) {
+                const feat = mlyFeatures[0]
+                const rawId = feat.properties?.id ?? feat.id
+                const imageId = rawId ? String(rawId) : ''
+                if (imageId) {
+                    setMapillaryTarget({ lat: e.lngLat.lat, lng: e.lngLat.lng })
+                    setMapillaryViewerOpen(true)
+                    return // 攔截，不繼續查 POI
+                }
+            }
+        }
+
+        // ② 原有 POI symbol 查詢
+        const features = map.queryRenderedFeatures(bbox, {
+            layers: map.getStyle()?.layers
+                ?.filter(l => l.type === 'symbol' && l.layout?.['text-field'])
+                .map(l => l.id) || []
+        })
+
+        if (features && features.length > 0) {
+            const feature = features[0]
+            const props = feature.properties || {}
+            const coords = feature.geometry.type === 'Point'
+                ? (feature.geometry as GeoJSON.Point).coordinates
+                : [e.lngLat.lng, e.lngLat.lat]
+
+            const getName = () => {
+                for (const key of MAP_LOCALIZATION.CHINESE_NAME_KEYS) {
+                    if (props[key]) return props[key]
+                }
+                return props.name || (zh ? "地圖上的點" : "Map Point")
+            }
+
+            const poiData: POIBasicData = {
+                name: getName(),
+                type: props.class || props.subclass || props.type || 'place',
+                lat: coords[1],
+                lng: coords[0],
+                address: props.address || props.addr_street || props['addr:full'],
+                phone: props.phone || props['contact:phone'],
+                website: props.website || props['contact:website'],
+                opening_hours: props.opening_hours
+            }
+
+            setSearchResultMarker({ lat: poiData.lat, lng: poiData.lng, name: poiData.name })
+            setSelectedPOI(poiData)
+            setPoiDrawerOpen(true)
+        }
+    }, [showMapillaryCoverage, zh])
+
+    // 🆕 處理地圖長按 (任意取點)
+    const handleMapLongPress = useCallback((e: MapLayerMouseEvent) => {
+        const { lng, lat } = e.lngLat
+
+        const poiData: POIBasicData = {
+            name: zh ? "地圖上的點" : "Map Point",
+            type: 'place',
+            lat: lat,
+            lng: lng,
+        }
+
+        // 設置跳動大頭針標記
+        setSearchResultMarker({ lat, lng, name: poiData.name })
+        setSelectedPOI(poiData)
+        setPoiDrawerOpen(true)
+    }, [zh])
+
+    // 🆕 跨設備長按偵測 (手機/平板/電腦)
+    const handlePointerStart = useCallback((e: MapLayerMouseEvent) => {
+        // 僅限單指觸控或滑鼠左鍵
+        const isTouchEvent = 'touches' in e.originalEvent
+        if (isTouchEvent && (e.originalEvent as unknown as TouchEvent).touches?.length > 1) return
+
+        const { x, y } = e.point
+        touchStartPosRef.current = { x, y }
+        isMoveDetectedRef.current = false
+
+        if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+
+        longPressTimerRef.current = setTimeout(() => {
+            handleMapLongPress(e)
+            longPressTimerRef.current = null
+        }, 500)
+    }, [handleMapLongPress])
+
+    const handlePointerMove = useCallback((e: MapLayerMouseEvent) => {
+        if (!touchStartPosRef.current) return
+
+        const { x, y } = e.point
+        const dist = Math.sqrt(
+            Math.pow(x - touchStartPosRef.current.x, 2) +
+            Math.pow(y - touchStartPosRef.current.y, 2)
+        )
+
+        // 若移動超過 5 像素，判定為平移並鎖定狀態，取消長按計時
+        if (dist > 5) {
+            isMoveDetectedRef.current = true
+            if (longPressTimerRef.current) {
+                clearTimeout(longPressTimerRef.current)
+                longPressTimerRef.current = null
+            }
+        }
+    }, [])
+
+    const handlePointerEnd = useCallback(() => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
+        touchStartPosRef.current = null
+    }, [])
+
+    // 監聽地圖原生移動事件，一旦開始平移則鎖定狀態並取消計時
+    const handleMapMoveStart = useCallback(() => {
+        isMoveDetectedRef.current = true
+        touchStartPosRef.current = null
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+        }
+    }, [])
+
+    const handleContextMenu = useCallback((e: MapLayerMouseEvent) => {
+        e.originalEvent.preventDefault()
+        if (!isMoveDetectedRef.current) {
+            handleMapLongPress(e)
+        }
+    }, [handleMapLongPress])
+
+    // 卸載時清理長按定時器
+    useEffect(() => {
+        return () => {
+            if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+        }
+    }, [])
 
     // ✈️ 3D 航線巡航控制器
     const {
@@ -157,6 +343,12 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
         const availableDays = trip.days.map(d => d.day).sort((a, b) => a - b)
         return [0, ...availableDays]
     }, [trip])
+
+    // 可選的天數清單 (排除 0 全體，保底至少 Day 1)
+    const availableDayNumbers = useMemo(() => {
+        const days = dayTabs.filter(d => d !== 0)
+        return days.length > 0 ? days : [1]
+    }, [dayTabs])
 
     // 5. 兩階段漸進式路網請求 (獨立並行非同步載入 + 抵達即刻渲染)
     useEffect(() => {
@@ -521,7 +713,7 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         hasStreetView={isMapillaryAvailable()}
                     />
 
-                    {/* 🧭📍 地圖內部右上角懸浮控制膠囊 (Liquid Glass 物理晶透：高飽和透光 + 雙重鏡面光緣 + 隔離 WebGL 防重繪) */}
+                    {/* 🧭📍🌐 地圖內部右上角懸浮控制膠囊 (Liquid Glass 物理晶透) */}
                     <div
                         onPointerDown={(e) => e.stopPropagation()}
                         onTouchStart={(e) => e.stopPropagation()}
@@ -538,6 +730,19 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                             isTouring ? "opacity-0 pointer-events-none scale-90 -translate-y-2" : "opacity-100 scale-100 translate-y-0"
                         )}
                     >
+                        {/* 🌐 3D 地球儀 / 2D 平面切換 */}
+                        <button
+                            type="button"
+                            onClick={toggleGlobeProjection}
+                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
+                            title={isGlobe ? (zh ? "切換至平面地圖" : "Switch to 2D Mercator") : (zh ? "切換至 3D 地球儀" : "Switch to 3D Globe")}
+                            aria-label="Toggle Globe Projection"
+                        >
+                            <Globe className={cn("w-4 h-4 transition-colors", isGlobe ? "text-sky-500 dark:text-sky-400" : "text-slate-600 dark:text-slate-300")} />
+                        </button>
+
+                        <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
+
                         {/* 📍 GPS 定位到我按鈕 */}
                         <button
                             type="button"
@@ -595,6 +800,15 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         onLoad={() => {
                             fitMapToBounds(mapRef.current)
                         }}
+                        onMoveStart={handleMapMoveStart}
+                        onMouseDown={handlePointerStart}
+                        onMouseMove={handlePointerMove}
+                        onMouseUp={handlePointerEnd}
+                        onClick={(e) => {
+                            if ((e.originalEvent.target as HTMLElement).closest('button')) return
+                            handleMapClick(e)
+                        }}
+                        onContextMenu={handleContextMenu}
                         dragPan={true}
                         scrollZoom={true}
                         doubleClickZoom={true}
@@ -718,6 +932,38 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                             />
                         </Source>
 
+                        {/* 🆕 搜尋與長按結果標記（紅色跳動大頭針） */}
+                        {searchResultMarker && (
+                            <Marker
+                                longitude={searchResultMarker.lng}
+                                latitude={searchResultMarker.lat}
+                                anchor="bottom"
+                            >
+                                <div className="relative animate-bounce" style={{ animationDuration: '0.6s', animationIterationCount: 3 }}>
+                                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 bg-black/30 rounded-full blur-sm" />
+                                    <div className="relative">
+                                        <div
+                                            className="w-8 h-8 bg-red-500 rounded-full border-3 border-white shadow-lg flex items-center justify-center"
+                                            style={{
+                                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.5), 0 2px 4px rgba(0,0,0,0.2)'
+                                            }}
+                                        >
+                                            <div className="w-2 h-2 bg-white rounded-full" />
+                                        </div>
+                                        <div
+                                            className="absolute left-1/2 -translate-x-1/2 w-0 h-0"
+                                            style={{
+                                                borderLeft: '6px solid transparent',
+                                                borderRight: '6px solid transparent',
+                                                borderTop: '10px solid #ef4444',
+                                                top: '26px'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </Marker>
+                        )}
+
                         {/* 景點標記 Pin */}
                         {validPoints.map((pt, idx) => {
                             const isFocused = activeDay === 0 || activeDay === pt.day
@@ -789,9 +1035,28 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                     {/* 🆕 POI 詳情抽屜 (置於地圖容器內部，受控於 bottom-0，不再彈到頂部) */}
                     <POIDetailDrawer
                         isOpen={poiDrawerOpen}
-                        onClose={() => setPoiDrawerOpen(false)}
+                        onClose={() => {
+                            setPoiDrawerOpen(false)
+                            setSearchResultMarker(null)
+                        }}
                         poi={selectedPOI}
                         isInternal={true}
+                        onAddToItinerary={onAddPOI ? (poi, time, aiSummary) => {
+                            const notes = aiSummary
+                                ? `${aiSummary.summary}\n${zh ? '必訪/必點' : 'Must try'}: ${aiSummary.must_try?.join(', ') || ''}`
+                                : undefined
+
+                            if (activeDay !== 0) {
+                                // 智能判斷：若上方已選定某天，直接加入該天
+                                onAddPOI(poi, time, notes, activeDay)
+                                setPoiDrawerOpen(false)
+                                setSearchResultMarker(null)
+                            } else {
+                                // 若在全部 (ALL) 狀態，暫存並喚起天數選擇視窗
+                                setPendingPoiData({ poi, time, notes })
+                                setIsDayPickerOpen(true)
+                            }
+                        } : undefined}
                         onOpenStreetView={(lat, lng) => {
                             setMapillaryTarget({ lat, lng })
                             setMapillaryViewerOpen(true)
@@ -811,6 +1076,47 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay }: MultiD
                         onClose={() => setMapillaryViewerOpen(false)}
                     />
                 </div>
+
+                {/* 🆕 天數選擇彈窗 (在 ALL 模式下加入行程時，透過 Portal 掛載於 body，杜絕容器裁切) */}
+                <Dialog open={isDayPickerOpen} onOpenChange={setIsDayPickerOpen}>
+                    <DialogContent className="sm:max-w-xs rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xl">
+                        <DialogHeader>
+                            <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <Calendar className="w-4 h-4 text-indigo-500" />
+                                {zh ? "選擇加入天數" : "Select Target Day"}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                                {pendingPoiData?.poi.name}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid grid-cols-3 gap-2 py-3">
+                            {availableDayNumbers.map(d => (
+                                <Button
+                                    key={d}
+                                    disabled={isAddingActivity}
+                                    onClick={async () => {
+                                        if (!pendingPoiData || !onAddPOI) return
+                                        setIsAddingActivity(true)
+                                        try {
+                                            await onAddPOI(pendingPoiData.poi, pendingPoiData.time, pendingPoiData.notes, d)
+                                            setIsDayPickerOpen(false)
+                                            setPoiDrawerOpen(false)
+                                            setSearchResultMarker(null)
+                                            setPendingPoiData(null)
+                                        } finally {
+                                            setIsAddingActivity(false)
+                                        }
+                                    }}
+                                    variant="outline"
+                                    className="h-12 rounded-xl font-bold hover:border-indigo-500 hover:text-indigo-600 transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+                                >
+                                    <span className="text-[10px] text-slate-400 font-normal">Day</span>
+                                    <span className="text-sm font-black leading-none">{d}</span>
+                                </Button>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </>
     )

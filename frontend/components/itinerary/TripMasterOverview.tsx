@@ -22,6 +22,7 @@ import { resolveDayLocation, type ResolvedLocation } from "@/lib/location-resolv
 import { DailyWeatherStrip } from "@/components/itinerary/DailyWeatherStrip"
 import { MultiDayMasterMap } from "@/components/itinerary/MultiDayMasterMap"
 import { useWeatherStore, fetchFiveDayForecastWithDedup } from "@/lib/stores/weatherStore"
+import type { POIBasicData } from "@/components/POIDetailDrawer"
 
 interface TripMasterOverviewProps {
     currentTrip?: Trip
@@ -30,6 +31,7 @@ interface TripMasterOverviewProps {
     dailyLocs: Record<number, DailyLocation>
     onSelectDay: (day: number) => void
     onAddActivityToDay: (day: number) => void
+    onAddPOI?: (poi: POIBasicData, time: string, notes?: string, targetDay?: number) => void
 }
 
 /**
@@ -63,6 +65,7 @@ export function TripMasterOverview({
     dailyLocs,
     onSelectDay,
     onAddActivityToDay,
+    onAddPOI,
 }: TripMasterOverviewProps) {
     const { t } = useLanguage()
 
@@ -257,6 +260,7 @@ export function TripMasterOverview({
             <MultiDayMasterMap 
                 trip={currentTrip} 
                 onSelectDay={onSelectDay} 
+                onAddPOI={onAddPOI}
                 onScrollToDay={(d) => {
                     const card = document.getElementById(`overview-day-card-${d}`)
                     if (card) {

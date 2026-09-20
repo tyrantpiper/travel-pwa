@@ -240,14 +240,14 @@ export default function POIDetailDrawer({
                         animate={{ y: 0 }}
                         exit={{ y: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                        className={`${isInternal ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 ${isInternal ? 'z-50 border-t border-x border-slate-200 dark:border-slate-800' : 'z-100 shadow-2xl'} bg-white dark:bg-slate-900 rounded-t-3xl overflow-hidden transition-all ${isMinimized ? 'max-h-27.5' : (isInternal ? 'max-h-[70%]' : 'max-h-[85vh]')}`}
+                        className={`${isInternal ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 ${isInternal ? 'z-50 border-t border-x border-slate-200/80 dark:border-slate-800' : 'z-100 shadow-2xl border-t border-slate-200/80 dark:border-slate-800'} bg-white/96 dark:bg-slate-900/96 backdrop-blur-xl saturate-180 shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.8),0_-8px_32px_rgba(0,0,0,0.12)] dark:shadow-[inset_0_1px_0.5px_0_rgba(255,255,255,0.1),0_-8px_32px_rgba(0,0,0,0.3)] rounded-t-3xl overflow-hidden transition-all ${isMinimized ? 'max-h-27.5' : (isInternal ? 'max-h-[70%]' : 'max-h-[85vh]')}`}
                     >
                         {/* 🆕 拖曳把手 - 點擊切換最小化 */}
                         <button
                             onClick={() => setIsMinimized(!isMinimized)}
                             className="w-full flex flex-col items-center pt-3 pb-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer group"
                         >
-                            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full group-hover:bg-slate-400 transition-colors" />
+                            <div className="w-12 h-1.5 bg-slate-300/80 dark:bg-slate-600/80 rounded-full group-hover:bg-slate-400 dark:group-hover:bg-slate-500 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] transition-colors" />
                             <span className="text-xs text-slate-400 mt-1 group-hover:text-slate-600 transition-colors">
                                 {isMinimized ? t('poi_expand') : t('poi_collapse')}
                             </span>
@@ -256,7 +256,7 @@ export default function POIDetailDrawer({
                         {/* 關閉按鈕 */}
                         <button
                             onClick={() => { onClose(); setIsMinimized(false); }}
-                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100/80 dark:hover:bg-slate-800/80 transition-all active:scale-90 cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>

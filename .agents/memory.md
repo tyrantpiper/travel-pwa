@@ -11,6 +11,7 @@
 - **本地真機活體驗收守門 (Local Native Probing Gate)**: Node.js / JSDOM 單元測試無法模擬真實 WebGL Context。凡涉及圖形渲染、地圖底圖與事件循環的核心變更，必須在本地真機瀏覽器確認無誤後方可提交。
 - **Liquid Glass 物理材質純 CSS + GPU 合成層準則 (CSS Inset Specular over Heavy WebGL Shader)**: 堅決反對社群中盲目引入全屏 WebGL/WebGPU Shader（如 liquidGL）為按鈕製作液態玻璃效果的「反模式」。在已有 MapLibre 畫布的情況下，雙 WebGL Context 會引發 iOS Safari Context Loss 崩潰。規範一律使用純 CSS `backdrop-blur`、`saturate`、`shadow-[inset_...]` 搭配 `transform-gpu will-change-transform`，0ms JS 執行緒開銷，穩健交付 60~120fps。
 - **MapLibre 相機排程原子化原則 (Atomic Camera Transition Invariance)**: 連續呼叫 `easeTo` 與 `fitBounds` 會引發相機動畫排程競爭，後者會直接掐斷前者。若需在縮放視角的同時歸零角度，必須在 `fitBounds` 的 options 中顯式注入 `bearing: 0, pitch: 0`，使相機邊界縮放與方位重置在同一底層矩陣運算中原子化完成。
+- **多日總覽地圖 2D 平面 Mercator 預設守則 (Overview Map 2D Planar Default Invariance)**: 行程總覽（MultiDayMasterMap）涵蓋多天城際甚至跨國大尺度邊界，其預設投影必須維持 2D Mercator 平面（`isGlobe = false`）。在大尺度下若預設開啟 3D Globe，拖曳手勢會從線性平移退化為球面弧線旋轉（Spherical Rotation），導致視角傾斜、旋轉拉扯與手感降級。3D 地球儀必須作為選擇性增強功能，僅在使用者點擊 🌐 按鈕時按需動態開啟。
 
 ### 2. 狀態持久化、SWR 快取與自癒機制 (State, SWR, Routing & Self-Healing)
 - **雙重核驗型別化自癒架構 (Double-Checked Silent Self-Healing)**: 分散式快取自癒嚴禁僅憑單次 HTTP 404 就草率清除快取（避免網路抖動導致正常行程被誤判跳轉）。必須透過「行程總清單存活二次核驗（List Double-Check）」證實死透後，才在 300ms 內完全靜默導正至最新有效行程。

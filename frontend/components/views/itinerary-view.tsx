@@ -121,16 +121,21 @@ export function ItineraryView() {
         useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
     )
 
-    // 🆕 處理從地圖加入 POI
-    const handleAddPOI = async (poi: POIBasicData, time: string, notes?: string) => {
+    // 🆕 處理從地圖加入 POI (支援多日總覽定向加入天數)
+    const handleAddPOI = async (poi: POIBasicData, time: string, notes?: string, targetDay?: number) => {
         if (!activeTripId) return
+
+        // 🛡️ 守衛：若有顯式傳入 targetDay 且 > 0 則使用；否則若當前 day > 0 則使用；總覽模式保底為 Day 1
+        const destinationDay = (typeof targetDay === 'number' && targetDay > 0)
+            ? targetDay
+            : (day > 0 ? day : 1)
 
         try {
             await itemsApi.create({
                 trip_id: activeTripId,
                 user_id: userId || "", // 🔒 Fix: Auth header
-                day: day,
-                time: time,
+                day: destinationDay,
+                time: time || "10:00",
                 place: poi.name,
                 desc: notes || poi.address || "",
                 category: poi.type || "sightseeing",
@@ -1405,6 +1410,7 @@ export function ItineraryView() {
                             setEditItem({ time: "10:00", place: "", desc: "", category: "sightseeing", lat: null, lng: null, tags: [] })
                             setIsEditOpen(true)
                         }}
+                        onAddPOI={handleAddPOI}
                     />
                 ) : (
                     <>
