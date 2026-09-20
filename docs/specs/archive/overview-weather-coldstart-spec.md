@@ -1,7 +1,8 @@
 # 總覽天氣首次進入顯示修復規格書 (Overview Weather Cold-Start Spec)
 
-> **規格狀態**: Draft (待確認)  
+> **規格狀態**: ✅ Implemented & Archived (已於 2026-09-15 完整交付並閉環)  
 > **建立日期**: 2026-09-15  
+> **歸檔日期**: 2026-09-20  
 > **關聯檔案**:
 > - `frontend/components/itinerary/TripMasterOverview.tsx`
 > - `frontend/components/itinerary/DailyWeatherStrip.tsx`
