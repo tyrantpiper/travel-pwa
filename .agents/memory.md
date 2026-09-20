@@ -12,6 +12,8 @@
 - **Liquid Glass 物理材質純 CSS + GPU 合成層準則 (CSS Inset Specular over Heavy WebGL Shader)**: 堅決反對社群中盲目引入全屏 WebGL/WebGPU Shader（如 liquidGL）為按鈕製作液態玻璃效果的「反模式」。在已有 MapLibre 畫布的情況下，雙 WebGL Context 會引發 iOS Safari Context Loss 崩潰。規範一律使用純 CSS `backdrop-blur`、`saturate`、`shadow-[inset_...]` 搭配 `transform-gpu will-change-transform`，0ms JS 執行緒開銷，穩健交付 60~120fps。
 - **MapLibre 相機排程原子化原則 (Atomic Camera Transition Invariance)**: 連續呼叫 `easeTo` 與 `fitBounds` 會引發相機動畫排程競爭，後者會直接掐斷前者。若需在縮放視角的同時歸零角度，必須在 `fitBounds` 的 options 中顯式注入 `bearing: 0, pitch: 0`，使相機邊界縮放與方位重置在同一底層矩陣運算中原子化完成。
 - **多日總覽地圖 2D 平面 Mercator 預設守則 (Overview Map 2D Planar Default Invariance)**: 行程總覽（MultiDayMasterMap）涵蓋多天城際甚至跨國大尺度邊界，其預設投影必須維持 2D Mercator 平面（`isGlobe = false`）。在大尺度下若預設開啟 3D Globe，拖曳手勢會從線性平移退化為球面弧線旋轉（Spherical Rotation），導致視角傾斜、旋轉拉扯與手感降級。3D 地球儀必須作為選擇性增強功能，僅在使用者點擊 🌐 按鈕時按需動態開啟。
+- **地圖控制膠囊單一真理與呼吸降敏架構 (MapControlCapsule Single Source of Truth & Idle Dimming)**: `day-map.tsx` 與 `MultiDayMasterMap.tsx` 消除重複控制鈕與樣式代碼，抽取共用元件 `MapControlCapsule.tsx`。繼承 Tabidachi 核心設計 DNA——對齊 Ryan AI 聊天懸浮球的 `isIdle` 呼吸降敏機制：靜止 3 秒無操作自動以平滑動畫降低至 25% 晶透幽靈態（`opacity-25 scale-95`），避開東北方景點視野遮蔽；地圖拖曳、游標懸停或手指觸控瞬間點亮至 100% 飽和高亮態，完美兼顧視覺沉浸度與操作可發現性。
+- **離散手勢排程優於每幀高頻監聽原則 (Discrete Lifecycle over 60fps Frame Thrashing)**: 偵測地圖運動時嚴禁直接在 MapLibre `onMove`（每秒 60~120 次）中綁定 React 狀態，防止高頻 Re-render 與 WebGL 掉幀。架構上一律使用離散生命週期事件——`onMoveStart` 進入平移態、`onMoveEnd` 結束平移態。拖曳過程中 React 觸發次數降為 0，實現完全無負擔的流暢滑動。
 
 ### 2. 狀態持久化、SWR 快取與自癒機制 (State, SWR, Routing & Self-Healing)
 - **雙重核驗型別化自癒架構 (Double-Checked Silent Self-Healing)**: 分散式快取自癒嚴禁僅憑單次 HTTP 404 就草率清除快取（避免網路抖動導致正常行程被誤判跳轉）。必須透過「行程總清單存活二次核驗（List Double-Check）」證實死透後，才在 300ms 內完全靜默導正至最新有效行程。
@@ -38,6 +40,8 @@
 - **輸入法組合態攔截與自適應高度防線 (IME Composition Guard & Auto-Growing Textarea)**: 中文（注音/倉頡/拼音）與日文選字時，輸入框全面升級為自適應高度 `<textarea>`（`min-h-9 max-h-32`），並在 `onKeyDown` 嚴格掛載 `if (e.nativeEvent.isComposing) return`，防止提前觸發發送。
 - **高密度對話組件原地微創升級原則 (In-Place Surgical Modernization over Premature Component Splitting)**: 對於承載 12+ 項複雜閉包的高密度邏輯組件（如 `chat-widget.tsx`、`ExpenseDialog.tsx`），堅決抵制盲目拆檔，改以原地微創升級保持閉包穩定，取得最高穩定度與安全 ROI。
 - **導覽列原生 CSS 暗黑適配優先於 React State (Native CSS Dark Token over Runtime Hydration)**: 核心 UI 控制項（如常駐 Bottom Nav）的指示器背景與邊框，嚴禁在客戶端尚未 Hydration 前依賴 React `isDark` state 進行 inline style 賦值。必須以 Tailwind CSS 原生 `dark:` 類別接管，確保 SSR 渲染至客戶端繪製期間零延遲、無色彩跳動。
+- **Touch-Safe 指針偽類隔離防禦 (Pointer-Type Touch-Safe Hover Invariance)**: 行動裝置觸控螢幕會將按鈕點擊判定為 `:hover` 黏滯（Sticky Hover），導致無法自動退回幽靈態。架構上指針事件必須以 `e.pointerType === "mouse"` 隔離，使 Hover 續命邏輯僅對真實滑鼠生效，觸控設備純由 Touch 與 Map Move 離散狀態機接管。
+- **跨層彈窗 Radix Portal 物理隔離原則 (Radix Portal Container Escape)**: 在全景地圖或深度巢狀容器中喚醒天數選擇器等跨天彈窗（DaySelectDialog），必須透過 Radix UI Dialog Portal 將 DOM 節點直接掛載至 `document.body`，杜絕地圖容器外層 `overflow-hidden isolate` 引發的彈窗裁切與層級穿透問題。
 
 ### 4. 離線架構與 PWA 快取 (Offline, Service Worker & PWA)
 - **Service Worker 構建路徑絕對化標準 (Hermetic Build-Time Path Resolution)**: 工具腳本中的靜態資產掃描嚴禁依賴非確定性的 `process.cwd()`。必須以模組目錄 `import.meta.url` 為錨點解析絕對路徑，確保無論從專案根目錄或子模組呼叫皆具備相同的產出確定性。
@@ -89,6 +93,7 @@
 - **JSDOM / SSR 建置通過帶來的偽陽性安全感 (`WebGL Canvas Testing Blind Spot`)**: `tsc --noEmit` 與 `vitest` 在 Node.js / JSDOM 環境下無法模擬真實 WebGL 上下文與 Canvas 交互，誤導做出「升級通過」的斷言。教訓：WebGL 與 Canvas 相關改動必須以瀏覽器真實繪製為唯一驗收標準。
 - **MapLibre 動畫排程競爭陷阱 (`Camera Animation Preemption Trap`)**: 在羅盤點擊處理器中先調用 `targetMap.easeTo({ bearing: 0, pitch: 0, duration: 400 })`，接著同步調用 `targetMap.fitBounds(...)`。使用者在旋轉地圖後點擊羅盤，地圖僅縮放了邊界，相機角度依然保持歪斜。原因在於 MapLibre 相機是單一狀態機排程，後續的 `fitBounds` 立即掐斷了先前的 `easeTo` 動畫且預設維持原有視角。教訓：複合相機運動必須整合在單一呼叫（`fitBounds(bounds, { bearing: 0, pitch: 0, ... })`）原子執行。
 - **雙 WebGL 上下文引發 Safari 崩潰 (`Dual WebGL Context Safari Crash Trap`)**: 探討使用 WebGL 片段著色器為 UI 按鈕繪製次表面折射效果，但在 iOS 測試機上偶發白屏，終端出現 `WebGL: CONTEXT_LOST_WEBGL` 警告。原因在於頁面中已運行大型 MapLibre WebGL 地圖畫布，在 DOM 上額外掛載小型 WebGL Context 容易突破 iOS Safari 嚴格的 GPU 記憶體與 Context 總數配額。教訓：PWA 的 UI 控制項嚴禁使用額外 WebGL Context，一律採用純 CSS 濾鏡與 Inset 陰影模擬光學折射。
+- **手勢基準點清理遺漏導致跨手勢座標殘留 (`Stale Touch Pos Reference Trap`)**: 長按防手震手勢機在平移開始（`onMoveStart`）未清理 `touchStartPosRef.current = null`，導致從邊界脫離後舊座標污染新長按判斷。教訓：所有手勢狀態機在進入平移生命週期時，必須原子化重置觸控基準參考點。
 
 ### 2. 狀態持久化、快取與自癒踩坑
 - **原生 fetch 吞沒 404 引發 SWR 假成功 (`Raw Fetch 404 Swallowing Trap`)**: 在 fetcher 中直接使用 `fetch().then(r => r.json())` 未檢查 `r.ok`。後端回傳 404 時 Promise 依然正常 resolve，SWR 將 `{ detail: "Trip not found" }` 判定為成功資料寫入快取，導致 `error` 永遠為 `undefined`，SWR 的 `onErrorRetry` 與自癒完全啞火。教訓：所有底層 Fetcher 必須嚴格檢驗 `!r.ok` 並主動拋出標準 `HttpError`。
@@ -106,6 +111,8 @@
 - **React 19 在 useEffect 內同步 setState 觸發 cascading renders (`React 19 Cascading Renders Trap`)**: 在 `DailyWeatherStrip` 的 `useEffect` 內若同步呼叫 `setIsTimedOut(false)`，會被 React Compiler 判定為串聯重新渲染引發 Linter 報錯。教訓：改用衍生狀態 `const showTimeoutFallback = isTimedOut && !hasData && !isLoading`，`useEffect` 僅負責逾時定時器生命週期。
 - **試圖在 React RootLayout 內嵌 Raw HTML 假裝原生 Splash (`Inline Splash Over-Engineering Trap`)**: 在 Next.js App Router 體系下硬塞 90 行 inline `<style>`、`id="pwa-native-splash"` 與原生 DOM 操作腳本，破壞現代架構純潔性，忽視了真實 PWA 在安裝後會由 OS (iOS/Android) 依據 `manifest.json` 自動渲染原生啟動畫面的基本事實。
 - **React State 延遲導致 Hydration FOUC 閃爍 (`Hydration Dark Mode FOUC Trap`)**: 在 `bottom-nav.tsx` 的指示器使用 `style={{ backgroundColor: isDark ? "rgba(...)" : "rgba(...)" }}`，深色模式重新整理頁面時，指示器在第 1 幀短暫顯示為淺色底塊。原因在於 `ThemeContext` 初始 state 為 `isDark = false`，需待客戶端掛載後透過 `useEffect` 讀取 `localStorage`。此時 HTML 標籤早已由 SSR 帶有 `class="dark"`，但 inline style 的 React state 尚未更新。教訓：常駐型核心元件的暗黑適配必須由 CSS `dark:` 變體承擔，堅決不讓未就緒的 React state 決定首屏關鍵樣式。
+- **React Compiler Effect 同步 setState 串聯渲染報警 (`React Compiler Cascading Renders Trap`)**: 在 `useEffect` 內部同步調用 `setIsIdle(false)`，觸發 React Compiler 針對 Effect 內部同步 setState 導致 cascading renders 的嚴格攔截。教訓：初始狀態直接設定 `isIdle = false`，運動與懸停狀態改採派生計算（`isVisibleAwake = !isIdle || isMapMoving || isHovered`），搭配非同步微任務（`setTimeout(..., 0)`）重置計時器，杜絕同步渲染瀑布。
+- **行動端 Safari/Chrome Sticky Hover 黏滯陷阱 (`Sticky Hover Retention Trap`)**: 在觸控螢幕上直接套用 Tailwind `hover:opacity-100`，手指點擊按鈕後，行動瀏覽器強制將元素維持在 `:hover` 偽類，導致計時結束仍無法回到 25% 幽靈態。教訓：在 `onPointerEnter` / `onPointerLeave` 中嚴格檢驗 `if (e.pointerType === "mouse")`，切斷觸控設備對 Hover 的非預期黏滯。
 
 ### 4. 離線架構與 PWA 踩坑
 - **Service Worker 嚴格路徑比對導致帶參冷啟動白屏 (`Strict Navigation URL Mismatch Trap`)**: PWA 從桌面圖示啟動時常攜帶 `?source=pwa`，若 Service Worker 宣告 `navigateFallback` 未開啟 `ignoreSearch: true`，比對失敗直接由瀏覽器發起真實網路請求，在斷網情境下拋出小恐龍死白屏。教訓：離線 App Shell 導航快取必須宣告 `matchOptions: { ignoreSearch: true }`。
@@ -154,6 +161,7 @@
 - **BackgroundSync iOS Safari 降級機制強化**: iOS Safari 原生不支援 W3C Background Sync API，目前依賴 Service Worker 被動重啟。後續可評估在 `SyncManager` 前端組件中監聽 `window.addEventListener('online')` 作為主動觸發保險。
 - **離線記帳本機暫存與背景重播隊列 (Offline Mutation Queue)**: 目前記帳頁面新增支出若處於斷網狀態，尚未整合 IndexedDB Background Sync 隊列自動重播。
 - **活動多連結陣列化擴充 (Activity Dynamic Links Array)**: 行程活動項目目前支援單一外部連結，手冊中已標註預留多連結與訂位憑證結構，未來可將 `activity.link` 擴展為 link 物件陣列。
+- **地圖控制膠囊插槽擴充性 (MapControlCapsule Action Slot Extensibility)**: 未來若地圖需引進即時路況或等高線圖層，可在 MapControlCapsule 設計 children 插槽或動態 items 配置，保持控制膠囊可插拔彈性。
 
 ---
 
@@ -167,6 +175,10 @@
 - **Great-Circle Slerp Interpolation**: 大圓航線球面線性插值，在 2D/3D 平面上以球面幾何學平滑渲染長途跨城軌跡。
 - **Coupled Dependency Atomic Lock**: 雙套件依賴強耦合原子升級鎖，將具有深層內部 API 依賴的跨函式庫綁定為單一原子升級單元。
 - **Local Native Probing Gate**: 本地真機活體驗收守門，要求涉及圖形渲染與原生 Web API 的重大變更必須通過本機瀏覽器實地驗收。
+- **MapControlCapsule Idle Dimming**: 地圖控制膠囊呼吸降敏，無手勢操作時 3 秒自動平滑降至 25% 晶透幽靈態，觸碰/拖曳瞬間點亮。
+- **Discrete Camera Lifecycle Scheduling**: 離散相機生命週期排程，使用 `onMoveStart`/`onMoveEnd` 取代 60fps `onMove` 狀態綁定，徹底消除地圖拖曳掉幀。
+- **Pointer-Type Touch-Safe Hover**: 指針型態觸控安全懸停防禦，透過 `e.pointerType === "mouse"` 根除行動端 Sticky Hover 黏滯。
+- **Radix Portal Container Escape**: Radix Portal 容器逃逸，將彈窗掛載至 document.body 杜絕地圖容器 overflow:hidden 裁切。
 
 ### 2. 狀態持久化與自癒領域
 - **Double-Checked Silent Self-Healing**: 雙重核驗完全靜默自癒，結合 SWR 404 立即熔斷與清單二度核驗，達成 <300ms 無感導正與零誤判防禦。

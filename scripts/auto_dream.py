@@ -90,15 +90,18 @@ async def trigger_llm_compaction(history_content):
     """
     
     try:
-        # 使用 Antigravity CLI 進行壓縮 (非同步執行，帶 --print 與 30 秒安全停損)
+        # 使用 Antigravity CLI 進行壓縮 (非同步執行，透過 stdin 傳遞避開 Windows 命令列 32KB 長度限制，設置 90 秒停損)
         process = await asyncio.create_subprocess_exec(
             AGY_CMD,
             "--print",
-            prompt[:64000],  # 解除 8K 歷史截斷閥，支援結構化記憶體完整上下文
+            "-",
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=30)
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+            process.communicate(input=prompt.encode("utf-8")), timeout=90
+        )
         
         stdout = stdout_bytes.decode('utf-8') if stdout_bytes else ""
         stderr = stderr_bytes.decode('utf-8') if stderr_bytes else ""
