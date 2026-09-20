@@ -8,13 +8,14 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { TripContext, AffiliateCategory } from '@/lib/affiliate-config'
 import { getEnabledPlatforms, getPlatformsByCategory, getAvailableCategories } from '@/lib/affiliate-config'
+import { isAsianTrip } from '@/lib/activity-mapping'
 import { CategoryPills } from './CategoryPills'
 import { AffiliateCard } from './AffiliateCard'
 import { SmartRecommendation } from './SmartRecommendation'
 
 interface BookingTabProps {
   tripContext: TripContext
-  lang?: 'en' | 'zh'
+  lang?: 'zh' | 'en'
 }
 
 // Category display config
@@ -34,7 +35,15 @@ export function BookingTab({ tripContext, lang = 'zh' }: BookingTabProps) {
 
   const enabledPlatforms = getEnabledPlatforms()
   const availableCategories = getAvailableCategories()
-  const filteredPlatforms = getPlatformsByCategory(activeCategory)
+  const rawPlatforms = getPlatformsByCategory(activeCategory)
+
+  // 🛡️ 智慧地理過濾：12Go Asia 專注亞洲交通，非亞洲行程（如義大利、歐洲）自動過濾隱藏
+  const filteredPlatforms = rawPlatforms.filter(p => {
+    if (p.id === '12go') {
+      return isAsianTrip(tripContext)
+    }
+    return true
+  })
 
   // Build category pills data from available categories
   const categoryPills = availableCategories.map(cat => ({
@@ -87,7 +96,7 @@ export function BookingTab({ tripContext, lang = 'zh' }: BookingTabProps) {
         >
           {filteredPlatforms.map((platform, idx) => (
             <AffiliateCard
-              key={platform.id}
+              key={`${platform.id}-${tripContext.tripId || ''}-${tripContext.destination || ''}-${tripContext.arrivalAirport || ''}-${tripContext.departureAirport || ''}`}
               platform={platform}
               tripContext={tripContext}
               lang={lang}

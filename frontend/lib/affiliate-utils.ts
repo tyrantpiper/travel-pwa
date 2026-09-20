@@ -5,6 +5,8 @@
 //   - activeTripData (useTripDetail hook) → flight_info, hotel_info
 
 import type { TripContext } from './affiliate-config'
+import { resolveAirportFromDestination } from './airport-mapping'
+import { resolveRecommendedActivities } from './activity-mapping'
 
 /**
  * Destination → ISO 3166-1 alpha-2 country code mapping.
@@ -92,12 +94,22 @@ export function extractCountryCode(destination?: string): string | undefined {
 export function extractDestination(tripTitle?: string): string | undefined {
   if (!tripTitle) return undefined
 
-  // Remove common suffixes/patterns
+  const titleLower = tripTitle.toLowerCase()
+
+  // 1. 優先精準比對已知城市與國家字典 (長度優先避免子字串誤判)
+  const sortedKnownNames = Object.keys(DESTINATION_COUNTRY_MAP).sort((a, b) => b.length - a.length)
+  for (const knownName of sortedKnownNames) {
+    if (knownName.length >= 2 && titleLower.includes(knownName.toLowerCase())) {
+      return knownName
+    }
+  }
+
+  // 2. 啟發式後綴去除 (例如 "5日遊", "10天", "夢幻之旅")
   const cleaned = tripTitle
-    .replace(/\d+\s*(日|天|days?|nights?)/gi, '')   // "5日遊", "7 days"
-    .replace(/(遊|旅行|自由行|行程|trip|adventure|vacation|tour)/gi, '')
-    .replace(/\d{4}/g, '')                           // Year like "2026"
-    .replace(/[&＆、]/g, ' ')                         // Split conjunctions
+    .replace(/\d+\s*(日|天|days?|nights?)/gi, '')
+    .replace(/(之行|之旅|自由行|旅行|行程|遊|trip|adventure|vacation|tour)/gi, '')
+    .replace(/\d{4}/g, '')
+    .replace(/[&＆、]/g, ' ')
     .trim()
 
   if (!cleaned) return undefined
@@ -141,6 +153,7 @@ export function extractFlightContext(flightInfo: unknown): {
  */
 export function buildTripContext(
   activeTrip: {
+    id?: string
     title?: string
     start_date?: string
     end_date?: string
@@ -149,19 +162,61 @@ export function buildTripContext(
   activeTripData: {
     flight_info?: unknown
     hotel_info?: unknown
-  } | null | undefined
+    days?: Array<{ activities?: Array<{ place_name?: string; place?: string }> }>
+    day_tickets?: Record<number, Array<{ name?: string }>>
+  } | null | undefined,
+  lang: 'zh' | 'en' = 'zh'
 ): TripContext {
   const destination = extractDestination(activeTrip?.title)
   const flightCtx = extractFlightContext(activeTripData?.flight_info)
 
+  // 🛡️ 智能機場推測守護 (Zero-Friction Airport Inference):
+  // 1. 若手動航班存在起降代碼，100% 絕對優先採用
+  // 2. 若無手動設定，依目的地自動推測主要國際機場代碼 (如東京 ➔ NRT)
+  // 3. 出發機場預設為台灣主要樞紐 'TPE'
+  const inferredArrival = flightCtx.arrivalAirport || resolveAirportFromDestination(destination)
+  const inferredDeparture = flightCtx.departureAirport || (inferredArrival ? 'TPE' : undefined)
+
+  // 🎯 萃取行程中的景點與票券 (去重並傳入雙軌活動解析器)
+  const itinerarySpots: string[] = []
+  if (activeTripData?.days && Array.isArray(activeTripData.days)) {
+    for (const d of activeTripData.days) {
+      if (Array.isArray(d.activities)) {
+        for (const act of d.activities) {
+          const spotName = act.place || act.place_name
+          if (spotName && typeof spotName === 'string') {
+            itinerarySpots.push(spotName)
+          }
+        }
+      }
+    }
+  }
+
+  if (activeTripData?.day_tickets && typeof activeTripData.day_tickets === 'object') {
+    for (const ticketList of Object.values(activeTripData.day_tickets)) {
+      if (Array.isArray(ticketList)) {
+        for (const t of ticketList) {
+          if (t?.name && typeof t.name === 'string') {
+            itinerarySpots.push(t.name)
+          }
+        }
+      }
+    }
+  }
+
+  const activities = resolveRecommendedActivities(destination, itinerarySpots, lang)
+
   return {
+    tripId: activeTrip?.id,
     destination,
     tripTitle: activeTrip?.title,
     checkinDate: activeTrip?.start_date || undefined,
     checkoutDate: activeTrip?.end_date || undefined,
     travelers: Array.isArray(activeTrip?.members) ? activeTrip.members.length : undefined,
-    departureAirport: flightCtx.departureAirport,
-    arrivalAirport: flightCtx.arrivalAirport,
+    departureAirport: inferredDeparture,
+    arrivalAirport: inferredArrival,
     countryCode: extractCountryCode(destination),
+    lang,
+    itineraryActivities: activities,
   }
 }

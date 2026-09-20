@@ -28,7 +28,8 @@ def _get_cached(key: str) -> dict | None:
     if key in _price_cache:
         ts, data = _price_cache[key]
         if time.time() - ts < CACHE_TTL:
-            return data
+            if data.get("prices"):
+                return data
         del _price_cache[key]
     return None
 
@@ -48,8 +49,19 @@ async def get_flight_prices(
     if not TP_TOKEN:
         raise HTTPException(503, "Travel data API not configured")
 
-    origin = origin.upper()
-    destination = destination.upper()
+    origin = origin.strip().upper()
+    destination = destination.strip().upper()
+
+    # 🛡️ 同城起降防衛 (Same-city short circuit): 境內同城無需查詢航班
+    if origin == destination:
+        return {
+            "origin": origin,
+            "destination": destination,
+            "currency": currency.upper(),
+            "prices": [],
+            "lowest_price": None,
+            "cached": False,
+        }
 
     # Check cache first
     cache_key = f"{origin}-{destination}-{departure_at}-{currency}"
@@ -88,6 +100,30 @@ async def get_flight_prices(
 
     # Transform response
     prices = raw.get("data", [])
+
+    # 🛡️ 彈性降級 (Resilient Fallback): 若特定出發日期無快取報價，自動退回航線近期最優惠報價
+    if departure_at and not prices:
+        try:
+            fallback_params = {
+                "origin": origin,
+                "destination": destination,
+                "currency": currency,
+                "sorting": "price",
+                "limit": 5,
+                "unique": "false",
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                fb_resp = await client.get(
+                    f"{TP_BASE}/aviasales/v3/prices_for_dates",
+                    params=fallback_params,
+                    headers={"X-Access-Token": TP_TOKEN},
+                )
+                if fb_resp.status_code == 200:
+                    prices = fb_resp.json().get("data", [])
+                    logger.info(f"[TP] Specific date had no prices, fallback retrieved {len(prices)} general route prices")
+        except Exception as fb_err:
+            logger.warning(f"[TP] Fallback route query skipped: {fb_err}")
+
     result = {
         "origin": origin,
         "destination": destination,
@@ -109,7 +145,51 @@ async def get_flight_prices(
         "cached": False,
     }
 
-    # Store in cache
-    _price_cache[cache_key] = (time.time(), {**result, "cached": True})
+    # Store in cache only if prices exist
+    if prices:
+        _price_cache[cache_key] = (time.time(), {**result, "cached": True})
     logger.info(f"[TP] Fetched {len(prices)} prices for {origin}→{destination}")
     return result
+
+
+@router.get("/airport-search")
+async def search_airports(
+    query: str = Query(..., min_length=1, max_length=50, description="City, country, or airport name"),
+    locale: str = Query("en", max_length=10),
+):
+    """
+    🔍 Autocomplete airports & cities worldwide (Tier 2 Dynamic Fallback).
+    Data source: Travelpayouts places2 API
+    """
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(
+                "https://autocomplete.travelpayouts.com/places2",
+                params={
+                    "term": query,
+                    "locale": locale,
+                    "types[]": ["airport", "city"],
+                },
+            )
+            if resp.status_code == 200:
+                raw = resp.json()
+                results = []
+                for item in raw[:6]:
+                    code = item.get("code")
+                    if not code:
+                        continue
+                    name = item.get("name", code)
+                    city_name = item.get("city_name")
+                    country_name = item.get("country_name")
+                    results.append({
+                        "code": code.upper(),
+                        "name": name,
+                        "city_name": city_name,
+                        "country_name": country_name,
+                    })
+                return {"query": query, "airports": results}
+    except Exception as e:
+        logger.warning(f"[TP] Autocomplete search failed for '{query}': {e}")
+
+    return {"query": query, "airports": []}
+

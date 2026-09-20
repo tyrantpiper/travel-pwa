@@ -18,7 +18,15 @@ export interface AffiliatePlatform {
   enabled: boolean        // Auto-hidden when Affiliate ID is empty
 }
 
+export interface TripActivityItem {
+  name: string
+  category?: 'ticket' | 'tour' | 'pass' | 'spot'
+  source: 'itinerary' | 'preset'
+  city?: string
+}
+
 export interface TripContext {
+  tripId?: string
   destination?: string
   country?: string
   countryCode?: string
@@ -30,6 +38,28 @@ export interface TripContext {
   arrivalAirport?: string
   travelers?: number
   tripTitle?: string
+  lang?: 'zh' | 'en'
+  customActivityQuery?: string
+  serviceType?: 'hotel' | 'train' | 'transfer' | 'activity'
+  transferRoute?: { origin: string; destination: string }
+  itineraryActivities?: TripActivityItem[]
+}
+
+/**
+ * 🛡️ 智慧複合查詢消毒器 (防止「羅馬 羅馬競技場」重複疊詞)
+ */
+export function sanitizeActivityQuery(destination?: string, activityName?: string): string {
+  if (!activityName || !activityName.trim()) return destination?.trim() || ''
+  if (!destination || !destination.trim()) return activityName.trim()
+
+  const cleanDest = destination.trim()
+  const cleanAct = activityName.trim()
+
+  // 若活動名稱本身已包含目的地字串或相反，直接回傳活動名，避免重複疊詞
+  if (cleanAct.toLowerCase().includes(cleanDest.toLowerCase()) || cleanDest.toLowerCase().includes(cleanAct.toLowerCase())) {
+    return cleanAct
+  }
+  return `${cleanDest} ${cleanAct}`
 }
 
 // --- Affiliate IDs (Public tracking codes — safe for NEXT_PUBLIC_) ---
@@ -62,8 +92,9 @@ function formatDate(dateStr?: string): string {
  * Program IDs extracted from Travelpayouts Link Generator redirect analysis
  */
 function buildTpMediaUrl(marker: string, programId: number, targetUrl: string): string {
+  if (!marker) return targetUrl
   const encodedUrl = encodeURIComponent(targetUrl)
-  return `https://tp.media/r?marker=${marker}&p=${programId}&u=${encodedUrl}`
+  return `https://tp.media/r?marker=${encodeURIComponent(marker)}&p=${programId}&u=${encodedUrl}`
 }
 
 /**
@@ -97,12 +128,19 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     },
     badge: { en: 'Best Price', zh: '最低價保證' },
     buildUrl: (ctx) => {
-      const base = 'https://www.trip.com/hotels/list'
-      const params = new URLSearchParams()
-      if (ctx.destination) params.set('city', ctx.destination)
-      if (ctx.checkinDate) params.set('checkin', formatDate(ctx.checkinDate))
-      if (ctx.checkoutDate) params.set('checkout', formatDate(ctx.checkoutDate))
-      const target = params.toString() ? `${base}?${params}` : base
+      let target = 'https://www.trip.com'
+      if (ctx.serviceType === 'train') {
+        // 歐美鐵路 vs 亞洲鐵路路由分流
+        const isEurope = /義大利|法國|英國|德國|瑞士|西班牙|歐洲|奧地利|荷蘭|比利時|捷克|Italy|France|UK|Germany|Switzerland|Spain|Europe/i.test(ctx.destination || '')
+        target = isEurope ? 'https://www.trip.com/trains/eu/' : 'https://www.trip.com/trains/'
+      } else {
+        const base = 'https://www.trip.com/hotels/list'
+        const params = new URLSearchParams()
+        if (ctx.destination) params.set('city', ctx.destination)
+        if (ctx.checkinDate) params.set('checkin', formatDate(ctx.checkinDate))
+        if (ctx.checkoutDate) params.set('checkout', formatDate(ctx.checkoutDate))
+        target = params.toString() ? `${base}?${params}` : base
+      }
 
       // Direct Track: Trip.com Alliance ID + Site ID
       if (AFFILIATE_IDS.tripAllianceId && AFFILIATE_IDS.tripSid) {
@@ -231,13 +269,55 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     },
     badge: { en: 'Recommended', zh: '推薦' },
     buildUrl: (ctx) => {
-      const params = new URLSearchParams()
-      params.set('marker', AFFILIATE_IDS.travelpayouts)
-      if (ctx.departureAirport) params.set('origin_iata', ctx.departureAirport)
-      if (ctx.arrivalAirport) params.set('destination_iata', ctx.arrivalAirport)
-      if (ctx.checkinDate) params.set('depart_date', formatDate(ctx.checkinDate))
-      params.set('one_way', 'true')
-      return `https://search.aviasales.com/flights/?${params.toString()}`
+      const marker = AFFILIATE_IDS.travelpayouts
+      const dep = ctx.departureAirport?.toUpperCase()
+      const arr = ctx.arrivalAirport?.toUpperCase()
+      const travelers = ctx.travelers || 1
+
+      // 安全格式化出發日期與回程日期 (DDMM)
+      let depDateDDMM = ''
+      let retDateDDMM = ''
+
+      if (ctx.checkinDate) {
+        const cleanDep = ctx.checkinDate.split('T')[0]
+        const depParts = cleanDep.split('-')
+        if (depParts.length === 3) {
+          const [, mm, dd] = depParts
+          depDateDDMM = `${dd.padStart(2, '0')}${mm.padStart(2, '0')}`
+        }
+
+        // 🛡️ 日期衝突防禦：僅當回程日期嚴格晚於出發日期時才加入回程，杜絕 Aviasales search launch crash
+        if (ctx.checkoutDate) {
+          const cleanRet = ctx.checkoutDate.split('T')[0]
+          if (cleanRet > cleanDep) {
+            const retParts = cleanRet.split('-')
+            if (retParts.length === 3) {
+              const [, rmm, rdd] = retParts
+              retDateDDMM = `${rdd.padStart(2, '0')}${rmm.padStart(2, '0')}`
+            }
+          }
+        }
+      }
+
+      // 🛡️ 官方英文國際版 Deep Link 規範 (解決俄羅斯語系與跳轉失效問題)
+      if (dep && arr) {
+        const route = `${dep}${depDateDDMM}${arr}${retDateDDMM}${travelers}`
+        const targetUrl = `https://www.aviasales.com/search/${route}?locale=en&currency=TWD${marker ? `&marker=${marker}` : ''}`
+
+        // 💰 官方 Travelpayouts 安全跳轉鏈 (Campaign ID: 4114)
+        // 確保 100% 伺服器端記下 Affiliate Click 與 30 天追蹤 Cookie，免疫廣告阻擋
+        if (marker) {
+          return `https://tp.media/r?marker=${encodeURIComponent(marker)}&p=4114&u=${encodeURIComponent(targetUrl)}`
+        }
+        return targetUrl
+      }
+
+      // 若無航點代碼，退回英文搜尋首頁
+      const fallbackTarget = `https://www.aviasales.com/?locale=en&currency=TWD${marker ? `&marker=${marker}` : ''}`
+      if (marker) {
+        return `https://tp.media/r?marker=${encodeURIComponent(marker)}&p=4114&u=${encodeURIComponent(fallbackTarget)}`
+      }
+      return fallbackTarget
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
   },
@@ -299,11 +379,11 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     },
     badge: { en: 'Asia #1', zh: '亞太第一' },
     buildUrl: (ctx) => {
-      const params = new URLSearchParams()
-      if (ctx.destination) params.set('query', ctx.destination)
-      const queryStr = params.toString() ? `?${params.toString()}` : ''
-      const target = `https://www.klook.com/search/result/${queryStr}`
-      // Klook tracking is managed by Travelpayouts — direct ?aid= is NOT supported
+      const query = sanitizeActivityQuery(ctx.destination, ctx.customActivityQuery)
+      const langPath = ctx.lang === 'en' ? 'en-US' : 'zh-TW'
+      const queryStr = query ? `?query=${encodeURIComponent(query)}` : ''
+      const target = `https://www.klook.com/${langPath}/search/result/${queryStr}`
+      // Klook tracking is managed by Travelpayouts (Program ID: 4110)
       return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 4110, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
@@ -320,12 +400,13 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
       en: 'Local tours & unique experiences curated by locals',
       zh: '在地人精選行程與獨特旅遊體驗',
     },
+    badge: { en: 'Local Tours', zh: '精選行程' },
     buildUrl: (ctx) => {
-      const params = new URLSearchParams()
-      if (ctx.destination) params.set('keyword', ctx.destination)
-      const queryStr = params.toString() ? `?${params.toString()}` : ''
-      const target = `https://www.kkday.com/en/product/productlist${queryStr}`
-      // KKday tracking is managed by Travelpayouts — direct ?aid= is NOT supported
+      const keyword = sanitizeActivityQuery(ctx.destination, ctx.customActivityQuery)
+      const langPath = ctx.lang === 'en' ? 'en' : 'zh-tw'
+      const queryStr = keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''
+      const target = `https://www.kkday.com/${langPath}/product/productlist${queryStr}`
+      // KKday tracking is managed by Travelpayouts (Program ID: 9074)
       return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 9074, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
@@ -343,10 +424,9 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
       zh: '博物館與景點免排隊快速入場券',
     },
     buildUrl: (ctx) => {
+      const query = sanitizeActivityQuery(ctx.destination, ctx.customActivityQuery)
       const base = 'https://www.tiqets.com/en/search'
-      const params = new URLSearchParams()
-      if (ctx.destination) params.set('q', ctx.destination)
-      const target = params.toString() ? `${base}?${params.toString()}` : base
+      const target = query ? `${base}?q=${encodeURIComponent(query)}` : base
       return buildLegacyTpUrl(AFFILIATE_IDS.travelpayouts, 'c89', 2074, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
@@ -364,8 +444,9 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
       zh: '含門票的語音導覽與自助深度行程',
     },
     buildUrl: (ctx) => {
+      const query = sanitizeActivityQuery(ctx.destination, ctx.customActivityQuery)
       const base = 'https://wegotrip.com'
-      const target = ctx.destination ? `${base}/search/?q=${encodeURIComponent(ctx.destination)}` : base
+      const target = query ? `${base}/search/?q=${encodeURIComponent(query)}` : base
       return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 4487, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
@@ -388,7 +469,14 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
     },
     buildUrl: (ctx) => {
       const base = 'https://kiwitaxi.com'
-      const target = ctx.destination ? `${base}/search?text=${encodeURIComponent(ctx.destination)}` : base
+      let target = base
+      if (ctx.transferRoute?.origin && ctx.transferRoute?.destination) {
+        target = `${base}/search?from=${encodeURIComponent(ctx.transferRoute.origin)}&to=${encodeURIComponent(ctx.transferRoute.destination)}`
+      } else if (ctx.arrivalAirport) {
+        target = `${base}/search?text=${encodeURIComponent(ctx.arrivalAirport)}`
+      } else if (ctx.destination) {
+        target = `${base}/search?text=${encodeURIComponent(ctx.destination)}`
+      }
       return buildLegacyTpUrl(AFFILIATE_IDS.travelpayouts, 'c1', 647, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
@@ -405,8 +493,17 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
       en: 'Local driver meets you at the airport with a sign',
       zh: '當地專車到機場舉牌迎接，安心接駁',
     },
-    buildUrl: () => {
-      return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 8919, 'https://www.welcomepickups.com/')
+    buildUrl: (ctx) => {
+      const base = 'https://www.welcomepickups.com/'
+      let target = base
+      if (ctx.destination) {
+        const dest = ctx.destination.toLowerCase().replace(/\s+/g, '-')
+        const cityMatch = dest.match(/rome|milan|venice|florence|tokyo|osaka|kyoto|paris|london|barcelona|madrid|berlin|vienna|prague|athens|bangkok|singapore|taipei/i)
+        if (cityMatch) {
+          target = `${base}${cityMatch[0].toLowerCase()}/`
+        }
+      }
+      return buildTpMediaUrl(AFFILIATE_IDS.travelpayouts, 8919, target)
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
   },
@@ -422,8 +519,19 @@ export const AFFILIATE_PLATFORMS: AffiliatePlatform[] = [
       en: 'Trains, buses, ferries & transfers across Asia',
       zh: '亞洲火車、巴士、渡輪、接駁車票券',
     },
-    buildUrl: () => {
-      return `https://12go.asia/?marker=${AFFILIATE_IDS.travelpayouts}`
+    buildUrl: (ctx) => {
+      let target = 'https://12go.asia'
+      if (ctx.transferRoute?.origin && ctx.transferRoute?.destination) {
+        target = `${target}/en/travel/${encodeURIComponent(ctx.transferRoute.origin.toLowerCase().replace(/\s+/g, '-'))}/${encodeURIComponent(ctx.transferRoute.destination.toLowerCase().replace(/\s+/g, '-'))}`
+      } else if (ctx.destination) {
+        target = `${target}/en/travel/${encodeURIComponent(ctx.destination.toLowerCase().replace(/\s+/g, '-'))}`
+      }
+      const marker = AFFILIATE_IDS.travelpayouts
+      if (marker) {
+        const separator = target.includes('?') ? '&' : '?'
+        return `${target}${separator}marker=${encodeURIComponent(marker)}`
+      }
+      return target
     },
     enabled: !!AFFILIATE_IDS.travelpayouts,
   },

@@ -686,12 +686,36 @@ export const travelDataApi = {
                     departure_at: string
                     return_at: string | null
                     transfers: number
+                    flight_number?: string | number
+                    duration?: number
+                    gate?: string
                 }>
                 lowest_price: number | null
                 cached: boolean
             }
         } catch {
             return null  // Network error — silent fail
+        }
+    },
+    /** Autocomplete airports & cities worldwide (Tier 2 Dynamic Fallback) */
+    searchAirports: async (query: string, locale: string = 'en') => {
+        if (!query.trim()) return []
+        try {
+            const res = await fetch(
+                `${API.TRAVEL_DATA}/airport-search?query=${encodeURIComponent(query)}&locale=${encodeURIComponent(locale)}`
+            )
+            if (!res.ok) return []
+            const data = await res.json() as {
+                airports: Array<{
+                    code: string
+                    name: string
+                    city_name?: string
+                    country_name?: string
+                }>
+            }
+            return data.airports || []
+        } catch {
+            return []
         }
     },
 }

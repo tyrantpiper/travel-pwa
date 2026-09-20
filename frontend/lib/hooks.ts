@@ -177,18 +177,40 @@ export function useFlightPrice(
     departureAt?: string
 ) {
 
-    const key = origin && destination
-        ? `flight-price-${origin}-${destination}-${departureAt || ''}`
+    // 🛡️ 嚴格清洗日期為 YYYY-MM-DD，防禦 ISO 時間戳穿透至 Travelpayouts 導致 400/502 報警
+    const cleanDate = departureAt ? departureAt.split('T')[0].replace(/\//g, '-') : undefined
+    const cleanOrigin = origin?.trim().toUpperCase()
+    const cleanDest = destination?.trim().toUpperCase()
+    const isValidRoute = !!cleanOrigin && !!cleanDest && cleanOrigin !== cleanDest
+
+    const key = isValidRoute
+        ? `flight-price-${cleanOrigin}-${cleanDest}-${cleanDate || ''}`
         : null
 
     const { data, error, isLoading } = useSWR(
         key,
-        () => travelDataApi.getFlightPrices({
-            origin: origin!,
-            destination: destination!,
-            departure_at: departureAt,
-            currency: 'twd',
-        }),
+        async () => {
+            const res = await travelDataApi.getFlightPrices({
+                origin: cleanOrigin!,
+                destination: cleanDest!,
+                departure_at: cleanDate,
+                currency: 'twd',
+            })
+            // 🛡️ 彈性降級 (Resilient Fallback): 若特定出發日無快取報價，自動補位抓取該航線近期最優惠價格
+            if (cleanDate && (!res || !res.prices || res.prices.length === 0)) {
+                try {
+                    const fallbackRes = await travelDataApi.getFlightPrices({
+                        origin: origin!.toUpperCase(),
+                        destination: destination!.toUpperCase(),
+                        currency: 'twd',
+                    })
+                    if (fallbackRes && fallbackRes.prices && fallbackRes.prices.length > 0) {
+                        return fallbackRes
+                    }
+                } catch { /* non-blocking fallback */ }
+            }
+            return res
+        },
         {
             revalidateOnFocus: false,
             dedupingInterval: 300000,   // 5 min dedup

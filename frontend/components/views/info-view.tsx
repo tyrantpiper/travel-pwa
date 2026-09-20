@@ -822,7 +822,8 @@ export function InfoView() {
                                     transition={{ duration: 0.3 }}
                                 >
                                     <BookingTab
-                                        tripContext={buildTripContext(activeTrip, activeTripData)}
+                                        key={activeTrip?.id || 'no-trip'}
+                                        tripContext={buildTripContext(activeTrip, activeTripData, lang as 'en' | 'zh')}
                                         lang={lang as 'en' | 'zh'}
                                     />
                                 </motion.section>
