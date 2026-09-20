@@ -15,7 +15,7 @@ import { setWorkerUrl } from "maplibre-gl"
 if (typeof window !== "undefined") {
     setWorkerUrl("/maplibre/maplibre-gl-worker.mjs")
 }
-import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Crosshair, Trash, Plane, Compass, Globe } from "lucide-react"
+import { Bus, Car, Footprints, Satellite, Map as MapIcon, Search, X, Loader2, MapPin, Clock, Trash, Plane } from "lucide-react"
 import { MAP_STYLES, MAP_LOCALIZATION, MAPILLARY } from "@/lib/constants"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
@@ -23,6 +23,7 @@ import { useFlyoverController } from "@/hooks/useFlyoverController"
 import { TourHudCapsule } from "@/components/TourHudCapsule"
 import { Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { MapControlCapsule } from "@/components/MapControlCapsule"
 import { geocodeApi } from "@/lib/api"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
@@ -214,8 +215,7 @@ interface DayMapProps {
 }
 
 export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: DayMapProps) {
-    const { t, lang } = useLanguage()
-    const zh = lang === 'zh'
+    const { t } = useLanguage()
     const mapRef = useRef<MapRef>(null)
     const [mode, setMode] = useState<'walk' | 'drive' | 'transit'>('walk')
     const [popupInfo, setPopupInfo] = useState<MarkerData | null>(null)
@@ -301,6 +301,9 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
             setIsGlobe(true)
         }
     }, [])
+
+    // 🗺️ 地圖拖曳中狀態 (用於驅動 MapControlCapsule 呼吸降敏)
+    const [isMapMoving, setIsMapMoving] = useState<boolean>(false)
 
     const handleLocateMe = () => {
         if (!("geolocation" in navigator)) {
@@ -923,6 +926,8 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
     // 🆕 2026 修復：監聽地圖原生移動事件，一旦開始平移則鎖定狀態並取消計時
     const handleMapMoveStart = useCallback(() => {
         isMoveDetectedRef.current = true
+        touchStartPosRef.current = null
+        setIsMapMoving(true)
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current)
             longPressTimerRef.current = null
@@ -1110,64 +1115,16 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     hasStreetView={isMapillaryAvailable()}
                 />
 
-                {/* 🧭📍🌐 地圖右上角懸浮控制膠囊 (Liquid Glass 物理晶透，與行程總覽完全相同封裝) */}
-                <div
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                    className={cn(
-                        "absolute top-3 right-3 z-10 flex flex-col items-center gap-1.5 p-1 rounded-2xl pointer-events-auto select-none",
-                        "transform-gpu will-change-transform transition-all duration-300 ease-out", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
-                        "bg-white/82 dark:bg-slate-900/82 backdrop-blur-xl saturate-180",
-                        "border border-white/50 dark:border-slate-700/60",
-                        "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]",
-                        isTouring ? "opacity-0 pointer-events-none scale-90 -translate-y-2" : "opacity-100 scale-100 translate-y-0"
-                    )}
-                >
-                    {/* 🌐 3D 地球儀 / 2D 平面切換 */}
-                    <button
-                        type="button"
-                        onClick={toggleGlobeProjection}
-                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
-                        title={isGlobe ? (zh ? "切換至平面地圖" : "Switch to 2D Mercator") : (zh ? "切換至 3D 地球儀" : "Switch to 3D Globe")}
-                        aria-label="Toggle Globe Projection"
-                    >
-                        <Globe className={cn("w-4 h-4 transition-colors", isGlobe ? "text-sky-500 dark:text-sky-400" : "text-slate-600 dark:text-slate-300")} />
-                    </button>
-
-                    <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
-
-                    {/* 📍 GPS 定位到我按鈕 */}
-                    <button
-                        type="button"
-                        onClick={handleLocateMe}
-                        disabled={isLocating}
-                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer disabled:opacity-50"
-                        title={t('map_my_location')}
-                        aria-label="Locate Me"
-                    >
-                        {isLocating ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                        ) : (
-                            <Crosshair className="w-4 h-4 text-indigo-500" />
-                        )}
-                    </button>
-
-                    <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
-
-                    {/* 🧭 羅盤 / 視角聚焦 */}
-                    <button
-                        type="button"
-                        onClick={handleCompassReset}
-                        className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
-                        title={zh ? "全景置中 (正北歸零)" : "Fit Bounds and Reset North"}
-                        aria-label="Fit Bounds and Reset North"
-                    >
-                        <Compass className="w-4 h-4 text-indigo-500" />
-                    </button>
-                </div>
+                {/* 🧭📍🌐 地圖右上角懸浮控制膠囊 (Liquid Glass 物理晶透，具備 Ryan AI 同款 isIdle 呼吸降敏) */}
+                <MapControlCapsule
+                    isGlobe={isGlobe}
+                    onToggleGlobe={toggleGlobeProjection}
+                    isLocating={isLocating}
+                    onLocateMe={handleLocateMe}
+                    onCompassReset={handleCompassReset}
+                    isTouring={isTouring}
+                    isMapMoving={isMapMoving}
+                />
 
                 {/* 🔍 搜尋按鈕 (左下角) */}
                 <button
@@ -1361,6 +1318,7 @@ export default function DayMap({ activities, onAddPOI, dailyLoc, tripTitle }: Da
                     mapStyle={MAP_STYLES.VECTOR}
                     onLoad={handleMapLoad}
                     onMoveStart={handleMapMoveStart}
+                    onMoveEnd={() => setIsMapMoving(false)}
                     onMouseDown={handlePointerStart}
                     onMouseMove={handlePointerMove}
                     onMouseUp={handlePointerEnd}

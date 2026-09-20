@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import Map, { MapRef, Marker, Source, Layer, NavigationControl, AttributionControl } from "react-map-gl/maplibre"
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre"
-import { Satellite, Map as MapIcon, Route, Compass, ArrowRight, Plane, Footprints, Car, Bus, Eye, Crosshair, Loader2, Globe, Calendar } from "lucide-react"
+import { Satellite, Map as MapIcon, Route, ArrowRight, Plane, Footprints, Car, Bus, Eye, Calendar } from "lucide-react"
 import "maplibre-gl/dist/maplibre-gl.css"
 import { setWorkerUrl } from "maplibre-gl"
 
@@ -25,9 +25,9 @@ import { TourHudCapsule } from "@/components/TourHudCapsule"
 import MapillaryViewer from "@/components/MapillaryViewer"
 import { isMapillaryAvailable } from "@/lib/mapillary"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { MapControlCapsule } from "@/components/MapControlCapsule"
 
 // API 基礎路徑 (模組頂部常數化，避免在並行閉包內重複解析 process.env)
 const ROUTE_API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8008"
@@ -56,6 +56,9 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay, onAddPOI
     const [isDayPickerOpen, setIsDayPickerOpen] = useState<boolean>(false)
     const [pendingPoiData, setPendingPoiData] = useState<{ poi: POIBasicData; time: string; notes?: string } | null>(null)
     const [isAddingActivity, setIsAddingActivity] = useState<boolean>(false)
+
+    // 🗺️ 地圖拖曳中狀態 (用於驅動 MapControlCapsule 呼吸降敏)
+    const [isMapMoving, setIsMapMoving] = useState<boolean>(false)
 
     // 🆕 跨設備長按防手震手勢引用 (500ms / 5px 門檻)
     const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -440,6 +443,29 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay, onAddPOI
         }
     }, [bounds, validPoints.length])
 
+    // 🧭 羅盤正北歸零與全景置中 (正北歸零 + 俯視角歸零 + 智能行程聚焦)
+    const handleCompassReset = useCallback(() => {
+        if (isTouring || isFlying) cancelFlight()
+        const targetMap = mapRef.current
+        if (!targetMap) return
+
+        if (activeDay !== 0) {
+            const dayPoints = validPoints.filter(p => p.day === activeDay)
+            if (dayPoints.length > 0) {
+                const dayBounds = computeSafeMultiDayBounds(dayPoints)
+                targetMap.fitBounds(dayBounds, {
+                    padding: { top: 60, bottom: 60, left: 40, right: 40 },
+                    bearing: 0,
+                    pitch: 0,
+                    duration: 800,
+                    maxZoom: 16
+                })
+                return
+            }
+        }
+        fitMapToBounds(targetMap, true)
+    }, [isTouring, isFlying, cancelFlight, activeDay, validPoints, fitMapToBounds])
+
     // 7. 切換天數篩選
     const handleSelectDayFilter = (dayNum: number) => {
         setActiveDay(dayNum)
@@ -713,85 +739,17 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay, onAddPOI
                         hasStreetView={isMapillaryAvailable()}
                     />
 
-                    {/* 🧭📍🌐 地圖內部右上角懸浮控制膠囊 (Liquid Glass 物理晶透) */}
-                    <div
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => e.stopPropagation()}
-                        className={cn(
-                            "absolute top-3 right-3 z-10 flex flex-col items-center gap-1.5 p-1 rounded-2xl pointer-events-auto select-none",
-                            "transform-gpu will-change-transform transition-all duration-300 ease-out", // 隔離為獨立 GPU 合成層，消弭 WebGL 幀率拉扯
-                            // 保持 82% 物理混色基底，消弭 iOS Safari WebGL 穿透採樣噪點
-                            "bg-white/82 dark:bg-slate-900/82 backdrop-blur-xl saturate-180",
-                            "border border-white/50 dark:border-slate-700/60",
-                            "shadow-[inset_0_1.5px_1px_0_rgba(255,255,255,0.9),0_8px_24px_rgba(0,0,0,0.12)]",
-                            isTouring ? "opacity-0 pointer-events-none scale-90 -translate-y-2" : "opacity-100 scale-100 translate-y-0"
-                        )}
-                    >
-                        {/* 🌐 3D 地球儀 / 2D 平面切換 */}
-                        <button
-                            type="button"
-                            onClick={toggleGlobeProjection}
-                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
-                            title={isGlobe ? (zh ? "切換至平面地圖" : "Switch to 2D Mercator") : (zh ? "切換至 3D 地球儀" : "Switch to 3D Globe")}
-                            aria-label="Toggle Globe Projection"
-                        >
-                            <Globe className={cn("w-4 h-4 transition-colors", isGlobe ? "text-sky-500 dark:text-sky-400" : "text-slate-600 dark:text-slate-300")} />
-                        </button>
-
-                        <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
-
-                        {/* 📍 GPS 定位到我按鈕 */}
-                        <button
-                            type="button"
-                            onClick={handleLocateMe}
-                            disabled={isLocating}
-                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer disabled:opacity-50"
-                            title={zh ? "定位到我的位置" : "Locate Me"}
-                            aria-label="Locate Me"
-                        >
-                            {isLocating ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                            ) : (
-                                <Crosshair className="w-4 h-4 text-indigo-500" />
-                            )}
-                        </button>
-
-                        <div className="w-3.5 h-px bg-slate-200/80 dark:bg-slate-800/80 shadow-[inset_0_1px_0_rgba(0,0,0,0.05)]" />
-
-                        {/* 🧭 羅盤 / 視角聚焦 (正北歸零 + 俯視角歸零 + 智能行程聚焦) */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isTouring || isFlying) cancelFlight()
-                                const targetMap = mapRef.current
-                                if (!targetMap) return
-
-                                if (activeDay !== 0) {
-                                    const dayPoints = validPoints.filter(p => p.day === activeDay)
-                                    if (dayPoints.length > 0) {
-                                        const dayBounds = computeSafeMultiDayBounds(dayPoints)
-                                        targetMap.fitBounds(dayBounds, {
-                                            padding: { top: 60, bottom: 60, left: 40, right: 40 },
-                                            bearing: 0,
-                                            pitch: 0,
-                                            duration: 800,
-                                            maxZoom: 16
-                                        })
-                                        return
-                                    }
-                                }
-                                fitMapToBounds(targetMap, true)
-                            }}
-                            className="p-2 rounded-xl text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/80 transition-all active:scale-88 active:rounded-2xl cursor-pointer"
-                            title={activeDay === 0 ? (zh ? "全景置中 (正北歸零)" : "Fit All Bounds (North)") : (zh ? `聚焦 Day ${activeDay} (正北歸零)` : `Fit Day ${activeDay}`)}
-                            aria-label="Fit Bounds and Reset North"
-                        >
-                            <Compass className="w-4 h-4 text-indigo-500" />
-                        </button>
-                    </div>
+                    {/* 🧭📍🌐 地圖右上角懸浮控制膠囊 (Liquid Glass 物理晶透，具備 Ryan AI 同款 isIdle 呼吸降敏) */}
+                    <MapControlCapsule
+                        isGlobe={isGlobe}
+                        onToggleGlobe={toggleGlobeProjection}
+                        isLocating={isLocating}
+                        onLocateMe={handleLocateMe}
+                        onCompassReset={handleCompassReset}
+                        compassTitle={activeDay === 0 ? (zh ? "全景置中 (正北歸零)" : "Fit All Bounds (North)") : (zh ? `聚焦 Day ${activeDay} (正北歸零)` : `Fit Day ${activeDay}`)}
+                        isTouring={isTouring}
+                        isMapMoving={isMapMoving}
+                    />
 
                     <Map
                         ref={mapRef}
@@ -800,7 +758,13 @@ function MultiDayMasterMapComponent({ trip, onSelectDay, onScrollToDay, onAddPOI
                         onLoad={() => {
                             fitMapToBounds(mapRef.current)
                         }}
-                        onMoveStart={handleMapMoveStart}
+                        onMoveStart={() => {
+                            handleMapMoveStart()
+                            setIsMapMoving(true)
+                        }}
+                        onMoveEnd={() => {
+                            setIsMapMoving(false)
+                        }}
                         onMouseDown={handlePointerStart}
                         onMouseMove={handlePointerMove}
                         onMouseUp={handlePointerEnd}
