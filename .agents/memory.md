@@ -135,7 +135,11 @@
 - **依據手冊修詞卻未查證功能存在的盲目覆寫陷阱 (`Blind Rephrasing without Implementation Verification`)**: 在最佳化使用者使用手冊或介面文字時，直接根據既有文案進行文字美化或擴寫，卻未同步審查核心程式碼與元件功能清單（例如文案描述了「智能克隆前一天資料到新天數」、「手動發送測試推播」，實際上系統根本未實作該 API/按鈕），導致手冊給出空頭支票誤導使用者。教訓：任何文案修正必須以真實程式碼實作作為單一事實來源（Single Source of Truth），無對應實作者應果斷自手冊中剔除或先行實作。
 - **國旗圖示盲目直連外部 CDN 導致 404 報錯陷阱 (`Flag CDN 404 Direct Dependency Trap`)**: 採用靜態 CDN 圖片作為法幣對應國旗時，因 ISO 4217 代碼（如 EUR 歐元、XAU 黃金）無法直接 1:1 對應 ISO 3166-1 國旗代碼，造成大量 404 資源載入失敗與控制台報警。教訓：法幣選單應以標準 ISO 4217 代碼為主鍵，圖示應支援本地靜態回退或純符號降級，杜絕單點外部網路依賴。
 
+### 8. 聯盟行銷與即時比價踩坑
+- **12Go Asia 誤用 Travelpayouts 舊 Program ID 產生 404 斷點 (`12Go Promo Not Found Trap`)**: 將 Travelpayouts 舊版 Program ID 1024 誤作為 `tp.media/r` 的 promo tool ID 呼叫，導致所有交通跳轉拋出 HTTP 404 promo not found。教訓：加盟夥伴跳轉格式必須對齊各平台官方最新深層連結規範，不假設通用短鏈結構，優先使用官方直連帶參。
+
 ---
+
 
 ## [Technical Debt]
 
@@ -213,3 +217,7 @@
 - **Documentation Reality Alignment**: 手冊與實作真實對齊原則，手冊所有操作流程與功能描述必須具備真實可運行的前端 DOM 或後端 API 支撐，禁止幽靈功能預先宣傳。
 - **Dynamic Spatial Evacuation**: 動態空間避讓機制，3D 運鏡巡航時頂部 GPS/視角面板自動平滑淡出（`opacity-0 pointer-events-none`），最大化觀景視野且巡航終止時無縫復原。
 - **Strict ISO 4217 Fiat Standard**: 嚴格 ISO 4217 法幣規範，記帳貨幣嚴格收斂至法定貨幣與標準三位代碼，防止非標貨幣符號破壞匯率換算精確度。
+
+### 8. 聯盟行銷與即時比價領域
+- **Official Direct Affiliate Parameterization**: 官方直連加盟帶參規範。切斷無效的第三方轉址代理（如 `tp.media/r?p=1024` 引發 404 promo not found），採用 12Go 官方標準帶參格式 `https://12go.asia/en/travel/.../?marker=${marker}`，確保 HTTP 301/200 正常重定向與分潤 Cookie 寫入。
+- **Same-City Flight Zero-Delay Short-Circuit**: 同城起降零延遲短路防衛。前端 SWR hook 與後端 API 同步攔截出發地與目的地相同（`cleanOrigin === cleanDest`）之無效航班查詢，以 0ms 記憶體短路回傳免搭機狀態，消除外部 API 無效調用、超時與 502 Bad Gateway 異常。
