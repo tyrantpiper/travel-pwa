@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
 jobs:
@@ -40,6 +41,6 @@ jobs:
             --timeout 600s \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "^||^SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co||API_VERSION=v1||NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu||CLOUDINARY_API_KEY=996197457174111||GAS_GEOCODE_URLS=${{ secrets.GAS_GEOCODE_URLS }}||GAS_RESOLVE_LINK_URLS=${{ secrets.GAS_RESOLVE_LINK_URLS }}" \
+            --set-env-vars "^||^SUPABASE_URL=https://oudnkmigfueuyvxqpqwn.supabase.co||API_VERSION=v1||NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dnpcnwrcu||CLOUDINARY_API_KEY=996197457174111||TP_API_TOKEN=c0142188ca95fe72045846eb76c68443||GAS_GEOCODE_URLS=${{ secrets.GAS_GEOCODE_URLS }}||GAS_RESOLVE_LINK_URLS=${{ secrets.GAS_RESOLVE_LINK_URLS }}" \
             --set-secrets "SUPABASE_KEY=supabase-key:latest,ARCGIS_API_KEY=arcgis-api-key:latest,CLOUDINARY_API_SECRET=cloudinary-api-secret:latest" \
             --project antigravity-prod-2026

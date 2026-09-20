@@ -1,9 +1,9 @@
 """
-Travel Data Router (Phase 2A)
+Travel Data Router (Phase 2A - Production Configured)
 -----------------------------
 Proxy for Travelpayouts Data API.
 Provides cached flight price data to the frontend.
-Token is server-side only — never exposed to the client.
+Token is server-side only — configured via TP_API_TOKEN environment variable.
 """
 
 import os
