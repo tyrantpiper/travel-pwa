@@ -260,7 +260,7 @@ export function CreateTripModal({
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button className="h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 bg-transparent text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl flex flex-col gap-2 cursor-pointer transition-all active:scale-[0.98]">
+                <Button id="tour-create-trip" className="h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 bg-transparent text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl flex flex-col gap-2 cursor-pointer transition-all active:scale-[0.98]">
                     <Plus className="w-6 h-6 text-amber-500" />
                     <span className="text-xs font-bold uppercase tracking-wider">{t('new_trip')}</span>
                 </Button>

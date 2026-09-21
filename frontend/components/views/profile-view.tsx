@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
@@ -30,9 +30,7 @@ import {
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { TaskCard } from "@/components/onboarding/TaskCard"
 import { debugLog } from "@/lib/debug"
-import { useOnboardingStore } from "@/lib/stores/onboardingStore"
 import { usersApi, appApi } from "@/lib/api"
 import type { UserPreference } from "@/lib/api"
 import { UsageGuideDialog } from "@/components/UsageGuideDialog"
@@ -49,6 +47,43 @@ export function ProfileView() {
     const { isDark, toggleDark, accentColor, setAccentColor, currentTheme, fontScale, setFontScale } = useTheme()
     const haptic = useHaptic()
     const [subView, setSubView] = useState<'main' | 'account' | 'guide'>('main')
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
+    const mainScrollPosRef = useRef<number>(0)
+
+    // 🎯 導航至子視圖之安全包裝函式（記錄精確捲動位置並切換）
+    const navigateToSubView = useCallback((target: 'account' | 'guide') => {
+        haptic.selection()
+        if (scrollContainerRef.current) {
+            mainScrollPosRef.current = scrollContainerRef.current.scrollTop
+        }
+        setSubView(target)
+    }, [haptic])
+
+    // 🎯 滾動位置生命週期調度（防範 AnimatePresence mode="wait" 截斷，進入置頂、返回還原）
+    useEffect(() => {
+        const container = scrollContainerRef.current
+        if (!container) return
+
+        if (subView !== 'main') {
+            requestAnimationFrame(() => {
+                container.scrollTo({ top: 0, behavior: 'instant' })
+            })
+        } else {
+            let active = true
+            const rafId1 = requestAnimationFrame(() => {
+                const rafId2 = requestAnimationFrame(() => {
+                    if (active && container && mainScrollPosRef.current > 0) {
+                        container.scrollTo({ top: mainScrollPosRef.current, behavior: 'instant' })
+                    }
+                })
+                return () => cancelAnimationFrame(rafId2)
+            })
+            return () => {
+                active = false
+                cancelAnimationFrame(rafId1)
+            }
+        }
+    }, [subView])
     const [copiedUuid, setCopiedUuid] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
     const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
@@ -365,7 +400,7 @@ export function ProfileView() {
     }
 
     return (
-        <div className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none relative">
+        <div ref={scrollContainerRef} className="h-full bg-stone-50 dark:bg-slate-900 overflow-y-auto overflow-x-hidden overscroll-y-contain overscroll-x-none relative">
             <AnimatePresence mode="wait" initial={false}>
                 {subView === 'main' ? (
                     <motion.div
@@ -781,14 +816,6 @@ export function ProfileView() {
                         </div>
                     )
                 })()}
-
-                {/* 🆕 新手任務卡片 */}
-                {!useOnboardingStore.getState().isCompleted && (
-                    <TaskCard
-                        onNavigateToApiKey={() => setApiKeyDialogOpen(true)}
-                        className="mt-6"
-                    />
-                )}
 
                 <div className="mt-8 bg-slate-900 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-3 opacity-20">
@@ -1234,20 +1261,14 @@ export function ProfileView() {
                             icon={User} 
                             label={t('account_settings')} 
                             showChevron 
-                            onClick={() => {
-                                haptic.selection()
-                                setSubView('account')
-                            }} 
+                            onClick={() => navigateToSubView('account')} 
                         />
                         <Separator />
                         <MenuItem 
                             icon={BookOpen} 
                             label={t('usage_guide')} 
                             showChevron 
-                            onClick={() => {
-                                haptic.selection()
-                                setSubView('guide')
-                            }} 
+                            onClick={() => navigateToSubView('guide')} 
                         />
                         <Separator />
                         {/* 📱 App 版本 (已依需求隱藏) */}

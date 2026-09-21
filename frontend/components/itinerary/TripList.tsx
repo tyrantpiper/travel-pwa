@@ -104,7 +104,11 @@ export function TripList({
     return (
         <div className="space-y-4">
             {trips.map((trip: Trip, index: number) => (
-                <Card key={trip.id} className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group">
+                <Card 
+                    key={trip.id} 
+                    id={index === 0 ? "tour-sample-trip" : undefined}
+                    className="p-0 overflow-hidden border-0 shadow-sm transition-transform relative group"
+                >
                     <div className="absolute top-2 right-2 z-20">
                         {userId && trip.created_by === userId && (
                             <Button
@@ -120,6 +124,7 @@ export function TripList({
                     {/* Top Clickable Banner Button */}
                     <button 
                         type="button" 
+                        data-tour-action="primary"
                         className="w-full text-left cursor-pointer transition-all duration-200 active:scale-[0.985] block p-0 border-none bg-transparent outline-hidden" 
                         onClick={() => {
                             haptic.selection()

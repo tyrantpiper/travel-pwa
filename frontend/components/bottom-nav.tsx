@@ -48,12 +48,16 @@ export function BottomNav({ activeTab, onTabChange, onActiveTabClick, isVisible 
                     return (
                         <button
                             key={tab.id}
+                            id={`tour-nav-${tab.id}`}
                             onClick={() => {
                                 haptic.selection()
                                 if (isActive) {
                                     onActiveTabClick?.(tab.id)
                                 } else {
                                     onTabChange(tab.id)
+                                    if (typeof window !== "undefined") {
+                                        window.dispatchEvent(new CustomEvent("tabidachi-tab-changed", { detail: tab.id }))
+                                    }
                                 }
                             }}
                             className={cn(

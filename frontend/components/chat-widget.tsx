@@ -1176,6 +1176,7 @@ ${isStale ? '⚠️ 提醒：此數據已超過 3 小時，可能存在誤差。
                 }}
             >
                 <Button
+                    id="tour-ai-bot"
                     size="icon"
                     className={cn(
                         "h-14 w-14 rounded-full transition-all duration-300 hover:scale-105 touch-manipulation relative overflow-hidden",

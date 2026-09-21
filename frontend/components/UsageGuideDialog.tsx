@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import { BookOpen } from "lucide-react"
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -15,10 +16,30 @@ interface UsageGuideDialogProps {
 export function UsageGuideDialog({ open, onOpenChange }: UsageGuideDialogProps) {
     const { lang } = useLanguage()
     const zh = lang === 'zh'
+    const contentRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (open) {
+            requestAnimationFrame(() => {
+                if (contentRef.current) {
+                    contentRef.current.scrollTop = 0
+                }
+            })
+        }
+    }, [open])
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-0 gap-0">
+            <DialogContent
+                ref={contentRef}
+                onOpenAutoFocus={(e) => {
+                    e.preventDefault()
+                    if (contentRef.current) {
+                        contentRef.current.scrollTop = 0
+                    }
+                }}
+                className="max-w-lg max-h-[85vh] overflow-y-auto p-0 gap-0"
+            >
                 <DialogHeader className="sticky top-0 z-10 bg-white dark:bg-slate-800 p-5 pb-3 border-b border-slate-200 dark:border-slate-700">
                     <DialogTitle className="flex items-center gap-2 text-lg">
                         <BookOpen className="w-5 h-5 text-blue-600" />

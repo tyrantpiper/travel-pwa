@@ -17,6 +17,9 @@ import { useTripContext } from "@/lib/trip-context"
 
 import { motion } from "framer-motion"
 
+import { SpotlightTour } from "@/components/onboarding/SpotlightTour"
+import { useOnboardingStore } from "@/lib/stores/onboardingStore"
+
 const TAB_INDICES: Record<string, number> = {
     itinerary: 0,
     info: 1,
@@ -164,6 +167,28 @@ export function AppShell() {
         return () => clearTimeout(preheatTimer)
     }, [shouldPreheat])
 
+    // 🚀 Spotlight Tour 首次自動啟動與重啟事件監聽
+    useEffect(() => {
+        const { isTourCompleted, isTourActive, startTour } = useOnboardingStore.getState()
+        if (!isTourCompleted && !isTourActive) {
+            const timer = setTimeout(() => {
+                startTour()
+            }, 600)
+            return () => clearTimeout(timer)
+        }
+    }, [])
+
+    useEffect(() => {
+        const handleRestart = () => {
+            setActiveView("itinerary")
+            setTimeout(() => {
+                useOnboardingStore.getState().startTour()
+            }, 100)
+        }
+        window.addEventListener("tabidachi-restart-tour", handleRestart)
+        return () => window.removeEventListener("tabidachi-restart-tour", handleRestart)
+    }, [setActiveView])
+
     return (
         <>
             <OfflineBanner />
@@ -174,6 +199,8 @@ export function AppShell() {
                     localStorage.setItem("push_prompt_dismissed", "1")
                 }}
             />
+            {/* 🌟 聚光燈新手導引全域掛載 */}
+            <SpotlightTour />
             <div className="h-screen bg-background flex flex-col overflow-hidden">
                 <main className="flex-1 flex flex-col min-h-0 relative" data-scroll="true">
                     {/* ✨ 全域 AI 狀態按鈕 — 左上角固定定位 (與右上角通知對稱) */}

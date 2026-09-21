@@ -91,6 +91,15 @@ export function ItineraryView() {
     const [mounted, setMounted] = useState(false)
     useEffect(() => setMounted(true), []) // 🔧 Client-side only rendering for Portal
 
+    // 🚀 Spotlight Tour: 當導引進入建立行程步驟時，自動切換至清單視圖
+    useEffect(() => {
+        const handleReset = () => {
+            setViewMode('list')
+        }
+        window.addEventListener('tabidachi-reset-itinerary-view', handleReset)
+        return () => window.removeEventListener('tabidachi-reset-itinerary-view', handleReset)
+    }, [])
+
 
     // 🆕 DND State
     const [activeId, setActiveId] = useState<string | null>(null)

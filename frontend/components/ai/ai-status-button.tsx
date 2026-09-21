@@ -32,6 +32,7 @@ export function AIStatusButton() {
     return (
         <>
             <button
+                id="tour-ai-status"
                 type="button"
                 onClick={() => setDialogOpen(true)}
                 className={cn(

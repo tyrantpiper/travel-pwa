@@ -33,8 +33,39 @@ export function UsageGuideContent() {
     const { lang } = useLanguage()
     const zh = lang === 'zh'
 
+    const handleRestartTour = () => {
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("tabidachi-restart-tour"))
+        }
+    }
+
     return (
         <div className="space-y-4">
+            {/* 🚀 1. 互動式新手導引重啟卡片 (置於使用說明第一位) */}
+            <div className="p-4 rounded-2xl bg-linear-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-pink-950/30 border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md">
+                        <span className="text-lg">🚀</span>
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>{zh ? '重新啟動新手互動導引' : 'Restart Interactive Tour'}</span>
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                            {zh ? '一步一步帶著走，重新體驗 AI 旅伴、行程建立與 3D 地圖核心操作' : 'Experience the step-by-step guided walkthrough to explore AI, trips, and 3D maps'}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleRestartTour}
+                    className="self-end sm:self-center px-3.5 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                    <span>{zh ? '立即啟動' : 'Start Tour'}</span>
+                    <span>→</span>
+                </button>
+            </div>
+
             <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-stone-200/60 dark:border-slate-700/60 shadow-xs flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                     <BookOpen className="w-5 h-5" />
