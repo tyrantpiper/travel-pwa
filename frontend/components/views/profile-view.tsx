@@ -6,7 +6,7 @@ import {
     LogOut, CreditCard, Edit3, Save, Camera, Trash2, Smartphone, User, Loader2,
     Shield, Copy, Globe, Sparkles, Moon, Sun, Palette, AlertTriangle,
     ChevronDown, ChevronUp, Brain, ChevronRight, ChevronLeft, // 🆕 AI 記憶與導航圖示
-    BookOpen, Mail, Check, BellRing  // 🆕 使用說明、聯絡、推播圖示
+    BookOpen, Mail, Check, BellRing, Type  // 🆕 使用說明、聯絡、推播、字級圖示
 } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ import { ZoomableImage } from "@/components/ui/zoomable-image"
 import { useHaptic } from "@/lib/hooks"
 
 import { useLanguage } from "@/lib/LanguageContext"
-import { useTheme, ACCENT_COLORS, AccentColor } from "@/lib/ThemeContext"
+import { useTheme, ACCENT_COLORS, AccentColor, VALID_FONT_SCALES, FONT_SCALE_TIERS } from "@/lib/ThemeContext"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { toast } from "sonner"
 import {
@@ -46,7 +46,7 @@ import { AIKeyDialog } from "@/components/ai/ai-key-dialog"
 export function ProfileView() {
     const { lang, setLang, t } = useLanguage()
     const zh = lang === 'zh'
-    const { isDark, toggleDark, accentColor, setAccentColor, currentTheme } = useTheme()
+    const { isDark, toggleDark, accentColor, setAccentColor, currentTheme, fontScale, setFontScale } = useTheme()
     const haptic = useHaptic()
     const [subView, setSubView] = useState<'main' | 'account' | 'guide'>('main')
     const [copiedUuid, setCopiedUuid] = useState(false)
@@ -867,6 +867,106 @@ export function ProfileView() {
                                     >
                                         {accentColor === color && "✓"}
                                     </button>
+                                ))}
+                            </div>
+                        </div>
+                        <Separator />
+
+                        {/* 🔤 Font Size / Text Scale Adjustment */}
+                        <div className="p-4 text-slate-700 dark:text-slate-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <Type className="w-5 h-5 text-slate-400" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">{t('profile_font_size')}</span>
+                                        <span className="text-[10px] text-slate-400 font-normal">{t('profile_font_size_desc')}</span>
+                                    </div>
+                                </div>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                    {fontScale}% · {zh ? FONT_SCALE_TIERS[fontScale].labelZh : FONT_SCALE_TIERS[fontScale].labelEn}
+                                </span>
+                            </div>
+
+                            {/* 📱 即時預覽卡 (Live Preview Mini Card) */}
+                            <div className="p-3 mb-4 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 shadow-xs transition-all">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                        {t('profile_font_preview_title')}
+                                    </span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300">
+                                        {t('profile_font_preview_tag')}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    {t('profile_font_preview_subtitle')}
+                                </p>
+                            </div>
+
+                            {/* 🎚️ 4 段式分段步進器 (Stepped Segmented Control) */}
+                            <div 
+                                className="flex items-center justify-between gap-3 px-2"
+                                role="radiogroup"
+                                aria-label={t('profile_font_size')}
+                            >
+                                <span className="text-xs font-bold text-slate-400 select-none" aria-hidden="true">A</span>
+                                <div className="relative flex-1 flex items-center justify-between py-2">
+                                    {/* 軌道背景 */}
+                                    <div className="absolute left-2 right-2 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                                    {/* 進度填充 */}
+                                    {(() => {
+                                        const minScale = VALID_FONT_SCALES[0]
+                                        const maxScale = VALID_FONT_SCALES[VALID_FONT_SCALES.length - 1]
+                                        const progressRatio = maxScale > minScale ? (fontScale - minScale) / (maxScale - minScale) : 0
+                                        return (
+                                            <div
+                                                className="absolute left-2 h-1.5 rounded-full transition-all duration-200 bg-indigo-500"
+                                                style={{
+                                                    width: `${progressRatio * 100}%`
+                                                }}
+                                            />
+                                        )
+                                    })()}
+                                    {VALID_FONT_SCALES.map((scale) => {
+                                        const isSelected = fontScale === scale
+                                        return (
+                                            <button
+                                                key={scale}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={isSelected}
+                                                onClick={() => {
+                                                    haptic.selection()
+                                                    setFontScale(scale)
+                                                }}
+                                                className={cn(
+                                                    "relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all cursor-pointer focus:outline-hidden",
+                                                    isSelected
+                                                        ? "bg-white dark:bg-slate-900 border-2 border-indigo-500 shadow-md scale-115"
+                                                        : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 scale-90"
+                                                )}
+                                                aria-label={`${scale}% - ${zh ? FONT_SCALE_TIERS[scale].labelZh : FONT_SCALE_TIERS[scale].labelEn}`}
+                                                title={`${scale}%`}
+                                            >
+                                                {isSelected && <span className="w-2 h-2 rounded-full bg-indigo-500" />}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                                <span className="text-base font-bold text-slate-700 dark:text-slate-200 select-none" aria-hidden="true">A</span>
+                            </div>
+
+                            {/* 刻度標籤 */}
+                            <div className="flex justify-between text-[11px] text-slate-400 dark:text-slate-500 px-1 mt-1 font-medium select-none">
+                                {VALID_FONT_SCALES.map((scale) => (
+                                    <span
+                                        key={scale}
+                                        className={cn(
+                                            "transition-colors",
+                                            fontScale === scale && "text-indigo-600 dark:text-indigo-400 font-bold"
+                                        )}
+                                    >
+                                        {zh ? FONT_SCALE_TIERS[scale].labelZh : FONT_SCALE_TIERS[scale].labelEn}
+                                    </span>
                                 ))}
                             </div>
                         </div>

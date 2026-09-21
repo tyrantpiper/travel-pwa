@@ -62,6 +62,22 @@ export default function RootLayout({
       <head>
         <meta name="google" content="notranslate" />
         <meta name="agd-partner-manual-verification" />
+        {/* 🚀 Zero-FOUC Font Scale Pre-Hydration Sync */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var s = localStorage.getItem('app_font_scale');
+                  if (s === '100' || s === '110' || s === '120' || s === '130') {
+                    document.documentElement.style.fontSize = s + '%';
+                    document.documentElement.setAttribute('data-font-scale', s);
+                  }
+                } catch (e) {}
+              })();
+            `
+          }}
+        />
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <PwaHardSkeleton />
