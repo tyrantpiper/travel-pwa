@@ -85,6 +85,8 @@
 - **手冊即事實單一來源原則 (Documentation Truthfulness over Aspirational Copy)**: 軟體系統說明手冊必須 1-to-1 忠實映射代碼庫實作，堅決杜絕早期規劃的「願景型功能（Aspirational Features）」或工程術語；未實作機制絕不寫入手冊，所有操作路徑必須完全符合當前介面。
 - **3D 巡航空間避讓與人體工學 (Dynamic Spatial Evacuation over Static Overlap)**: 3D 動態低空巡航啟動時，右上角常駐地圖控制項透過 CSS Transition 宣告式動態淡出與禁用指標事件（`pointer-events-none`），退出後平滑恢復，解決相機視角干擾與按鈕物理碰撞。
 - **ISO 4217 法定貨幣白名單與國旗安全回退標準 (Strict ISO 4217 Fiat & Flag Fallback Standard)**: 在記帳中間層建立 110+ 種官方主權法幣白名單切斷非主流代幣雜訊，並維護 `CURRENCY_TO_COUNTRY_CODE` 確定性映射與本地多層 SVG 回退，徹底根除 Flag CDN 404 破圖。
+- **去中心化 Git 身分投影與官方 ID 隱私信箱標準 (Decoupled Git Identity & ID-Pinned Privacy Standard)**: Git Commit 協議僅傳遞純文字 Name 與 Email，無中心化 GitHub ID 欄位。GitHub 將 Email 視為身分與貢獻熱力圖的對帳代幣，誤填範例信箱（如 `example.com`）會引發第三方帳號碰撞冒領。專案與全域環境一律強制固化採用 GitHub 官方 ID 隱私信箱格式（`223093762+tyrantpiper@users.noreply.github.com`），達成真實私人信箱 100% 隱蔽與貢獻度 100% 唯一綁定。
+- **不可逆獨立封裝備份與租約前置獲取原則 (Hermetic Bundle Backup & Fetch-Before-Lease Invariance)**: 執行歷史重構（`git-filter-repo`）時，因工具預設會遍歷重寫所有 local refs 並移除 origin，備份防禦必須封裝為完全獨立於倉庫外的單一二進位檔案（`.bundle`）並經由 verify 檢驗；重新掛載 remote 後必須先 `git fetch origin main` 同步遠端基準指針，方可安全執行 `--force-with-lease` 覆蓋。
 
 ---
 
@@ -146,6 +148,10 @@
 - **粗糙 AST Pattern 比對引發的偽陽性爆發 (`AST Pattern Overmatching Trap`)**: 企圖以單一寬鬆 AST Pattern 比對包含特定 CSS 類別的動態文字標籤，若未指定確切約束，會把全站所有 JSX 文字節點全部誤判。教訓：語法審核必須採約束性 AST 規則（Constraints & Regex）。
 - **JSON 重複鍵盲區 (`Duplicate Key Trap`)**: 在已有 overrides 的 package.json 粗暴追加新區塊產生重複鍵語法錯誤。教訓：工程修改前必須嚴格確認既有代碼結構，堅持原地增量合併。
 - **GFE 逾時引發的偽性 CORS 誤診 (`GFE 60s Timeout False CORS Trap`)**: 連線在到達 FastAPI Middleware Stack 前被 Google Front End 依據 60s 逾時強制斷開回傳不帶 CORS Headers 的 504 頁面。修改程式碼層 CORS Middleware 無效，根因在於基礎設施層逾時配置。
+- **佔位範例信箱引發第三方帳號碰撞 (`Placeholder Email Collision Trap`)**: 誤用 `ryan@example.com`，被 GitHub 索引到同名外國開發者 `ryan-winkler`，導致 Vercel 的 `Created` 欄位展示陌生人頭像與名字。教訓：任何開發環境嚴禁使用 `example.com` 作為本機 Git Config，必須在全域 `~/.gitconfig` 預先固化正統帳號。
+- **缺乏全域 Git 配置導致多專案身分漂移 (`Missing Global Gitconfig Trap`)**: 本機未曾建立 `~/.gitconfig`，導致不同專案各自為政且易殘留佔位信箱。教訓：開發機初次裝機或初始化環境時，第一優先級任務必須是全域宣告 `git config --global user.name` 與 `user.email`。
+- **未考慮 git-filter-repo 重寫全域 Ref 的本地備份污染 (`Ref-Rewriting Self-Pollution Trap`)**: 在重寫前於本地同儲存庫建立備份分支，但 `git-filter-repo` 預設行為會重寫倉庫內的所有 local refs，導致備份分支一同被改寫。教訓：不可逆備份必須封裝為完全獨立於倉庫目錄外的單一二進位檔案（`.bundle`）。
+- **未 Fetch 追蹤分支即調用 --force-with-lease 的租約斷裂 (`Un-anchored Lease Push Trap`)**: `git-filter-repo` 重構後會自動移除 `origin` remote，未執行 `fetch` 便直接 push 導致 lease 檢查崩潰。教訓：安全租約覆蓋前，必須強制以 `git fetch origin main` 同步遠端基準點。
 
 ### 7. 文件審核、UI 狀態與國際化踩坑
 - **依據手冊修詞卻未查證功能存在的盲目覆寫陷阱 (`Blind Rephrasing without Implementation Verification`)**: 在最佳化使用者使用手冊或介面文字時，直接根據既有文案進行文字美化或擴寫，卻未同步審查核心程式碼與元件功能清單（例如文案描述了「智能克隆前一天資料到新天數」、「手動發送測試推播」，實際上系統根本未實作該 API/按鈕），導致手冊給出空頭支票誤導使用者。教訓：任何文案修正必須以真實程式碼實作作為單一事實來源（Single Source of Truth），無對應實作者應果斷自手冊中剔除或先行實作。
@@ -233,6 +239,10 @@
 - **In-Place Override Merging**: 原地覆蓋合併，在既有 package.json overrides 區塊增量注入而不破壞既有補丁。
 - **Infra-as-Code Authority**: 基礎設施程式碼權威，雲端執行時配置以 CI/CD Workflow 定義為唯一真實來源。
 - **AI Recombination**: 大腦記憶壓縮重組模式，使新舊日誌無縫融合並保留歷史脈絡與技術債。
+- **Decoupled Git Identity**: 去中心化 Git 身分解耦架構，正視 Git Commit 僅傳遞純文字 Name/Email，而無 GitHub ID 概念之底層特性。
+- **ID-Pinned Noreply Standard**: 官方 ID 錨定隱私信箱標準，以 `ID+username@users.noreply.github.com` 同時達成個資隱蔽與身分防偽。
+- **Hermetic Bundle Backup**: 封閉獨立打包備份，利用 Git Bundle 獨立封裝全量 DAG 規避歷史重構時的全域 Ref 污染。
+- **Fetch-Before-Lease**: 租約前置同步原則，在 force-with-lease 前強制獲取遠端追蹤指針避免租約斷裂。
 
 ### 7. 文件真實性與介面工程領域
 - **Documentation Reality Alignment**: 手冊與實作真實對齊原則，手冊所有操作流程與功能描述必須具備真實可運行的前端 DOM 或後端 API 支撐，禁止幽靈功能預先宣傳。
